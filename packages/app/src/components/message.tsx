@@ -770,6 +770,8 @@ export const assistantMessageStylesheet = StyleSheet.create((theme) => ({
 }));
 
 const ASSISTANT_IMAGE_MIN_HEIGHT = 160;
+// Stays below the lightbox's 640px max height so opening an image enlarges it.
+const ASSISTANT_IMAGE_MAX_HEIGHT = 480;
 
 function AssistantMarkdownImage({
   source,
@@ -816,7 +818,7 @@ function AssistantMarkdownImage({
   );
   const imageSizeStyle = useMemo<ViewStyle>(() => {
     if (aspectRatio) {
-      return { aspectRatio };
+      return { aspectRatio, maxWidth: ASSISTANT_IMAGE_MAX_HEIGHT * aspectRatio };
     }
     return { height: ASSISTANT_IMAGE_MIN_HEIGHT };
   }, [aspectRatio]);
