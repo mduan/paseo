@@ -1946,6 +1946,7 @@ export const ko: TranslationResources = {
     tokens: "{{used}} / {{max}} 토큰",
     sessionCost: "세션 비용 {{cost}}",
     sessionCostEstimate: "API 정가 기준 추정치",
+    sessionCostUnavailable: "사용할 수 없음",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
   review: {

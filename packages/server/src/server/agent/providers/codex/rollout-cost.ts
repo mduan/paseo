@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { StringDecoder } from "node:string_decoder";
-import { estimateCodexCostUsd } from "./pricing.js";
+import type { CodexPrices } from "./pricing.js";
 
 /**
  * Sums the estimated cost of every model request recorded in a Codex rollout file.
@@ -26,13 +26,22 @@ export class CodexRolloutCost {
    * Returns the session cost so far, or undefined when no request used a priced model.
    * ponytail: prices every request at the current service tier; the rollout does not record it.
    */
-  read(serviceTier: string | null): Promise<number | undefined> {
-    const result = this.queue.then(() => this.readAppended(serviceTier));
+  read({
+    prices,
+    serviceTier,
+  }: {
+    prices: CodexPrices;
+    serviceTier: string | null;
+  }): Promise<number | undefined> {
+    const result = this.queue.then(() => this.readAppended(prices, serviceTier));
     this.queue = result.catch(() => undefined);
     return result;
   }
 
-  private async readAppended(serviceTier: string | null): Promise<number | undefined> {
+  private async readAppended(
+    prices: CodexPrices,
+    serviceTier: string | null,
+  ): Promise<number | undefined> {
     const handle = await fs.open(this.filePath, "r");
     try {
       const { size } = await handle.stat();
@@ -45,7 +54,7 @@ export class CodexRolloutCost {
         );
         this.pendingLine = lines.pop() ?? "";
         for (const line of lines) {
-          this.applyLine(line, serviceTier);
+          this.applyLine(line, prices, serviceTier);
         }
       }
     } finally {
@@ -54,7 +63,7 @@ export class CodexRolloutCost {
     return this.pricedRequests > 0 ? this.costUsd : undefined;
   }
 
-  private applyLine(line: string, serviceTier: string | null): void {
+  private applyLine(line: string, prices: CodexPrices, serviceTier: string | null): void {
     // Skip the bulk of the rollout (messages, tool output) without parsing it.
     if (!line.includes('"turn_context"') && !line.includes('"token_count"')) return;
     const entry = parseRecord(line);
@@ -71,13 +80,12 @@ export class CodexRolloutCost {
     // Codex re-emits token_count with an unchanged total, so a request counts only when it grows.
     if (totalTokens <= this.highestTotalTokens) return;
     this.highestTotalTokens = totalTokens;
-    const cost = estimateCodexCostUsd({
+    const cost = prices.requestCostUsd({
       model: this.model,
       serviceTier,
       inputTokens: readCount(last.input_tokens),
       cachedInputTokens: readCount(last.cached_input_tokens),
       outputTokens: readCount(last.output_tokens),
-      isSingleRequest: true,
     });
     if (cost === undefined) return;
     this.costUsd += cost;

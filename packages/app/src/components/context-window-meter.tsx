@@ -9,6 +9,8 @@ interface ContextWindowMeterProps {
   maxTokens: number | null;
   usedTokens: number | null;
   totalCostUsd?: number | null;
+  /** The provider estimates cost but could not load its price list. */
+  totalCostUnavailable?: boolean;
   showPercentage?: boolean;
   /** Reserve the meter footprint and show a loading ring while usage is pending. */
   pending?: boolean;
@@ -94,6 +96,7 @@ export function ContextWindowMeter({
   maxTokens,
   usedTokens,
   totalCostUsd,
+  totalCostUnavailable = false,
   showPercentage = false,
   pending = false,
   glyphSize,
@@ -200,12 +203,17 @@ export function ContextWindowMeter({
             })}
           </Text>
           {formattedSessionCost ? (
-            <Text style={styles.tooltipDetail}>
-              {t("contextWindow.sessionCost", { cost: formattedSessionCost })}
-            </Text>
+            <>
+              <Text style={styles.tooltipDetail}>
+                {t("contextWindow.sessionCost", { cost: formattedSessionCost })}
+              </Text>
+              <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+            </>
           ) : null}
-          {formattedSessionCost ? (
-            <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+          {!formattedSessionCost && totalCostUnavailable ? (
+            <Text style={styles.tooltipDetail}>
+              {t("contextWindow.sessionCost", { cost: t("contextWindow.sessionCostUnavailable") })}
+            </Text>
           ) : null}
         </View>
       </TooltipContent>

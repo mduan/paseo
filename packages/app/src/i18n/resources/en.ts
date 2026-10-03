@@ -1959,8 +1959,9 @@ export const en = {
     title: "Context window",
     used: "{{percentage}}% used",
     tokens: "{{used}} / {{max}} tokens",
-    sessionCost: "Session cost {{cost}}",
+    sessionCost: "Session cost: {{cost}}",
     sessionCostEstimate: "Estimated at API list prices",
+    sessionCostUnavailable: "Unavailable",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

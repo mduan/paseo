@@ -2,7 +2,21 @@ import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { CodexPrices } from "./pricing.js";
 import { CodexRolloutCost } from "./rollout-cost.js";
+
+// LiteLLM rates in USD per token.
+const prices = new CodexPrices({
+  "gpt-6.1-sol": {
+    input_cost_per_token: 2e-6,
+    cache_read_input_token_cost: 1e-7,
+    output_cost_per_token: 1e-5,
+    input_cost_per_token_above_272k_tokens: 4e-6,
+    output_cost_per_token_above_272k_tokens: 1.5e-5,
+  },
+  "gpt-6-luna": { input_cost_per_token: 1e-7, output_cost_per_token: 5e-7 },
+});
+const read = { prices, serviceTier: "default" };
 
 function turnContext(model: string): string {
   return `${JSON.stringify({ type: "turn_context", payload: { model } })}\n`;
@@ -61,7 +75,7 @@ describe("CodexRolloutCost", () => {
         tokenCount({ total: 620_000, input: 200_000, output: 0 }),
     );
 
-    expect(await new CodexRolloutCost(file).read("default")).toBeCloseTo(1.67);
+    expect(await new CodexRolloutCost(file).read(read)).toBeCloseTo(1.67);
   });
 
   test("ignores re-emitted token counts and reads only appended lines", async () => {
@@ -70,7 +84,7 @@ describe("CodexRolloutCost", () => {
       turnContext("gpt-6.1-sol") + tokenCount({ total: 1_000, input: 100_000, output: 0 }),
     );
     const cost = new CodexRolloutCost(file);
-    expect(await cost.read("default")).toBeCloseTo(0.2);
+    expect(await cost.read(read)).toBeCloseTo(0.2);
 
     // A duplicate total, then a request split mid-line across two writes.
     const next = tokenCount({ total: 2_000, input: 100_000, output: 0 });
@@ -78,10 +92,10 @@ describe("CodexRolloutCost", () => {
       file,
       tokenCount({ total: 1_000, input: 100_000, output: 0 }) + next.slice(0, 20),
     );
-    expect(await cost.read("default")).toBeCloseTo(0.2);
+    expect(await cost.read(read)).toBeCloseTo(0.2);
 
     appendFileSync(file, next.slice(20));
-    expect(await cost.read("default")).toBeCloseTo(0.4);
+    expect(await cost.read(read)).toBeCloseTo(0.4);
   });
 
   test("returns undefined when no request used a priced model", async () => {
@@ -90,6 +104,6 @@ describe("CodexRolloutCost", () => {
       turnContext("unknown-model") + tokenCount({ total: 10, input: 10, output: 0 }),
     );
 
-    expect(await new CodexRolloutCost(file).read("default")).toBeUndefined();
+    expect(await new CodexRolloutCost(file).read(read)).toBeUndefined();
   });
 });

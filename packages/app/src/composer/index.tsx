@@ -273,19 +273,29 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
       contextWindowMaxTokens: agent?.lastUsage?.contextWindowMaxTokens ?? null,
       contextWindowUsedTokens: agent?.lastUsage?.contextWindowUsedTokens ?? null,
       totalCostUsd: agent?.lastUsage?.totalCostUsd ?? null,
+      totalCostUnavailable: agent?.lastUsage?.totalCostUnavailable ?? false,
       model: agent?.model ?? null,
     };
   };
 }
 
-function renderContextWindowMeter(
-  contextWindowMaxTokens: number | null,
-  contextWindowUsedTokens: number | null,
-  totalCostUsd: number | null,
-  showPercentage: boolean,
-  pending: boolean,
-  glyphSize: number,
-): ReactElement | null {
+function renderContextWindowMeter({
+  contextWindowMaxTokens,
+  contextWindowUsedTokens,
+  totalCostUsd,
+  totalCostUnavailable,
+  showPercentage,
+  pending,
+  glyphSize,
+}: {
+  contextWindowMaxTokens: number | null;
+  contextWindowUsedTokens: number | null;
+  totalCostUsd: number | null;
+  totalCostUnavailable: boolean;
+  showPercentage: boolean;
+  pending: boolean;
+  glyphSize: number;
+}): ReactElement | null {
   const hasData = contextWindowMaxTokens !== null && contextWindowUsedTokens !== null;
   if (!hasData && !pending) {
     return null;
@@ -295,6 +305,7 @@ function renderContextWindowMeter(
       maxTokens={contextWindowMaxTokens}
       usedTokens={contextWindowUsedTokens}
       totalCostUsd={totalCostUsd}
+      totalCostUnavailable={totalCostUnavailable}
       showPercentage={showPercentage}
       pending={pending}
       glyphSize={glyphSize}
@@ -2075,18 +2086,20 @@ function ComposerContentImpl({
 
   const contextWindowMeter = useMemo(
     () =>
-      renderContextWindowMeter(
+      renderContextWindowMeter({
         contextWindowMaxTokens,
         contextWindowUsedTokens,
-        agentState.totalCostUsd,
-        false,
-        contextWindowPending,
-        contextWindowMeterGlyphSize,
-      ),
+        totalCostUsd: agentState.totalCostUsd,
+        totalCostUnavailable: agentState.totalCostUnavailable,
+        showPercentage: false,
+        pending: contextWindowPending,
+        glyphSize: contextWindowMeterGlyphSize,
+      }),
     [
       contextWindowMaxTokens,
       contextWindowUsedTokens,
       agentState.totalCostUsd,
+      agentState.totalCostUnavailable,
       contextWindowPending,
       contextWindowMeterGlyphSize,
     ],

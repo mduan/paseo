@@ -1914,6 +1914,7 @@ export const zhCN: TranslationResources = {
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "会话费用 {{cost}}",
     sessionCostEstimate: "按 API 标价估算",
+    sessionCostUnavailable: "不可用",
     accessibility: "上下文窗口已使用 {{percentage}}%",
   },
   review: {

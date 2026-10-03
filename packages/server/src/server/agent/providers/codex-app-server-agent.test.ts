@@ -2501,23 +2501,6 @@ describe("Codex app-server provider", () => {
     });
   });
 
-  test("estimates session cost from the thread token total at list prices", () => {
-    const tokenUsage = {
-      total: { inputTokens: 1_000_000, cachedInputTokens: 400_000, outputTokens: 100_000 },
-      last: { inputTokens: 30000, cachedInputTokens: 5000, outputTokens: 15000 },
-    };
-    // gpt-6.1-sol: 600k uncached × $2/M + 400k cached × $0.10/M + 100k output × $10/M = $2.24
-    expect(
-      toAgentUsage(tokenUsage, { model: "gpt-6.1-sol", serviceTier: "default" })?.totalCostUsd,
-    ).toBeCloseTo(2.24);
-    expect(
-      toAgentUsage(tokenUsage, { model: "gpt-6.1-sol", serviceTier: "priority" })?.totalCostUsd,
-    ).toBeCloseTo(4.48);
-    expect(
-      toAgentUsage(tokenUsage, { model: "unknown-model", serviceTier: null })?.totalCostUsd,
-    ).toBeUndefined();
-  });
-
   test("normalizes raw output schemas for Codex structured outputs", () => {
     const input = {
       type: "object",

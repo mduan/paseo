@@ -218,9 +218,13 @@ export interface AgentUsage {
   cachedInputTokens?: number;
   outputTokens?: number;
   totalCostUsd?: number;
+  /** The provider can estimate cost, but its price list could not be loaded. */
+  totalCostUnavailable?: boolean;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
 }
+
+export type AgentUsageNumericField = Exclude<keyof AgentUsage, "totalCostUnavailable">;
 
 export const TOOL_CALL_ICON_NAMES = [
   "wrench",
