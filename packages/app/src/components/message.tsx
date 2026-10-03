@@ -586,16 +586,13 @@ interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
   onFork?: (request: AssistantForkRequest) => Promise<void> | void;
+  /** Show the actions without hover, for the latest completed turn. */
+  alwaysShowActions?: boolean;
 }
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
   hoverTarget: {
     position: "relative",
-  },
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
   },
   actions: {
     flexDirection: "row",
@@ -618,14 +615,15 @@ const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
 }));
 
 /**
- * Footer at the end of an assistant turn: the end timestamp, then the copy and fork actions.
- * The actions reveal on hover on web; touch layouts always show them. The actions keep their
- * slot while hidden, so revealing them never shifts the row (see docs/hover.md).
+ * Footer at the end of an assistant turn: the copy and fork actions, then the end timestamp.
+ * They reveal on hover on web; touch layouts and the latest completed turn always show them.
+ * They keep their slot while hidden, so revealing them never shifts the row (see docs/hover.md).
  */
 export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   getContent,
   completedAt,
   onFork,
+  alwaysShowActions,
 }: AssistantTurnFooterProps) {
   const isCompact = useIsCompactFormFactor();
   const [hovered, setHovered] = useState(false);
@@ -641,7 +639,7 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
     },
     [onFork],
   );
-  const showActions = hovered || isNative || isCompact;
+  const showActions = alwaysShowActions || hovered || isNative || isCompact;
   const actionsStyle = useMemo(
     () => [
       assistantTurnFooterStylesheet.actions,
@@ -656,21 +654,19 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      <View style={assistantTurnFooterStylesheet.container}>
+      <View
+        style={actionsStyle}
+        pointerEvents={showActions ? "auto" : "none"}
+        testID="assistant-turn-actions"
+      >
+        <TurnCopyButton
+          getContent={getContent}
+          containerStyle={assistantTurnFooterStylesheet.copyButton}
+        />
+        {onFork ? <AssistantForkMenu onFork={handleFork} /> : null}
         {timestampLabel ? (
           <Text style={assistantTurnFooterStylesheet.label}>{timestampLabel}</Text>
         ) : null}
-        <View
-          style={actionsStyle}
-          pointerEvents={showActions ? "auto" : "none"}
-          testID="assistant-turn-actions"
-        >
-          <TurnCopyButton
-            getContent={getContent}
-            containerStyle={assistantTurnFooterStylesheet.copyButton}
-          />
-          {onFork ? <AssistantForkMenu onFork={handleFork} /> : null}
-        </View>
       </View>
     </View>
   );

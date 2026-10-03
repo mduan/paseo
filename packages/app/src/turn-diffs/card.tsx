@@ -1,5 +1,5 @@
 import { createContext, memo, useCallback, useContext, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp, Diff } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -138,12 +138,19 @@ function TurnDiffFileRow({
     () => onOpen?.({ turnId, focusPath: file.path }),
     [file.path, onOpen, turnId],
   );
+  const rowStyle = useCallback(
+    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.row,
+      onOpen && (hovered || pressed) && styles.rowHovered,
+    ],
+    [onOpen],
+  );
   return (
     <Pressable
       accessibilityRole={onOpen ? "button" : undefined}
       disabled={!onOpen}
       onPress={handlePress}
-      style={styles.row}
+      style={rowStyle}
       testID="turn-diff-file"
     >
       <Text style={styles.path} numberOfLines={1} ellipsizeMode="head">
@@ -169,7 +176,8 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: "hidden",
-    marginTop: theme.spacing[3],
+    marginTop: theme.spacing[1],
+    marginBottom: theme.spacing[3],
   },
   header: {
     flexDirection: "row",
@@ -202,6 +210,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+  rowHovered: {
+    backgroundColor: theme.colors.surface2,
   },
   path: {
     flex: 1,
