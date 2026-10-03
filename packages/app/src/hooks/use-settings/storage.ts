@@ -106,6 +106,9 @@ export interface AppSettings {
   vimKeybindings: boolean;
   turnDiffs: boolean;
   keepChatPosition: boolean;
+  sidebarAgentRows: boolean;
+  sidebarTerminalRows: boolean;
+  sidebarBrowserRows: boolean;
   /** Last fork mode chosen in the fork menu, per provider. */
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
@@ -166,6 +169,9 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   vimKeybindings: false,
   turnDiffs: true,
   keepChatPosition: false,
+  sidebarAgentRows: true,
+  sidebarTerminalRows: false,
+  sidebarBrowserRows: false,
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
   turnDiffOpenLocation: "explorer",
@@ -270,6 +276,9 @@ const StoredAppSettingsSchema = z
     vimKeybindings: z.boolean().catch(false),
     turnDiffs: z.boolean().catch(true),
     keepChatPosition: z.boolean().catch(false),
+    sidebarAgentRows: z.boolean().catch(true),
+    sidebarTerminalRows: z.boolean().catch(false),
+    sidebarBrowserRows: z.boolean().catch(false),
     openInSidePane: z
       .object({
         explorerFiles: z.boolean().catch(false),

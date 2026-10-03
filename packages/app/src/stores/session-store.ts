@@ -101,6 +101,7 @@ export interface Agent {
   labels: Record<string, string>;
   projectPlacement?: ProjectPlacementPayload | null;
   latestTurnDiffAt?: string;
+  lastAssistantPreview?: string;
 }
 
 export interface WorkspaceDescriptor {

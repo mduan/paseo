@@ -1234,6 +1234,10 @@ export const ru: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "Показать сеансы",
+        collapse: "Скрыть сеансы",
+      },
       status: {
         serviceRunning: "Сервис {{name}} запущен",
         serviceUnhealthy: "Сервис {{name}} работает некорректно",

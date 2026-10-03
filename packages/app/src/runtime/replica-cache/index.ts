@@ -257,6 +257,7 @@ const StoredAgentSnapshotSchema = z.strictObject({
   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
   attentionTimestamp: IsoDateSchema.nullable().optional(),
   archivedAt: IsoDateSchema.nullable().optional(),
+  lastAssistantPreview: z.string().optional(),
 });
 
 const StoredAgentSchema = z.strictObject({
@@ -676,6 +677,7 @@ function serializeAgent(agent: Agent): StoredAgent {
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
+    lastAssistantPreview: agent.lastAssistantPreview,
   };
   return {
     snapshot,

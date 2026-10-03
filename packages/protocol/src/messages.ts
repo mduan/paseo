@@ -846,6 +846,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   providerUnavailable: z.boolean().optional(),
   // Changes whenever the daemon records a turn diff; clients refetch the turn diff list.
   latestTurnDiffAt: z.string().optional(),
+  // Start of the last assistant message as plain text, refreshed at each turn end.
+  lastAssistantPreview: z.string().optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;

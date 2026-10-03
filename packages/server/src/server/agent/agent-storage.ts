@@ -79,6 +79,7 @@ const STORED_AGENT_SCHEMA = z.object({
   features: z.array(AgentFeatureSchema).optional(),
   persistence: PERSISTENCE_HANDLE_SCHEMA,
   lastError: z.string().nullable().optional(),
+  lastAssistantPreview: z.string().optional(),
   // Kept so the session cost survives a daemon restart.
   lastUsage: STORED_USAGE_SCHEMA.optional(),
   requiresAttention: z.boolean().optional(),
@@ -264,6 +265,8 @@ export class AgentStorage {
         createdAt: existing?.createdAt,
         internal: hasInternalOverride ? options?.internal : (agent.internal ?? existing?.internal),
       });
+      // A resumed agent has no preview until its timeline hydrates; keep the stored one.
+      record.lastAssistantPreview ??= existing?.lastAssistantPreview;
 
       // Preserve soft-delete/archive status across snapshot flushes. The
       // projection runs inside the per-agent write queue so it cannot commit a

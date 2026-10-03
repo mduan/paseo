@@ -1206,6 +1206,10 @@ export const zhCN: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "显示会话",
+        collapse: "隐藏会话",
+      },
       status: {
         serviceRunning: "服务 {{name}} 运行中",
         serviceUnhealthy: "服务 {{name}} 异常",

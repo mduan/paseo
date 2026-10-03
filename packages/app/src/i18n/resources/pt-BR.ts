@@ -1242,6 +1242,10 @@ export const ptBR: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "Mostrar sessões",
+        collapse: "Ocultar sessões",
+      },
       status: {
         serviceRunning: "Serviço {{name}} em execução",
         serviceUnhealthy: "Serviço {{name}} com falha",

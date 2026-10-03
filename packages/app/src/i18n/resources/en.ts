@@ -1224,6 +1224,10 @@ export const en = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "Show sessions",
+        collapse: "Hide sessions",
+      },
       status: {
         serviceRunning: "Service {{name}} running",
         serviceUnhealthy: "Service {{name}} unhealthy",
@@ -2052,6 +2056,18 @@ export const en = {
       keepChatPosition: {
         title: "Keep chat position",
         description: "Keep your reading position when you send a message",
+      },
+      sidebarAgentRows: {
+        title: "Agent chats in sidebar",
+        description: "List each workspace's agent chats under it in the sidebar",
+      },
+      sidebarTerminalRows: {
+        title: "Terminals in sidebar",
+        description: "List each workspace's terminals under it in the sidebar",
+      },
+      sidebarBrowserRows: {
+        title: "Browsers in sidebar",
+        description: "List each workspace's browser tabs under it in the sidebar",
       },
       turnDiffs: {
         title: "Turn diffs",
