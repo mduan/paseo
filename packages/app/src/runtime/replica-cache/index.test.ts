@@ -152,6 +152,7 @@ function agent(id = "agent-1"): Agent {
         persistence: null,
         title: "Cached agent",
         labels: {},
+        lastAssistantPreview: "Pushed both branches",
       },
       SERVER_ID,
     ),
@@ -313,6 +314,9 @@ describe("ReplicaCache", () => {
     const restoredTimeline = await reader.readTimeline(SERVER_ID, "agent-1");
 
     expect(restoredDirectory.agents.get("agent-1")?.title).toBe("Cached agent");
+    expect(restoredDirectory.agents.get("agent-1")?.lastAssistantPreview).toBe(
+      "Pushed both branches",
+    );
     expect(restoredDirectory.workspaces.get("workspace-1")?.name).toBe("main");
     expect(restoredDirectory.projects.get("project-1")?.projectDisplayName).toBe("Paseo");
     expect(restoredDirectory.checkpoint).toEqual({ agents: { generation: "g", afterSeq: 12 } });
