@@ -271,6 +271,50 @@ describe("useFileLink", () => {
     expect(getDirectorySuggestions).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps each link's lines when links to one file share a lookup", async () => {
+    const getDirectorySuggestions = vi.fn(async () =>
+      resolvedSuggestions([{ path: "src/a.ts", kind: "file" }]),
+    );
+    const openedFiles: OpenedFile[] = [];
+    const inlineCode = (text: string) => ({ href: text, text, sourceType: "inline-code" as const });
+    const { result } = renderHook(
+      () => ({
+        first: useFileLink(inlineCode("src/a.ts:37")),
+        second: useFileLink(inlineCode("src/a.ts:210-212")),
+      }),
+      {
+        wrapper: createWrapper({
+          client: { getDirectorySuggestions },
+          openedFiles,
+        }),
+      },
+    );
+
+    act(() => {
+      result.current.first.onPress();
+    });
+    await waitFor(() => {
+      expect(openedFiles).toHaveLength(1);
+    });
+    act(() => {
+      result.current.second.onPress();
+    });
+    await waitFor(() => {
+      expect(openedFiles).toHaveLength(2);
+    });
+
+    expect(getDirectorySuggestions).toHaveBeenCalledTimes(1);
+    expect(openedFiles.map(({ target }) => target)).toMatchObject([
+      { path: "/Users/test/project/src/a.ts", lineStart: 37 },
+      { path: "/Users/test/project/src/a.ts", lineStart: 210, lineEnd: 212 },
+    ]);
+    expect(result.current.second.target).toMatchObject({
+      path: "/Users/test/project/src/a.ts",
+      lineStart: 210,
+      lineEnd: 212,
+    });
+  });
+
   it("does not open a stale result after the workspace changes", async () => {
     const deferred = createDeferred<DirectorySuggestionResult>();
     const getDirectorySuggestions = vi.fn(() => deferred.promise);

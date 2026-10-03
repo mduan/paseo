@@ -124,7 +124,7 @@ export function useFileLink(source: AssistantFileLinkSource): UseFileLinkResult 
     if (resolution.kind === "resolved") {
       return resolution.value.kind === "file" ? resolution.value.target : null;
     }
-    return query.data ?? null;
+    return query.data ? { ...resolution.target, path: query.data.path } : null;
   }, [query.data, resolution]);
 
   return useMemo(() => ({ target, onHoverIn, onPress, open }), [target, onHoverIn, onPress, open]);
@@ -184,7 +184,8 @@ function openAssistantFileLink(input: {
 
   const run = async () => {
     try {
-      const target = await input.queryClient.fetchQuery({
+      // The lookup is cached per path, so only its path applies; lines come from this link.
+      const resolved = await input.queryClient.fetchQuery({
         queryKey: capturedQueryKey,
         queryFn: () =>
           fetchDaemonResolution({
@@ -198,7 +199,7 @@ function openAssistantFileLink(input: {
         staleTime: Infinity,
       });
       await dispatchFileTarget({
-        target,
+        target: { ...capturedResolution.target, path: resolved.path },
         disposition: input.disposition,
         capturedServerId: capturedConfig.serverId,
         capturedWorkspaceRoot: capturedConfig.workspaceRoot,

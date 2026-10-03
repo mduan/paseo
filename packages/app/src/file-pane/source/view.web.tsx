@@ -6,6 +6,7 @@ import { getLanguageForFile } from "@getpaseo/highlight";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";
 import { editorTheme } from "../editor/extensions.web";
+import { lineTargetHighlight, revealLineTarget } from "../editor/line-target.web";
 import { selectSourcePresentation, type SourcePresentation } from "./presentation";
 
 interface FileSourceViewProps {
@@ -80,6 +81,7 @@ function ReadonlyCodeMirror({
             "aria-label": `Source for ${values.filename}`,
           }),
           EditorView.editable.of(false),
+          lineTargetHighlight,
           languageCompartment.of(
             languageFor({ filename: values.filename, presentation: values.presentation }),
           ),
@@ -111,11 +113,9 @@ function ReadonlyCodeMirror({
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !location.lineStart) return;
-    const line = Math.min(location.lineStart, view.state.doc.lines);
-    const from = view.state.doc.line(line).from;
-    view.dispatch({ effects: EditorView.scrollIntoView(from, { y: "center" }) });
-  }, [location.lineStart, navigationRevision]);
+    if (!view) return;
+    revealLineTarget(view, { lineStart: location.lineStart, lineEnd: location.lineEnd });
+  }, [location.lineEnd, location.lineStart, navigationRevision]);
 
   return (
     <div style={FRAME_STYLE}>
