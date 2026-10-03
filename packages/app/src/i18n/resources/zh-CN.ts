@@ -1505,6 +1505,13 @@ export const zhCN: TranslationResources = {
     later: "稍后",
     stashRestored: "Stashed 变更已恢复",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "更改基准分支",
+    currentBase: "基准分支：{{baseRef}}。按下以更改基准分支。",
+    placeholder: "更改基准分支...",
+    title: "基准分支",
+    failedToSet: "更改基准分支失败",
+  },
   agentAutocomplete: {
     searchingWorkspace: "正在搜索 workspace...",
     loadingCommands: "正在加载 commands...",

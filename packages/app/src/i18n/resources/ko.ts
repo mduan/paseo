@@ -1532,6 +1532,13 @@ export const ko: TranslationResources = {
     later: "나중에",
     stashRestored: "스태시된 변경 사항이 복원되었습니다",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "기준 브랜치 변경",
+    currentBase: "기준 브랜치: {{baseRef}}. 눌러서 기준 브랜치를 변경합니다.",
+    placeholder: "기준 브랜치 변경...",
+    title: "기준 브랜치",
+    failedToSet: "기준 브랜치를 변경하지 못했습니다",
+  },
   agentAutocomplete: {
     searchingWorkspace: "워크스페이스 검색 중...",
     loadingCommands: "명령 불러오는 중...",

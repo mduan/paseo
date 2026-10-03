@@ -1539,6 +1539,13 @@ export const ja: TranslationResources = {
     later: "後で",
     stashRestored: "スタッシュした変更を復元しました",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "ベースブランチを変更",
+    currentBase: "ベースブランチ: {{baseRef}}。押すとベースブランチを変更します。",
+    placeholder: "ベースブランチを変更...",
+    title: "ベースブランチ",
+    failedToSet: "ベースブランチを変更できませんでした",
+  },
   agentAutocomplete: {
     searchingWorkspace: "ワークスペースを検索中...",
     loadingCommands: "コマンドを読み込み中...",

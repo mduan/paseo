@@ -1522,6 +1522,13 @@ export const ar: TranslationResources = {
     later: "لاحقاً",
     stashRestored: "تمت استعادة التغييرات المخفية",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "تغيير الفرع الأساسي",
+    currentBase: "الفرع الأساسي: {{baseRef}}. اضغط لتغيير الفرع الأساسي.",
+    placeholder: "تغيير الفرع الأساسي...",
+    title: "الفرع الأساسي",
+    failedToSet: "تعذر تغيير الفرع الأساسي",
+  },
   agentAutocomplete: {
     searchingWorkspace: "جارٍ البحث في مساحة العمل...",
     loadingCommands: "جارٍ تحميل الأوامر...",

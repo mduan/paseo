@@ -43,6 +43,7 @@ import {
   resolveRepositoryDefaultBranch,
   parseWorktreeList,
   renameCurrentBranch,
+  setCurrentBranchBaseRef,
   isPaseoWorktreePath,
   isDescendantPath,
   warmCheckoutShortstatInBackground,
@@ -1011,6 +1012,35 @@ const x = 1;
       baseRef: "main",
       aheadBehind: { ahead: 1, behind: 0 },
       aheadOfOrigin: null,
+    });
+  });
+
+  it("prefers the branch's chosen base over the worktree's stored base", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    const worktree = await createLegacyWorktreeForTest({
+      branchName: "feature",
+      cwd: repoDir,
+      baseBranch: "main",
+      worktreeSlug: "feature",
+      paseoHome,
+    });
+    execFileSync("git", ["checkout", "-b", "develop"], { cwd: repoDir });
+    commitFile(repoDir, "develop.txt", "develop\n", "develop commit");
+
+    await expect(getCheckoutStatus(worktree.worktreePath, { paseoHome })).resolves.toMatchObject({
+      baseRef: "main",
+      baseRefLabel: "main",
+    });
+
+    await expect(
+      setCurrentBranchBaseRef(worktree.worktreePath, "refs/heads/missing"),
+    ).rejects.toThrow("Base ref not found: refs/heads/missing");
+    await setCurrentBranchBaseRef(worktree.worktreePath, "refs/heads/develop");
+
+    await expect(getCheckoutStatus(worktree.worktreePath, { paseoHome })).resolves.toMatchObject({
+      baseRef: "develop",
+      baseRefLabel: "develop",
+      aheadBehind: { ahead: 0, behind: 1 },
     });
   });
 

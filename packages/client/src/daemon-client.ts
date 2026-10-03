@@ -57,6 +57,7 @@ import type {
   CheckoutPrMergeResponse,
   CheckoutPrMergeMethod,
   CheckoutForgeSetAutoMergeResponse,
+  CheckoutSetBaseRefResponse,
   CheckoutGithubSetAutoMergeResponse,
   CheckoutForgeGetCheckDetailsResponse,
   CheckoutGithubGetCheckDetailsResponse,
@@ -4293,6 +4294,17 @@ export class DaemonClient {
         mergeMethod: input.method,
       },
       responseType: "checkout_pr_merge_response",
+    });
+  }
+
+  async checkoutSetBaseRef(
+    cwd: string,
+    baseRef: string,
+    requestId?: string,
+  ): Promise<CheckoutSetBaseRefResponse["payload"]> {
+    return this.sendNamespacedCorrelatedSessionRequest<"checkout.set_base_ref.response">({
+      requestId,
+      message: { type: "checkout.set_base_ref.request", cwd, baseRef },
     });
   }
 

@@ -10,6 +10,7 @@ import type {
   CheckoutCommitFileDiffRequest,
   CheckoutRefreshRequest,
   CheckoutRenameBranchRequest,
+  CheckoutSetBaseRefRequest,
   CheckoutStatusRequest,
   SessionInboundMessage,
   SessionOutboundMessage,
@@ -52,6 +53,7 @@ import {
   pushCurrentBranch,
   listCheckoutCommits,
   getCommitFileDiff,
+  setCurrentBranchBaseRef,
 } from "../../../utils/checkout-git.js";
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import { expandTilde } from "../../../utils/path.js";
@@ -642,6 +644,24 @@ export class CheckoutSession {
           error: toCheckoutError(error),
           requestId,
         },
+      });
+    }
+  }
+
+  async handleCheckoutSetBaseRefRequest(msg: CheckoutSetBaseRefRequest): Promise<void> {
+    const { cwd, baseRef, requestId } = msg;
+    try {
+      await setCurrentBranchBaseRef(cwd, baseRef);
+      await this.gitMutation.notifyGitMutation(cwd, "set-base-ref", { invalidateForge: true });
+      this.scheduleDiffRefresh(cwd);
+      this.host.emit({
+        type: "checkout.set_base_ref.response",
+        payload: { cwd, success: true, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.set_base_ref.response",
+        payload: { cwd, success: false, error: toCheckoutError(error), requestId },
       });
     }
   }

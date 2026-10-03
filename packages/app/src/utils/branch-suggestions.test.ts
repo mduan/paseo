@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildBranchComboOptions, normalizeBranchOptionName } from "./branch-suggestions";
+import {
+  buildBaseRefComboOptions,
+  buildBranchComboOptions,
+  normalizeBranchOptionName,
+} from "./branch-suggestions";
 
 describe("normalizeBranchOptionName", () => {
   it("normalizes local and origin-prefixed refs", () => {
@@ -31,6 +35,23 @@ describe("buildBranchComboOptions", () => {
       { id: "main", label: "main" },
       { id: "feature/a", label: "feature/a" },
       { id: "release/next", label: "release/next" },
+    ]);
+  });
+});
+
+describe("buildBaseRefComboOptions", () => {
+  it("lists origin and local refs separately", () => {
+    expect(
+      buildBaseRefComboOptions([
+        { name: "main", hasLocal: true, hasRemote: true },
+        { name: "develop", hasRemote: true },
+        { name: "scratch", hasLocal: true },
+      ]),
+    ).toEqual([
+      { id: "refs/remotes/origin/main", label: "origin/main" },
+      { id: "refs/heads/main", label: "main" },
+      { id: "refs/remotes/origin/develop", label: "origin/develop" },
+      { id: "refs/heads/scratch", label: "scratch" },
     ]);
   });
 });

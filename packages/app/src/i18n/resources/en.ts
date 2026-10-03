@@ -1547,6 +1547,13 @@ export const en = {
     later: "Later",
     stashRestored: "Stashed changes restored",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "Change base branch",
+    currentBase: "Base branch: {{baseRef}}. Press to change base branch.",
+    placeholder: "Change base branch...",
+    title: "Base branch",
+    failedToSet: "Failed to change base branch",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Searching workspace...",
     loadingCommands: "Loading commands...",

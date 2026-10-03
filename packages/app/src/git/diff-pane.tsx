@@ -57,6 +57,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { GitActionsSplitButton } from "@/git/actions-split-button";
 import type { GitActions } from "@/git/policy";
 import { BranchSwitcher } from "@/components/branch-switcher";
+import { BaseRefSwitcher } from "@/components/base-ref-switcher";
 import { useGitActions } from "@/git/use-actions";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import { buildForgeSignInCommand, getForgePresentation, type Forge } from "@/git/forge";
@@ -279,7 +280,6 @@ export function DiffLayoutToggle({
 
 interface DiffModeMenuProps {
   diffMode: "uncommitted" | "base";
-  committedDescription?: string;
   testIDPrefix?: string;
   onSelectUncommitted: () => void;
   onSelectBase: () => void;
@@ -287,7 +287,6 @@ interface DiffModeMenuProps {
 
 export function DiffModeMenu({
   diffMode,
-  committedDescription,
   testIDPrefix = "changes-diff",
   onSelectUncommitted,
   onSelectBase,
@@ -329,7 +328,6 @@ export function DiffModeMenu({
         <DropdownMenuItem
           testID={`${testIDPrefix}-mode-committed`}
           selected={diffMode === "base"}
-          description={committedDescription}
           onSelect={onSelectBase}
         >
           {committedLabel}
@@ -456,6 +454,7 @@ interface ChangesPullRequestLinkModel extends Pick<PrHint, "forge" | "number" | 
 }
 
 interface ChangesRepositoryToolbarModel {
+  baseRefLabel: string | null;
   branchName: string | null;
   cwd: string;
   gitActions: GitActions | null;
@@ -465,7 +464,6 @@ interface ChangesRepositoryToolbarModel {
 }
 
 interface ChangesComparisonToolbarModel {
-  committedDescription?: string;
   diffMode: "uncommitted" | "base";
   mode: ChangesToolbarMode;
   selectedDiffStat: { additions: number; deletions: number } | null;
@@ -481,8 +479,8 @@ interface ChangesHeaderProps {
 }
 
 interface BuildChangesHeaderModelInput {
+  baseRefLabel: string | null;
   branchName: string | null;
-  committedDescription?: string;
   compact: boolean;
   cwd: string;
   diffMode: "uncommitted" | "base";
@@ -503,6 +501,7 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
 } {
   return {
     repository: {
+      baseRefLabel: input.baseRefLabel,
       branchName: input.branchName,
       cwd: input.cwd,
       gitActions: input.compact ? input.gitActions : null,
@@ -513,7 +512,6 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       workspaceId: input.workspaceId,
     },
     comparison: {
-      committedDescription: input.committedDescription,
       diffMode: input.diffMode,
       mode: input.mode,
       selectedDiffStat: input.selectedDiffStat,
@@ -542,6 +540,23 @@ function ChangesHeader({ compact, repository, comparison, sidebarSurface }: Chan
         model={repository}
         sidebarSurface={sidebarSurface}
       />
+      {repository.branchName && repository.baseRefLabel ? (
+        <ChangesToolbarRow
+          compact={compact}
+          sidebarSurface={sidebarSurface}
+          testID="changes-base-header"
+          trailing="glyph"
+        >
+          <ChangesToolbarLeading>
+            <BaseRefSwitcher
+              baseRefLabel={repository.baseRefLabel}
+              serverId={repository.serverId}
+              workspaceId={repository.workspaceId ?? repository.cwd}
+              cwd={repository.cwd}
+            />
+          </ChangesToolbarLeading>
+        </ChangesToolbarRow>
+      ) : null}
       <ChangesComparisonToolbar
         compact={compact}
         model={comparison}
@@ -731,7 +746,6 @@ function ChangesComparisonToolbar({
       <ChangesToolbarLeading>
         <DiffModeMenu
           diffMode={model.diffMode}
-          committedDescription={model.committedDescription}
           onSelectUncommitted={model.onSelectUncommitted}
           onSelectBase={model.onSelectBase}
         />
@@ -1129,20 +1143,9 @@ function DiffBodyContent({
   return children;
 }
 
-function computeBaseRefLabel(baseRef: string | undefined, fallbackLabel: string): string {
-  if (!baseRef) return fallbackLabel;
-  const trimmed = baseRef.replace(/^refs\/(heads|remotes)\//, "").trim();
-  return trimmed.startsWith("origin/") ? trimmed.slice("origin/".length) : trimmed;
-}
-
-function computeCommittedDiffDescription(
-  branchLabel: string,
-  baseRefLabel: string,
-): string | undefined {
-  if (!branchLabel || !baseRefLabel) {
-    return undefined;
-  }
-  return branchLabel === baseRefLabel ? undefined : `${branchLabel} -> ${baseRefLabel}`;
+// COMPAT(checkoutSetBaseRef): daemons before v0.11.0 send no baseRefLabel.
+function selectBaseRefLabel(status: CheckoutStatusPayload | null): string | null {
+  return status?.baseRefLabel ?? status?.baseRef ?? null;
 }
 
 interface ChangesEmptyAction {
@@ -1537,7 +1540,6 @@ export function ChangesSurface({
     isGit,
     notGit,
     statusErrorMessage,
-    baseRef,
     currentBranchName,
     diffMode,
     selectUncommitted: handleSelectUncommitted,
@@ -1753,19 +1755,12 @@ export function ChangesSurface({
   );
   const diffErrorMessage = diffPayloadError?.message ?? null;
   const prErrorMessage = computePrErrorMessage(githubFeaturesEnabled, prPayloadError);
-  const baseRefLabel = useMemo(
-    () => computeBaseRefLabel(baseRef, t("workspace.git.diff.base")),
-    [baseRef, t],
-  );
-  const { gitActions, branchLabel } = useGitActions({
+  const baseRefLabel = selectBaseRefLabel(status);
+  const { gitActions } = useGitActions({
     serverId,
     cwd,
     icons: GIT_ACTION_ICONS,
   });
-  const committedDiffDescription = useMemo(
-    () => computeCommittedDiffDescription(branchLabel, baseRefLabel),
-    [baseRefLabel, branchLabel],
-  );
   const emptyMessage = t("diffViewer.empty");
   const emptyAction = computeChangesEmptyAction({
     hideWhitespace: preferences.hideWhitespace,
@@ -1869,8 +1864,8 @@ export function ChangesSurface({
   const changesHeaderModel = useMemo(
     () =>
       buildChangesHeaderModel({
+        baseRefLabel,
         branchName: currentBranchName,
-        committedDescription: committedDiffDescription,
         compact: isMobile,
         cwd,
         diffMode,
@@ -1885,7 +1880,7 @@ export function ChangesSurface({
         workspaceId,
       }),
     [
-      committedDiffDescription,
+      baseRefLabel,
       currentBranchName,
       cwd,
       diffMode,
