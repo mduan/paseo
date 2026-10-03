@@ -2018,6 +2018,8 @@ export const es: TranslationResources = {
     used: "{{percentage}}% utilizado",
     tokens: "Fichas{{used}}/{{max}}",
     sessionCost: "Costo de la sesión{{cost}}",
+    sessionCostEstimate: "Estimado con precios de lista de la API",
+    sessionCostUnavailable: "No disponible",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {

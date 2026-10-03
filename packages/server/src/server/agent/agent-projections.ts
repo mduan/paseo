@@ -15,6 +15,7 @@ import type {
   AgentSessionConfig,
   AgentRuntimeInfo,
   AgentUsage,
+  AgentUsageNumericField,
   ImportableProviderSession,
 } from "./agent-sdk-types.js";
 import type { ManagedAgent } from "./agent-manager.js";
@@ -442,12 +443,10 @@ function sanitizeMetadataArray(value: unknown): AgentMetadata[] | undefined {
   return sanitized.length > 0 ? sanitized : undefined;
 }
 
-type UsageNumericField = Exclude<keyof AgentUsage, never>;
-
 function assignFiniteNumber(
   source: { [key: string]: JsonValue },
   target: AgentUsage,
-  field: UsageNumericField,
+  field: AgentUsageNumericField,
 ): boolean {
   const raw = source[field];
   if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -463,7 +462,7 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
     return undefined;
   }
   const result: AgentUsage = {};
-  const fields: UsageNumericField[] = [
+  const fields: AgentUsageNumericField[] = [
     "inputTokens",
     "cachedInputTokens",
     "outputTokens",
@@ -475,6 +474,9 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
     if (!assignFiniteNumber(sanitized, result, field)) {
       return undefined;
     }
+  }
+  if (typeof sanitized.totalCostUnavailable === "boolean") {
+    result.totalCostUnavailable = sanitized.totalCostUnavailable;
   }
   return Object.keys(result).length ? result : undefined;
 }

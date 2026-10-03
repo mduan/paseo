@@ -277,6 +277,17 @@ describe("toAgentPayload", () => {
     expect(permissionA.title).toBe("Run command");
   });
 
+  it("keeps the cost-unavailable flag in the usage payload", () => {
+    const agent = createManagedAgent({
+      lastUsage: { inputTokens: 10, totalCostUnavailable: true },
+    });
+
+    expect(toAgentPayload(agent).lastUsage).toEqual({
+      inputTokens: 10,
+      totalCostUnavailable: true,
+    });
+  });
+
   it("omits usage when any numeric usage field is NaN", () => {
     const fields = [
       "inputTokens",
