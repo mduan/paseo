@@ -2,7 +2,7 @@ import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ExternalLink, Folder, GitBranch, Globe } from "lucide-react-native";
+import { ExternalLink, Folder, GitBranch, Globe, Split } from "lucide-react-native";
 import {
   workspaceLabelKey,
   type WorkspaceLabelDefinition,
@@ -14,6 +14,7 @@ import type { PrHint } from "@/git/pr-hint";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { useSidebarMetaPreferences } from "@/components/sidebar/display-preferences/model";
+import { useAppSettings } from "@/hooks/use-settings";
 import type { Theme } from "@/styles/theme";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { CheckIndicator } from "./check-indicator";
@@ -38,6 +39,7 @@ const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
+const ThemedSplit = withUnistyles(Split);
 
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
 const EMPTY_LABELS: readonly WorkspaceLabelDefinition[] = [];
@@ -67,6 +69,7 @@ export function WorkspaceMetaRow({
   prHint,
   serviceSummary,
   labels = EMPTY_LABELS,
+  isWorktree = false,
 }: {
   currentBranch: string | null;
   projectName: string | null;
@@ -74,8 +77,10 @@ export function WorkspaceMetaRow({
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
+  isWorktree?: boolean;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
+  const worktreeIndicator = useAppSettings().settings.worktreeIndicator;
   const items = selectMetaRowItems({
     currentBranch,
     projectName,
@@ -94,7 +99,12 @@ export function WorkspaceMetaRow({
       {items.map((item, index) => (
         <Fragment key={item.kind}>
           {index > 0 ? <Text style={styles.separator}>·</Text> : null}
-          <MetaItemNode item={item} hostBadge={hostBadge} leading={index === 0} />
+          <MetaItemNode
+            item={item}
+            hostBadge={hostBadge}
+            leading={index === 0}
+            showWorktree={isWorktree && worktreeIndicator}
+          />
         </Fragment>
       ))}
     </View>
@@ -105,14 +115,16 @@ function MetaItemNode({
   item,
   hostBadge,
   leading,
+  showWorktree,
 }: {
   item: MetaRowItem;
   hostBadge: HostBadgeModel | null;
   /** First on the line, so this item's ink sets the rail the title above it already uses. */
   leading: boolean;
+  showWorktree: boolean;
 }): ReactNode {
   if (item.kind === "branch") {
-    return <IdentityItem kind="branch" name={item.name} />;
+    return <IdentityItem kind={showWorktree ? "worktree" : "branch"} name={item.name} />;
   }
   if (item.kind === "project") {
     return <IdentityItem kind="project" name={item.name} />;
@@ -132,11 +144,19 @@ function MetaItemNode({
   return <ServiceItem summary={item.summary} />;
 }
 
-function IdentityItem({ kind, name }: { kind: "branch" | "project"; name: string }) {
-  const Icon = kind === "branch" ? ThemedGitBranch : ThemedFolder;
+const IDENTITY_ICONS = { branch: ThemedGitBranch, worktree: ThemedSplit, project: ThemedFolder };
+
+function IdentityItem({ kind, name }: { kind: keyof typeof IDENTITY_ICONS; name: string }) {
+  const { t } = useTranslation();
+  const Icon = IDENTITY_ICONS[kind];
   return (
     <View style={styles.identityItem} testID={`sidebar-workspace-${kind}`}>
-      <View style={styles.identityIcon}>
+      <View
+        style={styles.identityIcon}
+        accessibilityLabel={
+          kind === "worktree" ? t("settings.customizations.gitWorktree") : undefined
+        }
+      >
         <Icon size={META_ICON_SIZE} uniProps={mutedMapping} />
       </View>
       <Text style={styles.identityText} numberOfLines={1}>
