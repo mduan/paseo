@@ -44,3 +44,13 @@ export function resolveFirstAgentPromptTitle(firstAgentContext?: FirstAgentConte
     }).provisionalTitle ?? null
   );
 }
+
+// Forks prefix "(N) " so the generation survives truncation of long titles.
+// Only single digits count, so "(9) X" forks to "(1) (9) X".
+export function buildForkAgentTitle(sourceTitle: string): string {
+  const match = /^\(([1-8])\) /.exec(sourceTitle);
+  if (!match) {
+    return `(1) ${sourceTitle}`;
+  }
+  return `(${Number(match[1]) + 1}) ${sourceTitle.slice(match[0].length)}`;
+}

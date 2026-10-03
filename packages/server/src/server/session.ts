@@ -62,6 +62,7 @@ import {
   unarchiveAgentState,
 } from "./agent/agent-prompt.js";
 import {
+  buildForkAgentTitle,
   resolveCreateAgentTitles,
   resolveFirstAgentPromptTitle,
 } from "./agent/create-agent-title.js";
@@ -4377,7 +4378,7 @@ export class Session {
       };
       const sourceTitle = (await this.agentStorage.get(summaryForkSourceId))?.title;
       if (!config.title && sourceTitle) {
-        config = { ...config, title: `${sourceTitle} copy` };
+        config = { ...config, title: buildForkAgentTitle(sourceTitle) };
       }
     }
 
@@ -8178,7 +8179,7 @@ export class Session {
         boundaryMessageId: msg.boundaryMessageId,
         cwd: msg.cwd,
         workspaceId,
-        title: sourcePayload.title ? `${sourcePayload.title} copy` : null,
+        title: sourcePayload.title ? buildForkAgentTitle(sourcePayload.title) : null,
       });
       this.emit({
         type: "agent.fork.response",

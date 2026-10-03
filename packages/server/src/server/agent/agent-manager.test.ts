@@ -4265,7 +4265,7 @@ test("forkAgent imports a provider fork that ends before the next prompt and mar
     boundaryMessageId: "assistant-1",
     cwd: workdir,
     workspaceId: "ws-source",
-    title: "Source copy",
+    title: "(1) Source",
   });
 
   expect(forkInputs).toEqual([{ beforeMessageId: "user-2", cwd: workdir }]);
