@@ -9,9 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSettings } from "@/hooks/use-settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 
@@ -23,12 +21,11 @@ export interface AssistantForkRequest {
 }
 
 export interface AssistantForkMenuContextValue {
-  provider?: string;
   /** The provider can fork its session with full history. */
   supportsFullHistory: boolean;
 }
 
-/** Provided by the agent stream so every fork menu in it knows its agent's provider. */
+/** Provided by the agent stream so every fork menu in it knows what its agent can fork. */
 export const AssistantForkMenuContext = createContext<AssistantForkMenuContextValue>({
   supportsFullHistory: false,
 });
@@ -45,6 +42,24 @@ const ThemedSplit = withUnistyles(Split);
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
+interface ForkOption {
+  target: AssistantForkTarget;
+  mode: AgentForkMode;
+}
+
+function listForkOptions(supportsFullHistory: boolean): ForkOption[] {
+  const modes = supportsFullHistory
+    ? [AgentForkMode.Full, AgentForkMode.Summary]
+    : [AgentForkMode.Summary];
+  return (["tab", "workspace"] as const).flatMap((target) =>
+    modes.map((mode) => ({ target, mode })),
+  );
+}
+
+function forkOptionKey(option: ForkOption): string {
+  return `${option.target}:${option.mode}`;
+}
+
 export const AssistantForkMenu = memo(function AssistantForkMenu({
   onFork,
   inFlight = false,
@@ -52,68 +67,33 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
 }: AssistantForkMenuProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [pendingTarget, setPendingTarget] = useState<AssistantForkTarget | null>(null);
-  const isLocked = pendingTarget !== null;
-  const { settings, updateSettings } = useSettings();
-  const { provider, supportsFullHistory } = useContext(AssistantForkMenuContext);
-  const isFullHistoryUnsupported = !supportsFullHistory;
-  const mode = isFullHistoryUnsupported
-    ? AgentForkMode.Summary
-    : ((provider ? settings.forkModeByProvider[provider] : undefined) ?? AgentForkMode.Full);
-  const isFullHistoryPending = mode === AgentForkMode.Full && inFlight;
+  const [pendingKey, setPendingKey] = useState<string>();
+  const isLocked = pendingKey !== undefined;
+  const { supportsFullHistory } = useContext(AssistantForkMenuContext);
 
-  const handleModeChange = useCallback(
-    (next: AgentForkMode) => {
-      if (!provider) return;
-      void updateSettings({
-        forkModeByProvider: { ...settings.forkModeByProvider, [provider]: next },
-      });
-    },
-    [provider, settings.forkModeByProvider, updateSettings],
-  );
-
-  const modeOptions = useMemo(
-    () => [
-      {
-        value: AgentForkMode.Full,
-        label: t("message.actions.forkModeFull"),
-        disabled: isFullHistoryUnsupported,
-        testID: `${testID}-mode-full`,
-      },
-      {
-        value: AgentForkMode.Summary,
-        label: t("message.actions.forkModeSummary"),
-        testID: `${testID}-mode-summary`,
-      },
-    ],
-    [isFullHistoryUnsupported, t, testID],
-  );
+  const options = useMemo(() => listForkOptions(supportsFullHistory), [supportsFullHistory]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      if (!next && pendingTarget !== null) return;
+      if (!next && pendingKey !== undefined) return;
       setIsOpen(next);
     },
-    [pendingTarget],
+    [pendingKey],
   );
 
   const handleSelect = useCallback(
-    (target: AssistantForkTarget) => async () => {
+    (option: ForkOption) => async () => {
       if (isLocked) return;
-      setPendingTarget(target);
+      setPendingKey(forkOptionKey(option));
       try {
-        await onFork({ target, mode });
+        await onFork(option);
       } finally {
-        setPendingTarget(null);
+        setPendingKey(undefined);
         setIsOpen(false);
       }
     },
-    [isLocked, mode, onFork],
+    [isLocked, onFork],
   );
-
-  const pendingDescription = isFullHistoryPending
-    ? t("message.actions.forkFullHistoryPending")
-    : undefined;
 
   const triggerStyle = useCallback(
     () => [styles.trigger, isLocked ? styles.triggerDisabled : null],
@@ -158,37 +138,33 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
         {tooltipContent}
       </Tooltip>
       <DropdownMenuContent align="start" minWidth={240} side="bottom" testID={`${testID}-content`}>
-        <View style={styles.modeRow}>
-          <SegmentedControl
-            options={modeOptions}
-            value={mode}
-            onValueChange={handleModeChange}
-            size="sm"
-            testID={`${testID}-mode`}
-          />
-        </View>
-        <DropdownMenuItem
-          closeOnSelect={false}
-          description={pendingDescription}
-          disabled={isFullHistoryPending || (isLocked && pendingTarget !== "tab")}
-          leading={forkIcon}
-          onSelect={handleSelect("tab")}
-          status={pendingTarget === "tab" ? "pending" : undefined}
-          testID={`${testID}-new-tab`}
-        >
-          {t("message.actions.forkInNewTab")}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          closeOnSelect={false}
-          description={pendingDescription}
-          disabled={isFullHistoryPending || (isLocked && pendingTarget !== "workspace")}
-          leading={forkIcon}
-          onSelect={handleSelect("workspace")}
-          status={pendingTarget === "workspace" ? "pending" : undefined}
-          testID={`${testID}-new-workspace`}
-        >
-          {t("message.actions.forkInNewWorkspace")}
-        </DropdownMenuItem>
+        {options.map((option) => {
+          const key = forkOptionKey(option);
+          const isSummary = option.mode === AgentForkMode.Summary;
+          // The provider hasn't saved a running turn, so only a summary can fork it.
+          const isFullHistoryPending = !isSummary && inFlight;
+          const label = t(
+            option.target === "tab"
+              ? "message.actions.forkInNewTab"
+              : "message.actions.forkInNewWorkspace",
+          );
+          return (
+            <DropdownMenuItem
+              key={key}
+              closeOnSelect={false}
+              description={
+                isFullHistoryPending ? t("message.actions.forkFullHistoryPending") : undefined
+              }
+              disabled={isFullHistoryPending || (isLocked && pendingKey !== key)}
+              leading={forkIcon}
+              onSelect={handleSelect(option)}
+              status={pendingKey === key ? "pending" : undefined}
+              testID={`${testID}-new-${option.target}${isSummary ? "-summary" : ""}`}
+            >
+              {isSummary ? `${label} (${t("message.actions.forkModeSummary")})` : label}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -206,11 +182,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   triggerSlot: {
     alignSelf: "center",
-  },
-  modeRow: {
-    paddingHorizontal: theme.spacing[2],
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[1],
   },
   tooltipText: {
     color: theme.colors.foreground,

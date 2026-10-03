@@ -124,7 +124,10 @@ async function selectAgent(page: Page, title: string) {
 async function expectForkFailureWithoutOverlappingStatus(page: Page) {
   const expectContinuousToast = await observeToastReplacement(page);
   await page.getByRole("button", { name: "Fork chat from here" }).last().click();
-  await page.getByRole("menuitem", { name: "Fork in a new tab", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: /^Fork in a new tab/ })
+    .first()
+    .click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Transport not connected" }),
   ).toBeVisible();

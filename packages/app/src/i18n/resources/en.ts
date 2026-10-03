@@ -330,7 +330,6 @@ export const en = {
       forkUnavailable: "Update the host to use this.",
       forkMissingWorkspace: "This agent is not in a workspace.",
       forkFailed: "Failed to fork chat",
-      forkModeFull: "Full history",
       forkModeSummary: "Summary",
       forkFullHistoryPending: "Available when this turn finishes",
       forkContinuedFromChat: "Continued from chat",
