@@ -17,7 +17,12 @@ import { AgentStorage } from "./agent-storage.js";
 import { InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { projectTimelineRows } from "./timeline-projection.js";
-import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import {
+  AgentForkMode,
+  buildAgentForkLabels,
+  getOpenAgentTabLabel,
+  PARENT_AGENT_ID_LABEL,
+} from "@getpaseo/protocol/agent-labels";
 import { formatSystemNotificationPrompt, startAgentRun } from "./agent-prompt.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
 import { ensureAgentLoaded, ensureUnarchivedAgentLoaded } from "./agent-loading.js";
@@ -4191,6 +4196,105 @@ test("resumeAgentFromPersistence keeps metadata config, applies overrides, and p
       PASEO_AGENT_CWD: workdir,
     },
   });
+});
+
+test("forkAgent imports a provider fork that ends before the next prompt and marks where the fork continues", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-fork-"));
+  const forkInputs: unknown[] = [];
+
+  class ForkableSession extends TestAgentSession {
+    override readonly capabilities = { ...TEST_CAPABILITIES, supportsFork: true };
+
+    async forkConversation(input: { beforeMessageId?: string; cwd: string }) {
+      forkInputs.push(input);
+      return { providerHandleId: "thread-fork" };
+    }
+  }
+
+  const firstTurn = [
+    { item: { type: "user_message" as const, text: "First", messageId: "user-1" } },
+    { item: { type: "assistant_message" as const, text: "One", messageId: "assistant-1" } },
+  ];
+  const secondTurn = [
+    { item: { type: "user_message" as const, text: "Second", messageId: "user-2" } },
+    { item: { type: "assistant_message" as const, text: "Two", messageId: "assistant-2" } },
+  ];
+
+  // What the forked provider session holds once the fork has its own turn.
+  class ForkedSession extends TestAgentSession {
+    override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      for (const { item } of [
+        ...firstTurn,
+        { item: { type: "user_message" as const, text: "Third", messageId: "user-3" } },
+      ]) {
+        yield { type: "timeline", provider: "codex", item };
+      }
+    }
+  }
+
+  class ForkClient extends TestAgentClient {
+    async importSession(input: ImportProviderSessionInput) {
+      const isFork = input.providerHandleId === "thread-fork";
+      return {
+        session: isFork
+          ? new ForkedSession({ provider: "codex", cwd: workdir })
+          : new ForkableSession({ provider: "codex", cwd: workdir }),
+        config: { provider: "codex" as const, cwd: workdir },
+        persistence: {
+          provider: "codex" as const,
+          sessionId: input.providerHandleId,
+          nativeHandle: input.providerHandleId,
+          metadata: { provider: "codex", cwd: workdir },
+        },
+        timeline: isFork ? firstTurn : [...firstTurn, ...secondTurn],
+      };
+    }
+  }
+
+  const manager = new AgentManager({ clients: { codex: new ForkClient() }, logger });
+  const source = await manager.importProviderSession({
+    provider: "codex",
+    providerHandleId: "thread-source",
+    cwd: workdir,
+    workspaceId: "ws-source",
+  });
+
+  const fork = await manager.forkAgent({
+    sourceAgentId: source.id,
+    boundaryMessageId: "assistant-1",
+    cwd: workdir,
+    workspaceId: "ws-source",
+    title: "Source copy",
+  });
+
+  expect(forkInputs).toEqual([{ beforeMessageId: "user-2", cwd: workdir }]);
+  expect(fork.labels).toMatchObject(
+    buildAgentForkLabels({
+      sourceAgentId: source.id,
+      mode: AgentForkMode.Full,
+      userMessageCount: 1,
+    }),
+  );
+
+  await startAgentRun(manager, fork.id, "Third", logger, {
+    runOptions: { clientMessageId: "third-client" },
+  });
+
+  expect(manager.getTimeline(fork.id)).toEqual([
+    { type: "user_message", text: "First", messageId: "user-1" },
+    { type: "assistant_message", text: "One", messageId: "assistant-1" },
+    { type: "fork_marker", sourceAgentId: source.id, mode: AgentForkMode.Full },
+    expect.objectContaining({ type: "user_message", text: "Third" }),
+  ]);
+
+  await manager.hydrateTimelineFromProvider(fork.id, { force: true });
+
+  expect(manager.getTimeline(fork.id).map((item) => item.type)).toEqual([
+    "user_message",
+    "assistant_message",
+    "fork_marker",
+    "user_message",
+  ]);
 });
 
 test("importProviderSession imports the selected session without listing and publishes ready state", async () => {

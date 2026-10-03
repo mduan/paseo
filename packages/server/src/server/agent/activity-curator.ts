@@ -3,7 +3,7 @@ import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import type { AgentTimelineRow } from "./agent-timeline-store-types.js";
 import { isLikelyExternalToolName } from "@getpaseo/protocol/tool-name-normalization";
 import { buildToolCallDisplayModel } from "@getpaseo/protocol/tool-call-display";
-import { projectTimelineRows } from "./timeline-projection.js";
+import { type TimelineProjectionEntry, projectTimelineRows } from "./timeline-projection.js";
 
 const DEFAULT_MAX_ITEMS = 0;
 const MAX_TOOL_INPUT_CHARS = 400;
@@ -247,6 +247,23 @@ function selectForkContextRows(input: {
   ) {
     throw new Error("Selected timeline position is no longer available.");
   }
+  const boundaryIndex = findForkBoundaryIndex({ projectedRows, boundaryCursor, boundaryMessageId });
+  const boundarySeq = resolveForkBoundarySeq(projectedRows, boundaryIndex);
+  const projected = projectedRows.filter((row) => row.seqEnd <= boundarySeq);
+
+  return {
+    items: projected.map((entry) => entry.item),
+    boundaryCursor,
+    boundaryMessageId,
+  };
+}
+
+function findForkBoundaryIndex(input: {
+  projectedRows: readonly TimelineProjectionEntry[];
+  boundaryCursor: { epoch: string; seq: number } | null;
+  boundaryMessageId: string | null;
+}): number {
+  const { projectedRows, boundaryCursor, boundaryMessageId } = input;
   const boundaryIndex = boundaryCursor
     ? projectedRows.findIndex((row) => row.seqEnd === boundaryCursor.seq)
     : projectedRows.findLastIndex(
@@ -259,19 +276,63 @@ function selectForkContextRows(input: {
         : "Selected assistant message is no longer available.",
     );
   }
-  const boundarySeq = projectedRows[boundaryIndex].seqEnd;
+  return boundaryIndex;
+}
+
+function resolveForkBoundarySeq(
+  projectedRows: readonly TimelineProjectionEntry[],
+  index: number,
+): number {
+  const boundarySeq = projectedRows[index].seqEnd;
   if (projectedRows.some((row) => row.seqStart <= boundarySeq && row.seqEnd > boundarySeq)) {
     throw new Error(
       "This checkpoint changed after it was created. Fork from a later completed response instead.",
     );
   }
-  const projected = projectedRows.filter((row) => row.seqEnd <= boundarySeq);
+  return boundarySeq;
+}
 
-  return {
-    items: projected.map((entry) => entry.item),
-    boundaryCursor,
-    boundaryMessageId,
-  };
+/**
+ * Finds the first user message after the forked assistant message. A native
+ * fork copies the provider session up to that message; `undefined` means the
+ * fork keeps everything.
+ */
+export function selectNativeForkNextUserRow(input: {
+  rows: readonly AgentTimelineRow[];
+  cursorBoundary?: ForkCursorBoundary | null;
+  boundaryMessageId?: string | null;
+}): AgentTimelineRow | undefined {
+  const projectedRows = projectTimelineRows({ rows: input.rows, mode: "projected" });
+  if (
+    input.cursorBoundary &&
+    input.cursorBoundary.cursor.epoch !== input.cursorBoundary.timelineEpoch
+  ) {
+    throw new Error("Selected timeline position is no longer available.");
+  }
+  const boundaryIndex = findForkBoundaryIndex({
+    projectedRows,
+    boundaryCursor: input.cursorBoundary?.cursor ?? null,
+    boundaryMessageId: input.boundaryMessageId?.trim() || null,
+  });
+  const boundarySeq = resolveForkBoundarySeq(projectedRows, boundaryIndex);
+  return input.rows.find((row) => row.seq > boundarySeq && row.item.type === "user_message");
+}
+
+const CHAT_HISTORY_SUMMARY_OPEN = "<chat-history-summary>";
+const CHAT_HISTORY_SUMMARY_CLOSE = "</chat-history-summary>";
+const CHAT_HISTORY_SUMMARY_PATTERN = new RegExp(
+  `${CHAT_HISTORY_SUMMARY_OPEN}[\\s\\S]*?${CHAT_HISTORY_SUMMARY_CLOSE}\\s*`,
+  "g",
+);
+
+/**
+ * Removes a summary fork's chat history from a user message. Live prompts never
+ * show it, but providers store it in the prompt text, so rebuilt history would.
+ */
+export function stripChatHistorySummary(text: string): string {
+  return text.includes(CHAT_HISTORY_SUMMARY_OPEN)
+    ? text.replace(CHAT_HISTORY_SUMMARY_PATTERN, "").trim()
+    : text;
 }
 
 function trimContextMetadata(value: string | null | undefined): string | null {
@@ -293,10 +354,11 @@ function buildForkContextText(input: {
   if (cwd) {
     header.push(`Source directory: ${cwd}`);
   }
-  return `<chat-history-summary>\n${header.join("\n")}\n\n${input.body}\n</chat-history-summary>`;
+  return `${CHAT_HISTORY_SUMMARY_OPEN}\n${header.join("\n")}\n\n${input.body}\n${CHAT_HISTORY_SUMMARY_CLOSE}`;
 }
 
 export function buildAgentForkContextAttachment(input: {
+  agentId: string;
   rows: readonly AgentTimelineRow[];
   cursorBoundary?: ForkCursorBoundary | null;
   boundaryMessageId?: string | null;
@@ -334,6 +396,7 @@ export function buildAgentForkContextAttachment(input: {
         agentTitle: input.agentTitle,
         cwd: input.cwd,
       }),
+      sourceAgentId: input.agentId,
     },
     itemCount: selected.items.length,
     boundaryCursor: selected.boundaryCursor,

@@ -1,4 +1,11 @@
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { MessagePayload } from "@/composer/types";
+import type {
+  PendingNativeFork,
+  PendingWorkspaceDraftSetup,
+} from "@/stores/workspace-draft-submission-store";
+import type { CreateEmptyWorkspaceInput } from "./new-workspace-empty";
 
 function isLikelyWindowsPath(path: string): boolean {
   return /^[a-zA-Z]:\//.test(path);
@@ -47,4 +54,40 @@ export function remapDraftCwdToWorkspace(input: {
   return [workspaceDirectory.replace(/[\\/]+$/, ""), ...relativePath.split("/")]
     .filter(Boolean)
     .join(separator);
+}
+
+/**
+ * Finishes a full-history fork into a new workspace: creates the workspace with no
+ * agent, forks the source agent into it, and sends any typed text as the fork's
+ * next message.
+ */
+export async function runCreateNativeFork(input: {
+  payload: MessagePayload;
+  forkSetup: PendingWorkspaceDraftSetup & { nativeFork: PendingNativeFork };
+  ensureWorkspace: CreateEmptyWorkspaceInput["ensureWorkspace"];
+  client: DaemonClient;
+  serverId: string;
+  navigate: (input: { serverId: string; workspaceId: string; agentId: string }) => void;
+}): Promise<void> {
+  const { payload, forkSetup, client, serverId } = input;
+  const workspace = await input.ensureWorkspace({
+    cwd: payload.cwd,
+    prompt: "",
+    attachments: [],
+    withInitialAgent: false,
+  });
+  const fork = await client.forkAgent(forkSetup.nativeFork.sourceAgentId, {
+    ...forkSetup.nativeFork.boundary,
+    cwd: remapDraftCwdToWorkspace({
+      cwd: forkSetup.setup.cwd,
+      sourceDirectory: forkSetup.sourceDirectory,
+      workspaceDirectory: workspace.workspaceDirectory,
+    }),
+    workspaceId: workspace.id,
+  });
+  const text = payload.text.trim();
+  if (text) {
+    await client.sendAgentMessage(fork.id, text);
+  }
+  input.navigate({ serverId, workspaceId: workspace.id, agentId: fork.id });
 }

@@ -4,6 +4,7 @@ import type {
   AgentFeatureToggle,
   AgentProviderNotice,
   AgentTaskItem,
+  ForkMarkerTimelineItem,
   JsonValue,
   ProviderOptions,
   ToolPolicy,
@@ -178,6 +179,7 @@ export interface AgentCapabilityFlags {
   supportsRewindConversation?: boolean;
   supportsRewindFiles?: boolean;
   supportsRewindBoth?: boolean;
+  supportsFork?: boolean;
 }
 
 export interface AgentPersistenceHandle {
@@ -400,6 +402,7 @@ export type AgentTimelineItem =
       message: string;
     }
   | CompactionTimelineItem
+  | ForkMarkerTimelineItem
   | PluginTimelineItem;
 
 export type AgentStreamEvent =
@@ -685,6 +688,14 @@ export interface AgentSession {
   revertConversation?(input: { messageId: string }): Promise<void>;
   revertFiles?(input: { messageId: string }): Promise<void>;
   revertBoth?(input: { messageId: string }): Promise<void>;
+  /**
+   * Copies the provider session into a new one stored for `cwd` and returns its
+   * handle. The source session is left unchanged. With `beforeMessageId`, the
+   * copy ends right before that user message; otherwise it copies everything.
+   */
+  forkConversation?(input: { beforeMessageId?: string; cwd: string }): Promise<{
+    providerHandleId: string;
+  }>;
   /**
    * Out-of-band prompt handler. When non-null, the manager runs the returned
    * handler instead of allocating a turn. The handler emits stream events

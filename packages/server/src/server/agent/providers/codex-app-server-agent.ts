@@ -92,7 +92,11 @@ import {
   type CodexThreadRollbackResponse,
   type CodexAppServerTraceContext,
 } from "./codex/app-server-transport.js";
-import { type CodexUserMessageTurnIndex, revertCodexConversation } from "./codex/rewind.js";
+import {
+  type CodexUserMessageTurnIndex,
+  forkCodexConversation,
+  revertCodexConversation,
+} from "./codex/rewind.js";
 import {
   materializeProviderImage,
   renderProviderImageOutputAsAssistantMarkdown,
@@ -240,6 +244,7 @@ const CODEX_APP_SERVER_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: false,
   supportsRewindBoth: false,
+  supportsFork: true,
 };
 
 const CODEX_MODES: AgentMode[] = [
@@ -4922,7 +4927,25 @@ export class CodexAppServerAgentSession implements AgentSession {
     };
   }
 
-  async revertConversation(input: { messageId: string }): Promise<void> {
+  async forkConversation(input: {
+    beforeMessageId?: string;
+    cwd: string;
+  }): Promise<{ providerHandleId: string }> {
+    const client = await this.prepareConversationFork();
+    const threadId = await forkCodexConversation({
+      ...this.conversationForkInput(client),
+      messageId: input.beforeMessageId,
+      cwd: input.cwd,
+    });
+    // thread/fork leaves the fork loaded as a writer in this agent's app-server, and
+    // thread/unsubscribe does not unload it. Archiving unloads it, so the new agent's
+    // own app-server can resume it; unarchiving keeps it listed.
+    await client.request("thread/archive", { threadId });
+    await client.request("thread/unarchive", { threadId });
+    return { providerHandleId: threadId };
+  }
+
+  private async prepareConversationFork(): Promise<CodexAppServerClient> {
     await this.connect();
     if (!this.client) {
       throw new Error("Codex client is not initialized");
@@ -4932,17 +4955,27 @@ export class CodexAppServerAgentSession implements AgentSession {
     } else {
       await this.ensureThread();
     }
+    return this.client;
+  }
 
-    await revertCodexConversation({
-      client: this.client,
+  private conversationForkInput(client: CodexAppServerClient) {
+    return {
+      client,
       threadId: this.currentThreadId,
-      messageId: input.messageId,
       cwd: this.config.cwd ?? null,
       model: this.config.model ?? null,
       serviceTier: this.serviceTier,
       config: this.buildCodexInnerConfig(),
       userMessageTurns: this.codexUserMessageTurns(),
       threadRollbackAvailable: this.threadRollbackAvailable,
+    };
+  }
+
+  async revertConversation(input: { messageId: string }): Promise<void> {
+    const client = await this.prepareConversationFork();
+    await revertCodexConversation({
+      ...this.conversationForkInput(client),
+      messageId: input.messageId,
       setThreadId: async (threadId) => {
         this.currentThreadId = threadId;
         this.cachedRuntimeInfo = null;

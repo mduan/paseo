@@ -1,3 +1,4 @@
+import type { AgentForkMode } from "./agent-labels.js";
 import type { AgentAttachment } from "./messages.js";
 
 export type AgentProvider = string;
@@ -362,6 +363,12 @@ export interface PluginTimelineItem {
   data: JsonValue;
 }
 
+export interface ForkMarkerTimelineItem {
+  type: "fork_marker";
+  sourceAgentId: string;
+  mode: AgentForkMode;
+}
+
 export interface AgentTaskItem {
   text: string;
   completed: boolean;
@@ -383,6 +390,7 @@ export type AgentTimelineItem =
       message: string;
     }
   | CompactionTimelineItem
+  | ForkMarkerTimelineItem
   | PluginTimelineItem;
 
 export type AgentStreamEvent =

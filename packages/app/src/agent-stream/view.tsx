@@ -104,6 +104,11 @@ import {
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
+import { ForkMarker } from "@/components/fork-marker";
+import {
+  AssistantForkMenuContext,
+  type AssistantForkMenuContextValue,
+} from "@/components/assistant-fork-menu";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
@@ -327,6 +332,7 @@ const AGENT_CAPABILITY_FLAG_KEYS: (keyof AgentCapabilityFlags)[] = [
   "supportsRewindConversation",
   "supportsRewindFiles",
   "supportsRewindBoth",
+  "supportsFork",
 ];
 
 const EMPTY_STREAM_HEAD: StreamItem[] = [];
@@ -340,6 +346,14 @@ function useRetainedValue<T>(value: T, active: boolean): T {
 }
 const EMPTY_PENDING_MESSAGE_SUBMISSIONS: readonly PendingMessageSubmission[] = [];
 const GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT = 200;
+
+function useForkMenuContext(agent: AgentScreenAgent): AssistantForkMenuContextValue {
+  const supportsFullHistory = agent.capabilities?.supportsFork === true;
+  return useMemo(
+    () => ({ provider: agent.provider, supportsFullHistory }),
+    [agent.provider, supportsFullHistory],
+  );
+}
 
 function resolveBottomOverlayControlOffset(clearance: number | undefined): number {
   return Math.max(16, clearance ?? 0);
@@ -526,12 +540,13 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     });
 
     const handleForkAssistantTurn: AssistantTurnForkHandler = useStableEvent(
-      async ({ target, boundary }) => {
+      async ({ target, mode, boundary }) => {
         await forkAgent({
           agentId,
           agent: context,
           workspaceId: context.workspaceId,
           target,
+          mode,
           boundary,
         });
       },
@@ -541,14 +556,18 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     // projects the whole timeline when neither boundary field is given, so the
     // fork carries everything up to now, including the response still streaming
     // in front of the user.
-    const handleForkInFlightTurn: InFlightTurnForkHandler = useStableEvent(async (target) => {
-      await forkAgent({
-        agentId,
-        agent: context,
-        workspaceId: context.workspaceId,
-        target,
-      });
-    });
+    const handleForkInFlightTurn: InFlightTurnForkHandler = useStableEvent(
+      async ({ target, mode }) => {
+        await forkAgent({
+          agentId,
+          agent: context,
+          workspaceId: context.workspaceId,
+          target,
+          mode,
+        });
+      },
+    );
+    const forkMenuContext = useForkMenuContext(context);
 
     // Freeze stream presentation while this tab slot is hidden to prevent offscreen
     // cell-window and turn-lifecycle renders from background agents.
@@ -915,6 +934,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           case "todo_list":
             return <TodoListCard items={item.items} activity={item.activity} />;
 
+          case "fork_marker":
+            return (
+              <ForkMarker
+                serverId={resolvedServerId}
+                sourceAgentId={item.sourceAgentId}
+                mode={item.mode}
+              />
+            );
+
           case "compaction":
             return (
               <CompactionMarker
@@ -1202,7 +1230,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     );
     return (
       <StreamCustomizationProviders compactChat={compactChat} workToggles={workToggles}>
-        {stream}
+        <AssistantForkMenuContext.Provider value={forkMenuContext}>
+          {stream}
+        </AssistantForkMenuContext.Provider>
       </StreamCustomizationProviders>
     );
   },

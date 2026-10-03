@@ -106,6 +106,12 @@ export async function expectChatHistoryAttachment(page: Page): Promise<void> {
   await expect(attachment).toContainText("Chat history");
 }
 
+export async function expectSummaryForkMarker(page: Page): Promise<void> {
+  const marker = page.getByTestId("fork-marker").last();
+  await expect(marker).toBeVisible({ timeout: 30_000 });
+  await expect(marker).toContainText("Continued from a summary of chat");
+}
+
 export async function expectLiveAssistantText(page: Page, text: string): Promise<void> {
   await expect(inFlightTurn(page)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("assistant-message").last()).toContainText(text, {

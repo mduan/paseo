@@ -1,4 +1,6 @@
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type {
   AgentForkContextOptions,
@@ -19,7 +21,7 @@ import {
 } from "@/attachments/workspace-attachments-store";
 import { useWorkspaceDraftSubmissionStore } from "@/stores/workspace-draft-submission-store";
 import { toErrorMessage } from "@/utils/error-messages";
-import { buildNewWorkspaceRoute } from "@/utils/host-routes";
+import { buildHostAgentDetailRoute, buildNewWorkspaceRoute } from "@/utils/host-routes";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 /**
@@ -56,6 +58,7 @@ export interface ForkAgentRequest {
   agent: ForkAgentSource;
   workspaceId?: string;
   target: AssistantForkTarget;
+  mode: AgentForkMode;
   boundary?: ForkAgentBoundary;
 }
 
@@ -117,6 +120,47 @@ function buildForkDraftTabTarget(
   return setup ? { kind: "draft", draftId, setup } : { kind: "draft", draftId };
 }
 
+async function runFullHistoryFork(input: {
+  client: DaemonClient;
+  serverId: string;
+  request: Omit<ForkAgentRequest, "mode">;
+  draftSetup: WorkspaceDraftTabSetup | undefined;
+  sourceDirectory: string | undefined;
+  navigate: (route: Href) => void;
+  t: TFunction;
+}): Promise<void> {
+  const { client, serverId, draftSetup, sourceDirectory, t } = input;
+  const { agentId, agent, workspaceId, target, boundary } = input.request;
+  if (!boundary || !draftSetup) {
+    throw new Error(t("message.actions.forkFullHistoryPending"));
+  }
+  if (target === "tab") {
+    if (!workspaceId) {
+      throw new Error(t("message.actions.forkMissingWorkspace"));
+    }
+    const fork = await client.forkAgent(agentId, { ...boundary, cwd: agent.cwd, workspaceId });
+    // The open-intent route waits for the new agent to reach the session store before focusing it.
+    input.navigate(buildHostAgentDetailRoute(serverId, fork.id, workspaceId));
+    return;
+  }
+  const draftId = generateDraftId();
+  useWorkspaceDraftSubmissionStore.getState().setDraftSetup({
+    draftId,
+    setup: draftSetup,
+    sourceDirectory,
+    nativeFork: { sourceAgentId: agentId, boundary },
+  });
+  input.navigate(
+    buildNewWorkspaceRoute({
+      serverId,
+      sourceDirectory,
+      displayName: agent.projectPlacement?.projectName,
+      projectId: agent.projectPlacement?.projectKey,
+      draftId,
+    }),
+  );
+}
+
 /**
  * Shared fork driver behind both turn-footer fork affordances: the completed
  * turn's footer (which supplies a boundary pinned to that turn) and the
@@ -132,7 +176,7 @@ export function useForkAgent(
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const supportsAgentForkContext = useHostFeature(serverId, "agentForkContext") && !readOnly;
 
-  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary }) => {
+  return useStableEvent(async ({ agentId, agent, workspaceId, target, mode, boundary }) => {
     try {
       if (!supportsAgentForkContext) {
         toast?.error(t("message.actions.forkUnavailable"));
@@ -142,6 +186,21 @@ export function useForkAgent(
         throw new Error(t("workspace.terminal.hostDisconnected"));
       }
       const draftSetup = buildForkDraftSetup(agent);
+      const sourceDirectory =
+        agent.projectPlacement?.checkout?.cwd?.trim() || agent.cwd.trim() || undefined;
+
+      if (mode === AgentForkMode.Full) {
+        await runFullHistoryFork({
+          client,
+          serverId,
+          request: { agentId, agent, workspaceId, target, boundary },
+          draftSetup,
+          sourceDirectory,
+          navigate: (route) => router.push(route),
+          t,
+        });
+        return;
+      }
       const prepareForkDraft = async () => {
         const draftId = generateDraftId();
         const payload = await client.buildAgentForkContext(agentId, boundary);
@@ -173,8 +232,6 @@ export function useForkAgent(
       }
 
       const draftId = await prepareForkDraft();
-      const sourceDirectory =
-        agent.projectPlacement?.checkout?.cwd?.trim() || agent.cwd.trim() || undefined;
       if (draftSetup) {
         useWorkspaceDraftSubmissionStore.getState().setDraftSetup({
           draftId,

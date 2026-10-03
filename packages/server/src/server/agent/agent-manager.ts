@@ -10,12 +10,16 @@ import {
   type AgentLifecycleStatus,
 } from "@getpaseo/protocol/agent-lifecycle";
 import {
+  AgentForkMode,
+  buildAgentForkLabels,
+  getAgentForkOriginFromLabels,
   getParentAgentIdFromLabels,
   hasOpenAgentTab,
   isDelegatedAgent,
   isOpenAgentTabLabel,
   PARENT_AGENT_ID_LABEL,
 } from "@getpaseo/protocol/agent-labels";
+import { selectNativeForkNextUserRow, stripChatHistorySummary } from "./activity-curator.js";
 import type { Logger } from "pino";
 import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
 import type { ProviderPaseoToolsPolicy } from "@getpaseo/protocol/provider-config";
@@ -62,6 +66,7 @@ import {
   type SeedAgentTimelineOptions,
 } from "./agent-timeline-store.js";
 import type {
+  AgentTimelineCursor,
   AgentTimelineFetchOptions,
   AgentTimelineFetchResult,
   AgentTimelineRow,
@@ -655,10 +660,31 @@ function buildImportedTimelineRows(entries: readonly ImportedTimelineEntry[]): A
     rows.push({
       seq: rows.length + 1,
       timestamp: entry.timestamp ?? new Date().toISOString(),
-      item: limitAgentTimelineItemContent(entry.item),
+      item: limitAgentTimelineItemContent(withoutChatHistorySummary(entry.item)),
     });
   }
   return rows;
+}
+
+function withoutChatHistorySummary(item: AgentTimelineItem): AgentTimelineItem {
+  return item.type === "user_message"
+    ? { ...item, text: stripChatHistorySummary(item.text) }
+    : item;
+}
+
+function resolveProviderUserMessageId(row: AgentTimelineRow): string {
+  const item = row.item;
+  if (item.type !== "user_message") {
+    throw new Error("Fork boundary must be a user message");
+  }
+  // A live prompt carries Paseo's client id until the provider echoes its own id.
+  const isUnacknowledged = item.clientMessageId && item.messageId === item.clientMessageId;
+  const providerMessageId =
+    row.providerMessageId ?? (isUnacknowledged ? undefined : item.messageId);
+  if (!providerMessageId) {
+    throw new Error("Cannot fork before the provider acknowledges the next prompt");
+  }
+  return providerMessageId;
 }
 
 function resolveImportedAgentTitle(
@@ -1411,12 +1437,64 @@ export class AgentManager {
     return this.trackAgentRegistrationOperation(this.importProviderSessionInternal(input));
   }
 
+  /**
+   * Forks the source agent's provider session at an assistant message and imports
+   * the copy as a new agent with the source's config. The fork keeps that
+   * message's whole turn.
+   */
+  forkAgent(input: {
+    sourceAgentId: string;
+    boundaryCursor?: AgentTimelineCursor;
+    boundaryMessageId?: string;
+    cwd: string;
+    workspaceId: string;
+    title: string | null;
+  }): Promise<ManagedAgent> {
+    return this.trackAgentRegistrationOperation(this.forkAgentInternal(input));
+  }
+
+  private async forkAgentInternal(input: {
+    sourceAgentId: string;
+    boundaryCursor?: AgentTimelineCursor;
+    boundaryMessageId?: string;
+    cwd: string;
+    workspaceId: string;
+    title: string | null;
+  }): Promise<ManagedAgent> {
+    const source = this.requireSessionAgent(input.sourceAgentId);
+    if (!source.session.capabilities.supportsFork || !source.session.forkConversation) {
+      throw new Error(`Provider '${source.provider}' does not support forking with full history`);
+    }
+    const timeline = this.timelineStore.fetch(source.id, { direction: "tail", limit: 0 });
+    const nextUserRow = selectNativeForkNextUserRow({
+      rows: timeline.rows,
+      cursorBoundary: input.boundaryCursor
+        ? { timelineEpoch: timeline.epoch, cursor: input.boundaryCursor }
+        : null,
+      boundaryMessageId: input.boundaryMessageId,
+    });
+    const fork = await source.session.forkConversation({
+      beforeMessageId: nextUserRow ? resolveProviderUserMessageId(nextUserRow) : undefined,
+      cwd: input.cwd,
+    });
+    return this.importProviderSessionInternal({
+      provider: source.provider,
+      providerHandleId: fork.providerHandleId,
+      cwd: input.cwd,
+      workspaceId: input.workspaceId,
+      config: { ...source.config, cwd: input.cwd, title: input.title },
+      forkSourceAgentId: source.id,
+    });
+  }
+
   private async importProviderSessionInternal(input: {
     provider: AgentProvider;
     providerHandleId: string;
     cwd: string;
     workspaceId: string;
     labels?: Record<string, string>;
+    config?: AgentSessionConfig;
+    forkSourceAgentId?: string;
   }): Promise<ManagedAgent> {
     this.assertAcceptingAgentRegistrations();
     const resolvedAgentId = validateAgentId(this.idFactory(), "importProviderSession");
@@ -1428,7 +1506,7 @@ export class AgentManager {
     }
 
     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
-      {
+      input.config ?? {
         provider: input.provider,
         cwd: input.cwd,
       },
@@ -1457,11 +1535,23 @@ export class AgentManager {
         stripInternalPaseoMcpServer(imported.config),
       );
       const timelineRows = buildImportedTimelineRows(imported.timeline);
-      const initialTitle = resolveImportedAgentTitle(importedConfig, timelineRows);
+      const initialTitle =
+        input.config?.title || resolveImportedAgentTitle(importedConfig, timelineRows);
+      const labels = input.forkSourceAgentId
+        ? {
+            ...input.labels,
+            ...buildAgentForkLabels({
+              sourceAgentId: input.forkSourceAgentId,
+              mode: AgentForkMode.Full,
+              userMessageCount: timelineRows.filter((row) => row.item.type === "user_message")
+                .length,
+            }),
+          }
+        : input.labels;
 
       handedToRegistration = true;
       const agent = await this.registerSession(imported.session, importedConfig, resolvedAgentId, {
-        labels: input.labels,
+        labels,
         workspaceId: input.workspaceId,
         timelineRows,
         timelineNextSeq: timelineRows.length + 1,
@@ -4393,7 +4483,8 @@ export class AgentManager {
     options: { fromHistory?: boolean } | undefined;
     flags: StreamEventFlags;
   }): Promise<void> {
-    const { agent, event, options, flags } = params;
+    const { agent, options, flags } = params;
+    const event = { ...params.event, item: withoutChatHistorySummary(params.event.item) };
 
     if (event.item.type === "user_message" && isSystemInjectedEnvelope(event.item.text)) {
       flags.shouldDispatchEvent = false;
@@ -4639,6 +4730,18 @@ export class AgentManager {
     turnId?: string,
     options?: { providerMessageId?: string },
   ): AgentStreamEvent {
+    const marker = this.recordForkMarkerBefore(agentId, item);
+    if (marker) {
+      this.dispatchStream(
+        agentId,
+        { type: "timeline", item: marker.item, provider },
+        {
+          seq: marker.seq,
+          epoch: this.timelineStore.getEpoch(agentId),
+          timestamp: marker.timestamp,
+        },
+      );
+    }
     const row = this.recordTimeline(agentId, item, { ...options, turnId });
     const event: AgentStreamEvent = {
       type: "timeline",
@@ -4769,6 +4872,38 @@ export class AgentManager {
     return parts.join("\n\n");
   }
 
+  /**
+   * A forked agent shows a "Continued from chat" divider right before its first
+   * user message after the copied history. The timeline is rebuilt from provider
+   * history on every load, so the marker is re-derived from the fork labels.
+   */
+  private recordForkMarkerBefore(
+    agentId: string,
+    item: AgentTimelineItem,
+    timestamp?: string,
+  ): AgentTimelineRow | undefined {
+    if (item.type !== "user_message") {
+      return undefined;
+    }
+    const origin = getAgentForkOriginFromLabels(this.agents.get(agentId)?.labels);
+    if (!origin) {
+      return undefined;
+    }
+    const rows = this.timelineStore.getRows(agentId);
+    if (rows.some((row) => row.item.type === "fork_marker")) {
+      return undefined;
+    }
+    const userMessageCount = rows.filter((row) => row.item.type === "user_message").length;
+    if (userMessageCount !== origin.userMessageCount) {
+      return undefined;
+    }
+    return this.recordTimeline(
+      agentId,
+      { type: "fork_marker", sourceAgentId: origin.sourceAgentId, mode: origin.mode },
+      timestamp ? { timestamp } : undefined,
+    );
+  }
+
   private recordTimeline(
     agentId: string,
     item: AgentTimelineItem,
@@ -4778,7 +4913,9 @@ export class AgentManager {
       turnId?: string;
     },
   ): AgentTimelineRow {
-    item = limitAgentTimelineItemContent(item);
+    item = limitAgentTimelineItemContent(withoutChatHistorySummary(item));
+    // History rebuilds only record; the live path dispatches the marker itself.
+    this.recordForkMarkerBefore(agentId, item, options?.timestamp);
     const row = this.timelineStore.append(agentId, item, options);
     this.enqueueDurableTimelineAppend(agentId, row);
     return row;

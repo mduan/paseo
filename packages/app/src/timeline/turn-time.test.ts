@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { deriveStreamTurnTiming } from "./turn-time";
 import type { StreamItem } from "@/types/stream";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 
 function user(id: string, timestamp: Date): StreamItem {
   return {
@@ -22,6 +23,32 @@ function assistant(id: string, timestamp: Date): StreamItem {
 }
 
 describe("deriveStreamTurnTiming", () => {
+  it("keeps a fork marker out of the copied turn and times the next turn from its prompt", () => {
+    const marker: StreamItem = {
+      kind: "fork_marker",
+      id: "marker",
+      timestamp: new Date("2026-05-15T00:10:00.000Z"),
+      sourceAgentId: "source",
+      mode: AgentForkMode.Full,
+    };
+
+    const timing = deriveStreamTurnTiming({
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+      tail: [
+        user("u1", new Date("2026-05-15T00:00:00.000Z")),
+        assistant("a1", new Date("2026-05-15T00:00:05.000Z")),
+        marker,
+        user("u2", new Date("2026-05-15T00:10:00.000Z")),
+        assistant("a2", new Date("2026-05-15T00:10:03.000Z")),
+      ],
+      head: [],
+    });
+
+    assert.equal(timing.byAssistantId.get("a1")?.durationMs, 5000);
+    assert.equal(timing.byAssistantId.get("a2")?.durationMs, 3000);
+  });
+
   it("starts elapsed time from the submitted prompt", () => {
     const submittedAt = new Date("2026-05-15T00:00:00.000Z");
 

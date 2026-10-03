@@ -5,6 +5,7 @@ import {
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import type { PluginTimelineData } from "@getpaseo/plugin";
 import {
   normalizeProjectDescriptor,
@@ -152,6 +153,12 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
     status: z.enum(["loading", "completed"]),
     trigger: z.enum(["auto", "manual"]).optional(),
     preTokens: z.number().nonnegative().optional(),
+  }),
+  z.strictObject({
+    ...TimelineItemBaseShape,
+    kind: z.literal("fork_marker"),
+    sourceAgentId: z.string(),
+    mode: z.enum(AgentForkMode),
   }),
   z.strictObject({
     ...TimelineItemBaseShape,
@@ -476,6 +483,13 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         ...(item.trigger ? { trigger: item.trigger } : {}),
         ...(item.preTokens !== undefined ? { preTokens: item.preTokens } : {}),
       };
+    case "fork_marker":
+      return {
+        ...base,
+        kind: item.kind,
+        sourceAgentId: item.sourceAgentId,
+        mode: item.mode,
+      };
     case "tool_call":
       if (item.payload.source !== "agent") return null;
       return {
@@ -565,6 +579,13 @@ function deserializeBuiltinTimelineItem(
         status: item.status,
         ...(item.trigger ? { trigger: item.trigger } : {}),
         ...(item.preTokens !== undefined ? { preTokens: item.preTokens } : {}),
+      };
+    case "fork_marker":
+      return {
+        ...base,
+        kind: item.kind,
+        sourceAgentId: item.sourceAgentId,
+        mode: item.mode,
       };
     case "tool_call": {
       const tool = item.item;
