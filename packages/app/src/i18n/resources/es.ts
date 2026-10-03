@@ -233,6 +233,7 @@ export const es: TranslationResources = {
     empty: "Comience a chatear con este agente...",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
+    workedFor: "Trabajó durante {{duration}}",
     messageCapped: "Este mensaje fue truncado ({{bytes}} bytes).",
     permission: {
       rejectedPlan: "Plan rechazado",
@@ -1999,10 +2000,6 @@ export const es: TranslationResources = {
     paseoCalls: {
       one: "llamó a Paseo {{count}} vez",
       other: "llamó a Paseo {{count}} veces",
-    },
-    failed: {
-      one: "{{count}} falló",
-      other: "{{count}} fallaron",
     },
     and: "y",
   },

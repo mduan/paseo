@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentToolCallData, StreamItem } from "@/types/stream";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import { foldCompletedTurns } from "./collapse-completed-turns";
 
 const timestamp = new Date("2026-01-01T00:00:00.000Z");
@@ -74,24 +75,79 @@ describe("foldCompletedTurns", () => {
     expect(toggles.w1).toMatchObject({ turnKey: "t1", expanded: true });
   });
 
-  it("summarizes the hidden tool calls and counts failures", () => {
+  it("times the turn from its prompt to its last row", () => {
+    const at = (seconds: number) => new Date(timestamp.getTime() + seconds * 1000);
     const folded = foldCompletedTurns({
       tail: [
-        user("p", "t"),
-        tool("edit", "t", { type: "edit", filePath: "a.ts" }, "completed"),
-        tool("shell", "t", { type: "shell", command: "npm test" }, "failed"),
-        tool("read", "t", { type: "read", filePath: "a.ts" }, "canceled"),
-        assistant("a", "t"),
+        { ...user("p", "t"), timestamp: at(0) },
+        { ...thought("w", "t"), timestamp: at(5) },
+        { ...assistant("a", "t"), timestamp: at(12) },
       ],
       head: [],
       isTurnActive: false,
       activeTurnId: null,
       expandedTurnKeys: new Set(),
     });
-    expect(folded.toggles.get("a")).toMatchObject({
-      toolSummary: { editedFileCount: 1, commandCount: 1, readFileCount: 1 },
-      failedToolCount: 1,
+    expect(folded.toggles.get("a")).toMatchObject({ hasWork: true, durationMs: 12_000 });
+  });
+
+  it("gives a turn without work a duration-only row", () => {
+    const folded = foldCompletedTurns({
+      tail: [user("p", "t"), assistant("a", "t")],
+      head: [],
+      isTurnActive: false,
+      activeTurnId: null,
+      expandedTurnKeys: new Set(),
     });
+    expect(folded.items.map((item) => item.id)).toEqual(["p", "a"]);
+    expect(folded.toggles.get("a")).toMatchObject({ hasWork: false, durationMs: 0 });
+  });
+
+  it("folds the rule Codex puts before a later message with the work", () => {
+    const rule: StreamItem = {
+      kind: "assistant_message",
+      id: "final:0",
+      text: "---",
+      timestamp,
+      turnId: "t",
+      blockGroupId: "final",
+    };
+    const tail = [
+      user("p", "t"),
+      assistant("intro", "t"),
+      tool("shell", "t", { type: "shell", command: "ls" }, "completed"),
+      rule,
+      assistant("final:1", "t", "final"),
+    ];
+    const foldRuleTurn = (expanded: string[]) =>
+      foldCompletedTurns({
+        tail,
+        head: [],
+        isTurnActive: false,
+        activeTurnId: null,
+        expandedTurnKeys: new Set(expanded),
+      }).items.map((item) => item.id);
+    expect(foldRuleTurn([])).toEqual(["p", "final:1"]);
+    expect(foldRuleTurn(["t"])).toEqual(tail.map((item) => item.id));
+  });
+
+  it("keeps a fork marker visible above the folded work", () => {
+    const marker: StreamItem = {
+      kind: "fork_marker",
+      id: "marker",
+      timestamp,
+      sourceAgentId: "source",
+      mode: AgentForkMode.Full,
+    };
+    const folded = foldCompletedTurns({
+      tail: [marker, user("p", "t"), thought("w", "t"), assistant("a", "t")],
+      head: [],
+      isTurnActive: false,
+      activeTurnId: null,
+      expandedTurnKeys: new Set(),
+    });
+    expect(folded.items.map((item) => item.id)).toEqual(["marker", "p", "a"]);
+    expect(folded.toggles.get("a")).toMatchObject({ hasWork: true });
   });
 
   it("never folds the active turn", () => {

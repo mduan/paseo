@@ -233,6 +233,7 @@ export const ja: TranslationResources = {
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
+    workedFor: "{{duration}}作業",
     messageCapped: "このメッセージは上限で切り詰められました（{{bytes}}バイト）。",
     permission: {
       rejectedPlan: "却下されたプラン",
@@ -1971,10 +1972,6 @@ export const ja: TranslationResources = {
     paseoCalls: {
       one: "Paseoを{{count}}回呼び出し",
       other: "Paseoを{{count}}回呼び出し",
-    },
-    failed: {
-      one: "{{count}}件失敗",
-      other: "{{count}}件失敗",
     },
     and: "および",
   },

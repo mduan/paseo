@@ -1561,6 +1561,18 @@ export class AgentManager {
             }),
           }
         : input.labels;
+      if (input.forkSourceAgentId) {
+        // Show "Continued from chat" before the first prompt, right after the copied history.
+        timelineRows.push({
+          seq: timelineRows.length + 1,
+          timestamp: new Date().toISOString(),
+          item: {
+            type: "fork_marker",
+            sourceAgentId: input.forkSourceAgentId,
+            mode: AgentForkMode.Full,
+          },
+        });
+      }
 
       handedToRegistration = true;
       const agent = await this.registerSession(imported.session, importedConfig, resolvedAgentId, {
@@ -4142,6 +4154,8 @@ export class AgentManager {
         providerSubagentEvents.push(event);
       }
     }
+    const trailingForkMarker = this.forkMarkerAfterHistory(agent, historyEvents);
+    if (trailingForkMarker) historyEvents.push(trailingForkMarker);
 
     this.agentStreamCoalescer.flushAndDiscard(agent.id);
     await this.deleteCommittedTimeline(agent.id);
@@ -4211,6 +4225,9 @@ export class AgentManager {
       this.logger.warn({ err: error, agentId: agent.id }, "Failed to hydrate provider history");
       throw error;
     }
+
+    const trailingForkMarker = this.forkMarkerAfterHistory(agent, historyEvents);
+    if (trailingForkMarker) historyEvents.push(trailingForkMarker);
 
     // The replay is the timeline, so drop the rows a previous hydration committed.
     // Keeping them would leave getTimelineRows reading one copy per hydration.
@@ -4954,6 +4971,33 @@ export class AgentManager {
       { type: "fork_marker", sourceAgentId: origin.sourceAgentId, mode: origin.mode },
       timestamp ? { timestamp } : undefined,
     );
+  }
+
+  /**
+   * The fork marker that ends a replayed history which stops at the copied messages, so a
+   * fork shows its divider before its first prompt. Later prompts get theirs from
+   * `recordForkMarkerBefore` instead.
+   */
+  private forkMarkerAfterHistory(
+    agent: ActiveManagedAgent,
+    historyEvents: readonly Extract<AgentStreamEvent, { type: "timeline" }>[],
+  ): Extract<AgentStreamEvent, { type: "timeline" }> | undefined {
+    const origin = getAgentForkOriginFromLabels(agent.labels);
+    if (!origin) {
+      return undefined;
+    }
+    const userMessageCount = historyEvents.filter(
+      (event) => event.item.type === "user_message",
+    ).length;
+    if (userMessageCount !== origin.userMessageCount) {
+      return undefined;
+    }
+    return {
+      type: "timeline",
+      provider: agent.provider,
+      item: { type: "fork_marker", sourceAgentId: origin.sourceAgentId, mode: origin.mode },
+      timestamp: historyEvents.at(-1)?.timestamp,
+    };
   }
 
   private recordTimeline(

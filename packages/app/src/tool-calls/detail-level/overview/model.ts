@@ -41,7 +41,7 @@ export function buildOverviewGroup(run: ToolCallRun): OverviewToolCallGroup {
   };
 }
 
-export function summarizeToolCalls(calls: readonly ToolCallItem[]): OverviewSummary {
+function summarizeToolCalls(calls: readonly ToolCallItem[]): OverviewSummary {
   const editedFiles = new Set<string>();
   const readFiles = new Set<string>();
   let commandCount = 0;

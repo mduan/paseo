@@ -4,7 +4,6 @@ import { SettingsCard, SettingsSection, SettingsSwitch } from "@/components/sett
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 
 const CUSTOMIZATIONS = [
-  "collapseCompletedTurns",
   "compactChat",
   "turnDiffs",
   "keepChatPosition",

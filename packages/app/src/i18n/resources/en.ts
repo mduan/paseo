@@ -227,6 +227,7 @@ export const en = {
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
     historyLoadFailed: "Couldn't load agent history",
+    workedFor: "Worked for {{duration}}",
     messageCapped: "This message was capped ({{bytes}} bytes).",
     permission: {
       rejectedPlan: "Rejected plan",
@@ -1977,10 +1978,6 @@ export const en = {
       one: "called Paseo {{count}} time",
       other: "called Paseo {{count}} times",
     },
-    failed: {
-      one: "{{count}} failed",
-      other: "{{count}} failed",
-    },
     and: "and",
   },
   renameModal: {
@@ -2052,10 +2049,6 @@ export const en = {
     customizations: {
       group: "Customizations",
       all: "All",
-      collapseCompletedTurns: {
-        title: "Collapse completed turns",
-        description: "Hide the work in finished turns behind a Show work toggle",
-      },
       compactChat: {
         title: "Compact chat",
         description: "Reduce spacing between messages and restyle user bubbles",

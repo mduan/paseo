@@ -231,6 +231,7 @@ export const ar: TranslationResources = {
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
+    workedFor: "عمل لمدة {{duration}}",
     messageCapped: "تم اقتطاع هذه الرسالة ({{bytes}} بايت).",
     permission: {
       rejectedPlan: "خطة مرفوضة",
@@ -1951,10 +1952,6 @@ export const ar: TranslationResources = {
     paseoCalls: {
       one: "استدعى Paseo {{count}} مرة",
       other: "استدعى Paseo {{count}} مرات",
-    },
-    failed: {
-      one: "فشل {{count}}",
-      other: "فشل {{count}}",
     },
     and: "و",
   },

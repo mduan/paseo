@@ -63,10 +63,7 @@ import { ToolCallDetailsContent } from "@/components/tool-call-details";
 import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { createStreamPresentation, getStreamItemMessageId } from "./presentation";
-import {
-  OverviewToolCallGroupView,
-  useOverviewSummary,
-} from "@/tool-calls/detail-level/overview/view";
+import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
 import { type AgentStreamRenderModel, buildAgentStreamRenderModel } from "./model";
 import { resolveStreamRenderStrategy } from "./strategy-resolver";
 import { type StreamSegmentRenderers, type StreamViewportHandle } from "./strategy";
@@ -110,6 +107,7 @@ import {
   type AssistantForkMenuContextValue,
 } from "@/components/assistant-fork-menu";
 import { isWeb } from "@/constants/platform";
+import { formatDuration } from "@/utils/time";
 import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
@@ -399,7 +397,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const toolCallDetailLevel = useSettings((settings) => settings.toolCallDetailLevel);
     const chatOutlineEnabled = useSettings((settings) => settings.chatOutlineEnabled);
     const compactChat = useSettings((settings) => settings.compactChat);
-    const collapseCompletedTurns = useSettings((settings) => settings.collapseCompletedTurns);
     const contentMaxWidth = useSettings(resolveContentMaxWidth);
     const viewportRef = useRef<StreamViewportHandle | null>(null);
     const pendingClientMessageIds = useMemo(
@@ -628,7 +625,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       [onOpenTurnDiff, presentation.tail, turnDiffs, turnDiffsEnabled],
     );
     const { tail: displayTail, workToggles } = useFoldedTail({
-      enabled: collapseCompletedTurns,
       chatKey: `${resolvedServerId}:${agentId}`,
       tail: presentation.tail,
       head: presentation.head,
@@ -1797,9 +1793,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
   },
-  workToggleFailed: {
-    color: theme.colors.destructive,
-  },
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -1968,32 +1961,26 @@ function WorkToggleButton({ itemId }: { itemId: string }) {
 function WorkToggleRow({
   turnKey,
   expanded,
-  toolSummary,
-  failedToolCount,
+  hasWork,
+  durationMs,
   onToggle,
 }: WorkToggle & { onToggle: (turnKey: string) => void }) {
   const { t } = useTranslation();
-  const title = t(
-    expanded ? "settings.customizations.hideWork" : "settings.customizations.showWork",
-  );
-  const summary = useOverviewSummary(toolSummary);
-  const failed =
-    failedToolCount > 0
-      ? t(`toolCallGroup.failed.${failedToolCount === 1 ? "one" : "other"}`, {
-          count: failedToolCount,
-        })
-      : "";
-  const details = [summary, failed].filter(Boolean).join(" · ");
-  const labelRef = useRef<Text>(null);
-  useEffect(() => {
-    // ponytail: native browser tooltip for truncated labels; RN Web 0.21 drops the `title` prop.
-    if (isWeb) {
-      const label = details ? `${title} (${details})` : title;
-      (labelRef.current as unknown as HTMLElement | null)?.setAttribute("title", label);
-    }
-  }, [title, details]);
   const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
+  const label =
+    durationMs !== null
+      ? t("agentStream.workedFor", { duration: formatDuration(durationMs) })
+      : t(expanded ? "settings.customizations.hideWork" : "settings.customizations.showWork");
+  if (!hasWork) {
+    return (
+      <View style={stylesheet.workToggle} testID="work-toggle">
+        <Text numberOfLines={1} style={stylesheet.workToggleText}>
+          {label}
+        </Text>
+      </View>
+    );
+  }
   const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
   return (
     <Pressable
@@ -2003,15 +1990,8 @@ function WorkToggleRow({
       style={stylesheet.workToggle}
       testID="work-toggle"
     >
-      <Text ref={labelRef} numberOfLines={1} style={stylesheet.workToggleText}>
-        {title}
-        {details ? (
-          <>
-            {` (${summary}${summary && failed ? " · " : ""}`}
-            {failed ? <Text style={stylesheet.workToggleFailed}>{failed}</Text> : null}
-            {")"}
-          </>
-        ) : null}
+      <Text numberOfLines={1} style={stylesheet.workToggleText}>
+        {label}
       </Text>
       <Chevron size={14} uniProps={mutedColorMapping} />
     </Pressable>

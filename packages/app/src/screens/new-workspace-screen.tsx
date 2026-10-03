@@ -95,7 +95,12 @@ import {
 import { useProjectIcons } from "@/projects/icons";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import type { ComposerAttachment } from "@/attachments/types";
-import { useDraftWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
+import {
+  useDraftWorkspaceAttachmentScopeKey,
+  useWorkspaceAttachmentsStore,
+} from "@/attachments/workspace-attachments-store";
+import { ForkMarker } from "@/components/fork-marker";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import type { MessagePayload } from "@/composer/types";
 import type { UserComposerAttachment } from "@/attachments/types";
 import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messages";
@@ -2472,12 +2477,45 @@ export function NewWorkspaceScreen({
           formStack={formStack}
           onImportSession={importSession.open}
         >
+          <DraftForkMarker
+            serverId={serverId}
+            forkDraftSetup={forkDraftSetup}
+            attachmentScopeKey={draftContextScopeKey}
+          />
           {composer}
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         </NewWorkspaceLayout>
       </View>
       {importSession.sheet}
     </FileDropZone>
+  );
+}
+
+/** A fork into a new workspace creates its agent on submit, so the draft shows the divider. */
+function DraftForkMarker({
+  serverId,
+  forkDraftSetup,
+  attachmentScopeKey,
+}: {
+  serverId: string;
+  forkDraftSetup: PendingWorkspaceDraftSetup | null | undefined;
+  attachmentScopeKey: string;
+}) {
+  const nativeForkSourceAgentId = forkDraftSetup?.nativeFork?.sourceAgentId;
+  const summaryForkSourceAgentId = useWorkspaceAttachmentsStore(
+    (state) =>
+      state.attachmentsByScope[attachmentScopeKey]?.find(
+        (attachment) => attachment.kind === "chat_history",
+      )?.source.agentId,
+  );
+  const sourceAgentId = nativeForkSourceAgentId ?? summaryForkSourceAgentId;
+  if (!sourceAgentId) return null;
+  return (
+    <ForkMarker
+      serverId={serverId}
+      sourceAgentId={sourceAgentId}
+      mode={nativeForkSourceAgentId ? AgentForkMode.Full : AgentForkMode.Summary}
+    />
   );
 }
 

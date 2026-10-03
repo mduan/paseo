@@ -233,6 +233,7 @@ export const ru: TranslationResources = {
     empty: "Начните общаться с этим агентом...",
     scrollToBottom: "Прокрутить вниз",
     historyLoadFailed: "Не удалось загрузить историю агента",
+    workedFor: "Работал {{duration}}",
     messageCapped: "Это сообщение было обрезано ({{bytes}} байт).",
     permission: {
       rejectedPlan: "Отклонённый план",
@@ -1984,10 +1985,6 @@ export const ru: TranslationResources = {
     paseoCalls: {
       one: "выполнен {{count}} вызов Paseo",
       other: "выполнены вызовы Paseo ({{count}})",
-    },
-    failed: {
-      one: "ошибок: {{count}}",
-      other: "ошибок: {{count}}",
     },
     and: "и",
   },

@@ -632,130 +632,93 @@ export const UserMessage = memo(function UserMessage({
 interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
-  durationMs?: number | null;
   onFork?: (request: AssistantForkRequest) => Promise<void> | void;
 }
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
+  hoverTarget: {
+    position: "relative",
+  },
   container: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+  },
+  actionsHidden: {
+    opacity: 0,
   },
   copyButton: {
     alignSelf: "center",
     padding: theme.spacing[1],
     paddingTop: theme.spacing[1],
     marginTop: 0,
-    marginLeft: -theme.spacing[1],
   },
-  labelWrapper: {
-    position: "relative",
-  },
-  labelSizer: {
-    color: theme.colors.foregroundMuted,
-    fontSize: STREAM_METADATA_FONT_SIZE,
-    opacity: 0,
-  },
-  labelOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
+  label: {
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
   },
 }));
 
-const TIMESTAMP_REVEAL_MS = 3000;
-
 /**
- * Footer rendered next to the copy button at the end of an assistant turn.
- * Shows the turn duration and swaps to the end timestamp when both are known.
- * A turn without a visible start shows its end timestamp directly.
+ * Footer at the end of an assistant turn: the end timestamp, then the copy and fork actions.
+ * The actions reveal on hover on web; touch layouts always show them. The actions keep their
+ * slot while hidden, so revealing them never shifts the row (see docs/hover.md).
  */
 export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   getContent,
   completedAt,
-  durationMs,
   onFork,
 }: AssistantTurnFooterProps) {
+  const isCompact = useIsCompactFormFactor();
   const [hovered, setHovered] = useState(false);
-  const [pressedReveal, setPressedReveal] = useState(false);
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (revealTimerRef.current) {
-        clearTimeout(revealTimerRef.current);
-        revealTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const durationLabel = useMemo(
-    () =>
-      durationMs !== undefined && durationMs !== null
-        ? `Worked for ${formatDuration(durationMs)}`
-        : "",
-    [durationMs],
-  );
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => setHovered(false), []);
   const timestampLabel = useMemo(
     () => (completedAt ? formatMessageTimestamp(completedAt) : ""),
     [completedAt],
   );
-
-  const primaryLabel = durationLabel || timestampLabel;
-  const canSwap = Boolean(durationLabel && timestampLabel);
-  const showTimestamp = canSwap && (isWeb ? hovered : pressedReveal);
-
-  const handleHoverIn = useCallback(() => setHovered(true), []);
-  const handleHoverOut = useCallback(() => setHovered(false), []);
-  const handlePress = useCallback(() => {
-    if (isWeb || !canSwap) return;
-    if (revealTimerRef.current) {
-      clearTimeout(revealTimerRef.current);
-    }
-    setPressedReveal((prev) => !prev);
-    revealTimerRef.current = setTimeout(() => {
-      setPressedReveal(false);
-      revealTimerRef.current = null;
-    }, TIMESTAMP_REVEAL_MS);
-  }, [canSwap]);
   const handleFork = useCallback(
     (request: AssistantForkRequest) => {
       return onFork?.(request);
     },
     [onFork],
   );
-  const canFork = Boolean(onFork);
+  const showActions = hovered || isNative || isCompact;
+  const actionsStyle = useMemo(
+    () => [
+      assistantTurnFooterStylesheet.actions,
+      !showActions && assistantTurnFooterStylesheet.actionsHidden,
+    ],
+    [showActions],
+  );
 
   return (
-    <View style={assistantTurnFooterStylesheet.container}>
-      <TurnCopyButton
-        getContent={getContent}
-        containerStyle={assistantTurnFooterStylesheet.copyButton}
-      />
-      {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
-      {primaryLabel ? (
-        <Pressable
-          onPress={handlePress}
-          onHoverIn={handleHoverIn}
-          onHoverOut={handleHoverOut}
-          accessibilityRole={canSwap ? "button" : undefined}
-          accessibilityLabel={canSwap ? `${durationLabel}, ended ${timestampLabel}` : primaryLabel}
+    <View
+      style={assistantTurnFooterStylesheet.hoverTarget}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+    >
+      <View style={assistantTurnFooterStylesheet.container}>
+        {timestampLabel ? (
+          <Text style={assistantTurnFooterStylesheet.label}>{timestampLabel}</Text>
+        ) : null}
+        <View
+          style={actionsStyle}
+          pointerEvents={showActions ? "auto" : "none"}
+          testID="assistant-turn-actions"
         >
-          <View style={assistantTurnFooterStylesheet.labelWrapper}>
-            {/* Sizer reserves space for whichever label is longer so the
-                container width is stable across hover transitions. */}
-            <Text style={assistantTurnFooterStylesheet.labelSizer} aria-hidden>
-              {primaryLabel.length >= timestampLabel.length ? primaryLabel : timestampLabel}
-            </Text>
-            <Text style={assistantTurnFooterStylesheet.labelOverlay}>
-              {showTimestamp ? timestampLabel : primaryLabel}
-            </Text>
-          </View>
-        </Pressable>
-      ) : null}
+          <TurnCopyButton
+            getContent={getContent}
+            containerStyle={assistantTurnFooterStylesheet.copyButton}
+          />
+          {onFork ? <AssistantForkMenu onFork={handleFork} /> : null}
+        </View>
+      </View>
     </View>
   );
 });
