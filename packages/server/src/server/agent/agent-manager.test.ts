@@ -7761,6 +7761,10 @@ test("runAgent assembles finalText from trailing assistant chunks", async () => 
 
   const result = await manager.runAgent(snapshot.id, "generate commit message");
   expect(result.finalText).toBe(expectedFinalText);
+  // The turn end saves a plain-text preview of the same message for the sidebar.
+  expect(manager.getAgent(snapshot.id)?.lastAssistantPreview).toBe(
+    'json {"message":"Reserve space for archive button in sidebar agent list"}',
+  );
 });
 
 test("listAgents excludes internal agents", async () => {

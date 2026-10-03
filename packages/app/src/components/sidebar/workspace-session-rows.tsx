@@ -244,18 +244,23 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
         >
           {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <>
-              <WorkspaceTabIcon
-                presentation={presentation}
-                active={selected}
-                backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
-              />
-              <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
-                {presentation.titleState === "loading"
-                  ? t("workspace.tabs.loading")
-                  : presentation.label}
-              </Text>
+              <View style={styles.titleLine}>
+                <WorkspaceTabIcon
+                  presentation={presentation}
+                  active={selected}
+                  backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                />
+                <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
+                  {presentation.titleState === "loading"
+                    ? t("workspace.tabs.loading")
+                    : presentation.label}
+                </Text>
+                {row.target.kind === "agent" ? (
+                  <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
+                ) : null}
+              </View>
               {row.target.kind === "agent" ? (
-                <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
+                <AgentPreview serverId={serverId} agentId={row.target.agentId} />
               ) : null}
             </>
           )}
@@ -274,6 +279,17 @@ function resolveBackdrop(input: {
   if (input.selected) return "surfaceSidebarSelected";
   if (input.hovered) return "surfaceSidebarHover";
   return "surfaceSidebar";
+}
+
+function AgentPreview({ serverId, agentId }: { serverId: string; agentId: string }) {
+  const preview = useSessionStore(
+    (state) => state.sessions[serverId]?.agents?.get(agentId)?.lastAssistantPreview,
+  );
+  return preview ? (
+    <Text style={styles.preview} numberOfLines={1}>
+      {preview}
+    </Text>
+  ) : null;
 }
 
 function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: string }) {
@@ -303,14 +319,25 @@ const styles = StyleSheet.create((theme) => ({
     paddingLeft: theme.spacing[2],
   },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
+    justifyContent: "center",
     minHeight: 28,
+    paddingVertical: theme.spacing[1],
     paddingLeft: SESSION_ROW_INSET,
     paddingRight: theme.spacing[3],
     borderRadius: theme.borderRadius.lg,
     userSelect: "none",
+  },
+  titleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+  },
+  // Starts under the title, past the 14px tab icon and its gap.
+  preview: {
+    paddingLeft: 14 + theme.spacing[2],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
   },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,

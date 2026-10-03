@@ -5,6 +5,7 @@ import {
   buildStoredAgentPayload,
   toAgentPayload,
   toRecentProviderSessionDescriptorPayload,
+  toAssistantPreview,
   toStoredAgentRecord,
   type ManagedAgent,
 } from "./agent-projections.js";
@@ -233,6 +234,14 @@ describe("toStoredAgentRecord", () => {
       totalCostUsd: 1.25,
       outputTokens: 20,
     });
+  });
+  it("keeps the assistant preview so an unloaded agent still shows it", () => {
+    const agent = createManagedAgent({ lastAssistantPreview: "Pushed both branches" });
+    const record = toStoredAgentRecord(agent);
+
+    expect(buildStoredAgentPayload(record, ["codex"]).lastAssistantPreview).toBe(
+      "Pushed both branches",
+    );
   });
 });
 
@@ -548,5 +557,18 @@ describe("toRecentProviderSessionDescriptorPayload", () => {
       firstPromptPreview: null,
       lastPromptPreview: null,
     });
+  });
+});
+
+describe("toAssistantPreview", () => {
+  it("flattens markdown to one line of plain text", () => {
+    expect(toAssistantPreview("## Done\n\n- Pushed **both** branches\n- Ran `npm test`")).toBe(
+      "Done Pushed both branches Ran npm test",
+    );
+  });
+
+  it("caps the length and skips empty text", () => {
+    expect(toAssistantPreview("a".repeat(500))).toHaveLength(200);
+    expect(toAssistantPreview("  \n ")).toBeUndefined();
   });
 });

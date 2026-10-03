@@ -77,6 +77,7 @@ import {
   AgentStreamCoalescer,
 } from "./agent-stream-coalescer.js";
 import { limitAgentTimelineItemContent } from "./agent-timeline-content.js";
+import { toAssistantPreview } from "./agent-projections.js";
 import {
   AgentRunState,
   type ForegroundTurnWaiter,
@@ -440,6 +441,8 @@ interface ManagedAgentBase {
   latestTurnDiffAt?: Date;
   lastUsage?: AgentUsage;
   lastError?: string;
+  /** The start of the last assistant message as plain text, saved at each turn end. */
+  lastAssistantPreview?: string;
   attention: AttentionState;
   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
   finalizedForegroundTurnIds: Set<string>;
@@ -2023,6 +2026,7 @@ export class AgentManager {
         lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
         lastUsage: record.lastUsage,
         lastError: record.lastError ?? undefined,
+        lastAssistantPreview: record.lastAssistantPreview,
         attention,
         internal: record.internal,
         labels: record.labels,
@@ -3288,6 +3292,18 @@ export class AgentManager {
   ): Promise<void> {
     const agent = this.requireSessionAgent(agentId);
     await this.hydrateTimelineFromLegacyProviderHistory(agent, options);
+    if (this.refreshLastAssistantPreview(agent)) {
+      this.emitState(agent);
+    }
+  }
+
+  /** Returns whether the preview changed. */
+  private refreshLastAssistantPreview(agent: ManagedAgent): boolean {
+    const text = this.getLastAssistantMessageFromTimeline(this.timelineStore.getItems(agent.id));
+    const preview = text ? toAssistantPreview(text) : undefined;
+    if (!preview || preview === agent.lastAssistantPreview) return false;
+    agent.lastAssistantPreview = preview;
+    return true;
   }
 
   async rewind(agentId: string, messageId: string, mode: RewindMode): Promise<void> {
@@ -4350,6 +4366,11 @@ export class AgentManager {
     }
 
     const flags: StreamEventFlags = { shouldDispatchEvent: true, shouldNotifyWaiters: true };
+
+    // Set before the terminal handlers emit state, so the idle snapshot carries it.
+    if (isTurnTerminalEvent(event) && !options?.fromHistory) {
+      this.refreshLastAssistantPreview(agent);
+    }
 
     const dispatchPromise = this.dispatchStreamEventByType({
       agent,

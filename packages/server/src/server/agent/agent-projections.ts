@@ -92,6 +92,7 @@ export function toStoredAgentRecord(
     features: normalizeFeatures(agent.features),
     persistence,
     lastError: agent.lastError ?? undefined,
+    lastAssistantPreview: agent.lastAssistantPreview,
     lastUsage: sanitizeUsage(agent.lastUsage),
     requiresAttention: agent.attention.requiresAttention,
     attentionReason: agent.attention.requiresAttention ? agent.attention.attentionReason : null,
@@ -151,6 +152,10 @@ export function toAgentPayload(
 
   if (agent.lastError !== undefined) {
     payload.lastError = agent.lastError;
+  }
+
+  if (agent.lastAssistantPreview !== undefined) {
+    payload.lastAssistantPreview = agent.lastAssistantPreview;
   }
 
   // Handle attention state
@@ -252,6 +257,7 @@ export function buildStoredAgentPayload(
     archivedAt: record.archivedAt ?? null,
     labels: normalizeLabels(record.labels),
     ...(record.lastUsage ? { lastUsage: record.lastUsage } : {}),
+    ...(record.lastAssistantPreview ? { lastAssistantPreview: record.lastAssistantPreview } : {}),
     ...(providerAvailable ? {} : { providerUnavailable: true }),
   };
 }
@@ -507,4 +513,19 @@ function sanitizeRuntimeInfo(
     sanitized.extra = extra;
   }
   return sanitized;
+}
+
+const ASSISTANT_PREVIEW_MAX_LENGTH = 200;
+
+// ponytail: drops only inline markdown markers; a preview of a table or code block still reads raw.
+export function toAssistantPreview(text: string): string | undefined {
+  const plain = text
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[`*]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) return undefined;
+  return plain.length > ASSISTANT_PREVIEW_MAX_LENGTH
+    ? `${plain.slice(0, ASSISTANT_PREVIEW_MAX_LENGTH - 1)}…`
+    : plain;
 }

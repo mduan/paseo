@@ -86,6 +86,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
     ...(agent.latestTurnDiffAt ? { latestTurnDiffAt: agent.latestTurnDiffAt } : {}),
+    ...(agent.lastAssistantPreview ? { lastAssistantPreview: agent.lastAssistantPreview } : {}),
   };
 }
 
@@ -136,5 +137,6 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     parentAgentId,
     labels: snapshot.labels,
     latestTurnDiffAt: snapshot.latestTurnDiffAt,
+    lastAssistantPreview: snapshot.lastAssistantPreview,
   };
 }
