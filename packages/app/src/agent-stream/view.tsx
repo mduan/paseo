@@ -102,12 +102,12 @@ import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store"
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
-import { SPACING, type Theme } from "@/styles/theme";
+import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { CompactChatContext, useCompactChat } from "./compact-chat";
-import { getCompactGapBetweenStreamItems, getGapBetweenStreamItems } from "./spacing";
+import { getCompactGapBetweenStreamItems } from "./spacing";
 import {
   useFoldedTail,
   useWorkToggle,
@@ -186,7 +186,7 @@ function renderStreamItemWithTurnFooter(input: {
   const content = (
     <StreamItemWrapper
       itemId={input.layoutItem.item.id}
-      gapAbove={getGapBetweenStreamItems(input.layoutItem.aboveItem, input.layoutItem.item)}
+      belowItemId={input.layoutItem.belowItem?.id}
       gapBelow={input.layoutItem.gapBelow}
       compactGapBelow={
         input.layoutItem.item.kind === "user_message" || input.layoutItem.completedFooter
@@ -1712,6 +1712,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
+    marginTop: theme.spacing[1],
     marginBottom: theme.spacing[4],
     paddingBottom: theme.spacing[2],
     borderBottomWidth: 1,
@@ -1847,7 +1848,7 @@ const permissionStyles = StyleSheet.create((theme) => ({
 
 interface StreamItemWrapperProps {
   itemId: string;
-  gapAbove: number;
+  belowItemId: string | undefined;
   gapBelow: number;
   compactGapBelow: number;
   children: ReactNode;
@@ -1855,19 +1856,24 @@ interface StreamItemWrapperProps {
 
 function StreamItemWrapper({
   itemId,
-  gapAbove,
+  belowItemId,
   gapBelow,
   compactGapBelow,
   children,
 }: StreamItemWrapperProps) {
-  const marginBottom = useCompactChat() ? compactGapBelow : gapBelow;
+  const compactChat = useCompactChat();
+  // The toggle moves between the final message and the first work row, which take different
+  // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
+  const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
+  let marginBottom = compactChat ? compactGapBelow : gapBelow;
+  if (isAboveWorkToggle) marginBottom = 0;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],
   );
   return (
     <View style={wrapperStyle}>
-      <WorkToggleButton itemId={itemId} gapAbove={gapAbove} />
+      <WorkToggleButton itemId={itemId} />
       {children}
     </View>
   );
@@ -1876,24 +1882,17 @@ function StreamItemWrapper({
 const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedChevronDown = withUnistyles(ChevronDown);
 
-function WorkToggleButton({ itemId, gapAbove }: { itemId: string; gapAbove: number }) {
+function WorkToggleButton({ itemId }: { itemId: string }) {
   const toggle = useWorkToggle(itemId);
-  return toggle ? <WorkToggleRow {...toggle} gapAbove={gapAbove} /> : null;
+  return toggle ? <WorkToggleRow {...toggle} /> : null;
 }
 
 function WorkToggleRow({
   turnKey,
   expanded,
-  gapAbove,
   onToggle,
-}: WorkToggle & { gapAbove: number; onToggle: (turnKey: string) => void }) {
+}: WorkToggle & { onToggle: (turnKey: string) => void }) {
   const { t } = useTranslation();
-  // The toggle moves between the final message and the first work row, which sit at different
-  // gaps below the user message. Cancel that gap so the toggle stays put.
-  const style = useMemo(
-    () => [stylesheet.workToggle, { marginTop: SPACING[1] - gapAbove }],
-    [gapAbove],
-  );
   const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
@@ -1902,7 +1901,7 @@ function WorkToggleRow({
       accessibilityRole="button"
       accessibilityState={accessibilityState}
       onPress={handlePress}
-      style={style}
+      style={stylesheet.workToggle}
       testID="work-toggle"
     >
       <Text style={stylesheet.workToggleText}>

@@ -397,14 +397,37 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
     },
     [chatFindRowIndexes],
   );
+  // Rows that move from mounted history into the virtualizer keep their rendered height. Their
+  // DOM is still in place during this render. An estimate would move the rows below them, and
+  // the virtualizer would then scroll to make up for a layout the reader never saw.
+  const mountedRowHeights = useMemo(() => {
+    const heights = new Map<string, number>();
+    const contentNode = contentRef.current;
+    if (!contentNode) return heights;
+    const virtualizedIds = new Set(segments.historyVirtualized.map((item) => item.id));
+    const mountedRows = contentNode.querySelectorAll<HTMLElement>(
+      "[data-history-row-id]:not([data-index])",
+    );
+    for (const element of mountedRows) {
+      const rowId = element.dataset.historyRowId;
+      if (rowId && virtualizedIds.has(rowId)) {
+        heights.set(rowId, element.getBoundingClientRect().height);
+      }
+    }
+    return heights;
+  }, [segments.historyVirtualized]);
   const rowVirtualizer = useVirtualizer({
     count: segments.historyVirtualized.length,
     enabled: shouldUseVirtualizer,
     getScrollElement: () => scrollContainerRef.current,
+    // The virtualizer scrolls to this offset when it turns on. History can cross the
+    // threshold mid-read (expanding a folded turn), so start from where the reader is.
+    initialOffset: () => scrollContainerRef.current?.scrollTop ?? 0,
     getItemKey: (index: number) => segments.historyVirtualized[index]?.id ?? index,
     estimateSize: (index: number) => {
       const row = segments.historyVirtualized[index];
-      return row ? estimateStreamItemHeight(row, contentMaxWidth) : 120;
+      if (!row) return 120;
+      return mountedRowHeights.get(row.id) ?? estimateStreamItemHeight(row, contentMaxWidth);
     },
     measureElement: measureVirtualElement,
     rangeExtractor,
