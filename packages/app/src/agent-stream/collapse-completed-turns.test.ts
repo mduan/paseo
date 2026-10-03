@@ -91,6 +91,26 @@ describe("foldCompletedTurns", () => {
     expect(folded.toggles.get("a")).toMatchObject({ hasWork: true, durationMs: 12_000 });
   });
 
+  it("times a hidden-prompt turn from its first row, and not a cut-off first turn", () => {
+    const at = (seconds: number) => new Date(timestamp.getTime() + seconds * 1000);
+    const folded = foldCompletedTurns({
+      tail: [
+        { ...thought("cut", "t0"), timestamp: at(0) },
+        { ...assistant("a0", "t0"), timestamp: at(1) },
+        { ...user("p", "t1"), timestamp: at(2) },
+        { ...assistant("a1", "t1"), timestamp: at(4) },
+        { ...thought("w", "t2"), timestamp: at(30) },
+        { ...assistant("a2", "t2"), timestamp: at(33) },
+      ],
+      head: [],
+      isTurnActive: false,
+      activeTurnId: null,
+      expandedTurnKeys: new Set(),
+    });
+    expect(folded.toggles.get("a0")).toMatchObject({ durationMs: null });
+    expect(folded.toggles.get("a2")).toMatchObject({ hasWork: true, durationMs: 3_000 });
+  });
+
   it("gives a turn without work a duration-only row", () => {
     const folded = foldCompletedTurns({
       tail: [user("p", "t"), assistant("a", "t")],

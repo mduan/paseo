@@ -2,7 +2,7 @@ import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getGapBetweenStreamItems } from "./spacing";
 import type { StreamFrameChildOrder, StreamStrategy } from "./strategy";
-import { continuesResponse, continuesTurn, isResponseBoundary } from "./turn-membership";
+import { continuesResponse, continuesTurn, isTurnBoundary } from "./turn-membership";
 
 export type StreamToolSequence = "single" | "first" | "middle" | "last" | "none";
 
@@ -73,8 +73,9 @@ function createTurnFooterHost(input: {
   };
 }
 
-function findLatestAssistantInResponse(input: {
+function findLatestAssistant(input: {
   strategy: StreamStrategy;
+  continues: (previous: StreamItem | null, next: StreamItem | null) => boolean;
   items: StreamItem[];
   startIndex: number;
   boundaryAboveItems?: StreamItem[] | null;
@@ -92,7 +93,7 @@ function findLatestAssistantInResponse(input: {
       index = input.strategy.getNeighborIndex(index, "above")
     ) {
       const item = items[index];
-      if (!item || (laterItem && !continuesResponse(item, laterItem))) {
+      if (!item || (laterItem && !input.continues(item, laterItem))) {
         return null;
       }
       if (item.kind === "assistant_message") {
@@ -127,8 +128,10 @@ function resolveAuxiliaryTurnFooter(input: StreamLayoutInput): TurnFooterHost | 
     return null;
   }
 
-  const assistant = findLatestAssistantInResponse({
+  // A trailing tool-only turn with no visible prompt still ends on the earlier turn's message.
+  const assistant = findLatestAssistant({
     strategy: input.strategy,
+    continues: continuesResponse,
     items: footerItems,
     startIndex: latestIndex,
   });
@@ -155,12 +158,13 @@ function resolveCompletedFooter(input: {
   boundaryAboveItems: StreamItem[] | null;
   boundaryAboveIndex: number | null;
 }): TurnFooterHost | null {
-  if (input.item.kind === "user_message" || !isResponseBoundary(input.item, input.belowItem)) {
+  if (input.item.kind === "user_message" || !isTurnBoundary(input.item, input.belowItem)) {
     return null;
   }
 
-  const assistant = findLatestAssistantInResponse({
+  const assistant = findLatestAssistant({
     strategy: input.strategy,
+    continues: continuesTurn,
     items: input.items,
     startIndex: input.index,
     boundaryAboveItems: input.boundaryAboveItems,

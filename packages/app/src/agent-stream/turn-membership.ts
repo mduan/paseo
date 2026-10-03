@@ -31,10 +31,6 @@ export function isTurnBoundary(previous: StreamItem | null, next: StreamItem | n
   return previous !== null && next !== null && !continuesTurn(previous, next);
 }
 
-export function isResponseBoundary(previous: StreamItem | null, next: StreamItem | null): boolean {
-  return previous !== null && next !== null && !continuesResponse(previous, next);
-}
-
 /** Whether `item` begins a new chronological turn after `previous`. */
 export function startsNewTurn(item: StreamItem, previous: StreamItem | null): boolean {
   return previous === null || isTurnBoundary(previous, item);

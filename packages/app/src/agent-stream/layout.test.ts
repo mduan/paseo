@@ -162,6 +162,19 @@ describe("layoutStream", () => {
     expect(footerOwners(layout)).toEqual([priorAssistant.id]);
   });
 
+  it("places a footer after each turn of a response without a visible prompt", () => {
+    const priorAssistant = assistantMessage("prior", 1, undefined, "turn-1");
+    const nextTool = toolCall("next-tool", 2, "turn-2");
+    const nextAssistant = assistantMessage("next", 3, undefined, "turn-2");
+    const layout = layoutFor({
+      platform: "web",
+      tail: [priorAssistant, nextTool, nextAssistant],
+      timingIds: [priorAssistant.id, nextAssistant.id],
+    });
+
+    expect(footerOwners(layout)).toEqual([priorAssistant.id, nextAssistant.id]);
+  });
+
   it("recomputes cached history layout when only the live boundary turn changes", () => {
     const priorAssistant = assistantMessage("prior", 1, undefined, "turn-1");
     const history = [priorAssistant];

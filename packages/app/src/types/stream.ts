@@ -262,9 +262,13 @@ function produceUserMessage(
     clientMessageId: incoming.clientMessageId ?? existing.clientMessageId,
     messageId: incoming.messageId ?? existing.messageId,
     timelineCursor: incoming.timelineCursor ?? existing.timelineCursor,
+    // A created agent's local prompt is handed off after the canonical row may have landed; keep
+    // that row's turn so the live turn is not folded as finished.
+    turnId: existing.turnId ?? incoming.turnId,
   });
   if (
     existing.id === merged.id &&
+    existing.turnId === merged.turnId &&
     existing.clientMessageId === merged.clientMessageId &&
     existing.messageId === merged.messageId &&
     existing.timelineCursor === merged.timelineCursor &&
