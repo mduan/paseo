@@ -70,6 +70,13 @@
         -webkit-app-region: no-drag !important;
       }
 
+      /* Chromium keeps app regions of content scrolled out of view at its
+         hidden position (electron/electron#40610), so chat buttons scrolled
+         above the viewport punch no-drag holes in the header above it. */
+      [data-outside-titlebar] * {
+        -webkit-app-region: initial !important;
+      }
+
       /* Suppress the browser's default focus outline — it appears on mouse
          clicks and looks out of place against our themed surfaces. Keep a
          themed ring for keyboard users via :focus-visible. */

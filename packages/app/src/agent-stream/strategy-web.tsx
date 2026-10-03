@@ -1301,6 +1301,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
       <div
         ref={handleScrollContainerRef}
         data-testid="agent-chat-scroll"
+        data-outside-titlebar
         data-overlay-scrollbar={scrollEnabled && !isMobileBreakpoint ? "true" : undefined}
         id={`agent-chat-scroll-${shouldUseVirtualizer ? "web-dom-virtualized" : "web-dom-scroll"}`}
         style={scrollContainerStyle}
