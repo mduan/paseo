@@ -8,6 +8,8 @@ import {
 } from "@/utils/diff-layout";
 import { compactHighlightTokens } from "@/utils/diff-rendering";
 import { getInlineReviewThreadState, getSplitInlineReviewThreadState } from "@/review/geometry";
+import { canExpandDiffFile, diffGaps, gapDirections, type DiffGap } from "@/git/diff-gaps";
+import { gapSeparatorHeight } from "./gap-separator";
 import { advancesFor, requiresShaping } from "./text-measurement";
 import type {
   BuildDiffDocumentModelInput,
@@ -15,6 +17,7 @@ import type {
   DiffDocumentModel,
   DiffFileSection,
   DiffFragment,
+  DiffGapSeparator,
   DiffGrapheme,
   DiffLineRow,
   DiffRow,
@@ -37,10 +40,16 @@ interface CellSource {
   sourceIdentity: DiffSourceIdentity;
 }
 
+interface LineSource {
+  cells: [CellSource] | [CellSource | null, CellSource | null];
+  separator?: DiffGapSeparator;
+}
+
 interface GeometryLine {
   cells: DiffLineRow["cells"];
   reviewHeight: number;
   height: number;
+  separator?: DiffGapSeparator;
 }
 
 interface ReusableModelIndex {
@@ -169,12 +178,13 @@ function appendReusableFileRows(candidate: {
     ) {
       nextRow = {
         ...nextRow,
-        cells: materializeCells(
-          nextRow.cells,
-          candidate.file.file,
-          candidate.file.gutterWidth,
-          candidate.input,
-        ),
+        cells: materializeCells({
+          cells: nextRow.cells,
+          file: candidate.file.file,
+          gutterWidth: candidate.file.gutterWidth,
+          input: candidate.input,
+          separator: nextRow.separator,
+        }),
       };
     }
     candidate.rows.push(nextRow);
@@ -237,10 +247,7 @@ function appendNewFileRows(candidate: {
     };
   }
 
-  const lines = geometryLines(
-    lineSources(candidate.file, candidate.input.layout, false),
-    candidate.input,
-  );
+  const lines = geometryLines(lineSources(candidate.file, candidate.input), candidate.input);
   const fileBottom =
     candidate.bodyTop +
     lines.reduce((height, line) => height + line.height, 0) +
@@ -255,7 +262,13 @@ function appendNewFileRows(candidate: {
       candidate.input.wrapLines ||
       intersectsMaterializationWindow(candidate.input, top, top + line.height);
     const cells = shouldMaterialize
-      ? materializeCells(line.cells, candidate.file, candidate.gutterWidth, candidate.input)
+      ? materializeCells({
+          cells: line.cells,
+          file: candidate.file,
+          gutterWidth: candidate.gutterWidth,
+          input: candidate.input,
+          separator: line.separator,
+        })
       : line.cells;
     const columnWidth = candidate.input.viewportWidth / cells.length;
     if (measureWidth) {
@@ -272,7 +285,7 @@ function appendNewFileRows(candidate: {
       }
     }
     const textHeight = Math.max(
-      candidate.input.typography.lineHeight,
+      line.height - line.reviewHeight,
       ...cells.map((cell) => (cell?.fragments.length ?? 1) * candidate.input.typography.lineHeight),
     );
     const height = textHeight + line.reviewHeight;
@@ -285,34 +298,52 @@ function appendNewFileRows(candidate: {
       height,
       cells,
       reviewHeight: line.reviewHeight,
+      ...(line.separator ? { separator: line.separator } : {}),
     });
     top += height;
   }
   return { bottom: top + DIFF_BODY_BORDER_HEIGHT, maximumHorizontalOverflow };
 }
 
-function materializeCells(
-  cells: DiffLineRow["cells"],
-  file: BuildDiffDocumentModelInput["files"][number],
-  gutterWidth: number,
-  input: BuildDiffDocumentModelInput,
-): DiffLineRow["cells"] {
+function materializeCells({
+  cells,
+  file,
+  gutterWidth,
+  input,
+  separator,
+}: {
+  cells: DiffLineRow["cells"];
+  file: BuildDiffDocumentModelInput["files"][number];
+  gutterWidth: number;
+  input: BuildDiffDocumentModelInput;
+  separator?: DiffGapSeparator;
+}): DiffLineRow["cells"] {
   const availableWidth = Math.max(
     input.measureText.measure("M"),
     input.viewportWidth / cells.length - gutterWidth - CODE_HORIZONTAL_PADDING,
   );
+  // Separator rows are taller than a line; center their label.
+  const textTop = separator
+    ? (gapSeparatorHeight(input.typography.lineHeight) - input.typography.lineHeight) / 2
+    : 0;
   return cells.map((cell) => {
     if (!cell || cell.fragments.length > 0) return cell;
-    const sourceLine =
-      file.hunks[cell.sourceIdentity.hunkIndex]!.lines[cell.sourceIdentity.lineIndex]!;
-    return measureCell({
-      source: {
-        ...cell,
-        tokenText: cell.type === "header" ? [] : compactHighlightTokens(sourceLine.tokens ?? []),
-      },
+    const tokens =
+      cell.type === "header"
+        ? []
+        : (file.hunks[cell.sourceIdentity.hunkIndex]!.lines[cell.sourceIdentity.lineIndex]!
+            .tokens ?? []);
+    const measured = measureCell({
+      source: { ...cell, tokenText: compactHighlightTokens(tokens) },
       availableWidth,
-      input,
+      // Separator labels stay on one line so the row keeps its height.
+      input: separator ? { ...input, wrapLines: false } : input,
     });
+    for (const fragment of measured.fragments) {
+      fragment.top += textTop;
+      fragment.baseline += textTop;
+    }
+    return measured;
   }) as DiffLineRow["cells"];
 }
 
@@ -358,31 +389,79 @@ export function retainReusableModels(
 
 function lineSources(
   file: BuildDiffDocumentModelInput["files"][number],
+  input: BuildDiffDocumentModelInput,
+): LineSource[] {
+  const sources = layoutLineSources(file, input.layout);
+  if (!input.expandableGaps || !canExpandDiffFile(file)) return sources;
+  const gaps = diffGaps(file);
+  const withSeparators: LineSource[] = [];
+  const pushSeparator = (gap: DiffGap | undefined) => {
+    if (gap && gap.end > gap.start) withSeparators.push(gapSeparatorSource({ file, gap, input }));
+  };
+  for (const source of sources) {
+    const [cell] = source.cells;
+    if (source.cells.length === 1 && cell?.type === "header") {
+      pushSeparator(gaps[cell.sourceIdentity.hunkIndex]);
+      continue;
+    }
+    withSeparators.push(source);
+  }
+  pushSeparator(gaps.at(-1));
+  return withSeparators;
+}
+
+function layoutLineSources(
+  file: BuildDiffDocumentModelInput["files"][number],
   layout: "unified" | "split",
-  includeTokens: boolean,
-): Array<[CellSource] | [CellSource | null, CellSource | null]> {
+): LineSource[] {
   if (layout === "split") {
     return buildSplitDiffRows(file).map((row) => {
       if (row.kind === "header") {
-        return [headerSource(row.content, row.hunkIndex, row.lineIndex)];
+        return { cells: [headerSource(row.content, row.hunkIndex, row.lineIndex)] };
       }
-      return [cellSource(row.left, includeTokens), cellSource(row.right, includeTokens)];
+      return { cells: [cellSource(row.left), cellSource(row.right)] };
     });
   }
-  return buildUnifiedDiffLines(file).map((entry) => [
-    {
-      type: entry.line.type,
-      content: entry.line.content,
-      lineNumber: entry.lineNumber,
-      reviewTarget: entry.reviewTarget,
-      tokenText: includeTokens ? compactHighlightTokens(entry.line.tokens ?? []) : [],
-      sourceIdentity: {
-        hunkIndex: entry.hunkIndex,
-        lineIndex: entry.lineIndex,
-        side: entry.reviewTarget?.side ?? "new",
+  return buildUnifiedDiffLines(file).map((entry) => ({
+    cells: [
+      {
+        type: entry.line.type,
+        content: entry.line.content,
+        lineNumber: entry.lineNumber,
+        reviewTarget: entry.reviewTarget,
+        tokenText: [],
+        sourceIdentity: {
+          hunkIndex: entry.hunkIndex,
+          lineIndex: entry.lineIndex,
+          side: entry.reviewTarget?.side ?? "new",
+        },
       },
-    },
-  ]);
+    ],
+  }));
+}
+
+function gapSeparatorSource(candidate: {
+  file: BuildDiffDocumentModelInput["files"][number];
+  gap: DiffGap;
+  input: BuildDiffDocumentModelInput;
+}): LineSource {
+  const { file, gap, input } = candidate;
+  let comments = 0;
+  for (const targetComments of input.reviewActions?.commentsByTarget.values() ?? []) {
+    for (const comment of targetComments) {
+      if (comment.filePath !== file.path) continue;
+      const newLine =
+        comment.side === "new" ? comment.lineNumber : comment.lineNumber - gap.oldOffset;
+      if (gap.start <= newLine && newLine < gap.end) comments += 1;
+    }
+  }
+  return {
+    // ponytail: the -1 line index marks a row with no source line; reused rows keep their count.
+    cells: [
+      headerSource(input.labels.gap({ lines: gap.end - gap.start, comments }), gap.index, -1),
+    ],
+    separator: { gapIndex: gap.index, directions: gapDirections(gap, file.hunks.length) },
+  };
 }
 
 function headerSource(content: string, hunkIndex: number, lineIndex: number): CellSource {
@@ -396,14 +475,14 @@ function headerSource(content: string, hunkIndex: number, lineIndex: number): Ce
   };
 }
 
-function cellSource(line: SplitDiffDisplayLine | null, includeTokens: boolean): CellSource | null {
+function cellSource(line: SplitDiffDisplayLine | null): CellSource | null {
   if (!line) return null;
   return {
     type: line.type,
     content: line.content,
     lineNumber: line.lineNumber,
     reviewTarget: line.reviewTarget,
-    tokenText: includeTokens ? compactHighlightTokens(line.tokens ?? []) : [],
+    tokenText: [],
     sourceIdentity: {
       hunkIndex: line.hunkIndex,
       lineIndex: line.lineIndex,
@@ -424,19 +503,20 @@ function geometryCell(source: CellSource): DiffCell {
   };
 }
 
-function geometryLines(
-  sources: Array<[CellSource] | [CellSource | null, CellSource | null]>,
-  input: BuildDiffDocumentModelInput,
-): GeometryLine[] {
-  return sources.map((sourceCells) => {
-    const cells = sourceCells.map((source) =>
-      source ? geometryCell(source) : null,
+function geometryLines(sources: LineSource[], input: BuildDiffDocumentModelInput): GeometryLine[] {
+  return sources.map((source) => {
+    const cells = source.cells.map((cell) =>
+      cell ? geometryCell(cell) : null,
     ) as DiffLineRow["cells"];
     const reviewHeight = reviewHeightForCells(cells, input);
+    const textHeight = source.separator
+      ? gapSeparatorHeight(input.typography.lineHeight)
+      : input.typography.lineHeight;
     return {
       cells,
       reviewHeight,
-      height: input.typography.lineHeight + reviewHeight,
+      height: textHeight + reviewHeight,
+      ...(source.separator ? { separator: source.separator } : {}),
     };
   });
 }

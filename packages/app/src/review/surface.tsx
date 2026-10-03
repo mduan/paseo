@@ -136,6 +136,7 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
             lineNumber: current.target.lineNumber,
             startSide: current.start?.side,
             startLineNumber: current.start?.lineNumber,
+            content: current.target.content,
             body: trimmedBody,
           },
         });

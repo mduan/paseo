@@ -911,6 +911,10 @@ export const zhCN: TranslationResources = {
         jumpToFile: {
           title: "跳转到文件",
         },
+        unmodifiedLines_one: "{{count}} 行未修改",
+        unmodifiedLines_other: "{{count}} 行未修改",
+        hiddenComments_one: "{{count}} 条评论",
+        hiddenComments_other: "{{count}} 条评论",
         binaryFile: "二进制文件",
         tooLarge: "Diff 过大，无法显示",
         previewTooLargeTitle: "此 diff 过大，无法预览",

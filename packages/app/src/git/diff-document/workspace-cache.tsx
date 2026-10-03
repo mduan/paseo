@@ -119,6 +119,9 @@ function modelVariantKey(input: Omit<BuildDiffDocumentModelInput, "reuseFrom">):
     paletteKey(input.palette),
     input.labels.binary,
     input.labels.tooLarge,
+    // The gap label is a formatter; a sample output tracks its language.
+    input.labels.gap({ lines: 2, comments: 1 }),
+    input.expandableGaps === true,
   ]);
 }
 

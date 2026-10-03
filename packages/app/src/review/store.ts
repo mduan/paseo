@@ -120,6 +120,7 @@ function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment 
     lineNumber: input.lineNumber,
     startSide: input.startSide,
     startLineNumber: input.startLineNumber,
+    ...(input.content !== undefined ? { content: input.content } : {}),
     body: input.body,
     createdAt: input.createdAt ?? now,
     updatedAt: input.updatedAt ?? input.createdAt ?? now,
@@ -202,6 +203,7 @@ function buildCommentContext(input: {
     side: comment.side,
     lineNumber: comment.lineNumber,
   });
+  if (endIndex < 0) return storedCommentContext(comment);
   const startIndex =
     comment.startLineNumber === undefined
       ? endIndex
@@ -234,6 +236,20 @@ function buildCommentContext(input: {
     .slice(0, MAX_CONTEXT_LINES);
 
   return { hunkHeader: startLine.hunkHeader, targetLine, lines };
+}
+
+/** Context for a comment whose line is no longer in the diff, e.g. collapsed expanded context. */
+function storedCommentContext(
+  comment: ReviewDraftComment,
+): ReviewAttachment["comments"][number]["context"] | null {
+  if (comment.content === undefined) return null;
+  const targetLine: ReviewAttachmentContextLine = {
+    oldLineNumber: comment.side === "old" ? comment.lineNumber : null,
+    newLineNumber: comment.side === "new" ? comment.lineNumber : null,
+    type: "context",
+    content: comment.content,
+  };
+  return { hunkHeader: "", targetLine, lines: [targetLine] };
 }
 
 export function buildReviewAttachmentSnapshot(

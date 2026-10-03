@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getCommitFileDiff } from "./checkout-git.js";
+import { getCommitFileDiff, readDiffContextLines } from "./checkout-git.js";
 
 const tempDirs: string[] = [];
 
@@ -62,6 +62,26 @@ describe("getCommitFileDiff", () => {
     expect(lines.some((line) => line.type === "add" && line.content === "B")).toBe(true);
     expect(lines.some((line) => line.type === "add" && line.content === "d")).toBe(true);
     expect(lines.some((line) => line.type === "remove" && line.content === "b")).toBe(true);
+  });
+
+  it("pins the commit so hidden lines can be expanded later", async () => {
+    const repoDir = initRepo();
+    const original = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`);
+    commitFile(repoDir, "foo.txt", `${original.join("\n")}\n`, "initial");
+    commitFile(repoDir, "foo.txt", `${original.toSpliced(14, 1, "changed").join("\n")}\n`, "edit");
+    const sha = headSha(repoDir);
+    commitFile(repoDir, "foo.txt", "rewritten\n", "later");
+
+    const file = await getCommitFileDiff({ cwd: repoDir, sha, path: "foo.txt" });
+    expect(file).toMatchObject({ targetRef: sha, lineCount: 30 });
+    const lines = await readDiffContextLines({
+      cwd: repoDir,
+      path: "foo.txt",
+      ref: file?.targetRef,
+      startLine: 1,
+      lineCount: 2,
+    });
+    expect(lines.map((line) => line.content)).toEqual(["line 1", "line 2"]);
   });
 
   it("returns a diff flagged as new for an added file", async () => {

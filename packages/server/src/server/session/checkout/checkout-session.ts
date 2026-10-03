@@ -8,6 +8,7 @@ import type {
   BranchSuggestionsRequest,
   CheckoutCommitsListRequest,
   CheckoutCommitFileDiffRequest,
+  CheckoutDiffContextRequest,
   CheckoutRefreshRequest,
   CheckoutRenameBranchRequest,
   CheckoutSetBaseRefRequest,
@@ -53,11 +54,18 @@ import {
   pushCurrentBranch,
   listCheckoutCommits,
   getCommitFileDiff,
+  readDiffContextLines,
   setCurrentBranchBaseRef,
 } from "../../../utils/checkout-git.js";
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import { expandTilde } from "../../../utils/path.js";
 import type { GitMetadataGenerator } from "./git-metadata-generator.js";
+
+function assertSafeRelativePath(path: string): void {
+  if (path.length === 0 || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
+    throw new Error(`Invalid path: ${path}`);
+  }
+}
 
 /**
  * The collaborators a checkout command reaches that are NOT part of the checkout
@@ -297,9 +305,7 @@ export class CheckoutSession {
 
     try {
       assertSafeGitRef(sha, "commit");
-      if (path.length === 0 || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
-        throw new Error(`Invalid path: ${path}`);
-      }
+      assertSafeRelativePath(path);
       const file = await getCommitFileDiff({ cwd: expandTilde(cwd), sha, path });
       this.host.emit({
         type: "checkout.commits.file_diff.response",
@@ -309,6 +315,31 @@ export class CheckoutSession {
       this.host.emit({
         type: "checkout.commits.file_diff.response",
         payload: { cwd, sha, path, file: null, error: toCheckoutError(error), requestId },
+      });
+    }
+  }
+
+  async handleDiffContextRequest(msg: CheckoutDiffContextRequest): Promise<void> {
+    const { cwd, path, ref, startLine, lineCount, requestId } = msg;
+
+    try {
+      if (ref) assertSafeGitRef(ref, "diff target");
+      assertSafeRelativePath(path);
+      const lines = await readDiffContextLines({
+        cwd: expandTilde(cwd),
+        path,
+        ref,
+        startLine,
+        lineCount,
+      });
+      this.host.emit({
+        type: "checkout.diff.context.response",
+        payload: { lines, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.diff.context.response",
+        payload: { lines: [], error: toCheckoutError(error), requestId },
       });
     }
   }

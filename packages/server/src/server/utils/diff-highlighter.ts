@@ -26,6 +26,8 @@ export interface ParsedDiffFile {
   deletions: number;
   hunks: DiffHunk[];
   status?: "ok" | "too_large" | "binary";
+  targetRef?: string;
+  lineCount?: number;
 }
 
 interface HighlightDiffWithFileContentOptions {
@@ -421,6 +423,38 @@ export async function parseAndHighlightDiff(
   );
 
   return highlightedFiles;
+}
+
+function splitFileLines(content: string): string[] {
+  const lines = content.split("\n");
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
+}
+
+export function countFileLines(content: string): number {
+  return splitFileLines(content).length;
+}
+
+/**
+ * Returns highlighted lines [startLine, startLine + lineCount) of a file.
+ * Highlights the whole file so multi-line constructs tokenize the same as the diff.
+ */
+export function highlightFileLines(input: {
+  content: string;
+  path: string;
+  startLine: number;
+  lineCount: number;
+}): Array<{ content: string; tokens?: HighlightToken[] }> {
+  const start = input.startLine - 1;
+  const lines = splitFileLines(input.content).slice(start, start + input.lineCount);
+  const tokensByLine =
+    isLanguageSupported(input.path) && lines.length > 0
+      ? buildFullFileTokenLookup(input.content, input.path)
+      : null;
+  return lines.map((content, index) => {
+    const tokens = tokensByLine?.get(input.startLine + index);
+    return tokens ? { content, tokens } : { content };
+  });
 }
 
 // Re-export types

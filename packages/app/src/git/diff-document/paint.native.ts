@@ -21,6 +21,7 @@ import {
   fileNameForPath,
   formatDiffCount,
 } from "@/git/file-header-presentation";
+import { gapChevronSegments } from "./gap-separator";
 import { DIFF_BODY_BORDER_HEIGHT, expandedBodyBorderTop, visibleRowRange } from "./model";
 import { nativeTextRuns } from "./native-text-runs";
 import { horizontalOffsetForPath, type DiffHorizontalOffsets } from "./horizontal-offsets";
@@ -349,6 +350,16 @@ function paintNativeGutter(input: {
         Skia.XYWHRect(columnX + file.gutterWidth, y, 1, reviewDividerHeight(row.height)),
         input.paints.border,
       );
+      if (row.separator) {
+        paintNativeGapChevrons({
+          canvas: input.canvas,
+          row,
+          file,
+          x: columnX,
+          y,
+          paints: input.paints,
+        });
+      }
       const label = String(cell.lineNumber ?? "");
       const font = input.textLayout.font;
       input.canvas.drawText(
@@ -503,6 +514,16 @@ function paintNativeFixedCell(input: {
     ),
     input.input.paints.border,
   );
+  if (input.row.separator) {
+    paintNativeGapChevrons({
+      canvas: input.input.canvas,
+      row: input.row,
+      file: input.file,
+      x: input.columnX,
+      y: input.y,
+      paints: input.input.paints,
+    });
+  }
   const label = String(input.cell.lineNumber ?? "");
   const font = input.input.textLayout.font;
   input.input.canvas.drawText(
@@ -512,6 +533,24 @@ function paintNativeFixedCell(input: {
     input.input.paints[codeLineNumberTone(input.cell)],
     font,
   );
+}
+
+function paintNativeGapChevrons(input: {
+  canvas: SkCanvas;
+  row: DiffLineRow;
+  file: DiffFileSection;
+  x: number;
+  y: number;
+  paints: NativePaints;
+}): void {
+  const stroke = input.paints.foregroundMuted.copy();
+  stroke.setStyle(PaintStyle.Stroke);
+  stroke.setStrokeWidth(1.5);
+  stroke.setStrokeCap(StrokeCap.Round);
+  for (const [x1, y1, x2, y2] of gapChevronSegments({ row: input.row, file: input.file })) {
+    input.canvas.drawLine(input.x + x1, input.y + y1, input.x + x2, input.y + y2, stroke);
+  }
+  stroke.dispose();
 }
 
 function paintNativeCodeCell(input: {

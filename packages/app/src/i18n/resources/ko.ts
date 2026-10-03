@@ -926,6 +926,10 @@ export const ko: TranslationResources = {
         jumpToFile: {
           title: "파일로 이동",
         },
+        unmodifiedLines_one: "변경되지 않은 줄 {{count}}개",
+        unmodifiedLines_other: "변경되지 않은 줄 {{count}}개",
+        hiddenComments_one: "댓글 {{count}}개",
+        hiddenComments_other: "댓글 {{count}}개",
         binaryFile: "바이너리 파일",
         tooLarge: "표시하기에 diff가 너무 큽니다",
         previewTooLargeTitle: "Diff가 너무 커서 미리 볼 수 없습니다",

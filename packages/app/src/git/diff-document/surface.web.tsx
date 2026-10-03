@@ -20,6 +20,7 @@ import {
 import { isSameReviewLineRange, type ReviewLineRange } from "@/review/range";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
+import type { ExpandDiffGapInput } from "@/git/diff-gaps";
 import { DocumentFileHeader } from "./document-file-header";
 import {
   diffInteractionWindowTop,
@@ -42,6 +43,7 @@ import {
   resolveLineHighlight,
   type LineGutterHit,
 } from "./line-range";
+import { gapSeparatorLabel } from "./gap-separator";
 import { buildDiffDocumentModel, FILE_HEADER_HEIGHT, resolveRelayoutScrollTop } from "./model";
 import { paintWebFileHeader, paintWebViewport } from "./paint.web";
 import { hasPointerDragStarted } from "./pointer-gesture";
@@ -185,6 +187,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     readyTypographyResource === typographyResource ? typographyResource.measureText : null;
   const reviewActions = props.mode.kind === "working" ? props.mode.reviewActions : undefined;
   const reviewGeometry = useReviewGeometry(reviewActions);
+  const expandableGaps = Boolean(props.onExpandGap);
   const model = useMemo(() => {
     if (!loadedTypography || !measurement) {
       return emptyDiffDocumentModel({
@@ -207,11 +210,14 @@ export function DiffSurface(props: DiffSurfaceProps) {
       labels: {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
+        gap: gapSeparatorLabel(t),
       },
+      expandableGaps,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
     });
     return next;
   }, [
+    expandableGaps,
     fileWindowTop,
     measurement,
     props.collapsedFilePaths,
@@ -659,6 +665,12 @@ export function DiffSurface(props: DiffSurfaceProps) {
     desiredTypography,
     setSelection,
   ]);
+  const pointerCursor = useCallback(
+    (hit: DiffHit | null, clientX: number, clientY: number) =>
+      hit?.kind === "gap" || lineGutterHitAt(hit, clientX, clientY) ? "pointer" : "text",
+    [lineGutterHitAt],
+  );
+  const expandGap = useStableEvent((input: ExpandDiffGapInput) => props.onExpandGap?.(input));
   const pointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
@@ -671,6 +683,10 @@ export function DiffSurface(props: DiffSurfaceProps) {
       )
         return;
       const hit = pointHit(event);
+      if (hit?.kind === "gap") {
+        expandGap({ path: hit.path, gapIndex: hit.gapIndex, direction: hit.direction });
+        return;
+      }
       const lineGutterHit =
         event.pointerType === "mouse"
           ? lineGutterHitAt(hit, event.clientX, event.clientY)
@@ -705,7 +721,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       event.currentTarget.focus();
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [lineGutterHitAt, pointHit, setSelection],
+    [expandGap, lineGutterHitAt, pointHit, setSelection],
   );
   const updateActiveHeader = useCallback(
     (target: EventTarget | null) => {
@@ -735,9 +751,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         return;
       }
       const hit = pointHit(event);
-      event.currentTarget.style.cursor = lineGutterHitAt(hit, event.clientX, event.clientY)
-        ? "pointer"
-        : "text";
+      event.currentTarget.style.cursor = pointerCursor(hit, event.clientX, event.clientY);
       const drag = dragRef.current;
       if (drag) {
         drag.moved = hasPointerDragStarted({
@@ -778,7 +792,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       if (!drag || hit?.kind !== "cell") return;
       setSelection({ anchor: drag.anchor, focus: hit.position });
     },
-    [extendLineDrag, lineGutterHitAt, pointHit, setSelection, updateActiveHeader],
+    [extendLineDrag, pointHit, pointerCursor, setSelection, updateActiveHeader],
   );
   // The pinned add button sits on the bottom line of a highlight that resolves in this layout.
   const pinnedTargetKey = lineHighlight?.addButtonTargetKey;

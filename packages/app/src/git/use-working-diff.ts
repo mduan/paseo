@@ -8,6 +8,7 @@ import {
   useInlineReviewController,
   useReviewAttachmentSnapshot,
 } from "@/review";
+import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { useCheckoutDiffQuery } from "@/git/use-diff-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { useWorkingDiffComparison } from "@/git/working-diff-comparison";
@@ -90,9 +91,19 @@ export function useWorkingDiff({
     [baseRef, checkoutMode, cwd, ignoreWhitespace, serverId, workspaceId],
   );
   const reviewActions = useInlineReviewController({ reviewDraftKey });
+  const expansion = useWorkingDiffExpansion({
+    serverId,
+    cwd,
+    ignoreWhitespace,
+    reviewDraftKey,
+    turnComparison,
+    turnDiff,
+    checkoutFiles: checkoutDiff.files,
+  });
   const reviewAttachment = useReviewAttachmentSnapshot({
     key: reviewDraftKey,
-    diffFiles: checkoutDiff.files,
+    // Expanded lines give review comments on them their surrounding context.
+    diffFiles: expansion.files,
     cwd,
     mode: checkoutMode,
     baseRef,
@@ -113,7 +124,8 @@ export function useWorkingDiff({
     ...(turnComparison
       ? {
           isTurnSnapshotMissing: turnDiff.isSnapshotMissing,
-          files: turnDiff.files,
+          files: expansion.files,
+          onExpandGap: expansion.onExpandGap,
           diffPayloadError: turnDiff.payloadError,
           diffTooLarge: turnDiff.diffTooLarge,
           isDiffLoading: turnDiff.isLoading,
@@ -123,7 +135,8 @@ export function useWorkingDiff({
         }
       : {
           isTurnSnapshotMissing: false,
-          files: checkoutDiff.files,
+          files: expansion.files,
+          onExpandGap: expansion.onExpandGap,
           diffPayloadError: checkoutDiff.payloadError,
           diffTooLarge: checkoutDiff.diffTooLarge,
           isDiffLoading: checkoutDiff.isLoading,
@@ -167,6 +180,28 @@ function useResolvedDiffComparison(input: {
 
 const EMPTY_FILES: ParsedDiffFile[] = [];
 
+function useWorkingDiffExpansion(input: {
+  serverId: string;
+  cwd: string;
+  ignoreWhitespace: boolean;
+  reviewDraftKey: string;
+  turnComparison: TurnDiffComparison | null;
+  turnDiff: { cwd: string; agentId: string | null; files: ParsedDiffFile[] };
+  checkoutFiles: ParsedDiffFile[];
+}) {
+  const { serverId, turnComparison, turnDiff } = input;
+  return useDiffContextExpansion({
+    serverId,
+    ...(turnComparison
+      ? {
+          cwd: turnDiff.cwd,
+          scopeKey: `turn:${serverId}:${turnDiff.agentId}:${turnComparison}:${input.ignoreWhitespace}`,
+          files: turnDiff.files,
+        }
+      : { cwd: input.cwd, scopeKey: input.reviewDraftKey, files: input.checkoutFiles }),
+  });
+}
+
 /** The focused agent's frozen turn snapshot, in the same shape as the checkout diff. */
 function useTurnComparisonDiff(input: {
   serverId: string;
@@ -188,6 +223,8 @@ function useTurnComparisonDiff(input: {
     ? { code: "UNKNOWN" as const, message: query.error.message }
     : null;
   return {
+    agentId,
+    cwd: payload?.cwd ?? "",
     files: payload?.files ?? EMPTY_FILES,
     payloadError: payload?.error ?? queryError,
     diffTooLarge: payload?.diffTooLarge === true,

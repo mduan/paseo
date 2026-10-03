@@ -1603,6 +1603,7 @@ export function ChangesSurface({
     isDiffLoading,
     reviewActions,
     reviewAttachment,
+    onExpandGap,
   } = useWorkingDiff({
     serverId,
     workspaceId: workspaceId ?? undefined,
@@ -1845,6 +1846,7 @@ export function ChangesSurface({
         collapseState={collapseState}
         displayPreferences={sharedDisplayPreferences}
         mode={workingMode}
+        onExpandGap={onExpandGap}
       />
     </DiffBodyContent>
   );

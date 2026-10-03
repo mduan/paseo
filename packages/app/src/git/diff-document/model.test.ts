@@ -11,6 +11,7 @@ import {
   shouldApplyRelayoutScroll,
 } from "./model";
 import type { BuildDiffDocumentModelInput, TextMeasurer } from "./types";
+import { DiffGapDirection } from "@/git/diff-gaps";
 
 const measurer: TextMeasurer = { measure: (text) => Array.from(text).length * 10 };
 
@@ -65,12 +66,51 @@ function input(overrides: Partial<BuildDiffDocumentModelInput> = {}): BuildDiffD
       statusWarning: "orange",
       syntax: {},
     },
-    labels: { binary: "Binary", tooLarge: "Too large" },
+    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "" },
     ...overrides,
   };
 }
 
 describe("diff document model", () => {
+  it("replaces hunk headers with expandable gap separators", () => {
+    const expandable: ParsedDiffFile = {
+      ...file(),
+      lineCount: 50,
+      hunks: [{ ...file().hunks[0]!, oldStart: 30, newStart: 30 }],
+    };
+    const model = buildDiffDocumentModel(
+      input({
+        files: [expandable],
+        expandableGaps: true,
+        labels: {
+          binary: "Binary",
+          tooLarge: "Too large",
+          gap: ({ lines, comments }) => `${lines} hidden, ${comments} comments`,
+        },
+      }),
+    );
+    const separators = model.rows.flatMap((row) =>
+      row.kind === "line" && row.separator
+        ? [{ label: row.cells[0]?.content, separator: row.separator, height: row.height }]
+        : [],
+    );
+    expect(separators).toEqual([
+      {
+        label: "29 hidden, 0 comments",
+        separator: { gapIndex: 0, directions: [DiffGapDirection.Up] },
+        height: 27,
+      },
+      {
+        label: "20 hidden, 0 comments",
+        separator: { gapIndex: 1, directions: [DiffGapDirection.All] },
+        height: 27,
+      },
+    ]);
+    expect(
+      model.rows.some((row) => row.kind === "line" && row.cells[0]?.content === "@@ -1 +1 @@"),
+    ).toBe(false);
+  });
+
   it("preserves shaped wrap breaks when joining makes a longer prefix narrower", () => {
     const measure = (text: string) => {
       if (text === "لا") return 30;

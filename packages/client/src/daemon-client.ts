@@ -49,6 +49,7 @@ import type {
   CheckoutCommit,
   ParsedDiffFile,
   CheckoutCommitResponse,
+  CheckoutDiffContextResponse,
   CheckoutMergeResponse,
   CheckoutMergeFromBaseResponse,
   CheckoutPullResponse,
@@ -4343,6 +4344,24 @@ export class DaemonClient {
       throw new Error(payload.error.message);
     }
     return { file: payload.file };
+  }
+
+  async getDiffContextLines(input: {
+    cwd: string;
+    path: string;
+    ref?: string;
+    startLine: number;
+    lineCount: number;
+  }): Promise<CheckoutDiffContextResponse["payload"]["lines"]> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"checkout.diff.context.response">({
+        message: { type: "checkout.diff.context.request", ...input },
+        timeout: 60000,
+      });
+    if (payload.error) {
+      throw new Error(payload.error.message);
+    }
+    return payload.lines;
   }
 
   async checkoutPrCreate(
