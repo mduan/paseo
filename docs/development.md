@@ -47,7 +47,8 @@ than downloading a published desktop release.
 `PASEO_HOME` is the directory that holds runtime state (agents, worktrees, workspace config, sockets, daemon log). Resolution rules:
 
 - The **server itself** (e.g. when launched by the desktop app or `npm run start`) defaults to `~/.paseo` (see `packages/server/src/server/paseo-home.ts`).
-- **Repo dev scripts** default to `$ROOT/.dev/paseo-home`, where `$ROOT` is the current checkout or worktree root. This keeps all dev state scoped to the checkout instead of the packaged desktop app.
+- **Repo dev scripts** default to `$ROOT/.dev/paseo-home`, where `$ROOT` is the current checkout or worktree root. This keeps all dev state scoped to the checkout instead of the packaged desktop app. An inherited `PASEO_HOME` wins over this default.
+- **Agents running inside Paseo** inherit `PASEO_HOME=~/.paseo`, `PASEO_AGENT_ID`, and `PASEO_AGENT_CWD`. With those set, `npm run dev` sees the main daemon and exits, and `npm run dev:desktop` attaches to the main daemon on `6767` instead of the dev daemon. Prefix both with `env -u PASEO_HOME -u PASEO_AGENT_ID -u PASEO_AGENT_CWD`.
 - **`npm run cli -- ...`** runs through the same dev-home wrapper as the dev scripts, so the in-repo CLI automatically targets the current checkout's `.dev/paseo-home` and configured dev daemon endpoint.
 - **Paseo-created worktrees** seed `$PASEO_WORKTREE_PATH/.dev/paseo-home` from `$PASEO_SOURCE_CHECKOUT_PATH/.dev/paseo-home` by copying durable JSON metadata. Runtime files like pid files, sockets, and logs are not copied.
 - **This repo's worktree setup** also best-effort seeds `packages/app/ios` and the newest `.dev/ios-build` entry from the source checkout so iOS simulator services can reuse native project and Xcode cache state when it is safe enough to do so.
@@ -56,9 +57,20 @@ Override knobs:
 
 ```bash
 PASEO_HOME=~/.paseo-blue npm run dev          # explicit home
-PASEO_DEV_SEED_HOME=/path/to/home npm run dev # seed from a different source home
-PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived worktree home
+PASEO_DEV_SEED_HOME=/path/to/home npm run dev # copy agents, projects, and config from a source home
+PASEO_DEV_SEED_HOME=/path/to/home PASEO_DEV_RESET_HOME=1 npm run dev # clear the dev home, then copy again
 ```
+
+The dev scripts copy from a source home only when `PASEO_DEV_SEED_HOME` is set, and they skip the copy when the dev home already has files. `PASEO_DEV_RESET_HOME` has no effect without `PASEO_DEV_SEED_HOME`.
+
+To run the dev desktop app against your real workspaces and labels, seed from `~/.paseo`:
+
+```bash
+PASEO_DEV_SEED_HOME=$HOME/.paseo PASEO_DEV_RESET_HOME=1 npm run dev
+npm run dev:desktop
+```
+
+The seeded agents share provider sessions with the originals. View them; don't send them messages.
 
 ### Daemon endpoints
 

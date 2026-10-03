@@ -4,6 +4,10 @@ Paseo is a mobile app for monitoring and controlling your local AI coding agents
 
 **Supported agents:** Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, and Muse Code.
 
+## Fork
+
+This checkout is a personal fork (`origin` is `mduan/paseo`) of `getpaseo/paseo`. Changes stay in the fork. Don't open pull requests, issues, or comments against `getpaseo/paseo`, and don't suggest sending changes upstream.
+
 ## Repository map
 
 This is an npm workspace monorepo:
@@ -102,7 +106,7 @@ npm run format                       # Auto-format with Biome
 npm run format:check                 # Check formatting without writing
 ```
 
-Repo dev commands use checkout-local state by default. In this checkout, `PASEO_HOME` resolves to `.dev/paseo-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.paseo` on port `6767`.
+Repo dev commands use checkout-local state by default. In this checkout, `PASEO_HOME` resolves to `.dev/paseo-home`, and `npm run cli -- ...` targets that same dev home automatically. The packaged desktop app and production-style daemon keep using `~/.paseo` on port `6767`. Agents running inside Paseo inherit `PASEO_HOME=~/.paseo`; unset it before dev commands, and seed the dev home to see real workspaces. See [PASEO_HOME](docs/development.md#paseo_home).
 
 See [docs/development.md](docs/development.md) for full setup, build sync requirements, and debugging.
 
