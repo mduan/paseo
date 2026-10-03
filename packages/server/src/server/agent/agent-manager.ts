@@ -662,6 +662,10 @@ function buildExplicitTimelineSeedForRegister(
   };
 }
 
+function totalCostOf(usage: AgentUsage | undefined): number | undefined {
+  return usage?.totalCostUsd;
+}
+
 function buildImportedTimelineRows(entries: readonly ImportedTimelineEntry[]): AgentTimelineRow[] {
   const rows: AgentTimelineRow[] = [];
   for (const entry of entries) {
@@ -1425,6 +1429,7 @@ export class AgentManager {
         workspaceId: options?.workspaceId ?? null,
       },
     );
+    launchContext.priorTotalCostUsd = totalCostOf(record?.lastUsage);
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
     const session = await client.resumeSession(
       handle,
@@ -1436,6 +1441,7 @@ export class AgentManager {
     return this.registerSession(session, storedConfig, resolvedAgentId, {
       ...options,
       persistence: handle,
+      lastUsage: record?.lastUsage,
       restoring: true,
     });
   }
@@ -1653,6 +1659,7 @@ export class AgentManager {
       undefined,
       { reason: "refresh", purpose: "interactive", workspaceId: existing.workspaceId },
     );
+    launchContext.priorTotalCostUsd = totalCostOf(preservedLastUsage);
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
     if (
       Object.keys(storedConfig.mcpServers ?? {}).length > 0 &&
@@ -2014,7 +2021,7 @@ export class AgentManager {
         persistence: record.persistence ?? null,
         historyPrimed: true,
         lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
-        lastUsage: undefined,
+        lastUsage: record.lastUsage,
         lastError: record.lastError ?? undefined,
         attention,
         internal: record.internal,
@@ -4451,7 +4458,9 @@ export class AgentManager {
         this.onStreamThreadStarted(agent);
         return undefined;
       case "usage_updated":
-        agent.lastUsage = event.usage;
+        // Mid-turn updates carry only the fields that changed (Claude sends just the context
+        // window), so merge them and keep the session cost from the last completed turn.
+        agent.lastUsage = { ...agent.lastUsage, ...event.usage };
         this.emitState(agent);
         return undefined;
       case "mode_changed":

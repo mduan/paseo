@@ -627,6 +627,11 @@ export interface AgentLaunchContext {
    * AgentSessionConfig; providers may adapt it to their native tool surface.
    */
   paseoTools?: PaseoToolCatalog;
+  /**
+   * Session cost reported before this session object existed. Providers whose reported
+   * total restarts with their process add it, so a resume or reload keeps the session total.
+   */
+  priorTotalCostUsd?: number;
 }
 
 export interface AgentCreateSessionOptions {

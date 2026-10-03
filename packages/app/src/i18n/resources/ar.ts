@@ -1968,6 +1968,7 @@ export const ar: TranslationResources = {
     sessionCost: "تكلفة الجلسة{{cost}}",
     sessionCostEstimate: "تقدير بأسعار API المعلنة",
     sessionCostUnavailable: "غير متاح",
+    sessionCostBeforeTurn: "(قبل هذه الجولة)",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
   review: {

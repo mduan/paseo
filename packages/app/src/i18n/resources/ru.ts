@@ -2001,6 +2001,7 @@ export const ru: TranslationResources = {
     sessionCost: "Стоимость сессии: {{cost}}",
     sessionCostEstimate: "Оценка по прейскуранту API",
     sessionCostUnavailable: "Недоступно",
+    sessionCostBeforeTurn: "(до этого хода)",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

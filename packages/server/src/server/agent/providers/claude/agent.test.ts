@@ -2541,6 +2541,28 @@ describe("ClaudeAgentSession context window usage", () => {
     }
   });
 
+  test("adds the cost from before a resume to the session total", async () => {
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory: createQueryFactoryForTurns([
+        [createInitMessage(), createMessageStartEvent(), createSuccessResult()],
+      ]),
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession(
+      { provider: "claude", cwd: process.cwd() },
+      { priorTotalCostUsd: 1 },
+    );
+
+    try {
+      const result = await session.run("turn");
+
+      expect(result.usage?.totalCostUsd).toBe(1.25);
+    } finally {
+      await session.close();
+    }
+  });
+
   test("uses parent request usage after a real subagent tool result", async () => {
     const getContextUsage = vi.fn(async () => {
       throw new Error("getContextUsage should not be called during result handling");
@@ -2711,7 +2733,7 @@ describe("ClaudeAgentSession context window usage", () => {
       ],
       [
         createSuccessResult({
-          total_cost_usd: 0.1,
+          total_cost_usd: 0.4,
           usage: {
             input_tokens: 1_000,
             cache_read_input_tokens: 200,
@@ -2738,7 +2760,7 @@ describe("ClaudeAgentSession context window usage", () => {
         inputTokens: 1_000,
         cachedInputTokens: 200,
         outputTokens: 300,
-        totalCostUsd: 0.1,
+        totalCostUsd: 0.4,
         contextWindowMaxTokens: 200_000,
       });
     } finally {

@@ -420,6 +420,7 @@ interface ClaudeAgentSessionOptions {
   handle?: AgentPersistenceHandle;
   agentId?: string;
   launchEnv?: Record<string, string>;
+  priorTotalCostUsd?: number;
   persistSession?: boolean;
   logger: Logger;
   queryFactory?: ClaudeQueryFactory;
@@ -1536,6 +1537,7 @@ export class ClaudeAgentClient implements AgentClient {
       runtimeSettings: this.runtimeSettings,
       agentId: launchContext?.agentId,
       launchEnv: launchContext?.env,
+      priorTotalCostUsd: launchContext?.priorTotalCostUsd,
       persistSession: options?.persistSession,
       logger: this.logger,
       queryFactory: this.queryFactory,
@@ -1566,6 +1568,7 @@ export class ClaudeAgentClient implements AgentClient {
       handle,
       agentId: launchContext?.agentId,
       launchEnv: launchContext?.env,
+      priorTotalCostUsd: launchContext?.priorTotalCostUsd,
       logger: this.logger,
       queryFactory: this.queryFactory,
       resolveBinary: this.resolveBinary,
@@ -2047,6 +2050,10 @@ class ClaudeAgentSession implements AgentSession {
 
   private readonly config: ClaudeAgentConfig;
   private readonly launchEnv?: Record<string, string>;
+  // The SDK's total_cost_usd covers one query() process and restarts on resume or a query
+  // restart, so the session total is the cost of earlier processes plus the current one.
+  private costBeforeQueryUsd: number;
+  private queryCostUsd = 0;
   private readonly agentId?: string;
   private readonly defaults?: { agents?: Record<string, AgentDefinition> };
   private readonly runtimeSettings?: ProviderRuntimeSettings;
@@ -2127,6 +2134,7 @@ class ClaudeAgentSession implements AgentSession {
     this.config = config;
     assertClaudeThinkingOptionSupported(config.model, config.thinkingOptionId);
     this.launchEnv = options.launchEnv;
+    this.costBeforeQueryUsd = options.priorTotalCostUsd ?? 0;
     this.agentId = options.agentId;
     this.defaults = options.defaults;
     this.runtimeSettings = options.runtimeSettings;
@@ -3194,6 +3202,8 @@ class ClaudeAgentSession implements AgentSession {
     const options = await this.buildOptions();
     this.logger.debug({ options: summarizeClaudeOptionsForLog(options) }, "claude query");
     this.input = input;
+    this.costBeforeQueryUsd += this.queryCostUsd;
+    this.queryCostUsd = 0;
     this.query = claudeQuery(
       { prompt: input.iterable, options },
       {
@@ -4689,7 +4699,13 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private convertUsage(message: SDKResultMessage, modelUsage?: unknown): AgentUsage | undefined {
-    return this.contextUsage.buildResultUsage(message, modelUsage);
+    const usage = this.contextUsage.buildResultUsage(message, modelUsage);
+    if (usage?.totalCostUsd === undefined) {
+      return usage;
+    }
+    // A crash or startup-error result can carry a zeroed total; keep the running one.
+    this.queryCostUsd = Math.max(this.queryCostUsd, usage.totalCostUsd);
+    return { ...usage, totalCostUsd: this.costBeforeQueryUsd + this.queryCostUsd };
   }
 
   private handlePermissionRequest: CanUseTool = async (
