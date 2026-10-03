@@ -54,6 +54,8 @@ import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
+import { CodexPriceList, type CodexPrices } from "./codex/pricing.js";
+import { CodexRolloutCost } from "./codex/rollout-cost.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -286,6 +288,7 @@ interface CodexAppServerAgentDeps {
   customCodexConfig?: CodexCustomProviderConfig | null;
   // The CODEX_HOME the session's app-server runs with; prompts and skills are read from it.
   codexHome?: string;
+  codexPriceList?: CodexPriceList;
   _createCodexClient?: (
     child: ChildProcessWithoutNullStreams,
     logger: Logger,
@@ -1050,6 +1053,59 @@ function filterCodexThreadsByCwd(
   return threads.filter(
     (thread) => typeof thread.cwd === "string" && belongsToWorkspace(thread.cwd),
   );
+}
+
+let sharedCodexPriceList: CodexPriceList | undefined;
+
+// One price list per daemon, so every Codex session and custom Codex provider shares one fetch.
+function getSharedCodexPriceList(logger: Logger): CodexPriceList {
+  sharedCodexPriceList ??= new CodexPriceList({ logger });
+  return sharedCodexPriceList;
+}
+
+enum CodexCostStatus {
+  /** No priced request yet, an unpriced model, or no rollout file. */
+  Pending = "pending",
+  /** The price list could not be loaded. */
+  Unavailable = "unavailable",
+  Estimated = "estimated",
+}
+
+type CodexCostEstimate =
+  | { status: CodexCostStatus.Pending }
+  | { status: CodexCostStatus.Unavailable }
+  | { status: CodexCostStatus.Estimated; costUsd: number };
+
+function nextCostEstimate({
+  prices,
+  costUsd,
+}: {
+  prices: CodexPrices | undefined;
+  costUsd: number | undefined;
+}): CodexCostEstimate {
+  if (!prices) return { status: CodexCostStatus.Unavailable };
+  if (costUsd === undefined) return { status: CodexCostStatus.Pending };
+  return { status: CodexCostStatus.Estimated, costUsd };
+}
+
+function isSameCostEstimate(left: CodexCostEstimate, right: CodexCostEstimate): boolean {
+  if (left.status === CodexCostStatus.Estimated && right.status === CodexCostStatus.Estimated) {
+    return left.costUsd === right.costUsd;
+  }
+  return left.status === right.status;
+}
+
+// Both cost fields are always written, undefined included, so the agent manager's usage merge on
+// turn completion cannot keep a stale value from the previous state.
+function withCostEstimate(usage: AgentUsage, estimate: CodexCostEstimate): AgentUsage {
+  switch (estimate.status) {
+    case CodexCostStatus.Estimated:
+      return { ...usage, totalCostUsd: estimate.costUsd, totalCostUnavailable: false };
+    case CodexCostStatus.Unavailable:
+      return { ...usage, totalCostUsd: undefined, totalCostUnavailable: true };
+    case CodexCostStatus.Pending:
+      return { ...usage, totalCostUsd: undefined, totalCostUnavailable: undefined };
+  }
 }
 
 export function toAgentUsage(tokenUsage: unknown): AgentUsage | undefined {
@@ -3497,6 +3553,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   private warnedInvalidNotificationPayloads = new Set<string>();
   private warnedIncompleteEditToolCallIds = new Set<string>();
   private latestUsage: AgentUsage | undefined;
+  private rolloutCost: CodexRolloutCost | undefined;
+  private rolloutCostThreadId: string | null = null;
+  private costEstimate: CodexCostEstimate = { status: CodexCostStatus.Pending };
   private latestPlanResult: { callId: string; text: string; turnId: string | null } | null = null;
   private readonly userMessageTurnIndexes = new Map<string, number>();
   private readonly userMessageTurnIds: string[] = [];
@@ -6179,6 +6238,8 @@ export class CodexAppServerAgentSession implements AgentSession {
         provider: CODEX_PROVIDER,
         usage: this.latestUsage,
       });
+      // The rollout may record the turn's last request after its token-usage notification.
+      void this.refreshRolloutCost();
     }
     this.activeForegroundTurnId = null;
     this.activeClientMessageId = null;
@@ -6239,7 +6300,8 @@ export class CodexAppServerAgentSession implements AgentSession {
   private handleTokenUsageUpdatedNotification(
     parsed: Extract<ParsedCodexNotification, { kind: "token_usage_updated" }>,
   ): void {
-    this.latestUsage = toAgentUsage(parsed.tokenUsage);
+    const usage = toAgentUsage(parsed.tokenUsage);
+    this.latestUsage = usage ? withCostEstimate(usage, this.costEstimate) : undefined;
     if (this.latestUsage) {
       this.notifySubscribers({
         type: "usage_updated",
@@ -6247,6 +6309,52 @@ export class CodexAppServerAgentSession implements AgentSession {
         usage: this.latestUsage,
       });
     }
+    void this.refreshRolloutCost();
+  }
+
+  private async refreshRolloutCost(): Promise<void> {
+    const threadId = this.currentThreadId;
+    const priceList = this.deps.codexPriceList;
+    if (!threadId || !this.client || !priceList) return;
+    try {
+      if (this.rolloutCostThreadId !== threadId) {
+        this.rolloutCostThreadId = threadId;
+        this.costEstimate = { status: CodexCostStatus.Pending };
+        this.rolloutCost = await this.openRolloutCost(threadId);
+      }
+      const rolloutCost = this.rolloutCost;
+      if (!rolloutCost) return;
+      const prices = await priceList.get();
+      const costUsd = prices
+        ? await rolloutCost.read({ prices, serviceTier: this.serviceTier })
+        : undefined;
+      if (this.currentThreadId !== threadId) return;
+      this.applyCostEstimate(nextCostEstimate({ prices, costUsd }));
+    } catch (error) {
+      this.logger.warn({ error, threadId }, "Failed to read Codex rollout for the cost estimate");
+    }
+  }
+
+  private applyCostEstimate(estimate: CodexCostEstimate): void {
+    if (isSameCostEstimate(this.costEstimate, estimate)) return;
+    this.costEstimate = estimate;
+    if (!this.latestUsage) return;
+    this.latestUsage = withCostEstimate(this.latestUsage, estimate);
+    this.notifySubscribers({
+      type: "usage_updated",
+      provider: CODEX_PROVIDER,
+      usage: this.latestUsage,
+    });
+  }
+
+  private async openRolloutCost(threadId: string): Promise<CodexRolloutCost | undefined> {
+    if (!this.client) return undefined;
+    const response = toObjectRecord(
+      await this.client.request("thread/read", { threadId, includeTurns: false }),
+    );
+    // Thread.path is marked unstable in the app-server schema; without it there is no estimate.
+    const rolloutPath = toObjectRecord(response?.thread)?.path;
+    return typeof rolloutPath === "string" ? new CodexRolloutCost(rolloutPath) : undefined;
   }
 
   private resolveContextCompactionTrigger(itemId?: string): "auto" | "manual" | undefined {
@@ -7181,6 +7289,7 @@ export class CodexAppServerAgentClient implements AgentClient {
   private sessionDeps(launchEnv: Record<string, string> | undefined): CodexAppServerAgentDeps {
     return {
       ...this.deps,
+      codexPriceList: this.deps.codexPriceList ?? getSharedCodexPriceList(this.logger),
       codexHome: resolveCodexHomeDir(buildCodexAppServerEnv(this.runtimeSettings, launchEnv)),
       customCodexConfig: this.customProviderConfig(),
     };

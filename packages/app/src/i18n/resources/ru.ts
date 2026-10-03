@@ -2003,6 +2003,8 @@ export const ru: TranslationResources = {
     used: "Использовано: {{percentage}}%",
     tokens: "Токены: {{used}} / {{max}}",
     sessionCost: "Стоимость сессии: {{cost}}",
+    sessionCostEstimate: "Оценка по прейскуранту API",
+    sessionCostUnavailable: "Недоступно",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

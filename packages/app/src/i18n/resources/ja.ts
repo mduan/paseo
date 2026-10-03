@@ -1990,6 +1990,8 @@ export const ja: TranslationResources = {
     used: "{{percentage}}%使用",
     tokens: "{{used}} / {{max}}トークン",
     sessionCost: "セッションコスト: {{cost}}",
+    sessionCostEstimate: "API の定価に基づく推定",
+    sessionCostUnavailable: "利用不可",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {
