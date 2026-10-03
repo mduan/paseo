@@ -1,7 +1,15 @@
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
-import { Text, View, type ViewStyle } from "react-native";
+import { Pressable, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { CircleAlert, Folder, FolderGit2, Monitor } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Folder,
+  FolderGit2,
+  Monitor,
+} from "lucide-react-native";
 import { ProjectStatusIndicator } from "@/components/sidebar/project-leading-visual";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import {
@@ -29,6 +37,7 @@ import { StatusRing } from "@/components/status-ring";
 import { resolveSidebarWorkspacePrimaryLabel } from "@/components/sidebar/sidebar-workspace-title";
 import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
+import type { WorkspaceSessionRows } from "@/components/sidebar/workspace-session-rows";
 
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const needsInputColorMapping = (theme: Theme) => ({
@@ -40,6 +49,8 @@ const ThemedCircleAlert = withUnistyles(CircleAlert);
 const ThemedMonitor = withUnistyles(Monitor);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedFolderGit2 = withUnistyles(FolderGit2);
+const ThemedChevronDown = withUnistyles(ChevronDown);
+const ThemedChevronRight = withUnistyles(ChevronRight);
 
 export function SidebarWorkspaceRowFrame({
   workspace,
@@ -100,6 +111,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   shortcutNumber = null,
   showShortcutBadge = false,
   reserveIdleStatusIndicatorSpace = true,
+  expandToggle = null,
   children,
 }: {
   workspace: SidebarWorkspaceEntry;
@@ -117,6 +129,8 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   showShortcutBadge?: boolean;
   /** Keep the empty leading slot when the workspace has no active status. */
   reserveIdleStatusIndicatorSpace?: boolean;
+  /** Expands the workspace's nested session rows. */
+  expandToggle?: WorkspaceSessionRows["expandToggle"];
   children?: ReactNode;
 }) {
   const {
@@ -138,6 +152,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   return (
     <View style={styles.workspaceRowContent}>
       <View style={styles.workspaceRowMain}>
+        {expandToggle ? <WorkspaceExpandChevron toggle={expandToggle} /> : null}
         {leadingProjectName ? (
           <ProjectStatusIndicator
             iconDataUri={leadingProjectIconDataUri}
@@ -182,6 +197,35 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
     </View>
   );
 });
+
+function WorkspaceExpandChevron({
+  toggle,
+}: {
+  toggle: NonNullable<WorkspaceSessionRows["expandToggle"]>;
+}) {
+  const { t } = useTranslation();
+  const accessibilityState = useMemo(() => ({ expanded: toggle.expanded }), [toggle.expanded]);
+  // A workspace without sessions keeps the slot so every title stays on the same rail.
+  if (!toggle.visible) return <View style={styles.expandChevron} />;
+  const Chevron = toggle.expanded ? ThemedChevronDown : ThemedChevronRight;
+  return (
+    <Pressable
+      onPress={toggle.onToggle}
+      hitSlop={6}
+      style={styles.expandChevron}
+      accessibilityRole="button"
+      accessibilityLabel={
+        toggle.expanded
+          ? t("sidebar.workspace.sessions.collapse")
+          : t("sidebar.workspace.sessions.expand")
+      }
+      accessibilityState={accessibilityState}
+      testID="sidebar-workspace-expand-chevron"
+    >
+      <Chevron size={12} uniProps={foregroundMutedColorMapping} />
+    </Pressable>
+  );
+}
 
 function WorkspaceStatusIndicator({
   bucket,
@@ -480,6 +524,13 @@ const styles = StyleSheet.create((theme) => ({
     position: "absolute",
     top: 1,
     right: 0,
+  },
+  expandChevron: {
+    width: 12,
+    height: 20,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
   workspaceStatusDot: {
     position: "relative",

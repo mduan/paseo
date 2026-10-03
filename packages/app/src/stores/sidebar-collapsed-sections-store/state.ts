@@ -3,6 +3,8 @@ import { z } from "zod";
 export interface CollapsedProjectsState {
   collapsedProjectKeys: Set<string>;
   collapsedWorkspaceGroupKeys: Set<string>;
+  /** Workspaces whose nested session rows are hidden. Expanded is the default. */
+  collapsedWorkspaceKeys: Set<string>;
   collapsedPinned: boolean;
 }
 
@@ -10,6 +12,7 @@ export interface PersistedCollapsedProjects {
   collapsedProjectKeys?: string[];
   collapsedWorkspaceGroupKeys?: string[];
   collapsedStatusGroupKeys?: string[];
+  collapsedWorkspaceKeys?: string[];
   collapsedPinned?: boolean;
 }
 
@@ -19,6 +22,7 @@ export const PersistedCollapsedProjectsSchema: z.ZodType<PersistedCollapsedProje
     collapsedWorkspaceGroupKeys: z.array(z.string()).optional(),
     // COMPAT(sidebarWorkspaceGroupCollapse): added in v0.4.0, remove after 2027-02-14.
     collapsedStatusGroupKeys: z.array(z.string()).optional(),
+    collapsedWorkspaceKeys: z.array(z.string()).optional(),
     collapsedPinned: z.boolean().optional(),
   });
 
@@ -30,26 +34,37 @@ export function toggleProjectCollapsed(
   state: CollapsedProjectsState,
   projectKey: string,
 ): CollapsedProjectsState {
-  const next = new Set(state.collapsedProjectKeys);
-  if (next.has(projectKey)) {
-    next.delete(projectKey);
-  } else {
-    next.add(projectKey);
-  }
-  return { ...state, collapsedProjectKeys: next };
+  return { ...state, collapsedProjectKeys: toggleKey(state.collapsedProjectKeys, projectKey) };
 }
 
 export function toggleWorkspaceGroupCollapsed(
   state: CollapsedProjectsState,
   workspaceGroupKey: string,
 ): CollapsedProjectsState {
-  const next = new Set(state.collapsedWorkspaceGroupKeys);
-  if (next.has(workspaceGroupKey)) {
-    next.delete(workspaceGroupKey);
+  return {
+    ...state,
+    collapsedWorkspaceGroupKeys: toggleKey(state.collapsedWorkspaceGroupKeys, workspaceGroupKey),
+  };
+}
+
+export function toggleWorkspaceCollapsed(
+  state: CollapsedProjectsState,
+  workspaceKey: string,
+): CollapsedProjectsState {
+  return {
+    ...state,
+    collapsedWorkspaceKeys: toggleKey(state.collapsedWorkspaceKeys, workspaceKey),
+  };
+}
+
+function toggleKey(keys: Set<string>, key: string): Set<string> {
+  const next = new Set(keys);
+  if (next.has(key)) {
+    next.delete(key);
   } else {
-    next.add(workspaceGroupKey);
+    next.add(key);
   }
-  return { ...state, collapsedWorkspaceGroupKeys: next };
+  return next;
 }
 
 export function setProjectCollapsed(
@@ -69,11 +84,13 @@ export function setProjectCollapsed(
 export function serializeCollapsedProjects(state: CollapsedProjectsState): {
   collapsedProjectKeys: string[];
   collapsedWorkspaceGroupKeys: string[];
+  collapsedWorkspaceKeys: string[];
   collapsedPinned: boolean;
 } {
   return {
     collapsedProjectKeys: Array.from(state.collapsedProjectKeys),
     collapsedWorkspaceGroupKeys: Array.from(state.collapsedWorkspaceGroupKeys),
+    collapsedWorkspaceKeys: Array.from(state.collapsedWorkspaceKeys),
     collapsedPinned: state.collapsedPinned,
   };
 }
@@ -95,10 +112,14 @@ export function mergePersistedCollapsedProjects<S extends CollapsedProjectsState
       persisted.collapsedStatusGroupKeys ??
       Array.from(current.collapsedWorkspaceGroupKeys),
   );
+  const restoredWorkspaces = deserializeCollapsedKeys(
+    persisted.collapsedWorkspaceKeys ?? Array.from(current.collapsedWorkspaceKeys),
+  );
   const restoredPinned = persisted.collapsedPinned ?? current.collapsedPinned;
   if (
     areSetsEqual(current.collapsedProjectKeys, restoredProjects) &&
     areSetsEqual(current.collapsedWorkspaceGroupKeys, restoredWorkspaceGroups) &&
+    areSetsEqual(current.collapsedWorkspaceKeys, restoredWorkspaces) &&
     current.collapsedPinned === restoredPinned
   ) {
     return current;
@@ -107,6 +128,7 @@ export function mergePersistedCollapsedProjects<S extends CollapsedProjectsState
     ...current,
     collapsedProjectKeys: restoredProjects,
     collapsedWorkspaceGroupKeys: restoredWorkspaceGroups,
+    collapsedWorkspaceKeys: restoredWorkspaces,
     collapsedPinned: restoredPinned,
   };
 }

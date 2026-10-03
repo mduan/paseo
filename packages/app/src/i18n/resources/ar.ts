@@ -1216,6 +1216,10 @@ export const ar: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "إظهار الجلسات",
+        collapse: "إخفاء الجلسات",
+      },
       status: {
         serviceRunning: "الخدمة {{name}} قيد التشغيل",
         serviceUnhealthy: "الخدمة {{name}} غير سليمة",

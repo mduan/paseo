@@ -1252,6 +1252,10 @@ export const es: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "Mostrar sesiones",
+        collapse: "Ocultar sesiones",
+      },
       status: {
         serviceRunning: "Servicio {{name}} en ejecución",
         serviceUnhealthy: "Servicio {{name}} con fallos",

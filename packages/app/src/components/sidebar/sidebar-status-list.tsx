@@ -61,6 +61,10 @@ import {
 } from "@/components/sidebar/sidebar-workspace-row-content";
 import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
+import {
+  useWorkspaceSessionRows,
+  WorkspaceSessionRowList,
+} from "@/components/sidebar/workspace-session-rows";
 import { getStatusDotColor } from "@/utils/status-dot-color";
 import { selectWorkspaceServiceSummary } from "@/components/sidebar/workspace-meta-row";
 import {
@@ -800,6 +804,9 @@ function StatusWorkspaceRowInnerContent({
   const isDesktop = !isTouchPlatform;
   const serviceSummary = isDesktop ? selectWorkspaceServiceSummary(workspace.scripts) : null;
 
+  const sessions = useWorkspaceSessionRows(workspace);
+  // An expanded workspace hands its highlight to the nested row of the focused tab.
+  const rowSelected = selected && !sessions.showsFocusedRow;
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const didLongPressRef = dragInteraction?.didLongPressRef;
   const startDragPress = dragInteraction?.handlePressIn;
@@ -825,113 +832,127 @@ function StatusWorkspaceRowInnerContent({
   }, [endDragPress]);
 
   return (
-    <SidebarWorkspaceRowFrame workspace={workspace} isDragging={isDragging}>
-      {({ isHovered, contextMenuOpen, onContextMenuOpenChange, hoverHandlers }) => {
-        const showShortcut = showShortcutBadge && shortcutNumber !== null;
-        const {
-          trailingPresentation,
-          showKebab: showKebabInSlot,
-          showScrim,
-          renderSlot,
-          reserveSlotWidth,
-        } = resolveTrailingActionVisibility({
-          workspace,
-          trailing,
-          hasArchiveAction: Boolean(onArchive),
-          isHovered,
-          isTouchPlatform,
-          showShortcut,
-        });
-        const workspaceRowStyle = getStatusWorkspaceRowStyle({
-          isPressed,
-          selected,
-          isHovered,
-          inStatusGroup,
-          isDragging,
-        });
-        const backdrop = getSidebarRowBackdrop({ isDragging, isPressed, selected, isHovered });
-        return (
-          <View
-            {...dragAttributes}
-            {...dragHandleProps?.listeners}
-            ref={dragHandleProps?.setActivatorNodeRef as unknown as Ref<View>}
-            style={styles.workspaceRowContainer}
-            {...hoverHandlers}
-          >
-            <SidebarWorkspaceContextMenu
-              contextMenuOpen={contextMenuOpen}
-              onContextMenuOpenChange={onContextMenuOpenChange}
-              workspace={workspace}
-              leadingProjectName={projectName}
-              hostBadgeLabel={hostBadge?.label}
-              serviceSummary={serviceSummary}
-              workspaceKey={workspace.workspaceKey}
-              onCopyPath={onCopyPath}
-              onCopyBranchName={onCopyBranchName}
-              onRename={onRename}
-              onMarkAsRead={onMarkAsRead}
-              onMarkAsUnread={onMarkAsUnread}
-              onArchive={onArchive}
-              archiveLabel={archiveLabel}
-              archiveStatus={archiveStatus}
-              archivePendingLabel={archivePendingLabel}
-              archiveShortcutKeys={archiveShortcutKeys}
-              isPinned={isPinned}
-              onTogglePin={onTogglePin}
-              openInFileManagerPath={workspace.workspaceDirectory}
-              disabled={isArchiving}
-              accessibilityRole="button"
-              accessibilityState={accessibilityState}
-              style={workspaceRowStyle}
-              highlightStyle={styles.workspaceRowPressed}
-              onPressIn={handlePressIn}
-              onTouchMove={moveDragPress}
-              onPressOut={handlePressOut}
-              onPress={handlePress}
-              testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
+    <>
+      <SidebarWorkspaceRowFrame workspace={workspace} isDragging={isDragging}>
+        {({ isHovered, contextMenuOpen, onContextMenuOpenChange, hoverHandlers }) => {
+          const showShortcut = showShortcutBadge && shortcutNumber !== null;
+          const {
+            trailingPresentation,
+            showKebab: showKebabInSlot,
+            showScrim,
+            renderSlot,
+            reserveSlotWidth,
+          } = resolveTrailingActionVisibility({
+            workspace,
+            trailing,
+            hasArchiveAction: Boolean(onArchive),
+            isHovered,
+            isTouchPlatform,
+            showShortcut,
+          });
+          const workspaceRowStyle = getStatusWorkspaceRowStyle({
+            isPressed,
+            selected: rowSelected,
+            isHovered,
+            inStatusGroup,
+            isDragging,
+          });
+          const backdrop = getSidebarRowBackdrop({
+            isDragging,
+            isPressed,
+            selected: rowSelected,
+            isHovered,
+          });
+          return (
+            <View
+              {...dragAttributes}
+              {...dragHandleProps?.listeners}
+              ref={dragHandleProps?.setActivatorNodeRef as unknown as Ref<View>}
+              style={styles.workspaceRowContainer}
+              {...hoverHandlers}
             >
-              <SidebarWorkspaceRowContent
+              <SidebarWorkspaceContextMenu
+                contextMenuOpen={contextMenuOpen}
+                onContextMenuOpenChange={onContextMenuOpenChange}
                 workspace={workspace}
-                hostBadge={hostBadge}
                 leadingProjectName={projectName}
-                leadingProjectIconDataUri={projectIconDataUri}
+                hostBadgeLabel={hostBadge?.label}
                 serviceSummary={serviceSummary}
-                backdrop={backdrop}
-                isHovered={isHovered}
-                isLoading={isArchiving}
-                shortcutNumber={shortcutNumber}
-                showShortcutBadge={showShortcutBadge}
-                reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+                workspaceKey={workspace.workspaceKey}
+                onCopyPath={onCopyPath}
+                onCopyBranchName={onCopyBranchName}
+                onRename={onRename}
+                onMarkAsRead={onMarkAsRead}
+                onMarkAsUnread={onMarkAsUnread}
+                onArchive={onArchive}
+                archiveLabel={archiveLabel}
+                archiveStatus={archiveStatus}
+                archivePendingLabel={archivePendingLabel}
+                archiveShortcutKeys={archiveShortcutKeys}
+                isPinned={isPinned}
+                onTogglePin={onTogglePin}
+                openInFileManagerPath={workspace.workspaceDirectory}
+                disabled={isArchiving}
+                accessibilityRole="button"
+                accessibilityState={accessibilityState}
+                style={workspaceRowStyle}
+                highlightStyle={styles.workspaceRowPressed}
+                onPressIn={handlePressIn}
+                onTouchMove={moveDragPress}
+                onPressOut={handlePressOut}
+                onPress={handlePress}
+                testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
               >
-                {renderSlot ? (
-                  <StatusWorkspaceActionSlot
-                    workspace={workspace}
-                    backdrop={backdrop}
-                    trailing={trailing}
-                    trailingPresentation={trailingPresentation}
-                    showKebab={showKebabInSlot}
-                    showScrim={showScrim}
-                    reserveSlotWidth={reserveSlotWidth}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                    onCopyPath={onCopyPath}
-                    onCopyBranchName={onCopyBranchName}
-                    onRename={onRename}
-                    onMarkAsRead={onMarkAsRead}
-                    onMarkAsUnread={onMarkAsUnread}
-                    onArchive={onArchive}
-                    archiveLabel={archiveLabel}
-                    archiveStatus={archiveStatus}
-                    archivePendingLabel={archivePendingLabel}
-                    archiveShortcutKeys={archiveShortcutKeys}
-                  />
-                ) : null}
-              </SidebarWorkspaceRowContent>
-            </SidebarWorkspaceContextMenu>
-          </View>
-        );
-      }}
-    </SidebarWorkspaceRowFrame>
+                <SidebarWorkspaceRowContent
+                  workspace={workspace}
+                  hostBadge={hostBadge}
+                  leadingProjectName={projectName}
+                  leadingProjectIconDataUri={projectIconDataUri}
+                  serviceSummary={serviceSummary}
+                  backdrop={backdrop}
+                  isHovered={isHovered}
+                  isLoading={isArchiving}
+                  shortcutNumber={shortcutNumber}
+                  showShortcutBadge={showShortcutBadge}
+                  reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+                  expandToggle={sessions.expandToggle}
+                >
+                  {renderSlot ? (
+                    <StatusWorkspaceActionSlot
+                      workspace={workspace}
+                      backdrop={backdrop}
+                      trailing={trailing}
+                      trailingPresentation={trailingPresentation}
+                      showKebab={showKebabInSlot}
+                      showScrim={showScrim}
+                      reserveSlotWidth={reserveSlotWidth}
+                      isPinned={isPinned}
+                      onTogglePin={onTogglePin}
+                      onCopyPath={onCopyPath}
+                      onCopyBranchName={onCopyBranchName}
+                      onRename={onRename}
+                      onMarkAsRead={onMarkAsRead}
+                      onMarkAsUnread={onMarkAsUnread}
+                      onArchive={onArchive}
+                      archiveLabel={archiveLabel}
+                      archiveStatus={archiveStatus}
+                      archivePendingLabel={archivePendingLabel}
+                      archiveShortcutKeys={archiveShortcutKeys}
+                    />
+                  ) : null}
+                </SidebarWorkspaceRowContent>
+              </SidebarWorkspaceContextMenu>
+            </View>
+          );
+        }}
+      </SidebarWorkspaceRowFrame>
+      <WorkspaceSessionRowList
+        workspace={workspace}
+        sessions={sessions}
+        workspaceSelected={selected}
+        indented={inStatusGroup}
+      />
+    </>
   );
 }
 

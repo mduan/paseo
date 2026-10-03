@@ -1230,6 +1230,10 @@ export const ja: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "セッションを表示",
+        collapse: "セッションを非表示",
+      },
       status: {
         serviceRunning: "サービス {{name}} 実行中",
         serviceUnhealthy: "サービス {{name}} 異常",

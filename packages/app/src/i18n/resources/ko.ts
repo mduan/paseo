@@ -1223,6 +1223,10 @@ export const ko: TranslationResources = {
       },
     },
     workspace: {
+      sessions: {
+        expand: "세션 표시",
+        collapse: "세션 숨기기",
+      },
       status: {
         serviceRunning: "서비스 {{name}} 실행 중",
         serviceUnhealthy: "서비스 {{name}} 비정상",

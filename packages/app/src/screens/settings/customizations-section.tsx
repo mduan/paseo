@@ -6,6 +6,9 @@ import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 const CUSTOMIZATIONS = [
   "turnDiffs",
   "keepChatPosition",
+  "sidebarAgentRows",
+  "sidebarTerminalRows",
+  "sidebarBrowserRows",
 ] as const satisfies readonly (keyof AppSettings)[];
 
 type Customization = (typeof CUSTOMIZATIONS)[number];
