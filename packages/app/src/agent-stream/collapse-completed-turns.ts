@@ -1,11 +1,16 @@
 import { createContext, useCallback, useContext, useMemo, useReducer } from "react";
-import type { StreamItem } from "@/types/stream";
+import type { StreamItem, ToolCallItem } from "@/types/stream";
+import { describeToolCall } from "@/tool-calls/detail-level/grouping";
+import { summarizeToolCalls, type OverviewSummary } from "@/tool-calls/detail-level/overview/model";
 import { getStreamItemMessageId } from "./presentation";
 import { continuesTurn, startsNewTurn } from "./turn-membership";
 
 export interface WorkToggle {
   turnKey: string;
   expanded: boolean;
+  /** The tool calls hidden while folded. */
+  toolSummary: OverviewSummary;
+  failedToolCount: number;
 }
 
 export interface FoldedTail {
@@ -64,7 +69,17 @@ export function foldCompletedTurns(input: {
     const anchor = expanded
       ? turn[firstWorkIndex]!
       : turn.find((item, index) => index > firstWorkIndex && isVisibleWhenFolded(item, index))!;
-    toggles.set(anchor.id, { turnKey, expanded });
+    const hiddenToolCalls = turn.filter(
+      (item, index): item is ToolCallItem =>
+        item.kind === "tool_call" && !isVisibleWhenFolded(item, index),
+    );
+    toggles.set(anchor.id, {
+      turnKey,
+      expanded,
+      toolSummary: summarizeToolCalls(hiddenToolCalls),
+      failedToolCount: hiddenToolCalls.filter((call) => describeToolCall(call).status === "failed")
+        .length,
+    });
     items.push(...visible);
   });
   // A subsequence of the same length is the tail itself; keep its identity for layout caches.

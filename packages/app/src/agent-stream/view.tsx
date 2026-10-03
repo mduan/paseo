@@ -63,7 +63,10 @@ import { ToolCallDetailsContent } from "@/components/tool-call-details";
 import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { createStreamPresentation, getStreamItemMessageId } from "./presentation";
-import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
+import {
+  OverviewToolCallGroupView,
+  useOverviewSummary,
+} from "@/tool-calls/detail-level/overview/view";
 import { type AgentStreamRenderModel, buildAgentStreamRenderModel } from "./model";
 import { resolveStreamRenderStrategy } from "./strategy-resolver";
 import { type StreamSegmentRenderers, type StreamViewportHandle } from "./strategy";
@@ -1719,8 +1722,12 @@ const stylesheet = StyleSheet.create((theme) => ({
     borderBottomColor: theme.colors.border,
   },
   workToggleText: {
+    flexShrink: 1,
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
+  },
+  workToggleFailed: {
+    color: theme.colors.destructive,
   },
   emptyState: {
     flex: 1,
@@ -1890,9 +1897,30 @@ function WorkToggleButton({ itemId }: { itemId: string }) {
 function WorkToggleRow({
   turnKey,
   expanded,
+  toolSummary,
+  failedToolCount,
   onToggle,
 }: WorkToggle & { onToggle: (turnKey: string) => void }) {
   const { t } = useTranslation();
+  const title = t(
+    expanded ? "settings.customizations.hideWork" : "settings.customizations.showWork",
+  );
+  const summary = useOverviewSummary(toolSummary);
+  const failed =
+    failedToolCount > 0
+      ? t(`toolCallGroup.failed.${failedToolCount === 1 ? "one" : "other"}`, {
+          count: failedToolCount,
+        })
+      : "";
+  const details = [summary, failed].filter(Boolean).join(" · ");
+  const labelRef = useRef<Text>(null);
+  useEffect(() => {
+    // ponytail: native browser tooltip for truncated labels; RN Web 0.21 drops the `title` prop.
+    if (isWeb) {
+      const label = details ? `${title} (${details})` : title;
+      (labelRef.current as unknown as HTMLElement | null)?.setAttribute("title", label);
+    }
+  }, [title, details]);
   const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
@@ -1904,8 +1932,15 @@ function WorkToggleRow({
       style={stylesheet.workToggle}
       testID="work-toggle"
     >
-      <Text style={stylesheet.workToggleText}>
-        {t(expanded ? "settings.customizations.hideWork" : "settings.customizations.showWork")}
+      <Text ref={labelRef} numberOfLines={1} style={stylesheet.workToggleText}>
+        {title}
+        {details ? (
+          <>
+            {` (${summary}${summary && failed ? " · " : ""}`}
+            {failed ? <Text style={stylesheet.workToggleFailed}>{failed}</Text> : null}
+            {")"}
+          </>
+        ) : null}
       </Text>
       <Chevron size={14} uniProps={mutedColorMapping} />
     </Pressable>

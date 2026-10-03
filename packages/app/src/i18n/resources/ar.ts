@@ -1928,6 +1928,10 @@ export const ar: TranslationResources = {
       one: "استدعى Paseo {{count}} مرة",
       other: "استدعى Paseo {{count}} مرات",
     },
+    failed: {
+      one: "فشل {{count}}",
+      other: "فشل {{count}}",
+    },
     and: "و",
   },
   renameModal: {

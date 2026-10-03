@@ -1981,6 +1981,10 @@ export const fr: TranslationResources = {
       one: "a appelé Paseo {{count}} fois",
       other: "a appelé Paseo {{count}} fois",
     },
+    failed: {
+      one: "{{count}} en échec",
+      other: "{{count}} en échec",
+    },
     and: "et",
   },
   renameModal: {

@@ -1953,6 +1953,10 @@ export const en = {
       one: "called Paseo {{count}} time",
       other: "called Paseo {{count}} times",
     },
+    failed: {
+      one: "{{count}} failed",
+      other: "{{count}} failed",
+    },
     and: "and",
   },
   renameModal: {
