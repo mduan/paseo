@@ -7,7 +7,7 @@ export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 
 source "$SCRIPT_DIR/dev-home.sh"
 
-export PASEO_LISTEN="${PASEO_LISTEN:-127.0.0.1:6768}"
+export PASEO_LISTEN="${PASEO_LISTEN:-127.0.0.1:6769}"
 configure_dev_paseo_home
 
 EXPO_PORT="${EXPO_PORT:-8081}"

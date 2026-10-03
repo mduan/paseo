@@ -17,7 +17,7 @@ const simulatorName =
   process.env.PASEO_IOS_SIMULATOR_NAME || `Paseo ${worktreeName} ${worktreeHash}`;
 const daemonEndpoint =
   process.env.PASEO_DEV_DAEMON_ENDPOINT ||
-  `localhost:${process.env.PASEO_SERVICE_DAEMON_PORT || "6768"}`;
+  `localhost:${process.env.PASEO_SERVICE_DAEMON_PORT || "6769"}`;
 
 const env = {
   ...process.env,

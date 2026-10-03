@@ -15,7 +15,7 @@ npm run dev:desktop
 
 Root checkout dev is intentionally split across terminals:
 
-- `npm run dev:server` runs the daemon on `127.0.0.1:6768`.
+- `npm run dev:server` runs the daemon on `127.0.0.1:6769`.
 - `npm run dev:app` runs Expo on `http://localhost:8081` and connects to the dev daemon.
 - `npm run dev:desktop` runs its own Electron-flavored Expo server on the first free port from `8082` through `8089`. It never claims port `8081`.
 
@@ -63,7 +63,7 @@ PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived wor
 ### Daemon endpoints
 
 - Stable daemon launched by the desktop app: `localhost:6767`.
-- Root checkout dev daemon: `localhost:6768`.
+- Root checkout dev daemon: `localhost:6769`. It moved from `6768` because Orca serves its web UI on `6768`.
 - Root checkout Expo: `http://localhost:8081`.
 - Root checkout desktop dev Expo: first free port from `8082` through `8089`.
 - `npm run dev` (Windows): `localhost:6767` for the daemon.
@@ -110,7 +110,7 @@ npm run ios        # → expo run:ios (packages/app): builds and launches the ap
 
 ```bash
 EXPO_PUBLIC_LOCAL_DAEMON=localhost:${PASEO_SERVICE_DAEMON_PORT} npm run ios   # worktree daemon running as a Paseo service
-EXPO_PUBLIC_LOCAL_DAEMON=localhost:6768 npm run ios                          # standalone `npm run dev:server`
+EXPO_PUBLIC_LOCAL_DAEMON=localhost:6769 npm run ios                          # standalone `npm run dev:server`
 ```
 
 The iOS simulator shares the Mac's loopback, so `localhost:<port>` reaches the host daemon directly.
@@ -248,7 +248,7 @@ For the desktop Explorer sidebar toggle, run the app against the root checkout's
 npm run profile:explorer-toggle --workspace=@getpaseo/app
 ```
 
-The harness verifies port `6768`, opens the Paseo workspace, creates and warms the Explorer pane,
+The harness verifies port `6769`, opens the Paseo workspace, creates and warms the Explorer pane,
 records an idle control, then measures settled and 50 ms burst Cmd+E toggles. It reports
 input-to-DOM and input-to-paint latency, React commits, mounts, unmounts, and DOM mutations. Set
 `PASEO_PROFILE_TRACE_PATH=/tmp/explorer-toggle.trace.json` or

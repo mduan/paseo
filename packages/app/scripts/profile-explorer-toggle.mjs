@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const appUrl = process.env.PASEO_PROFILE_APP_URL ?? "http://127.0.0.1:8081";
-const daemonPort = Number(process.env.PASEO_PROFILE_DAEMON_PORT ?? 6768);
+const daemonPort = Number(process.env.PASEO_PROFILE_DAEMON_PORT ?? 6769);
 const workspaceCwd = process.env.PASEO_PROFILE_WORKSPACE_CWD ?? repoRoot;
 const workspaceId = process.env.PASEO_PROFILE_WORKSPACE_ID ?? resolvePaseoWorkspaceId();
 const serverId =
