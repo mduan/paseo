@@ -77,6 +77,7 @@ export function editorTheme(theme: EditorVisualTheme) {
         },
         ".cm-activeLine": { backgroundColor: "transparent" },
         ".cm-activeLineGutter": { backgroundColor: "transparent", color: theme.foreground },
+        ".cm-line-target": { backgroundColor: theme.selection },
         "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
           backgroundColor: theme.selection,
         },

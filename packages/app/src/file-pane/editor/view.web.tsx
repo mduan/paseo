@@ -8,6 +8,7 @@ import { isRenderedMarkdownFile } from "@/components/file-pane-render-mode";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
 import { editorBaseExtensions, editorTheme, type EditorVisualTheme } from "./extensions.web";
+import { lineTargetHighlight, revealLineTarget } from "./line-target.web";
 
 interface FileEditorViewProps {
   model: FileEditorModel;
@@ -58,6 +59,7 @@ export function FileEditorView({
           vimCompartment.of(values.vimEnabled ? vim() : []),
           find.extension,
           ...editorBaseExtensions(() => void values.model.save()),
+          lineTargetHighlight,
           languageCompartment.of(getLanguageForFile(values.filename)?.extension ?? []),
           wrappingCompartment.of(wrappingForFile(values.filename)),
           themeCompartment.of(editorTheme(values.theme)),
@@ -101,15 +103,8 @@ export function FileEditorView({
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !location.lineStart) return;
-    const lineStart = Math.min(location.lineStart, view.state.doc.lines);
-    const lineEnd = Math.min(location.lineEnd ?? lineStart, view.state.doc.lines);
-    const from = view.state.doc.line(lineStart).from;
-    const to = view.state.doc.line(Math.max(lineStart, lineEnd)).to;
-    view.dispatch({
-      selection: { anchor: from, head: lineEnd > lineStart ? to : from },
-      effects: EditorView.scrollIntoView(from, { y: "center" }),
-    });
+    if (!view) return;
+    revealLineTarget(view, { lineStart: location.lineStart, lineEnd: location.lineEnd });
   }, [location.lineEnd, location.lineStart, navigationRevision]);
 
   useEffect(() => {
