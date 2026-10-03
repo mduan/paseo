@@ -54,6 +54,7 @@ import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
+import { estimateCodexCostUsd, type CodexCostInput } from "./codex-pricing.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -1047,10 +1048,24 @@ function filterCodexThreadsByCwd(
   );
 }
 
-export function toAgentUsage(tokenUsage: unknown): AgentUsage | undefined {
+export function toAgentUsage(
+  tokenUsage: unknown,
+  pricing?: Pick<CodexCostInput, "model" | "serviceTier">,
+): AgentUsage | undefined {
   const usage = toObjectRecord(tokenUsage);
   if (!usage) return undefined;
   const last = toObjectRecord(usage.last);
+  const total = toObjectRecord(usage.total);
+  const totalCostUsd =
+    pricing && total
+      ? estimateCodexCostUsd({
+          ...pricing,
+          inputTokens: typeof total.inputTokens === "number" ? total.inputTokens : 0,
+          cachedInputTokens:
+            typeof total.cachedInputTokens === "number" ? total.cachedInputTokens : 0,
+          outputTokens: typeof total.outputTokens === "number" ? total.outputTokens : 0,
+        })
+      : undefined;
   const contextWindowMaxTokens = firstPositiveFiniteNumber(
     usage.model_context_window,
     usage.modelContextWindow,
@@ -1063,6 +1078,7 @@ export function toAgentUsage(tokenUsage: unknown): AgentUsage | undefined {
     outputTokens: typeof last?.outputTokens === "number" ? last.outputTokens : undefined,
     ...(contextWindowMaxTokens !== undefined ? { contextWindowMaxTokens } : {}),
     ...(contextWindowUsedTokens !== undefined ? { contextWindowUsedTokens } : {}),
+    ...(totalCostUsd !== undefined ? { totalCostUsd } : {}),
   };
 }
 
@@ -6206,7 +6222,10 @@ export class CodexAppServerAgentSession implements AgentSession {
   private handleTokenUsageUpdatedNotification(
     parsed: Extract<ParsedCodexNotification, { kind: "token_usage_updated" }>,
   ): void {
-    this.latestUsage = toAgentUsage(parsed.tokenUsage);
+    this.latestUsage = toAgentUsage(parsed.tokenUsage, {
+      model: this.config.model,
+      serviceTier: this.serviceTier,
+    });
     if (this.latestUsage) {
       this.notifySubscribers({
         type: "usage_updated",

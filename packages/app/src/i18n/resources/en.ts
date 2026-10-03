@@ -1960,6 +1960,7 @@ export const en = {
     used: "{{percentage}}% used",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Session cost {{cost}}",
+    sessionCostEstimate: "Estimated at API list prices",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

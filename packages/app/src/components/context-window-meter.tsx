@@ -204,6 +204,9 @@ export function ContextWindowMeter({
               {t("contextWindow.sessionCost", { cost: formattedSessionCost })}
             </Text>
           ) : null}
+          {formattedSessionCost ? (
+            <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+          ) : null}
         </View>
       </TooltipContent>
     </Tooltip>
