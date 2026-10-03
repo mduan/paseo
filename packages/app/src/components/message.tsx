@@ -105,6 +105,7 @@ import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { AssistantForkMenu, type AssistantForkTarget } from "@/components/assistant-fork-menu";
 import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useCompactChat } from "@/agent-stream/compact-chat";
 import {
   markdownCopyDataSet,
   markdownCopyOrderedListDataSet,
@@ -354,6 +355,22 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
     minWidth: 0,
     flexShrink: 1,
   },
+  // Compact chat: Codex-style bubbles.
+  containerCompact: {
+    marginTop: theme.spacing[3],
+    marginBottom: theme.spacing[1],
+  },
+  contentCompact: {
+    maxWidth: "75%",
+  },
+  bubbleCompact: {
+    backgroundColor: theme.colorScheme === "dark" ? "#183d76" : "#e8f3fe",
+    borderRadius: 20,
+    padding: theme.spacing[3],
+  },
+  textCompact: {
+    color: theme.colorScheme === "dark" ? "#ffffff" : "#0c264a",
+  },
   text: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.content,
@@ -468,16 +485,32 @@ export const UserMessage = memo(function UserMessage({
     [rewindMutation],
   );
 
+  const compact = useCompactChat();
   const containerStyle = useMemo(
     () => [
       userMessageStylesheet.container,
-      !resolvedDisableOuterSpacing && [
-        isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
-        isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,
-        !isFirstInGroup || !isLastInGroup ? userMessageStylesheet.containerSpacing : null,
-      ],
+      !resolvedDisableOuterSpacing &&
+        (compact
+          ? userMessageStylesheet.containerCompact
+          : [
+              isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
+              isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,
+              !isFirstInGroup || !isLastInGroup ? userMessageStylesheet.containerSpacing : null,
+            ]),
     ],
-    [resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
+    [compact, resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
+  );
+  const contentStyle = useMemo(
+    () => [userMessageStylesheet.content, compact && userMessageStylesheet.contentCompact],
+    [compact],
+  );
+  const bubbleStyle = useMemo(
+    () => [userMessageStylesheet.bubble, compact && userMessageStylesheet.bubbleCompact],
+    [compact],
+  );
+  const textStyle = useMemo(
+    () => [userMessageStylesheet.text, compact && userMessageStylesheet.textCompact],
+    [compact],
   );
   const imagePreviewContainerStyle = useMemo(
     () => [
@@ -506,11 +539,11 @@ export const UserMessage = memo(function UserMessage({
   return (
     <View style={containerStyle} testID="user-message" aria-busy={isPending}>
       <View
-        style={userMessageStylesheet.content}
+        style={contentStyle}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
       >
-        <View style={userMessageStylesheet.bubble}>
+        <View style={bubbleStyle}>
           {hasImages ? (
             <View style={imagePreviewContainerStyle}>
               {images.map((image) => (
@@ -542,7 +575,7 @@ export const UserMessage = memo(function UserMessage({
             </View>
           ) : null}
           {hasText ? (
-            <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
+            <Text selectable style={textStyle} dataSet={MESSAGE_TEXT_DATASET}>
               {message}
             </Text>
           ) : null}
@@ -768,6 +801,10 @@ export const assistantMessageStylesheet = StyleSheet.create((theme) => ({
     paddingTop: 0,
   },
   containerCompactBottom: {
+    paddingBottom: 0,
+  },
+  containerCompactChat: {
+    paddingTop: 0,
     paddingBottom: 0,
   },
   cappedNotice: {
@@ -1964,6 +2001,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     [blocks],
   );
 
+  const compactChat = useCompactChat();
   const assistantContainerStyle = useMemo(
     () => [
       assistantMessageStylesheet.container,
@@ -1971,8 +2009,9 @@ export const AssistantMessage = memo(function AssistantMessage({
         assistantMessageStylesheet.containerCompactTop,
       (spacing === "compactBottom" || spacing === "compactBoth") &&
         assistantMessageStylesheet.containerCompactBottom,
+      compactChat && assistantMessageStylesheet.containerCompactChat,
     ],
-    [spacing],
+    [compactChat, spacing],
   );
   const revealDataSet = useMemo(
     () =>
@@ -2846,16 +2885,18 @@ export const ExpandableBadge = memo(function ExpandableBadge({
     ],
   );
 
+  const compactChat = useCompactChat();
   const containerStyle = useMemo(
     () => [
       expandableBadgeStylesheet.container,
       !resolvedDisableOuterSpacing &&
+        !compactChat &&
         (isLastInSequence
           ? expandableBadgeStylesheet.containerLastInSequence
           : expandableBadgeStylesheet.containerSpacing),
       style,
     ],
-    [isLastInSequence, resolvedDisableOuterSpacing, style],
+    [compactChat, isLastInSequence, resolvedDisableOuterSpacing, style],
   );
 
   const pressableStyle = useMemo(

@@ -19,10 +19,12 @@ import type { TurnFooterHost } from "./layout";
 import { AssistantForkMenu } from "@/components/assistant-fork-menu";
 import { SyncedLoader } from "@/components/synced-loader";
 import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useCompactChat } from "./compact-chat";
 
 const ThemedSyncedLoader = withUnistyles(SyncedLoader);
 const workingIndicatorColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 export const TURN_FOOTER_BOTTOM_SPACING = SPACING[8];
+export const COMPACT_TURN_FOOTER_BOTTOM_SPACING = SPACING[2];
 
 export type TurnContentStrategy = StreamStrategy;
 export type AssistantTurnForkHandler = (input: {
@@ -147,7 +149,7 @@ function RunningTurnFooter({
   onForkInFlightTurn?: InFlightTurnForkHandler;
 }) {
   return (
-    <View style={stylesheet.turnFooterSlot} testID="turn-working-indicator">
+    <View style={useTurnFooterSlotStyle()} testID="turn-working-indicator">
       <WorkingIndicator
         inFlightTurnStartedAt={inFlightTurnStartedAt}
         onForkInFlightTurn={onForkInFlightTurn}
@@ -194,8 +196,9 @@ function CompletedTurnFooter({
     },
     [boundary, onForkAssistantTurn],
   );
+  const slotStyle = useTurnFooterSlotStyle();
   return (
-    <View style={stylesheet.turnFooterSlot}>
+    <View style={slotStyle}>
       <AssistantTurnFooter
         getContent={getContent}
         completedAt={timing?.completedAt}
@@ -206,8 +209,24 @@ function CompletedTurnFooter({
   );
 }
 
+function useTurnFooterSlotStyle() {
+  const compact = useCompactChat();
+  return useMemo(
+    () => [stylesheet.turnFooterSlot, compact && stylesheet.turnFooterSlotCompact],
+    [compact],
+  );
+}
+
 function TurnFooterRow({ children }: { children: ReactNode }) {
-  const rowStyle = useMemo(() => [stylesheet.streamItemWrapper, stylesheet.turnFooterRow], []);
+  const compact = useCompactChat();
+  const rowStyle = useMemo(
+    () => [
+      stylesheet.streamItemWrapper,
+      stylesheet.turnFooterRow,
+      compact && stylesheet.turnFooterRowCompact,
+    ],
+    [compact],
+  );
   return <View style={rowStyle}>{children}</View>;
 }
 
@@ -221,12 +240,18 @@ const stylesheet = StyleSheet.create((theme) => ({
   turnFooterRow: {
     marginTop: theme.spacing[2] + 5,
   },
+  turnFooterRowCompact: {
+    marginTop: theme.spacing[1],
+  },
   turnFooterSlot: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     minHeight: 24,
     paddingBottom: TURN_FOOTER_BOTTOM_SPACING,
+  },
+  turnFooterSlotCompact: {
+    paddingBottom: COMPACT_TURN_FOOTER_BOTTOM_SPACING,
   },
   turnFooterContent: {
     height: 24,
