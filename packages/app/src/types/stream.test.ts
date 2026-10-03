@@ -329,6 +329,32 @@ describe("user message identity", () => {
       },
     ]);
   });
+
+  it("keeps the canonical turn when a created agent's prompt is handed off after it", () => {
+    const canonical = {
+      ...createUserMessage({
+        id: "provider-1",
+        messageId: "provider-1",
+        clientMessageId: "client-1",
+        text: "review this",
+        timestamp: new Date("2026-07-27T11:00:01.000Z"),
+      }),
+      turnId: "turn-1",
+    };
+    const submitted = createUserMessage({
+      clientMessageId: "client-1",
+      text: "review this",
+      timestamp: new Date("2026-07-27T11:00:00.000Z"),
+    });
+
+    const result = handoffCreatedAgentUserMessageToStream({
+      tail: [canonical],
+      head: [],
+      message: submitted,
+    });
+
+    expect(result.tail[0]).toMatchObject({ turnId: "turn-1" });
+  });
 });
 
 function assistantTimeline(
