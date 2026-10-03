@@ -75,7 +75,6 @@ import {
   CompletedTurnFooterRow,
   TurnFooter,
   TURN_FOOTER_BOTTOM_SPACING,
-  COMPACT_TURN_FOOTER_BOTTOM_SPACING,
   type AssistantTurnForkHandler,
   type InFlightTurnForkHandler,
   type TurnContentStrategy,
@@ -112,8 +111,6 @@ import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
-import { CompactChatContext, useCompactChat } from "./compact-chat";
-import { getCompactGapBetweenStreamItems } from "./spacing";
 import {
   useFoldedTail,
   useWorkToggle,
@@ -205,11 +202,6 @@ function renderStreamItemWithTurnFooter(input: {
       itemId={input.layoutItem.item.id}
       belowItemId={input.layoutItem.belowItem?.id}
       gapBelow={input.layoutItem.gapBelow}
-      compactGapBelow={
-        input.layoutItem.item.kind === "user_message" || input.layoutItem.completedFooter
-          ? input.layoutItem.gapBelow
-          : getCompactGapBetweenStreamItems(input.layoutItem.item, input.layoutItem.belowItem)
-      }
     >
       {input.content}
     </StreamItemWrapper>
@@ -393,7 +385,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const autoExpandReasoning = useSettings((settings) => settings.autoExpandReasoning);
     const toolCallDetailLevel = useSettings((settings) => settings.toolCallDetailLevel);
     const chatOutlineEnabled = useSettings((settings) => settings.chatOutlineEnabled);
-    const compactChat = useSettings((settings) => settings.compactChat);
     const contentMaxWidth = useSettings(resolveContentMaxWidth);
     const viewportRef = useRef<StreamViewportHandle | null>(null);
     const pendingClientMessageIds = useMemo(
@@ -778,7 +769,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             capabilities={context.capabilities}
             client={client}
             isFirstInGroup={layoutItem.isFirstInUserGroup}
-            isLastInGroup={layoutItem.isLastInUserGroup}
             isPending={
               item.clientMessageId !== undefined &&
               pendingClientMessageIds.has(item.clientMessageId)
@@ -809,7 +799,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                   workspaceRoot={workspaceRoot}
                   serverId={resolvedServerId}
                   client={client}
-                  spacing={layoutItem.assistantSpacing}
                   phase={layoutItem.phase}
                 />
               )}
@@ -828,7 +817,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             onInlineDetailsExpandedChangeByItemId={setInlineDetailsExpanded}
             text={item.text}
             status={item.status}
-            isLastInSequence={layoutItem.isLastInToolSequence}
             defaultExpanded={autoExpandReasoning}
           />
         );
@@ -837,11 +825,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     );
 
     const renderSingleToolCallItem = useCallback(
-      (
-        item: Extract<StreamItem, { kind: "tool_call" }>,
-        isLastInSequence: boolean,
-        maxDetailHeight?: number,
-      ) => {
+      (item: Extract<StreamItem, { kind: "tool_call" }>, maxDetailHeight?: number) => {
         const { payload } = item;
 
         if (payload.source === "agent") {
@@ -868,7 +852,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               detail={data.detail}
               cwd={context.cwd}
               metadata={data.metadata}
-              isLastInSequence={isLastInSequence}
               onOpenFilePath={handleToolCallOpenFile}
               maxDetailHeight={maxDetailHeight}
             />
@@ -884,7 +867,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             args={data.arguments}
             result={data.result}
             status={data.status}
-            isLastInSequence={isLastInSequence}
             onOpenFilePath={handleToolCallOpenFile}
             maxDetailHeight={maxDetailHeight}
           />
@@ -902,24 +884,19 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "tool_call" }>) => {
         const group = getToolCallGroup(item.id);
         if (!group) {
-          return renderSingleToolCallItem(item, layoutItem.isLastInToolSequence);
+          return renderSingleToolCallItem(item);
         }
         const expanded = expandedToolCallGroupIds.has(group.run.id);
         return (
           <OverviewToolCallGroupView
             group={group}
             expanded={expanded}
-            isLastInSequence={layoutItem.isLastInToolSequence}
             onExpandedChange={setToolCallGroupExpanded}
           >
             {expanded
-              ? group.run.calls.map((call, index) => (
+              ? group.run.calls.map((call) => (
                   <React.Fragment key={call.id}>
-                    {renderSingleToolCallItem(
-                      call,
-                      index === group.run.calls.length - 1,
-                      GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
-                    )}
+                    {renderSingleToolCallItem(call, GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT)}
                   </React.Fragment>
                 ))
               : null}
@@ -1142,11 +1119,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         }),
     );
     const renderLiveAuxiliary = useCallback<StreamSegmentRenderers["renderLiveAuxiliary"]>(() => {
-      const footerSpacing = compactChat
-        ? COMPACT_TURN_FOOTER_BOTTOM_SPACING
-        : TURN_FOOTER_BOTTOM_SPACING;
       const existingTailSpacing =
-        auxiliary.turnFooter && !auxiliary.pendingPermissions ? footerSpacing : 0;
+        auxiliary.turnFooter && !auxiliary.pendingPermissions ? TURN_FOOTER_BOTTOM_SPACING : 0;
       const bottomOverlayInset = resolveBottomOverlayTailInset({
         requiredTailClearance: bottomOverlayTailClearance,
         existingTailSpacing,
@@ -1156,12 +1130,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         turnFooter: auxiliary.turnFooter,
         bottomOverlayInset,
       });
-    }, [
-      auxiliary.pendingPermissions,
-      auxiliary.turnFooter,
-      bottomOverlayTailClearance,
-      compactChat,
-    ]);
+    }, [auxiliary.pendingPermissions, auxiliary.turnFooter, bottomOverlayTailClearance]);
 
     const renderers = useMemo<StreamSegmentRenderers>(
       () => ({
@@ -1256,11 +1225,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       </ChatFind>
     );
     return (
-      <StreamCustomizationProviders
-        compactChat={compactChat}
-        workToggles={workToggles}
-        turnDiffCards={turnDiffCards}
-      >
+      <StreamCustomizationProviders workToggles={workToggles} turnDiffCards={turnDiffCards}>
         <AssistantForkMenuContext.Provider value={forkMenuContext}>
           {stream}
         </AssistantForkMenuContext.Provider>
@@ -1270,19 +1235,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 );
 
 function StreamCustomizationProviders(props: {
-  compactChat: boolean;
   workToggles: WorkToggleContextValue | undefined;
   turnDiffCards: TurnDiffCardsValue | undefined;
   children: ReactNode;
 }) {
   return (
-    <CompactChatContext.Provider value={props.compactChat}>
-      <WorkToggleContext.Provider value={props.workToggles}>
-        <TurnDiffCardsContext.Provider value={props.turnDiffCards}>
-          {props.children}
-        </TurnDiffCardsContext.Provider>
-      </WorkToggleContext.Provider>
-    </CompactChatContext.Provider>
+    <WorkToggleContext.Provider value={props.workToggles}>
+      <TurnDiffCardsContext.Provider value={props.turnDiffCards}>
+        {props.children}
+      </TurnDiffCardsContext.Provider>
+    </WorkToggleContext.Provider>
   );
 }
 
@@ -1422,7 +1384,6 @@ interface ThoughtSlotProps {
   onInlineDetailsExpandedChangeByItemId: (itemId: string, expanded: boolean) => void;
   text: string;
   status: Extract<StreamItem, { kind: "thought" }>["status"];
-  isLastInSequence: boolean;
   defaultExpanded: boolean;
 }
 
@@ -1432,7 +1393,6 @@ function ThoughtSlot({
   onInlineDetailsExpandedChangeByItemId,
   text,
   status,
-  isLastInSequence,
   defaultExpanded,
 }: ThoughtSlotProps) {
   const revealedText = useRevealedText(text, status === "ready" ? "complete" : "streaming");
@@ -1443,7 +1403,6 @@ function ThoughtSlot({
       toolName="thinking"
       args={revealedText}
       status={status === "ready" ? "completed" : "executing"}
-      isLastInSequence={isLastInSequence}
       defaultExpanded={defaultExpanded}
       forceInline={defaultExpanded}
     />
@@ -1918,23 +1877,14 @@ interface StreamItemWrapperProps {
   itemId: string;
   belowItemId: string | undefined;
   gapBelow: number;
-  compactGapBelow: number;
   children: ReactNode;
 }
 
-function StreamItemWrapper({
-  itemId,
-  belowItemId,
-  gapBelow,
-  compactGapBelow,
-  children,
-}: StreamItemWrapperProps) {
-  const compactChat = useCompactChat();
+function StreamItemWrapper({ itemId, belowItemId, gapBelow, children }: StreamItemWrapperProps) {
   // The toggle moves between the final message and the first work row, which take different
   // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
   const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
-  let marginBottom = compactChat ? compactGapBelow : gapBelow;
-  if (isAboveWorkToggle) marginBottom = 0;
+  const marginBottom = isAboveWorkToggle ? 0 : gapBelow;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],

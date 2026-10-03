@@ -2049,17 +2049,9 @@ export const en = {
     customizations: {
       group: "Customizations",
       all: "All",
-      compactChat: {
-        title: "Compact chat",
-        description: "Reduce spacing between messages and restyle user bubbles",
-      },
       keepChatPosition: {
         title: "Keep chat position",
         description: "Keep your reading position when you send a message",
-      },
-      worktreeIndicator: {
-        title: "Worktree indicator",
-        description: "Show a split-arrow icon on the branch of Git worktree workspaces",
       },
       turnDiffs: {
         title: "Turn diffs",

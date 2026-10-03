@@ -11,7 +11,6 @@ import { OverviewToolCallGroupSheet } from "./sheet";
 interface OverviewGroupProps {
   group: OverviewToolCallGroup;
   expanded: boolean;
-  isLastInSequence: boolean;
   onExpandedChange: (groupId: string, expanded: boolean) => void;
   children: ReactNode;
 }
@@ -58,7 +57,6 @@ function useOverviewSummary(summary: OverviewSummary): string {
 export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView({
   group,
   expanded,
-  isLastInSequence,
   onExpandedChange,
   children,
 }: OverviewGroupProps) {
@@ -99,7 +97,6 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
           icon={Wrench}
           isLoading={group.isLoading}
           isExpanded={false}
-          isLastInSequence={isLastInSequence}
           onToggle={toggle}
         />
         <OverviewToolCallGroupSheet visible={expanded} summary={aggregateSummary} onClose={close}>
@@ -116,7 +113,6 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
       icon={Wrench}
       isLoading={group.isLoading}
       isExpanded={expanded}
-      isLastInSequence={isLastInSequence}
       onToggle={toggle}
       renderDetails={renderDetails}
       borderlessWhenExpanded

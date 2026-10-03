@@ -4,10 +4,8 @@ import { SettingsCard, SettingsSection, SettingsSwitch } from "@/components/sett
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 
 const CUSTOMIZATIONS = [
-  "compactChat",
   "turnDiffs",
   "keepChatPosition",
-  "worktreeIndicator",
 ] as const satisfies readonly (keyof AppSettings)[];
 
 type Customization = (typeof CUSTOMIZATIONS)[number];

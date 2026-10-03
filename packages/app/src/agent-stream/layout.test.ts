@@ -233,12 +233,6 @@ describe("layoutStream", () => {
 
       expect(findLayoutItem(splitLayout, firstBlock.id).belowItem?.id).toBe(secondBlock.id);
       expect(findLayoutItem(splitLayout, secondBlock.id).aboveItem?.id).toBe(firstBlock.id);
-      expect(findLayoutItem(splitLayout, firstBlock.id).assistantSpacing).toBe(
-        findLayoutItem(unsplitLayout, firstBlock.id).assistantSpacing,
-      );
-      expect(findLayoutItem(splitLayout, secondBlock.id).assistantSpacing).toBe(
-        findLayoutItem(unsplitLayout, secondBlock.id).assistantSpacing,
-      );
       expect(findLayoutItem(splitLayout, firstBlock.id).gapBelow).toBe(
         findLayoutItem(unsplitLayout, firstBlock.id).gapBelow,
       );
@@ -318,20 +312,6 @@ describe("layoutStream", () => {
     expect(assistantRow.frameOrder).toBe("content-then-footer");
   });
 
-  it("compacts assistant block spacing across the history and live-head boundary", () => {
-    const historyBlock = assistantMessage("turn:block:0", 2, { groupId: "turn", index: 0 });
-    const headBlock = assistantMessage("turn:head", 3, { groupId: "turn", index: 1 });
-    const layout = layoutFor({
-      platform: "android",
-      tail: [userMessage("u1", 1), historyBlock],
-      head: [headBlock],
-      timingIds: [historyBlock.id, headBlock.id],
-    });
-
-    expect(findLayoutItem(layout, historyBlock.id).assistantSpacing).toBe("compactBottom");
-    expect(findLayoutItem(layout, headBlock.id).assistantSpacing).toBe("compactBoth");
-  });
-
   it.each(["web", "android"] as const)(
     "keeps split tool sequencing and gapBelow identical to unsplit history on %s",
     (platform) => {
@@ -378,8 +358,8 @@ describe("layoutStream", () => {
     expect(findLayoutItem(after, user.id)).toBe(findLayoutItem(before, user.id));
     expect(findLayoutItem(after, first.id)).toBe(findLayoutItem(before, first.id));
     expect(findLayoutItem(after, second.id)).not.toBe(findLayoutItem(before, second.id));
-    expect(findLayoutItem(after, second.id).isLastInToolSequence).toBe(false);
-    expect(findLayoutItem(after, third.id).isLastInToolSequence).toBe(true);
+    expect(findLayoutItem(after, second.id).toolSequence).toBe("middle");
+    expect(findLayoutItem(after, third.id).toolSequence).toBe("last");
   });
 
   it("computes tool sequence position from strategy-aware neighbors", () => {
