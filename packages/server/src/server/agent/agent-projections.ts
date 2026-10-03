@@ -139,6 +139,7 @@ export function toAgentPayload(
     persistence: projectPersistenceHandleForWire(agent.persistence),
     title: options?.title ?? null,
     labels: agent.labels,
+    ...(agent.latestTurnDiffAt ? { latestTurnDiffAt: agent.latestTurnDiffAt.toISOString() } : {}),
   };
 
   const usage = sanitizeUsage(agent.lastUsage);

@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -14,6 +14,7 @@ import {
   type ManagedAgent,
 } from "./agent-manager.js";
 import { AgentStorage } from "./agent-storage.js";
+import { TurnDiffStore } from "./turn-diffs/store.js";
 import { InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { projectTimelineRows } from "./timeline-projection.js";
@@ -11415,5 +11416,52 @@ test("failed startup history closes the session without registering an agent", a
     expect({ agents: manager.listAgents(), closed }).toEqual({ agents: [], closed: true });
   } finally {
     for (const agent of manager.listAgents()) await manager.closeAgent(agent.id);
+  }
+});
+
+test("records the files a foreground turn changed as a turn diff", async () => {
+  const root = mkdtempSync(join(tmpdir(), "agent-manager-turn-diff-"));
+  const repo = join(root, "repo");
+  execFileSync("git", ["init", "-q", repo]);
+  writeFileSync(join(repo, "a.txt"), "one\n");
+  execFileSync("git", ["add", "."], { cwd: repo });
+  execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@t", "commit", "-qm", "init"], {
+    cwd: repo,
+  });
+  class EditingSession extends TestAgentSession {
+    override async startTurn(): Promise<{ turnId: string }> {
+      writeFileSync(join(repo, "edited.txt"), "agent wrote this\n");
+      return super.startTurn();
+    }
+  }
+  const turnDiffs = new TurnDiffStore(join(root, "turn-diffs"), logger);
+  const manager = new AgentManager({
+    clients: {
+      codex: new (class extends TestAgentClient {
+        override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+          return new EditingSession(config);
+        }
+      })(),
+    },
+    turnDiffs,
+    logger,
+  });
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: repo }, undefined, {
+      workspaceId: undefined,
+    });
+    await manager.runAgent(agent.id, "edit a file");
+
+    await vi.waitFor(async () =>
+      expect(await turnDiffs.list(agent.id)).toMatchObject([
+        { files: [{ path: "edited.txt", additions: 1, deletions: 0 }] },
+      ]),
+    );
+    expect(toAgentPayload(manager.getAgent(agent.id)!).latestTurnDiffAt).toEqual(
+      expect.any(String),
+    );
+    await manager.closeAgent(agent.id);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

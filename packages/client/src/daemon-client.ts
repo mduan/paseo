@@ -9,6 +9,7 @@ import {
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
 import type { CreationSnapshot } from "@getpaseo/protocol/messages";
+import type { AgentTurnDiffTarget, TurnDiffSummary } from "@getpaseo/protocol/messages";
 import type { z } from "zod";
 import type { SessionEventSubscription } from "@getpaseo/protocol/messages";
 import type { ClientCapability } from "@getpaseo/protocol/client-capabilities";
@@ -671,6 +672,17 @@ export interface AgentTimelineSearchOptions {
   query: string;
   cursor?: number;
 }
+
+export interface AgentTurnDiffOptions {
+  agentId: string;
+  target: AgentTurnDiffTarget;
+  ignoreWhitespace?: boolean;
+}
+
+export type AgentTurnDiffPayload = Extract<
+  SessionOutboundMessage,
+  { type: "agent.turn_diffs.get_diff.response" }
+>["payload"];
 
 export type AgentTimelineSearchPayload = Extract<
   SessionOutboundMessage,
@@ -3287,6 +3299,36 @@ export class DaemonClient {
     });
     if (payload.error) throw new Error(payload.error);
     return payload;
+  }
+
+  async listAgentTurnDiffs(agentId: string): Promise<TurnDiffSummary[]> {
+    const requestId = this.createRequestId();
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "agent.turn_diffs.list.request", requestId, agentId },
+      responseType: "agent.turn_diffs.list.response",
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload.turns;
+  }
+
+  async getAgentTurnDiff({
+    agentId,
+    target,
+    ignoreWhitespace,
+  }: AgentTurnDiffOptions): Promise<AgentTurnDiffPayload> {
+    const requestId = this.createRequestId();
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "agent.turn_diffs.get_diff.request",
+        requestId,
+        agentId,
+        target,
+        ...(ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+      },
+      responseType: "agent.turn_diffs.get_diff.response",
+    });
   }
 
   async listAgentTimelinePrompts(

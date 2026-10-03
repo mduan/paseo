@@ -105,6 +105,7 @@ export interface AppSettings {
   chatOutlineEnabled: boolean;
   vimKeybindings: boolean;
   collapseCompletedTurns: boolean;
+  turnDiffs: boolean;
   compactChat: boolean;
   keepChatPosition: boolean;
   worktreeIndicator: boolean;
@@ -165,6 +166,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   chatOutlineEnabled: true,
   vimKeybindings: false,
   collapseCompletedTurns: false,
+  turnDiffs: true,
   compactChat: false,
   keepChatPosition: false,
   worktreeIndicator: false,
@@ -270,6 +272,7 @@ const StoredAppSettingsSchema = z
     chatOutlineEnabled: z.boolean().catch(true),
     vimKeybindings: z.boolean().catch(false),
     collapseCompletedTurns: z.boolean().catch(false),
+    turnDiffs: z.boolean().catch(true),
     compactChat: z.boolean().catch(false),
     keepChatPosition: z.boolean().catch(false),
     worktreeIndicator: z.boolean().catch(false),

@@ -101,4 +101,18 @@ describe("working diff comparison", () => {
       }),
     ).toBe(state);
   });
+
+  it("keeps a turn comparison across dirty-state changes", () => {
+    const selected = selectWorkingDiffComparisonInState(emptyState(), {
+      ...checkout,
+      comparison: "last_turn",
+      isDirty: false,
+    });
+    const expired = expireWorkingDiffComparisonsInState(selected, { ...checkout, isDirty: true });
+
+    expect(expired).toBe(selected);
+    expect(resolveWorkingDiffComparisonFromState(expired, { ...checkout, isDirty: true })).toBe(
+      "last_turn",
+    );
+  });
 });

@@ -100,6 +100,7 @@ export interface Agent {
   parentAgentId: string | null;
   labels: Record<string, string>;
   projectPlacement?: ProjectPlacementPayload | null;
+  latestTurnDiffAt?: string;
 }
 
 export interface WorkspaceDescriptor {

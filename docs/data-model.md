@@ -53,6 +53,8 @@ $PASEO_HOME/
 ├── agents/
 │   └── {sanitized-cwd}/
 │       └── {agentId}.json               # One file per agent
+├── turn-diffs/
+│   └── {agentId}.json                   # Turn snapshot index for one agent; see Turn diffs
 ├── schedules/
 │   └── {scheduleId}.json                # One file per schedule
 ├── projects/
@@ -172,6 +174,16 @@ Each agent is stored as a separate JSON file, grouped by project directory.
 Terminals are live daemon state, not persisted JSON records. A terminal carries a `workspaceId` while it is running; workspace-scoped terminal lists include only terminals with the matching `workspaceId`. Legacy live terminals without an owner remain visible to unscoped terminal reads but contribute to no workspace status.
 
 Terminal activity contributes to the workspace status bucket **per `workspaceId`**: a working terminal drives `running` onto the workspace it carries only. Same-`cwd` siblings are untouched; terminal visibility is likewise `workspaceId`-scoped.
+
+---
+
+## Turn diffs
+
+**Path:** `$PASEO_HOME/turn-diffs/{agentId}.json`, schema in `packages/server/src/server/agent/turn-diffs/store.ts`.
+
+The daemon snapshots the agent's whole git repo before each foreground turn starts and after it ends. A snapshot is a git tree written through a temporary copy of the index, so the user's staging area, HEAD and branches are never touched. Untracked files over 1 MiB and ignored files are left out. Non-git folders get no snapshots.
+
+The JSON file only indexes tree SHAs. The trees live in the repo's object store and stay alive through one ref per tree, `refs/paseo/turns/{agentId}/{treeSha}`. Refs that point at trees stay out of `git branch`, `git log --all` and normal pushes. Trimming old turns (the file keeps 200) and deleting the agent remove the matching refs.
 
 ---
 

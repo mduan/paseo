@@ -1,22 +1,37 @@
 import { useCallback, useMemo } from "react";
 import { createWorkspaceFileAttachment } from "@/attachments/workspace-file";
-import { resolveFocusedChatTarget } from "@/composer/focused-chat-target";
+import { resolveFocusedChatTarget, type FocusedChatTarget } from "@/composer/focused-chat-target";
 import { useDraftStore } from "@/stores/draft-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 
-export function useAddFileToChat(input: { serverId: string; workspaceId?: string | null }) {
-  const workspaceKey = input.workspaceId
+interface WorkspaceChatScope {
+  serverId: string;
+  workspaceId?: string | null;
+}
+
+function useWorkspaceKey(input: WorkspaceChatScope): string | null {
+  return input.workspaceId
     ? buildWorkspaceTabPersistenceKey({ serverId: input.serverId, workspaceId: input.workspaceId })
     : null;
+}
+
+/** The chat a workspace-level surface acts on; see `resolveFocusedChatTarget`. */
+export function useFocusedChatTarget(input: WorkspaceChatScope): FocusedChatTarget | null {
+  const workspaceKey = useWorkspaceKey(input);
   const layout = useWorkspaceLayoutStore((state) =>
     workspaceKey ? state.layoutByWorkspace[workspaceKey] : undefined,
   );
-  const focusTab = useWorkspaceLayoutStore((state) => state.focusTab);
-  const focusedChat = useMemo(
+  return useMemo(
     () => resolveFocusedChatTarget({ serverId: input.serverId, layout }),
     [input.serverId, layout],
   );
+}
+
+export function useAddFileToChat(input: WorkspaceChatScope) {
+  const workspaceKey = useWorkspaceKey(input);
+  const focusTab = useWorkspaceLayoutStore((state) => state.focusTab);
+  const focusedChat = useFocusedChatTarget(input);
   const addFile = useCallback(
     async (filePath: string) => {
       if (!focusedChat || !workspaceKey) {

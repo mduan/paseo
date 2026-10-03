@@ -21,6 +21,7 @@ import invariant from "tiny-invariant";
 import { shallow, useShallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { AgentStreamView, type AgentStreamViewHandle } from "@/agent-stream/view";
+import type { OpenTurnDiffInput } from "@/turn-diffs/card";
 import { ArchivedAgentCallout } from "@/components/archived-agent-callout";
 import { ComposerDock } from "@/composer/dock";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
@@ -1389,6 +1390,22 @@ const AgentStreamSection = memo(function AgentStreamSection({
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
+  const { openPreferredTarget } = usePaneContext();
+  const handleOpenTurnDiff = useCallback(
+    ({ turnId, focusPath }: OpenTurnDiffInput) => {
+      if (!agentId) return;
+      openPreferredTarget(
+        {
+          kind: "turn_diff",
+          agentId,
+          turnId,
+          ...(focusPath ? { focusPath, focusRequestId: Date.now() } : {}),
+        },
+        "diffs",
+      );
+    },
+    [agentId, openPreferredTarget],
+  );
   const hasWorkspaceDiffStat = useWorkspaceHasDiffStat(serverId, workspaceId);
   const hasVisibleComposerTracks =
     hasActiveComposer && (hasVisibleAgentTracks || hasWorkspaceDiffStat);
@@ -1459,6 +1476,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
       pendingMessageSubmissions={pendingMessageSubmissions}
       turnPresentation={turnPresentation}
       onOpenWorkspaceFile={onOpenWorkspaceFile}
+      onOpenTurnDiff={handleOpenTurnDiff}
     />
   );
 });

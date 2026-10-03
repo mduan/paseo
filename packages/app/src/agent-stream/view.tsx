@@ -115,6 +115,14 @@ import {
   type WorkToggleContextValue,
 } from "./collapse-completed-turns";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
+import { anchorTurnDiffs } from "@/turn-diffs/anchors";
+import {
+  TurnDiffCardSlot,
+  TurnDiffCardsContext,
+  type OpenTurnDiffInput,
+  type TurnDiffCardsValue,
+} from "@/turn-diffs/card";
+import { useAgentTurnDiffs, useTurnDiffsEnabled } from "@/turn-diffs/queries";
 
 function renderLiveAuxiliaryNode(input: {
   pendingPermissions: ReactNode;
@@ -173,14 +181,17 @@ function renderStreamItemWithTurnFooter(input: {
 
   const footerHost = input.layoutItem.completedFooter;
   const footer = footerHost ? (
-    <CompletedTurnFooterRow
-      strategy={input.strategy}
-      items={footerHost.items}
-      timing={footerHost.timing}
-      startIndex={footerHost.startIndex}
-      supportsTimelineCursor={input.supportsTimelineCursor}
-      onForkAssistantTurn={input.onForkAssistantTurn}
-    />
+    <>
+      <TurnDiffCardSlot itemId={footerHost.itemId} />
+      <CompletedTurnFooterRow
+        strategy={input.strategy}
+        items={footerHost.items}
+        timing={footerHost.timing}
+        startIndex={footerHost.startIndex}
+        supportsTimelineCursor={input.supportsTimelineCursor}
+        onForkAssistantTurn={input.onForkAssistantTurn}
+      />
+    </>
   ) : null;
   const content = (
     <StreamItemWrapper
@@ -303,6 +314,7 @@ export interface AgentStreamViewProps {
   bottomOverlayControlClearance?: number;
   toast?: ToastApi | null;
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
+  onOpenTurnDiff?: (input: OpenTurnDiffInput) => void;
   readOnly?: boolean;
   historyPagination?: {
     hasOlder: boolean;
@@ -357,6 +369,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       bottomOverlayControlClearance,
       toast,
       onOpenWorkspaceFile,
+      onOpenTurnDiff,
       readOnly = false,
       historyPagination,
     },
@@ -574,6 +587,22 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       ],
     );
     const detachFromBottom = useCallback(() => viewportRef.current?.detachFromBottom?.(), []);
+    const turnDiffsEnabled = useTurnDiffsEnabled(resolvedServerId);
+    const turnDiffs = useAgentTurnDiffs({
+      serverId: resolvedServerId,
+      agentId,
+      enabled: turnDiffsEnabled,
+    });
+    const turnDiffCards = useMemo<TurnDiffCardsValue | undefined>(
+      () =>
+        turnDiffsEnabled
+          ? {
+              anchors: anchorTurnDiffs({ tail: presentation.tail, turns: turnDiffs }),
+              onOpen: onOpenTurnDiff,
+            }
+          : undefined,
+      [onOpenTurnDiff, presentation.tail, turnDiffs, turnDiffsEnabled],
+    );
     const { tail: displayTail, workToggles } = useFoldedTail({
       enabled: collapseCompletedTurns,
       chatKey: `${resolvedServerId}:${agentId}`,
@@ -976,15 +1005,20 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const turnFooterNode = useMemo(
       () =>
         isTurnActive || bottomTurnFooterHost ? (
-          <TurnFooter
-            isRunning={isTurnActive}
-            inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
-            host={bottomTurnFooterHost}
-            strategy={streamRenderStrategy}
-            supportsTimelineCursor={supportsAgentForkContextCursor}
-            onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
-            onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
-          />
+          <>
+            {!isTurnActive && bottomTurnFooterHost ? (
+              <TurnDiffCardSlot itemId={bottomTurnFooterHost.itemId} />
+            ) : null}
+            <TurnFooter
+              isRunning={isTurnActive}
+              inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
+              host={bottomTurnFooterHost}
+              strategy={streamRenderStrategy}
+              supportsTimelineCursor={supportsAgentForkContextCursor}
+              onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
+              onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
+            />
+          </>
         ) : null,
       [
         handleForkAssistantTurn,
@@ -1196,7 +1230,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       </ChatFind>
     );
     return (
-      <StreamCustomizationProviders compactChat={compactChat} workToggles={workToggles}>
+      <StreamCustomizationProviders
+        compactChat={compactChat}
+        workToggles={workToggles}
+        turnDiffCards={turnDiffCards}
+      >
         {stream}
       </StreamCustomizationProviders>
     );
@@ -1206,12 +1244,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 function StreamCustomizationProviders(props: {
   compactChat: boolean;
   workToggles: WorkToggleContextValue | undefined;
+  turnDiffCards: TurnDiffCardsValue | undefined;
   children: ReactNode;
 }) {
   return (
     <CompactChatContext.Provider value={props.compactChat}>
       <WorkToggleContext.Provider value={props.workToggles}>
-        {props.children}
+        <TurnDiffCardsContext.Provider value={props.turnDiffCards}>
+          {props.children}
+        </TurnDiffCardsContext.Provider>
       </WorkToggleContext.Provider>
     </CompactChatContext.Provider>
   );

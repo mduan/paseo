@@ -44,6 +44,13 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
   }),
   z.strictObject({ kind: z.literal("setup"), workspaceId: z.string() }),
   z.strictObject({ kind: z.literal("commit_diff"), sha: z.string() }),
+  z.strictObject({
+    kind: z.literal("turn_diff"),
+    agentId: z.string(),
+    turnId: z.string(),
+    focusPath: z.string().optional(),
+    focusRequestId: z.number().optional(),
+  }),
   z.discriminatedUnion("context", [
     z.strictObject({
       kind: z.literal("plugin"),
