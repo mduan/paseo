@@ -1299,7 +1299,8 @@ const BODY_MARKER_STYLE: React.CSSProperties = {
   right: 0,
   pointerEvents: "none",
 };
-const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 4, userSelect: "text" };
+// Like the add buttons: above the canvas, below the sticky header canvases (zIndex 2).
+const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 1, userSelect: "text" };
 const CANVAS_STYLE: React.CSSProperties = {
   position: "absolute",
   top: 0,

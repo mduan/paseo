@@ -24,6 +24,7 @@ import { useReviewDraftComments, useReviewDraftStore, type ReviewDraftComment } 
 import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
 import {
   editorLineRange,
+  INLINE_REVIEW_COMMENT_HEIGHT,
   INLINE_REVIEW_EDITOR_HEIGHT,
   INLINE_REVIEW_GAP,
   INLINE_REVIEW_VERTICAL_PADDING,
@@ -695,7 +696,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: INLINE_REVIEW_VERTICAL_PADDING,
     paddingHorizontal: theme.spacing[3],
   },
+  // Fixed to the reserved row height so the diff layout and the card agree.
   commentBlock: {
+    height: INLINE_REVIEW_COMMENT_HEIGHT,
+    overflow: "hidden",
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,

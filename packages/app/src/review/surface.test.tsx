@@ -19,6 +19,7 @@ import {
   useInlineReviewController,
   type InlineReviewActions,
 } from "./index";
+import { INLINE_REVIEW_COMMENT_HEIGHT } from "./geometry";
 import { singleLineRange } from "./range";
 
 void testI18n;
@@ -592,6 +593,19 @@ describe("InlineReviewThread", () => {
     expect(actions.onEditComment).toHaveBeenCalledWith(reviewTarget, draftComment);
     fireEvent.click(getByTestId("review-comment-delete-comment-1"));
     expect(actions.onDeleteComment).toHaveBeenCalledWith("comment-1");
+  });
+
+  it("renders each saved comment card at the height the diff layout reserves for it", () => {
+    const reviewTarget = target();
+    const actions = buildReviewActions({
+      commentsByTarget: groupInlineReviewCommentsByTarget([comment()]),
+    });
+    const { getByText } = render(
+      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={88} />,
+    );
+
+    const card = getByText("Please simplify this.").parentElement!;
+    expect(getComputedStyle(card).height).toBe(`${INLINE_REVIEW_COMMENT_HEIGHT}px`);
   });
 
   it("labels single-line and range comments and the editor by side and line", () => {

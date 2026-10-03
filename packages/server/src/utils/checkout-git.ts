@@ -636,8 +636,17 @@ function normalizeNumstatPath(pathField: string): string {
   return pathField;
 }
 
+// Pin the a/ b/ path prefixes that the diff parser expects. These flags override the
+// user's diff.noprefix, diff.mnemonicprefix, diff.srcPrefix, and diff.dstPrefix config.
+const STANDARD_DIFF_PREFIX_ARGS = ["--src-prefix=a/", "--dst-prefix=b/"];
+
 function buildGitDiffArgs(args: { ignoreWhitespace?: boolean; extra: string[] }): string[] {
-  return ["diff", ...(args.ignoreWhitespace ? ["-w"] : []), ...args.extra];
+  return [
+    "diff",
+    ...STANDARD_DIFF_PREFIX_ARGS,
+    ...(args.ignoreWhitespace ? ["-w"] : []),
+    ...args.extra,
+  ];
 }
 
 const TRACKED_DIFF_NUMSTAT_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -2631,7 +2640,15 @@ export async function getCommitFileDiff({
   path: string;
 }): Promise<ParsedDiffFile | null> {
   const { stdout } = await runGitCommand(
-    ["show", sha, "--format=", "--diff-merges=first-parent", "--", path],
+    [
+      "show",
+      sha,
+      "--format=",
+      "--diff-merges=first-parent",
+      ...STANDARD_DIFF_PREFIX_ARGS,
+      "--",
+      path,
+    ],
     {
       cwd,
       envOverlay: READ_ONLY_GIT_ENV,
