@@ -10,6 +10,8 @@ import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import { ComposerImportPill } from "@/composer/draft/import-pill";
 import { COMPOSER_PILL_CLEARANCE } from "@/composer/pill-styles";
 import { AgentStreamView } from "@/agent-stream/view";
+import { ForkMarker } from "@/components/fork-marker";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import type { CreateAgentInitialValues } from "@/hooks/use-agent-form-state";
@@ -415,6 +417,13 @@ export function WorkspaceDraftAgentTab({
     workspaceId,
   });
   const draftAttachmentScopeKey = useDraftWorkspaceAttachmentScopeKey(draftId);
+  // A summary fork's draft shows its "Continued from" divider before the agent exists.
+  const summaryForkSourceAgentId = useWorkspaceAttachmentsStore(
+    (state) =>
+      state.attachmentsByScope[draftAttachmentScopeKey]?.find(
+        (attachment) => attachment.kind === "chat_history",
+      )?.source.agentId,
+  );
   const openInSidePane = useSettings((settings) => settings.openInSidePane);
   const attachmentScopeKeys = useMemo(
     () => [draftAttachmentScopeKey, workspaceAttachmentScopeKey].filter(Boolean),
@@ -635,6 +644,13 @@ export function WorkspaceDraftAgentTab({
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.configScrollContent}>
           <View style={styles.configSection}>
+            {summaryForkSourceAgentId ? (
+              <ForkMarker
+                serverId={serverId}
+                sourceAgentId={summaryForkSourceAgentId}
+                mode={AgentForkMode.Summary}
+              />
+            ) : null}
             {formErrorMessage ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{formErrorMessage}</Text>

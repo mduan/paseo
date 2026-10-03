@@ -231,6 +231,7 @@ export const zhCN: TranslationResources = {
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",
+    workedFor: "工作了 {{duration}}",
     messageCapped: "此消息已被截断（{{bytes}} 字节）。",
     permission: {
       rejectedPlan: "已拒绝的计划",
@@ -1929,10 +1930,6 @@ export const zhCN: TranslationResources = {
     paseoCalls: {
       one: "调用了 Paseo {{count}} 次",
       other: "调用了 Paseo {{count}} 次",
-    },
-    failed: {
-      one: "{{count}} 个失败",
-      other: "{{count}} 个失败",
     },
     and: "并",
   },

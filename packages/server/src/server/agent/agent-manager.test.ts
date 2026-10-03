@@ -4277,6 +4277,13 @@ test("forkAgent imports a provider fork that ends before the next prompt and mar
     }),
   );
 
+  // The divider shows before the first prompt, right after the copied history.
+  expect(manager.getTimeline(fork.id)).toEqual([
+    { type: "user_message", text: "First", messageId: "user-1" },
+    { type: "assistant_message", text: "One", messageId: "assistant-1" },
+    { type: "fork_marker", sourceAgentId: source.id, mode: AgentForkMode.Full },
+  ]);
+
   await startAgentRun(manager, fork.id, "Third", logger, {
     runOptions: { clientMessageId: "third-client" },
   });

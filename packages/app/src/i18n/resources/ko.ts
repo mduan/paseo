@@ -231,6 +231,7 @@ export const ko: TranslationResources = {
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
+    workedFor: "{{duration}} 동안 작업함",
     messageCapped: "이 메시지는 길이 제한으로 잘렸습니다({{bytes}}바이트).",
     permission: {
       rejectedPlan: "거부된 계획",
@@ -1961,10 +1962,6 @@ export const ko: TranslationResources = {
     paseoCalls: {
       one: "Paseo를 {{count}}회 호출함",
       other: "Paseo를 {{count}}회 호출함",
-    },
-    failed: {
-      one: "{{count}}개 실패",
-      other: "{{count}}개 실패",
     },
     and: "그리고",
   },

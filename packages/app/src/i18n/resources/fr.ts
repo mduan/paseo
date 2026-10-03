@@ -235,6 +235,7 @@ export const fr: TranslationResources = {
     empty: "Commencez à discuter avec cet agent...",
     scrollToBottom: "Faire défiler vers le bas",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
+    workedFor: "A travaillé pendant {{duration}}",
     messageCapped: "Ce message a été tronqué ({{bytes}} octets).",
     permission: {
       rejectedPlan: "Plan refusé",
@@ -2004,10 +2005,6 @@ export const fr: TranslationResources = {
     paseoCalls: {
       one: "a appelé Paseo {{count}} fois",
       other: "a appelé Paseo {{count}} fois",
-    },
-    failed: {
-      one: "{{count}} en échec",
-      other: "{{count}} en échec",
     },
     and: "et",
   },

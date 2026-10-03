@@ -34,7 +34,7 @@ function capitalizeFirst(text: string): string {
 }
 
 /** Lowercase summary, e.g. "edited 3 files and ran 2 commands"; empty when there were no tools. */
-export function useOverviewSummary(summary: OverviewSummary): string {
+function useOverviewSummary(summary: OverviewSummary): string {
   const { t } = useTranslation();
   return useMemo(() => {
     const parts: string[] = [];
