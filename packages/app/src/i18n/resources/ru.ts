@@ -338,7 +338,6 @@ export const ru: TranslationResources = {
       forkUnavailable: "Обновите хост, чтобы использовать эту функцию.",
       forkMissingWorkspace: "Этот агент не связан с рабочим пространством.",
       forkFailed: "Не удалось создать форк чата",
-      forkModeFull: "Полная история",
       forkModeSummary: "Сводка",
       forkFullHistoryPending: "Доступно после завершения этого хода",
       forkContinuedFromChat: "Продолжение чата",

@@ -339,7 +339,6 @@ export const es: TranslationResources = {
       forkUnavailable: "Actualiza el host para usar esto.",
       forkMissingWorkspace: "Este agente no está en un espacio de trabajo.",
       forkFailed: "No se pudo bifurcar el chat",
-      forkModeFull: "Historial completo",
       forkModeSummary: "Resumen",
       forkFullHistoryPending: "Disponible cuando termine este turno",
       forkContinuedFromChat: "Continuación del chat",

@@ -339,7 +339,6 @@ export const ja: TranslationResources = {
       forkUnavailable: "これを使用するにはホストを更新してください。",
       forkMissingWorkspace: "このエージェントはワークスペース内にありません。",
       forkFailed: "チャットのフォークに失敗しました",
-      forkModeFull: "全履歴",
       forkModeSummary: "要約",
       forkFullHistoryPending: "このターンの完了後に利用できます",
       forkContinuedFromChat: "チャットからの続き",

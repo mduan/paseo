@@ -359,10 +359,7 @@ const GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT = 200;
 
 function useForkMenuContext(agent: AgentScreenAgent): AssistantForkMenuContextValue {
   const supportsFullHistory = agent.capabilities?.supportsFork === true;
-  return useMemo(
-    () => ({ provider: agent.provider, supportsFullHistory }),
-    [agent.provider, supportsFullHistory],
-  );
+  return useMemo(() => ({ supportsFullHistory }), [supportsFullHistory]);
 }
 
 function resolveBottomOverlayControlOffset(clearance: number | undefined): number {

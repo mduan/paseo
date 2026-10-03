@@ -334,7 +334,6 @@ export const ar: TranslationResources = {
       forkUnavailable: "حدّث المضيف لاستخدام هذا.",
       forkMissingWorkspace: "هذا الوكيل ليس في مساحة عمل.",
       forkFailed: "فشل تفريع المحادثة",
-      forkModeFull: "السجل الكامل",
       forkModeSummary: "ملخص",
       forkFullHistoryPending: "متاح عند انتهاء هذا الدور",
       forkContinuedFromChat: "متابعة من المحادثة",

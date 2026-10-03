@@ -338,7 +338,6 @@ export const ptBR: TranslationResources = {
       forkUnavailable: "Atualize o host para usar isto.",
       forkMissingWorkspace: "Este agente não está em um workspace.",
       forkFailed: "Falha ao bifurcar o chat",
-      forkModeFull: "Histórico completo",
       forkModeSummary: "Resumo",
       forkFullHistoryPending: "Disponível quando este turno terminar",
       forkContinuedFromChat: "Continuação do chat",
