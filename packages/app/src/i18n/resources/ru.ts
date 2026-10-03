@@ -936,6 +936,10 @@ export const ru: TranslationResources = {
         jumpToFile: {
           title: "Перейти к файлу",
         },
+        unmodifiedLines_one: "{{count}} неизменённая строка",
+        unmodifiedLines_other: "{{count}} неизменённых строк",
+        hiddenComments_one: "{{count}} комментарий",
+        hiddenComments_other: "{{count}} комментариев",
         binaryFile: "Бинарный файл",
         tooLarge: "Дифф слишком велик для отображения",
         previewTooLargeTitle: "Этот дифф слишком велик для предварительного просмотра",

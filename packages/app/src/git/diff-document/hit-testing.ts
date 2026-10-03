@@ -1,3 +1,4 @@
+import { gapDirectionAt } from "./gap-separator";
 import { fileAtDocumentOffset, fragmentWidthForRange } from "./model";
 import type {
   DiffCell,
@@ -20,6 +21,17 @@ export function hitTestDiffDocument(input: {
   if (input.documentY < file.bodyTop) return { kind: "header", path: file.path };
   const row = rowAtOffset(input.model.rows, file.rowStart, file.rowEnd, input.documentY);
   if (!row || row.kind !== "line") return null;
+  if (row.separator) {
+    const direction = gapDirectionAt({
+      row,
+      file,
+      localX: input.x,
+      localY: input.documentY - row.top,
+    });
+    return direction
+      ? { kind: "gap", path: file.path, gapIndex: row.separator.gapIndex, direction }
+      : null;
+  }
   const textHeight = row.height - row.reviewHeight;
   if (input.documentY >= row.top + textHeight) return null;
   const columnCount = row.cells.length;

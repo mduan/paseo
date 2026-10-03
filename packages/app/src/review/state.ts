@@ -11,6 +11,8 @@ export interface ReviewDraftComment {
   // Top end of a range comment; `side`/`lineNumber` are the bottom end, where the thread anchors.
   startSide?: ReviewDraftSide;
   startLineNumber?: number;
+  /** The anchor line's text, so the comment still has context once that line is out of the diff. */
+  content?: string;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +35,7 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   lineNumber: z.number().int().positive(),
   startSide: z.enum(["old", "new"]).optional(),
   startLineNumber: z.number().int().positive().optional(),
+  content: z.string().optional(),
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,

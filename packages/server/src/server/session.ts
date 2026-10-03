@@ -2828,6 +2828,8 @@ export class Session {
         return this.checkoutSession.handleCommitsListRequest(msg);
       case "checkout.commits.file_diff.request":
         return this.checkoutSession.handleCommitFileDiffRequest(msg);
+      case "checkout.diff.context.request":
+        return this.checkoutSession.handleDiffContextRequest(msg);
       case "validate_branch_request":
         return this.checkoutSession.handleValidateBranchRequest(msg);
       case "branch_suggestions_request":

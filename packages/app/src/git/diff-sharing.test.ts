@@ -56,6 +56,12 @@ const fileChanges = {
   hunks: (value) => {
     value.hunks = [];
   },
+  targetRef: (value) => {
+    value.targetRef = "abc123";
+  },
+  lineCount: (value) => {
+    value.lineCount = 99;
+  },
 } satisfies Record<keyof ParsedDiffFile, (value: ParsedDiffFile) => void>;
 type Hunk = ParsedDiffFile["hunks"][number];
 const hunkChanges = {

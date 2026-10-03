@@ -8,6 +8,7 @@ import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { PaneContentToolbar } from "@/components/ui/pane-content-toolbar";
 import { isWeb } from "@/constants/platform";
+import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { DiffDocument } from "@/git/diff-document";
 import { ChangesSurface, DiffLayoutToggle, resolveDiffLayout } from "@/git/diff-pane";
 import { useCommitDiffFiles } from "@/git/use-diff-files";
@@ -23,6 +24,7 @@ import {
 import { useAddFileToChat } from "@/panels/use-add-file-to-chat";
 import { useWorkspaceDirectory } from "@/stores/session-store-hooks";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import { defaultChangesState, changesStateSchema } from "@/panels/changes/state";
 import { usePanelState } from "@/panels/use-panel-state";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -156,6 +158,8 @@ function ChangesPanel() {
   );
 }
 
+const EMPTY_FILES: ParsedDiffFile[] = [];
+
 function CommitDiffPanel() {
   const { t } = useTranslation();
   const { serverId, workspaceId, target } = usePaneContext();
@@ -169,6 +173,12 @@ function CommitDiffPanel() {
     enabled: Boolean(cwd),
   });
   const mode = useMemo(() => ({ kind: "commit" as const }), []);
+  const expansion = useDiffContextExpansion({
+    serverId,
+    cwd: cwd ?? "",
+    scopeKey: `commit:${serverId}:${cwd}:${target.sha}`,
+    files,
+  });
 
   let body: ReactNode;
   if (!cwd) {
@@ -191,9 +201,10 @@ function CommitDiffPanel() {
   } else {
     body = (
       <DiffDocument
-        files={files}
+        files={expansion.files}
         displayPreferences={panelPreferences.displayPreferences}
         mode={mode}
+        onExpandGap={expansion.onExpandGap}
       />
     );
   }
@@ -253,6 +264,12 @@ function TurnDiffPanel() {
   );
 
   const payload = query.data;
+  const expansion = useDiffContextExpansion({
+    serverId,
+    cwd: payload?.cwd ?? "",
+    scopeKey: `turn:${serverId}:${target.agentId}:${target.turnId}:${panelPreferences.preferences.hideWhitespace}`,
+    files: payload?.files ?? EMPTY_FILES,
+  });
   let body: ReactNode;
   if (query.error) {
     body = <PanelState message={t("panels.diff.loadError")} tone="error" />;
@@ -267,10 +284,11 @@ function TurnDiffPanel() {
   } else {
     body = (
       <DiffDocument
-        files={payload.files}
+        files={expansion.files}
         displayPreferences={panelPreferences.displayPreferences}
         mode={mode}
         collapseState={collapseState}
+        onExpandGap={expansion.onExpandGap}
       />
     );
   }

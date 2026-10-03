@@ -418,6 +418,30 @@ describe("buildReviewAttachmentSnapshot", () => {
     ).toEqual([]);
   });
 
+  it("falls back to the stored line when the commented line left the diff", () => {
+    const [comment] = snapshotComments(
+      [makeComment({ lineNumber: 15, content: "const collapsed = true;" })],
+      [makeTwoHunkFile()],
+    );
+    expect(comment?.context).toEqual({
+      hunkHeader: "",
+      targetLine: {
+        oldLineNumber: null,
+        newLineNumber: 15,
+        type: "context",
+        content: "const collapsed = true;",
+      },
+      lines: [
+        {
+          oldLineNumber: null,
+          newLineNumber: 15,
+          type: "context",
+          content: "const collapsed = true;",
+        },
+      ],
+    });
+  });
+
   it("caps range context at 80 lines", () => {
     const lines = Array.from({ length: 120 }, (_, index) => contextLine(index + 1));
     const file: ParsedDiffFile = {

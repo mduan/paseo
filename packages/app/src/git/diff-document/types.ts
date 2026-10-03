@@ -1,6 +1,7 @@
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import type { InlineReviewActions, InlineReviewGeometry } from "@/review";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
+import type { DiffGapDirection, ExpandDiffGapInput } from "@/git/diff-gaps";
 
 interface DiffDocumentBaseProps {
   files: ParsedDiffFile[];
@@ -12,6 +13,8 @@ interface DiffDocumentBaseProps {
     codeFontSize: number;
     monoFontFamily: string;
   };
+  /** Replaces hunk headers with expandable "N unmodified lines" rows. */
+  onExpandGap?: (input: ExpandDiffGapInput) => void;
 }
 
 export interface WorkingDiffMode {
@@ -116,6 +119,12 @@ export interface DiffCell {
   sourceIdentity: DiffSourceIdentity;
 }
 
+/** Hidden unchanged lines shown in place of a hunk header. */
+export interface DiffGapSeparator {
+  gapIndex: number;
+  directions: DiffGapDirection[];
+}
+
 export interface DiffLineRow {
   kind: "line";
   index: number;
@@ -125,6 +134,7 @@ export interface DiffLineRow {
   height: number;
   cells: [DiffCell] | [DiffCell | null, DiffCell | null];
   reviewHeight: number;
+  separator?: DiffGapSeparator;
 }
 
 export interface DiffStatusRow {
@@ -183,7 +193,13 @@ export interface BuildDiffDocumentModelInput {
   measureText: TextMeasurer;
   palette: DiffPalette;
   reviewActions?: InlineReviewGeometry;
-  labels: { binary: string; tooLarge: string };
+  labels: {
+    binary: string;
+    tooLarge: string;
+    gap: (input: { lines: number; comments: number }) => string;
+  };
+  /** Show gap separators instead of hunk headers for files that support expansion. */
+  expandableGaps?: boolean;
   materializationWindow?: { top: number; height: number };
   /** A geometry-compatible model whose unchanged file measurements may be reused. */
   reuseFrom?: readonly DiffDocumentModel[];
@@ -200,6 +216,7 @@ export interface DiffCharacterPosition {
 
 export type DiffHit =
   | { kind: "header"; path: string }
+  | { kind: "gap"; path: string; gapIndex: number; direction: DiffGapDirection }
   | {
       kind: "cell";
       target: ReviewableDiffTarget | null;

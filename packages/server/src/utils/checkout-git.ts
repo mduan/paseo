@@ -9,7 +9,9 @@ import { maxBase64EncryptedPlaintextByteLength } from "@getpaseo/relay";
 import type { Logger } from "pino";
 import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import {
+  countFileLines,
   highlightDiffWithFileContent,
+  highlightFileLines,
   parseAndHighlightDiff,
   parseDiff,
 } from "../server/utils/diff-highlighter.js";
@@ -605,6 +607,43 @@ async function readGitFileContentAtRef(
   } catch {
     return null;
   }
+}
+
+async function tryResolveCommit(cwd: string, ref: string): Promise<string | null> {
+  try {
+    const { stdout } = await runGitCommand(["rev-parse", "--verify", `${ref}^{commit}`], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads unchanged lines around diff hunks so the client can expand context.
+ * Without a ref, reads the working tree.
+ */
+export async function readDiffContextLines(input: {
+  cwd: string;
+  path: string;
+  ref?: string;
+  startLine: number;
+  lineCount: number;
+}): Promise<ReturnType<typeof highlightFileLines>> {
+  const content = input.ref
+    ? await readGitFileContentAtRef(input.cwd, input.ref, input.path)
+    : await readFile(resolve(input.cwd, input.path), "utf-8");
+  if (content === null) {
+    throw new Error(`Cannot read ${input.path} at ${input.ref}`);
+  }
+  return highlightFileLines({
+    content,
+    path: input.path,
+    startLine: input.startLine,
+    lineCount: input.lineCount,
+  });
 }
 
 async function tryResolveMergeBase(cwd: string, baseRef: string): Promise<string | null> {
@@ -2711,9 +2750,14 @@ export async function getCommitFileDiff({
     return null;
   }
 
+  const newContents = new Map<string, string | null>();
   const parsedFiles = await parseAndHighlightDiff(stdout, cwd, {
     getOldFileContent: (file) => readGitFileContentAtRef(cwd, `${sha}^`, file.path),
-    getNewFileContent: (file) => readGitFileContentAtRef(cwd, sha, file.path),
+    getNewFileContent: async (file) => {
+      const content = await readGitFileContentAtRef(cwd, sha, file.path);
+      newContents.set(file.path, content);
+      return content;
+    },
   });
 
   // `--` scopes the diff to a single pathspec, so there is at most one real
@@ -2729,7 +2773,12 @@ export async function getCommitFileDiff({
     return null;
   }
 
-  return file;
+  const newContent = newContents.get(file.path);
+  return {
+    ...file,
+    targetRef: sha,
+    ...(typeof newContent === "string" ? { lineCount: countFileLines(newContent) } : {}),
+  };
 }
 
 export interface CheckoutShortstat {
@@ -3133,9 +3182,13 @@ async function buildHighlightedTrackedDiffFile(input: {
           ? readGitFileContentAtRef(cwd, refsForDiff.targetRef, change.path)
           : null,
       ]);
+  const resolvedNewFileContent =
+    refsForDiff.targetRef || change.isDeleted
+      ? newFileContent
+      : await readFile(resolve(cwd, change.path), "utf-8").catch(() => null);
   const highlightedFile = await highlightDiffWithFileContent(parsedFile, cwd, {
     oldFileContent,
-    newFileContent,
+    newFileContent: resolvedNewFileContent,
   });
   return {
     ...highlightedFile,
@@ -3144,6 +3197,10 @@ async function buildHighlightedTrackedDiffFile(input: {
     isNew: change.isNew,
     isDeleted: change.isDeleted,
     status: "ok",
+    ...(refsForDiff.targetRef ? { targetRef: refsForDiff.targetRef } : {}),
+    ...(typeof resolvedNewFileContent === "string"
+      ? { lineCount: countFileLines(resolvedNewFileContent) }
+      : {}),
   };
 }
 
@@ -3450,7 +3507,8 @@ async function resolveCheckoutDiffRefs(
   const bestBaseRef = await resolveBestComparisonBaseRef(cwd, baseRef);
   return {
     baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
-    targetRef: "HEAD",
+    // Pin HEAD so expanding context later reads the commit that was diffed.
+    targetRef: (await tryResolveCommit(cwd, "HEAD")) ?? "HEAD",
     includeUntracked: false,
   };
 }

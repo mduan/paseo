@@ -942,6 +942,10 @@ export const ptBR: TranslationResources = {
         jumpToFile: {
           title: "Ir para o arquivo",
         },
+        unmodifiedLines_one: "{{count}} linha inalterada",
+        unmodifiedLines_other: "{{count}} linhas inalteradas",
+        hiddenComments_one: "{{count}} comentário",
+        hiddenComments_other: "{{count}} comentários",
         binaryFile: "Arquivo binário",
         tooLarge: "Diff grande demais para exibir",
         previewTooLargeTitle: "Este diff é grande demais para visualizar",

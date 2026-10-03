@@ -952,6 +952,10 @@ export const es: TranslationResources = {
         jumpToFile: {
           title: "Ir al archivo",
         },
+        unmodifiedLines_one: "{{count}} línea sin cambios",
+        unmodifiedLines_other: "{{count}} líneas sin cambios",
+        hiddenComments_one: "{{count}} comentario",
+        hiddenComments_other: "{{count}} comentarios",
         binaryFile: "archivo binario",
         tooLarge: "La diferencia es demasiado grande para mostrarse",
         previewTooLargeTitle: "Este diff es demasiado grande para previsualizarlo",

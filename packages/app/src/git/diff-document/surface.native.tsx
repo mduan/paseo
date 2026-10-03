@@ -28,6 +28,7 @@ import {
   diffMaterializationWindow,
   resolveVisibleFileSections,
 } from "./header-layout";
+import { gapSeparatorLabel } from "./gap-separator";
 import { hitTestDiffBodyPoint } from "./native-hit-testing";
 import { retainDiffViewport } from "./viewport";
 import { HorizontalScroll } from "./horizontal-scroll.native";
@@ -108,8 +109,10 @@ export function DiffSurface(props: DiffSurfaceProps) {
     [family, typography.size],
   );
   const reviewActions = props.mode.kind === "working" ? props.mode.reviewActions : undefined;
+  const expandableGaps = Boolean(props.onExpandGap);
   const model = useMemo(() => {
     const dependencies = [
+      expandableGaps,
       props.displayPreferences.layout,
       props.displayPreferences.wrapLines,
       viewport.width,
@@ -136,7 +139,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
       labels: {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
+        gap: gapSeparatorLabel(t),
       },
+      expandableGaps,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
       reuseFrom,
     });
@@ -146,6 +151,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     };
     return next;
   }, [
+    expandableGaps,
     measurement,
     fileWindowTop,
     props.collapsedFilePaths,
@@ -306,6 +312,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
             model={model}
             mode={props.mode}
             horizontalOffsets={horizontalOffsets}
+            onExpandGap={props.onExpandGap}
           />
         ))}
         <NativeReviewOverlays model={model} mode={props.mode} />
@@ -436,11 +443,13 @@ function NativeFileBody({
   model,
   mode,
   horizontalOffsets,
+  onExpandGap,
 }: {
   file: DiffFileSection;
   model: DiffDocumentModel;
   mode: DiffSurfaceProps["mode"];
   horizontalOffsets: SharedValue<DiffHorizontalOffsets>;
+  onExpandGap: DiffSurfaceProps["onExpandGap"];
 }) {
   const touchRef = useRef<{ x: number; y: number; startedAt: number; moved: boolean } | null>(null);
   const reviewActions = mode.kind === "working" ? mode.reviewActions : undefined;
@@ -465,7 +474,7 @@ function NativeFileBody({
     (event: GestureResponderEvent) => {
       const touch = touchRef.current;
       touchRef.current = null;
-      if (!touch || touch.moved || Date.now() - touch.startedAt > 500 || !reviewActions) return;
+      if (!touch || touch.moved || Date.now() - touch.startedAt > 500) return;
       const hit = hitTestDiffBodyPoint({
         model,
         file,
@@ -473,9 +482,13 @@ function NativeFileBody({
         locationY: event.nativeEvent.locationY,
         horizontalOffset: horizontalOffsetForPath(horizontalOffsets.value, file.path),
       });
-      if (hit?.kind === "cell" && hit.target) reviewActions.onStartComment(hit.target);
+      if (hit?.kind === "gap") {
+        onExpandGap?.({ path: hit.path, gapIndex: hit.gapIndex, direction: hit.direction });
+        return;
+      }
+      if (hit?.kind === "cell" && hit.target) reviewActions?.onStartComment(hit.target);
     },
-    [file, horizontalOffsets, model, reviewActions],
+    [file, horizontalOffsets, model, onExpandGap, reviewActions],
   );
   return (
     <View

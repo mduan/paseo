@@ -919,6 +919,10 @@ export const ar: TranslationResources = {
         jumpToFile: {
           title: "الانتقال إلى ملف",
         },
+        unmodifiedLines_one: "سطر واحد دون تغيير",
+        unmodifiedLines_other: "{{count}} أسطر دون تغيير",
+        hiddenComments_one: "تعليق واحد",
+        hiddenComments_other: "{{count}} تعليقات",
         binaryFile: "ملف ثنائي",
         tooLarge: "الفرق كبير جدًا بحيث لا يمكن عرضه",
         previewTooLargeTitle: "هذا الفرق كبير جدًا بحيث لا يمكن معاينته",

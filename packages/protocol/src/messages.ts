@@ -2336,6 +2336,17 @@ export const CheckoutCommitsListRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const CheckoutDiffContextRequestSchema = z.object({
+  type: z.literal("checkout.diff.context.request"),
+  cwd: z.string(),
+  path: z.string(),
+  // Absent reads the working tree.
+  ref: z.string().optional(),
+  startLine: z.number().int().positive(),
+  lineCount: z.number().int().positive(),
+  requestId: z.string(),
+});
+
 export const CheckoutCommitFileDiffRequestSchema = z.object({
   type: z.literal("checkout.commits.file_diff.request"),
   cwd: z.string(),
@@ -2744,6 +2755,10 @@ const ParsedDiffFileSchema = z.object({
   deletions: z.number(),
   hunks: z.array(DiffHunkSchema),
   status: z.enum(["ok", "too_large", "binary"]).optional(),
+  // The new side's git ref, for checkout.diff.context. Absent means the working tree.
+  targetRef: z.string().optional(),
+  // New-side line count, so the client can size the gap after the last hunk.
+  lineCount: z.number().int().nonnegative().optional(),
 });
 
 const FileExplorerEntrySchema = z.object({
@@ -3339,6 +3354,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeRequestSchema,
   CheckoutCommitsListRequestSchema,
   CheckoutCommitFileDiffRequestSchema,
+  CheckoutDiffContextRequestSchema,
   CheckoutForgeGetCheckDetailsRequestSchema,
   CheckoutGithubGetCheckDetailsRequestSchema,
   CheckoutPrStatusRequestSchema,
@@ -3614,6 +3630,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
         turnDiffs: z.boolean().optional(),
+        // COMPAT(diffExpandContext): added in v0.11.0, remove gate after 2027-10-03.
+        diffExpandContext: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
         workspaceTerminals: z.boolean().optional(),
         // COMPAT(checkoutSetBaseRef): added in v0.11.0, remove gate after 2027-04-02.
@@ -5640,6 +5658,17 @@ export const CheckoutCommitsListResponseSchema = z.object({
   }),
 });
 
+export const CheckoutDiffContextResponseSchema = z.object({
+  type: z.literal("checkout.diff.context.response"),
+  payload: z.object({
+    lines: z.array(
+      z.object({ content: z.string(), tokens: z.array(HighlightTokenSchema).optional() }),
+    ),
+    error: CheckoutErrorSchema.nullable(),
+    requestId: z.string(),
+  }),
+});
+
 export const CheckoutCommitFileDiffResponseSchema = z.object({
   type: z.literal("checkout.commits.file_diff.response"),
   payload: z.object({
@@ -7060,6 +7089,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeResponseSchema,
   CheckoutCommitsListResponseSchema,
   CheckoutCommitFileDiffResponseSchema,
+  CheckoutDiffContextResponseSchema,
   CheckoutForgeGetCheckDetailsResponseSchema,
   CheckoutGithubGetCheckDetailsResponseSchema,
   CheckoutPrStatusResponseSchema,
@@ -7427,6 +7457,8 @@ export type CheckoutCommitsListRequest = z.infer<typeof CheckoutCommitsListReque
 export type CheckoutCommitsListResponse = z.infer<typeof CheckoutCommitsListResponseSchema>;
 export type CheckoutCommitFileDiffRequest = z.infer<typeof CheckoutCommitFileDiffRequestSchema>;
 export type CheckoutCommitFileDiffResponse = z.infer<typeof CheckoutCommitFileDiffResponseSchema>;
+export type CheckoutDiffContextRequest = z.infer<typeof CheckoutDiffContextRequestSchema>;
+export type CheckoutDiffContextResponse = z.infer<typeof CheckoutDiffContextResponseSchema>;
 export type ParsedDiffFile = z.infer<typeof ParsedDiffFileSchema>;
 export type CheckoutPrCreateRequest = z.infer<typeof CheckoutPrCreateRequestSchema>;
 export type CheckoutPrCreateResponse = z.infer<typeof CheckoutPrCreateResponseSchema>;

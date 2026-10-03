@@ -927,6 +927,10 @@ export const en = {
         jumpToFile: {
           title: "Jump to file",
         },
+        unmodifiedLines_one: "{{count}} unmodified line",
+        unmodifiedLines_other: "{{count}} unmodified lines",
+        hiddenComments_one: "{{count}} comment",
+        hiddenComments_other: "{{count}} comments",
         binaryFile: "Binary file",
         tooLarge: "Diff too large to display",
         previewTooLargeTitle: "This diff is too large to preview",

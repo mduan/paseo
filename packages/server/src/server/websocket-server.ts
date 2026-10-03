@@ -1793,6 +1793,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceSetupRun: true,
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
         turnDiffs: true,
+        // COMPAT(diffExpandContext): added in v0.11.0, remove gate after 2027-10-03.
+        diffExpandContext: true,
         // COMPAT(providersSnapshot): keep optional until all clients rely on snapshot flow.
         providersSnapshot: true,
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.

@@ -1,3 +1,4 @@
+import { gapChevronSegments } from "./gap-separator";
 import { selectionRectangles } from "./hit-testing";
 import { isLineHighlighted, type ResolvedLineHighlight } from "./line-range";
 import {
@@ -296,6 +297,7 @@ function paintLine(
     }
     input.context.fillStyle = input.palette.border;
     input.context.fillRect(x + file.gutterWidth, input.y, 1, reviewDividerHeight(input.row.height));
+    if (input.row.separator) paintGapChevrons({ ...input, file, x });
     if (cell.lineNumber !== null) {
       const label = String(cell.lineNumber);
       input.context.fillStyle = lineNumberColor(cell, input.palette);
@@ -317,6 +319,24 @@ function paintLine(
     paintCellText({ ...input, cell, x: x + file.gutterWidth + CODE_LEFT_PADDING });
     input.context.restore();
   });
+}
+
+function paintGapChevrons(
+  input: PaintWebViewportInput & { row: DiffLineRow; file: DiffFileSection; x: number; y: number },
+): void {
+  const { context } = input;
+  context.save();
+  context.strokeStyle = input.palette.foregroundMuted;
+  context.lineWidth = 1.5;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.beginPath();
+  for (const [x1, y1, x2, y2] of gapChevronSegments({ row: input.row, file: input.file })) {
+    context.moveTo(input.x + x1, input.y + y1);
+    context.lineTo(input.x + x2, input.y + y2);
+  }
+  context.stroke();
+  context.restore();
 }
 
 function paintCellText(

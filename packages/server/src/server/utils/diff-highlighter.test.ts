@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  countFileLines,
+  highlightFileLines,
   parseDiff,
   reconstructNewFile,
   reconstructOldFile,
@@ -688,5 +690,15 @@ index 1111111..2222222 100644
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("highlightFileLines", () => {
+  it("returns the requested line range with full-file tokens", () => {
+    const content = "const a = 1;\nconst b = 2;\nconst c = 3;\n";
+    expect(countFileLines(content)).toBe(3);
+    const lines = highlightFileLines({ content, path: "example.ts", startLine: 2, lineCount: 5 });
+    expect(lines.map((line) => line.content)).toEqual(["const b = 2;", "const c = 3;"]);
+    expect(lines[0]?.tokens?.map((token) => token.text).join("")).toBe("const b = 2;");
   });
 });

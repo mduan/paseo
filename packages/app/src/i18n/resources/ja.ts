@@ -932,6 +932,10 @@ export const ja: TranslationResources = {
         jumpToFile: {
           title: "ファイルへ移動",
         },
+        unmodifiedLines_one: "変更のない {{count}} 行",
+        unmodifiedLines_other: "変更のない {{count}} 行",
+        hiddenComments_one: "コメント {{count}} 件",
+        hiddenComments_other: "コメント {{count}} 件",
         binaryFile: "バイナリファイル",
         tooLarge: "差分が大きすぎて表示できません",
         previewTooLargeTitle: "この差分は大きすぎるためプレビューできません",
