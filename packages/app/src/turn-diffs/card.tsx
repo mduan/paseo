@@ -176,7 +176,8 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: "hidden",
-    marginTop: theme.spacing[3],
+    marginTop: theme.spacing[1],
+    marginBottom: theme.spacing[3],
   },
   header: {
     flexDirection: "row",
