@@ -80,6 +80,9 @@ function createFakeDiffSubscriber(initial: CheckoutDiffSnapshotPayload) {
     scheduleRefreshForCwd: (cwd) => {
       refreshedCwds.push(cwd);
     },
+    refreshForCwdNow: async (cwd) => {
+      refreshedCwds.push(cwd);
+    },
   };
   return { subscriber, subscriptions, refreshedCwds };
 }

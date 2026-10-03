@@ -14,6 +14,7 @@ import { useToast } from "@/contexts/toast-context";
 import { useFetchQuery } from "@/data/query";
 import { invalidateCheckoutGitQueriesForClient } from "@/git/query-keys";
 import { buildBaseRefComboOptions } from "@/utils/branch-suggestions";
+import { usePendingCheckoutSwitch, withPendingCheckoutSwitch } from "@/git/pending-switch-store";
 
 interface BaseRefSwitcherProps {
   baseRefLabel: string;
@@ -61,7 +62,9 @@ export function BaseRefSwitcher({
     () => buildBaseRefComboOptions(branchesQuery.data ?? []),
     [branchesQuery.data],
   );
-  const value = options.find((option) => option.label === baseRefLabel)?.id ?? "";
+  const pendingBaseRefLabel = usePendingCheckoutSwitch(serverId, cwd)?.baseRefLabel;
+  const displayedBaseRefLabel = pendingBaseRefLabel ?? baseRefLabel;
+  const value = options.find((option) => option.label === displayedBaseRefLabel)?.id ?? "";
 
   const handleOpen = useCallback(() => setIsOpen(true), []);
   const handleSelect = useCallback(
@@ -69,7 +72,12 @@ export function BaseRefSwitcher({
       if (!client || baseRef === value) return;
       void (async () => {
         try {
-          const payload = await client.checkoutSetBaseRef(cwd, baseRef);
+          const pending = {
+            baseRefLabel: options.find((option) => option.id === baseRef)?.label ?? baseRef,
+          };
+          const payload = await withPendingCheckoutSwitch({ serverId, cwd, pending }, () =>
+            client.checkoutSetBaseRef(cwd, baseRef),
+          );
           if (payload.error) {
             toast.error(payload.error.message);
             return;
@@ -80,7 +88,7 @@ export function BaseRefSwitcher({
         }
       })();
     },
-    [client, cwd, queryClient, serverId, t, toast, value],
+    [client, cwd, options, queryClient, serverId, t, toast, value],
   );
 
   return (
@@ -91,12 +99,14 @@ export function BaseRefSwitcher({
           <TooltipTrigger asChild>
             <ToolbarLabelSelectTrigger
               testID="changes-base-ref-switcher"
-              label={baseRefLabel}
+              label={displayedBaseRefLabel}
               open={isOpen}
               onPress={handleOpen}
               disabled={!canSetBaseRef}
               accessibilityRole="button"
-              accessibilityLabel={t("baseRefSwitcher.currentBase", { baseRef: baseRefLabel })}
+              accessibilityLabel={t("baseRefSwitcher.currentBase", {
+                baseRef: displayedBaseRefLabel,
+              })}
             />
           </TooltipTrigger>
           <TooltipContent side="bottom">

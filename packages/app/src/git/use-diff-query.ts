@@ -6,6 +6,7 @@ import { checkoutDiffPushRoute } from "@/data/push-router";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@getpaseo/protocol/messages";
 import { checkoutDiffQueryKey } from "@/git/query-keys";
+import { usePendingCheckoutSwitch } from "@/git/pending-switch-store";
 
 interface UseCheckoutDiffQueryOptions {
   serverId: string;
@@ -52,6 +53,7 @@ export function useCheckoutDiffQuery({
   const retainedPanelActive = useRetainedPanelActive();
   const queryEnabled = enabled && retainedPanelActive;
   const isConnected = useHostRuntimeIsConnected(serverId);
+  const isSwitchingCheckout = usePendingCheckoutSwitch(serverId, cwd) !== undefined;
   const normalizedCompare = useMemo(
     () => normalizeCheckoutDiffCompare({ mode, baseRef, ignoreWhitespace }),
     [mode, baseRef, ignoreWhitespace],
@@ -91,7 +93,9 @@ export function useCheckoutDiffQuery({
     }),
   });
 
-  return deriveCheckoutDiffResult(query.data ?? null);
+  const result = deriveCheckoutDiffResult(query.data ?? null);
+  // While a switch runs, the diff on screen belongs to the checkout being left.
+  return isSwitchingCheckout ? { ...result, isLoading: true } : result;
 }
 
 export interface CheckoutDiffResult {

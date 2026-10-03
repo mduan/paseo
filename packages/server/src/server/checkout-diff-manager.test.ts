@@ -180,6 +180,23 @@ describe("CheckoutDiffManager", () => {
     );
   });
 
+  test("refreshForCwdNow resolves after subscribers receive the new diff", async () => {
+    const changedFile = { path: "a.ts" };
+    const getCheckoutDiff = vi
+      .fn()
+      .mockResolvedValueOnce({ diff: "", structured: [] })
+      .mockResolvedValue({ diff: "x", structured: [changedFile] });
+    const { manager } = createManager({ getCheckoutDiffImplementation: getCheckoutDiff });
+    const received: unknown[] = [];
+    await manager.subscribe({ cwd: "/tmp/repo", compare: { mode: "uncommitted" } }, (snapshot) =>
+      received.push(snapshot.files),
+    );
+
+    await manager.refreshForCwdNow("/tmp/repo");
+
+    expect(received).toEqual([[changedFile]]);
+  });
+
   test("unsubscribe calls the working tree watch unsubscribe", async () => {
     const { manager, unsubscribe } = createManager();
 

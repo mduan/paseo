@@ -7,6 +7,7 @@ import type { ToastApi } from "@/components/toast-host";
 import { invalidateCheckoutGitQueriesForClient } from "@/git/query-keys";
 import { createBranchSwitcherOperations } from "@/git/branch-switcher-operations";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { withPendingCheckoutSwitch } from "@/git/pending-switch-store";
 
 interface UseBranchSwitcherInput {
   client: DaemonClient | null;
@@ -120,7 +121,7 @@ export function useBranchSwitcher({
 
   const stashAndSwitch = useCallback(
     async (branchId: string) => {
-      if (!operations) return;
+      if (!operations || !workspaceDirectory) return;
       const shouldStash = await confirmDialog({
         title: t("branchSwitcher.uncommittedTitle"),
         message: t("branchSwitcher.uncommittedMessage"),
@@ -136,7 +137,10 @@ export function useBranchSwitcher({
           return;
         }
         await invalidateStashAndCheckout();
-        const switchPayload = await operations.switchBranch(branchId);
+        const switchPayload = await withPendingCheckoutSwitch(
+          { serverId: normalizedServerId, cwd: workspaceDirectory, pending: { branch: branchId } },
+          () => operations.switchBranch(branchId),
+        );
         if (switchPayload.error) {
           toast.error(switchPayload.error.message);
           return;
@@ -146,7 +150,15 @@ export function useBranchSwitcher({
         toast.error(err instanceof Error ? err.message : t("branchSwitcher.failedToStash"));
       }
     },
-    [operations, currentBranchName, invalidateStashAndCheckout, toast, t],
+    [
+      operations,
+      workspaceDirectory,
+      normalizedServerId,
+      currentBranchName,
+      invalidateStashAndCheckout,
+      toast,
+      t,
+    ],
   );
 
   const handleBranchSelect = useCallback(
@@ -154,9 +166,16 @@ export function useBranchSwitcher({
       if (branchId === currentBranchName) return;
 
       void (async () => {
-        if (!operations) return;
+        if (!operations || !workspaceDirectory) return;
         try {
-          const payload = await operations.switchBranch(branchId);
+          const payload = await withPendingCheckoutSwitch(
+            {
+              serverId: normalizedServerId,
+              cwd: workspaceDirectory,
+              pending: { branch: branchId },
+            },
+            () => operations.switchBranch(branchId),
+          );
           if (payload.error) {
             // If the error is about uncommitted changes, offer the stash dialog
             if (payload.error.message.toLowerCase().includes("uncommitted")) {
@@ -176,6 +195,8 @@ export function useBranchSwitcher({
     },
     [
       operations,
+      workspaceDirectory,
+      normalizedServerId,
       currentBranchName,
       invalidateStashAndCheckout,
       maybeRestoreStashForBranch,
