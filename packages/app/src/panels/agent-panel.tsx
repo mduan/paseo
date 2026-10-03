@@ -928,12 +928,13 @@ function ChatAgentContent({
     [agentId],
   );
 
+  const keepChatPosition = useSettings((settings) => settings.keepChatPosition);
   const handleMessageSent = useCallback(() => {
-    if (!agentId) {
+    if (!agentId || keepChatPosition) {
       return;
     }
     streamViewRef.current?.scrollToBottom("message-sent");
-  }, [agentId]);
+  }, [agentId, keepChatPosition]);
 
   const handleRewindComplete = useCallback(() => {
     streamViewRef.current?.scrollToBottom("rewind");
