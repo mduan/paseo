@@ -102,12 +102,12 @@ import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store"
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
-import type { Theme } from "@/styles/theme";
+import { SPACING, type Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { CompactChatContext, useCompactChat } from "./compact-chat";
-import { getCompactGapBetweenStreamItems } from "./spacing";
+import { getCompactGapBetweenStreamItems, getGapBetweenStreamItems } from "./spacing";
 import {
   useFoldedTail,
   useWorkToggle,
@@ -186,6 +186,7 @@ function renderStreamItemWithTurnFooter(input: {
   const content = (
     <StreamItemWrapper
       itemId={input.layoutItem.item.id}
+      gapAbove={getGapBetweenStreamItems(input.layoutItem.aboveItem, input.layoutItem.item)}
       gapBelow={input.layoutItem.gapBelow}
       compactGapBelow={
         input.layoutItem.item.kind === "user_message" || input.layoutItem.completedFooter
@@ -1711,7 +1712,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    marginTop: theme.spacing[1],
     marginBottom: theme.spacing[4],
     paddingBottom: theme.spacing[2],
     borderBottomWidth: 1,
@@ -1847,6 +1847,7 @@ const permissionStyles = StyleSheet.create((theme) => ({
 
 interface StreamItemWrapperProps {
   itemId: string;
+  gapAbove: number;
   gapBelow: number;
   compactGapBelow: number;
   children: ReactNode;
@@ -1854,6 +1855,7 @@ interface StreamItemWrapperProps {
 
 function StreamItemWrapper({
   itemId,
+  gapAbove,
   gapBelow,
   compactGapBelow,
   children,
@@ -1865,7 +1867,7 @@ function StreamItemWrapper({
   );
   return (
     <View style={wrapperStyle}>
-      <WorkToggleButton itemId={itemId} />
+      <WorkToggleButton itemId={itemId} gapAbove={gapAbove} />
       {children}
     </View>
   );
@@ -1874,17 +1876,24 @@ function StreamItemWrapper({
 const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedChevronDown = withUnistyles(ChevronDown);
 
-function WorkToggleButton({ itemId }: { itemId: string }) {
+function WorkToggleButton({ itemId, gapAbove }: { itemId: string; gapAbove: number }) {
   const toggle = useWorkToggle(itemId);
-  return toggle ? <WorkToggleRow {...toggle} /> : null;
+  return toggle ? <WorkToggleRow {...toggle} gapAbove={gapAbove} /> : null;
 }
 
 function WorkToggleRow({
   turnKey,
   expanded,
+  gapAbove,
   onToggle,
-}: WorkToggle & { onToggle: (turnKey: string) => void }) {
+}: WorkToggle & { gapAbove: number; onToggle: (turnKey: string) => void }) {
   const { t } = useTranslation();
+  // The toggle moves between the final message and the first work row, which sit at different
+  // gaps below the user message. Cancel that gap so the toggle stays put.
+  const style = useMemo(
+    () => [stylesheet.workToggle, { marginTop: SPACING[1] - gapAbove }],
+    [gapAbove],
+  );
   const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
@@ -1893,7 +1902,7 @@ function WorkToggleRow({
       accessibilityRole="button"
       accessibilityState={accessibilityState}
       onPress={handlePress}
-      style={stylesheet.workToggle}
+      style={style}
       testID="work-toggle"
     >
       <Text style={stylesheet.workToggleText}>
