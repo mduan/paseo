@@ -24,7 +24,7 @@ import { singleLineRange } from "./range";
 
 void testI18n;
 
-const { theme, pressablePropsByLabel } = vi.hoisted(() => {
+const { theme, pressablePropsByLabel, shortcutOs } = vi.hoisted(() => {
   Object.assign(globalThis, { __DEV__: false });
   return {
     theme: {
@@ -49,8 +49,11 @@ const { theme, pressablePropsByLabel } = vi.hoisted(() => {
       },
     },
     pressablePropsByLabel: new Map<string, Record<string, unknown>>(),
+    shortcutOs: { current: "non-mac" as "mac" | "non-mac" },
   };
 });
+
+vi.mock("@/utils/shortcut-platform", () => ({ getShortcutOs: () => shortcutOs.current }));
 
 vi.mock("react-native", async (importOriginal) => {
   const ReactModule = await import("react");
@@ -539,6 +542,31 @@ describe("InlineReviewEditor", () => {
 
     fireEvent.keyDown(input, { key: "Enter", metaKey: true });
     expect(onSave).toHaveBeenCalledWith("ready");
+  });
+
+  it("keeps macOS Home/End/Page scroll keys inside the textarea", () => {
+    const { getByTestId } = render(
+      <InlineReviewEditor
+        range={singleLineRange(target())}
+        initialBody="ready"
+        focusRequestId={0}
+        onChangeBody={vi.fn()}
+        onCancel={vi.fn()}
+        onSave={vi.fn()}
+        testID="editor"
+      />,
+    );
+    const input = getByTestId("editor-input");
+
+    shortcutOs.current = "mac";
+    for (const key of ["Home", "End", "PageUp", "PageDown"]) {
+      expect(fireEvent.keyDown(input, { key })).toBe(false);
+    }
+    expect(fireEvent.keyDown(input, { key: "End", shiftKey: true })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: "ArrowDown" })).toBe(true);
+
+    shortcutOs.current = "non-mac";
+    expect(fireEvent.keyDown(input, { key: "End" })).toBe(true);
   });
 
   it("does not show shortcut hints in the action buttons", () => {

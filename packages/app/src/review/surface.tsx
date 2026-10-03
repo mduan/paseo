@@ -22,6 +22,7 @@ import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import type { Theme } from "@/styles/theme";
 import { useReviewDraftComments, useReviewDraftStore, type ReviewDraftComment } from "./store";
 import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
+import { getShortcutOs } from "@/utils/shortcut-platform";
 import {
   editorLineRange,
   INLINE_REVIEW_COMMENT_HEIGHT,
@@ -524,6 +525,20 @@ function ReviewLinesLabel({ range }: { range: ReviewLineRange }) {
   );
 }
 
+// macOS binds plain Home/End/PageUp/PageDown to scroll commands, not caret moves. Chromium runs
+// them from the textarea and bubbles the scroll to the nearest ancestor that can scroll: the
+// diff, which moves the editor out of view. Scroll only the textarea, like a native text view.
+function macScrollKeyTextareaScrollTop(
+  key: string,
+  element: Pick<HTMLElement, "scrollTop" | "scrollHeight" | "clientHeight">,
+): number | undefined {
+  if (key === "Home") return 0;
+  if (key === "End") return element.scrollHeight;
+  if (key === "PageUp") return element.scrollTop - element.clientHeight;
+  if (key === "PageDown") return element.scrollTop + element.clientHeight;
+  return undefined;
+}
+
 export function InlineReviewEditor({
   range,
   initialBody,
@@ -575,6 +590,17 @@ export function InlineReviewEditor({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const hasModifier = event.shiftKey || event.altKey || event.metaKey || event.ctrlKey;
+      const scrollTop =
+        getShortcutOs() === "mac" && !hasModifier
+          ? macScrollKeyTextareaScrollTop(event.key, element)
+          : undefined;
+      if (scrollTop !== undefined) {
+        event.preventDefault();
+        element.scrollTop = scrollTop;
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
