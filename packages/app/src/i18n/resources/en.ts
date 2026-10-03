@@ -956,6 +956,11 @@ export const en = {
         diffMode: "Diff mode",
         uncommitted: "Uncommitted",
         committed: "Committed",
+        lastTurn: "Last Turn",
+        chatSession: "Chat Session",
+        noLastTurnChanges: "No changes in the last turn",
+        noSessionChanges: "No changes this session",
+        noTurnSnapshot: "No snapshot for this turn",
         branchUnknown: "Unknown",
         base: "base",
         newFile: "New",
@@ -1918,6 +1923,8 @@ export const en = {
       diffLabel: "Diff",
       changesSubtitle: "Working tree diff",
       commitSubtitle: "Commit diff",
+      turnSubtitle: "Turn diff",
+      turnLabel: "Turn · {{time}}",
       uncommittedSubtitle: "Uncommitted changes",
       baseSubtitle: "Compared with {{baseRef}}",
       directoryMissing: "Workspace directory not found.",
@@ -1925,6 +1932,14 @@ export const en = {
       loadError: "Failed to load diff",
       capabilityMissing: "Update the host to view commit diffs.",
     },
+  },
+  turnDiff: {
+    editedFile: "Edited {{name}}",
+    editedFiles: "Edited {{count}} files",
+    viewChanges: "View changes",
+    showMoreFiles_one: "Show {{count}} more file",
+    showMoreFiles_other: "Show {{count}} more files",
+    showFewerFiles: "Show fewer files",
   },
   toolCallDetails: {
     error: "Error",
@@ -2046,6 +2061,11 @@ export const en = {
       worktreeIndicator: {
         title: "Worktree indicator",
         description: "Show a split-arrow icon on the branch of Git worktree workspaces",
+      },
+      turnDiffs: {
+        title: "Turn diffs",
+        description:
+          "Show the files each turn changed, and add Last Turn and Chat Session to Changes",
       },
       showWork: "Show work",
       hideWork: "Hide work",

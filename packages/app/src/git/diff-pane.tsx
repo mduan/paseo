@@ -98,6 +98,10 @@ import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
 import type { PullRequestOpenLocation } from "@/hooks/use-settings";
+import {
+  isTurnDiffComparison,
+  type WorkingDiffComparison,
+} from "@/git/working-diff-comparison/state";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -131,7 +135,7 @@ function useDiscardChangesAction({
 }: {
   serverId: string;
   cwd: string;
-  diffMode: "uncommitted" | "base";
+  diffMode: WorkingDiffComparison;
 }): ((path: string, oldPath?: string) => void) | undefined {
   const { t } = useTranslation();
   const toast = useToast();
@@ -278,22 +282,34 @@ export function DiffLayoutToggle({
   );
 }
 
+interface TurnDiffModes {
+  selectLastTurn: () => void;
+  selectSession: () => void;
+}
+
 interface DiffModeMenuProps {
-  diffMode: "uncommitted" | "base";
+  diffMode: WorkingDiffComparison;
   testIDPrefix?: string;
   onSelectUncommitted: () => void;
   onSelectBase: () => void;
+  turnModes?: TurnDiffModes | null;
 }
+
+const DIFF_MODE_LABEL_KEYS = {
+  uncommitted: "workspace.git.diff.uncommitted",
+  base: "workspace.git.diff.committed",
+  last_turn: "workspace.git.diff.lastTurn",
+  session: "workspace.git.diff.chatSession",
+} as const satisfies Record<WorkingDiffComparison, string>;
 
 export function DiffModeMenu({
   diffMode,
   testIDPrefix = "changes-diff",
   onSelectUncommitted,
   onSelectBase,
+  turnModes,
 }: DiffModeMenuProps) {
   const { t } = useTranslation();
-  const uncommittedLabel = t("workspace.git.diff.uncommitted");
-  const committedLabel = t("workspace.git.diff.committed");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -307,7 +323,7 @@ export function DiffModeMenu({
           return (
             <>
               <Text style={toolbarLabelTriggerTextStyle(highlighted)} numberOfLines={1}>
-                {diffMode === "uncommitted" ? uncommittedLabel : committedLabel}
+                {t(DIFF_MODE_LABEL_KEYS[diffMode])}
               </Text>
               <ToolbarLabelTriggerIcon>
                 <ThemedChevronDown size={12} uniProps={extraMutedIconColorMapping} />
@@ -322,7 +338,7 @@ export function DiffModeMenu({
           selected={diffMode === "uncommitted"}
           onSelect={onSelectUncommitted}
         >
-          {uncommittedLabel}
+          {t(DIFF_MODE_LABEL_KEYS.uncommitted)}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -330,8 +346,27 @@ export function DiffModeMenu({
           selected={diffMode === "base"}
           onSelect={onSelectBase}
         >
-          {committedLabel}
+          {t(DIFF_MODE_LABEL_KEYS.base)}
         </DropdownMenuItem>
+        {turnModes ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              testID={`${testIDPrefix}-mode-last-turn`}
+              selected={diffMode === "last_turn"}
+              onSelect={turnModes.selectLastTurn}
+            >
+              {t(DIFF_MODE_LABEL_KEYS.last_turn)}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testID={`${testIDPrefix}-mode-session`}
+              selected={diffMode === "session"}
+              onSelect={turnModes.selectSession}
+            >
+              {t(DIFF_MODE_LABEL_KEYS.session)}
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -464,7 +499,8 @@ interface ChangesRepositoryToolbarModel {
 }
 
 interface ChangesComparisonToolbarModel {
-  diffMode: "uncommitted" | "base";
+  diffMode: WorkingDiffComparison;
+  turnModes: TurnDiffModes | null;
   mode: ChangesToolbarMode;
   selectedDiffStat: { additions: number; deletions: number } | null;
   onSelectBase: () => void;
@@ -483,7 +519,8 @@ interface BuildChangesHeaderModelInput {
   branchName: string | null;
   compact: boolean;
   cwd: string;
-  diffMode: "uncommitted" | "base";
+  diffMode: WorkingDiffComparison;
+  turnModes: TurnDiffModes | null;
   gitActions: GitActions;
   mode: ChangesToolbarMode;
   onOpenPullRequest: () => void;
@@ -504,7 +541,8 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       baseRefLabel: input.baseRefLabel,
       branchName: input.branchName,
       cwd: input.cwd,
-      gitActions: input.compact ? input.gitActions : null,
+      // Commit and push act on the live checkout, not on a frozen turn snapshot.
+      gitActions: input.compact && !isTurnDiffComparison(input.diffMode) ? input.gitActions : null,
       pullRequest: input.pullRequest
         ? { ...input.pullRequest, onOpen: input.onOpenPullRequest }
         : null,
@@ -513,6 +551,7 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
     },
     comparison: {
       diffMode: input.diffMode,
+      turnModes: input.turnModes,
       mode: input.mode,
       selectedDiffStat: input.selectedDiffStat,
       onSelectBase: input.onSelectBase,
@@ -748,6 +787,7 @@ function ChangesComparisonToolbar({
           diffMode={model.diffMode}
           onSelectUncommitted={model.onSelectUncommitted}
           onSelectBase={model.onSelectBase}
+          turnModes={model.turnModes}
         />
         {model.selectedDiffStat ? (
           <DiffStat
@@ -1153,9 +1193,20 @@ interface ChangesEmptyAction {
   onPress: () => void;
 }
 
+function resolveChangesEmptyMessage(input: {
+  diffMode: WorkingDiffComparison;
+  isTurnSnapshotMissing: boolean;
+  t: TFunction;
+}): string {
+  if (input.isTurnSnapshotMissing) return input.t("workspace.git.diff.noTurnSnapshot");
+  if (input.diffMode === "last_turn") return input.t("workspace.git.diff.noLastTurnChanges");
+  if (input.diffMode === "session") return input.t("workspace.git.diff.noSessionChanges");
+  return input.t("diffViewer.empty");
+}
+
 function computeChangesEmptyAction(input: {
   hideWhitespace: boolean;
-  diffMode: "uncommitted" | "base";
+  diffMode: WorkingDiffComparison;
   status: CheckoutStatusPayload | null;
   seeUncommittedLabel: string;
   seeCommittedLabel: string;
@@ -1544,6 +1595,8 @@ export function ChangesSurface({
     diffMode,
     selectUncommitted: handleSelectUncommitted,
     selectBase: handleSelectBase,
+    turnModes,
+    isTurnSnapshotMissing,
     files,
     diffPayloadError,
     diffTooLarge,
@@ -1761,7 +1814,7 @@ export function ChangesSurface({
     cwd,
     icons: GIT_ACTION_ICONS,
   });
-  const emptyMessage = t("diffViewer.empty");
+  const emptyMessage = resolveChangesEmptyMessage({ diffMode, isTurnSnapshotMissing, t });
   const emptyAction = computeChangesEmptyAction({
     hideWhitespace: preferences.hideWhitespace,
     diffMode,
@@ -1869,6 +1922,7 @@ export function ChangesSurface({
         compact: isMobile,
         cwd,
         diffMode,
+        turnModes,
         gitActions,
         mode: toolbarMode,
         onOpenPullRequest: handleOpenPullRequest,
@@ -1884,6 +1938,7 @@ export function ChangesSurface({
       currentBranchName,
       cwd,
       diffMode,
+      turnModes,
       gitActions,
       handleOpenPullRequest,
       handleSelectBase,

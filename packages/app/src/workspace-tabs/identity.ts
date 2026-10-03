@@ -35,6 +35,9 @@ export function normalizeWorkspaceTabTarget(
   if (value.kind === "working_diff") {
     return normalizeWorkingDiffTabTarget(value);
   }
+  if (value.kind === "turn_diff") {
+    return normalizeTurnDiffTabTarget(value);
+  }
   if (value.kind === "plugin") {
     return normalizePluginTabTarget(value);
   }
@@ -155,6 +158,9 @@ function secondaryWorkspaceTabTargetsEqual(
   if (left.kind === "commit_diff" && right.kind === "commit_diff") {
     return left.sha === right.sha;
   }
+  if (left.kind === "turn_diff") {
+    return recordsShallowEqual({ ...left }, { ...right });
+  }
   return false;
 }
 
@@ -216,6 +222,9 @@ export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): st
   if (target.kind === "commit_diff") {
     return `commit_diff_${target.sha}`;
   }
+  if (target.kind === "turn_diff") {
+    return `turn_diff_${target.agentId.length}_${target.agentId}_${target.turnId}`;
+  }
   if (target.kind === "working_diff") {
     return "working_diff";
   }
@@ -266,6 +275,23 @@ function normalizeWorkingDiffTabTarget(
   const focusRequestId = normalizePositiveInteger(value.focusRequestId);
   return {
     kind: "working_diff" as const,
+    ...(focusPath ? { focusPath } : {}),
+    ...(focusRequestId ? { focusRequestId } : {}),
+  };
+}
+
+function normalizeTurnDiffTabTarget(
+  value: Extract<WorkspaceTabTarget, { kind: "turn_diff" }>,
+): WorkspaceTabTarget | null {
+  const agentId = trimNonEmpty(value.agentId);
+  const turnId = trimNonEmpty(value.turnId);
+  if (!agentId || !turnId) return null;
+  const focusPath = trimNonEmpty(value.focusPath);
+  const focusRequestId = normalizePositiveInteger(value.focusRequestId);
+  return {
+    kind: "turn_diff",
+    agentId,
+    turnId,
     ...(focusPath ? { focusPath } : {}),
     ...(focusRequestId ? { focusRequestId } : {}),
   };

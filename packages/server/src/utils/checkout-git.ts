@@ -896,6 +896,15 @@ export interface CheckoutDiffCompare {
   includeStructured?: boolean;
 }
 
+/** Compares two fixed git objects (commits or trees), such as turn snapshots. */
+export interface TreeRangeDiffCompare {
+  mode: "range";
+  baseRef: string;
+  targetRef: string;
+  ignoreWhitespace?: boolean;
+  includeStructured?: boolean;
+}
+
 export interface MergeToBaseOptions {
   baseRef?: string;
   mode?: "merge" | "squash";
@@ -3420,11 +3429,14 @@ async function processTrackedChanges(
 
 async function resolveCheckoutDiffRefs(
   cwd: string,
-  compare: CheckoutDiffCompare,
+  compare: CheckoutDiffCompare | TreeRangeDiffCompare,
   context: CheckoutContext | undefined,
 ): Promise<CheckoutDiffRefs | null> {
   if (compare.mode === "uncommitted") {
     return { baseRef: "HEAD", includeUntracked: true };
+  }
+  if (compare.mode === "range") {
+    return { baseRef: compare.baseRef, targetRef: compare.targetRef, includeUntracked: false };
   }
   const { storedBaseRef, resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
   const baseRef = resolveOperationBaseRef({
@@ -3445,7 +3457,7 @@ async function resolveCheckoutDiffRefs(
 
 export async function getCheckoutDiff(
   cwd: string,
-  compare: CheckoutDiffCompare,
+  compare: CheckoutDiffCompare | TreeRangeDiffCompare,
   context?: CheckoutContext,
 ): Promise<CheckoutDiffResult> {
   await requireGitRepo(cwd);

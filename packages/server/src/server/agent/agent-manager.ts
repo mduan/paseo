@@ -95,6 +95,8 @@ import {
   type ProviderSubagentStoreEvent,
 } from "./provider-subagents/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
+import type { WorkingTreeSnapshot } from "./turn-diffs/snapshot.js";
+import type { TurnDiffStore } from "./turn-diffs/store.js";
 import { extractAttention } from "../persistence-hooks.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
@@ -325,6 +327,7 @@ export interface AgentManagerOptions {
   onAgentAttention?: AgentAttentionCallback;
   onWorkspaceStateMayHaveChanged?: (params: { cwd: string }) => void;
   durableTimelineStore?: AgentTimelineStore;
+  turnDiffs?: TurnDiffStore;
   terminalManager?: TerminalManager | null;
   mcpBaseUrl?: string;
   mcpAuthToken?: string;
@@ -396,6 +399,12 @@ interface HandleStreamEventOptions {
   fromHistory?: boolean;
 }
 
+interface PendingTurnDiff {
+  turnId: string;
+  start: WorkingTreeSnapshot;
+  clientMessageId?: string;
+}
+
 interface ManagedAgentBase {
   id: string;
   provider: AgentProvider;
@@ -427,6 +436,8 @@ interface ManagedAgentBase {
   lastUserMessageAt: Date | null;
   activeTurnId: string | null;
   activeTurnStartedAt: Date | null;
+  pendingTurnDiff?: PendingTurnDiff;
+  latestTurnDiffAt?: Date;
   lastUsage?: AgentUsage;
   lastError?: string;
   attention: AttentionState;
@@ -754,6 +765,7 @@ export class AgentManager {
   private readonly idFactory: () => string;
   private readonly registry?: AgentStorage;
   private readonly durableTimelineStore?: AgentTimelineStore;
+  readonly turnDiffs?: TurnDiffStore;
   private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
@@ -783,6 +795,7 @@ export class AgentManager {
     this.idFactory = options?.idFactory ?? (() => randomUUID());
     this.registry = options?.registry;
     this.durableTimelineStore = options?.durableTimelineStore;
+    this.turnDiffs = options.turnDiffs;
     this.onAgentAttention = options?.onAgentAttention;
     this.onWorkspaceStateMayHaveChanged = options?.onWorkspaceStateMayHaveChanged;
     this.mcpBaseUrl = options?.mcpBaseUrl ?? null;
@@ -2594,6 +2607,7 @@ export class AgentManager {
     const streamForwarder = async function* streamForwarder(this: AgentManager) {
       let turnId: string;
       let turnStream: ReturnType<AgentRunState["createTurnStream"]> | null = null;
+      const turnDiffStart = this.turnDiffs ? await this.turnDiffs.captureStart(agent.cwd) : null;
       turnId = await this.startPendingForegroundTurn({
         agent,
         agentId,
@@ -2608,6 +2622,9 @@ export class AgentManager {
       const turnStartedAt = new Date();
       pendingRun.start = { status: "started", turnId };
       agent.activeForegroundTurnId = turnId;
+      agent.pendingTurnDiff = turnDiffStart
+        ? { turnId, start: turnDiffStart, clientMessageId: options?.clientMessageId }
+        : undefined;
       this.openActiveTurn(agent, turnId, turnStartedAt);
       agent.lifecycle = "running";
       this.touchUpdatedAt(agent);
@@ -2692,6 +2709,7 @@ export class AgentManager {
     }
     mutableAgent.activeForegroundTurnId = null;
     this.applyActiveTurnTerminal(mutableAgent, turnId);
+    this.recordTurnDiff(mutableAgent, turnId);
     const terminalError = mutableAgent.lastError;
     const shouldHoldBusyForReplacement = mutableAgent.pendingReplacement && !terminalError;
     let nextLifecycle: "running" | "error" | "idle";
@@ -2727,6 +2745,39 @@ export class AgentManager {
       this.touchUpdatedAt(mutableAgent);
       this.emitState(mutableAgent);
     }
+  }
+
+  private recordTurnDiff(agent: ActiveManagedAgent, turnId?: string): void {
+    const pending = agent.pendingTurnDiff;
+    if (!pending || !this.turnDiffs || (turnId && pending.turnId !== turnId)) return;
+    agent.pendingTurnDiff = undefined;
+    const submitted = pending.clientMessageId
+      ? this.timelineStore.getSubmittedUserMessage(agent.id, pending.clientMessageId)
+      : null;
+    const userMessageIds = [pending.clientMessageId, submitted?.providerMessageId].filter(
+      (id): id is string => Boolean(id),
+    );
+    const task = this.turnDiffs
+      .recordTurn({
+        agentId: agent.id,
+        start: pending.start,
+        turnId: pending.turnId,
+        userMessageIds,
+      })
+      .then(() => {
+        const current = this.agents.get(agent.id);
+        if (!current) return undefined;
+        current.latestTurnDiffAt = new Date();
+        this.emitState(current, { persist: false });
+        return undefined;
+      })
+      .catch((err) => {
+        this.logger.warn(
+          { err, agentId: agent.id, turnId: pending.turnId },
+          "Failed to record turn diff",
+        );
+      });
+    this.trackBackgroundTask(task);
   }
 
   private openActiveTurn(agent: ActiveManagedAgent, turnId: string, startedAt: Date): void {
@@ -3281,6 +3332,7 @@ export class AgentManager {
   async deleteAgentState(agentId: string): Promise<void> {
     this.discardRetainedAgentState(agentId);
     await this.deleteCommittedTimeline(agentId);
+    await this.turnDiffs?.delete(agentId);
   }
 
   async deleteCommittedTimeline(agentId: string): Promise<void> {

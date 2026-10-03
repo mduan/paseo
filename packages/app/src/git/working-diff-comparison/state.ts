@@ -1,4 +1,13 @@
-export type WorkingDiffComparison = "uncommitted" | "base";
+export type CheckoutDiffComparison = "uncommitted" | "base";
+/** Frozen snapshots of the focused agent's turns; they don't follow the dirty state. */
+export type TurnDiffComparison = "last_turn" | "session";
+export type WorkingDiffComparison = CheckoutDiffComparison | TurnDiffComparison;
+
+export function isTurnDiffComparison(
+  comparison: WorkingDiffComparison,
+): comparison is TurnDiffComparison {
+  return comparison === "last_turn" || comparison === "session";
+}
 
 export interface WorkingDiffComparisonOverride {
   serverId: string;
@@ -57,7 +66,10 @@ export function resolveWorkingDiffComparisonFromState(
   const override = state.overrides[workingDiffComparisonKey(input)];
   // Status can render before boundary expiry runs, so resolution must also mask a stale
   // selection under any ordering of the two updates.
-  if (override?.isDirtyAtSelection === input.isDirty) {
+  if (
+    override &&
+    (isTurnDiffComparison(override.comparison) || override.isDirtyAtSelection === input.isDirty)
+  ) {
     return override.comparison;
   }
   return input.isDirty ? "uncommitted" : "base";
@@ -74,6 +86,7 @@ export function expireWorkingDiffComparisonsInState(
       ([, override]) =>
         override.serverId === input.serverId.trim() &&
         override.cwd === normalizeCwd(input.cwd) &&
+        !isTurnDiffComparison(override.comparison) &&
         override.isDirtyAtSelection !== input.isDirty,
     )
     .map(([key]) => key);

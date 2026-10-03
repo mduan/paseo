@@ -6,6 +6,7 @@ import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
 const CUSTOMIZATIONS = [
   "collapseCompletedTurns",
   "compactChat",
+  "turnDiffs",
   "keepChatPosition",
   "worktreeIndicator",
 ] as const satisfies readonly (keyof AppSettings)[];

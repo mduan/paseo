@@ -1,7 +1,7 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { FileDiff, GitCommitHorizontal } from "lucide-react-native";
+import { Diff, FileDiff, GitCommitHorizontal } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useRetainedPanelActive } from "@/components/retained-panel";
@@ -14,16 +14,23 @@ import { useCommitDiffFiles } from "@/git/use-diff-files";
 import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import { useAppSettings } from "@/hooks/use-settings";
 import { usePaneContext } from "@/panels/pane-context";
-import { definePanel, type PanelDescriptor, type PanelPresentation } from "@/panels/panel-registry";
+import {
+  definePanel,
+  type PanelDescriptor,
+  type PanelDescriptorContext,
+  type PanelPresentation,
+} from "@/panels/panel-registry";
 import { useAddFileToChat } from "@/panels/use-add-file-to-chat";
 import { useWorkspaceDirectory } from "@/stores/session-store-hooks";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { defaultChangesState, changesStateSchema } from "@/panels/changes/state";
 import { usePanelState } from "@/panels/use-panel-state";
 import { RenderProfile } from "@/utils/render-profiler";
+import { useAgentTurnDiff, useAgentTurnDiffs } from "@/turn-diffs/queries";
 
 const ThemedFileDiff = withUnistyles(FileDiff);
 const ThemedGitCommitHorizontal = withUnistyles(GitCommitHorizontal);
+const ThemedDiff = withUnistyles(Diff);
 
 function useDiffPanelPreferences() {
   const { settings } = useAppSettings();
@@ -210,6 +217,107 @@ function CommitDiffPanel() {
   );
 }
 
+function TurnDiffPanel() {
+  const { t } = useTranslation();
+  const { serverId, workspaceId, target, openPreferredTarget } = usePaneContext();
+  const isActive = useRetainedPanelActive();
+  const panelPreferences = useDiffPanelPreferences();
+  const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
+  const [collapsedFilePaths, setCollapsedFilePaths] = useState<string[]>([]);
+  invariant(target.kind === "turn_diff", "TurnDiffPanel requires turn_diff target");
+  const turnTarget = useMemo(() => ({ kind: "turn" as const, turnId: target.turnId }), [target]);
+  const query = useAgentTurnDiff({
+    serverId,
+    agentId: target.agentId,
+    target: turnTarget,
+    ignoreWhitespace: panelPreferences.preferences.hideWhitespace,
+    enabled: isActive,
+  });
+  const handleOpenFile = useCallback(
+    (path: string) => openPreferredTarget({ kind: "file", path }, "diffs"),
+    [openPreferredTarget],
+  );
+  const mode = useMemo(
+    () => ({
+      kind: "working" as const,
+      focusPath: target.focusPath,
+      focusRequestId: target.focusRequestId,
+      onOpenFile: handleOpenFile,
+      onAddToChat: canAddToChat ? addFile : undefined,
+    }),
+    [addFile, canAddToChat, handleOpenFile, target.focusPath, target.focusRequestId],
+  );
+  const collapseState = useMemo(
+    () => ({ paths: collapsedFilePaths, onChange: setCollapsedFilePaths }),
+    [collapsedFilePaths],
+  );
+
+  const payload = query.data;
+  let body: ReactNode;
+  if (query.error) {
+    body = <PanelState message={t("panels.diff.loadError")} tone="error" />;
+  } else if (!payload) {
+    body = <PanelState message={t("workspace.tabs.loading")} />;
+  } else if (!payload.available) {
+    body = <PanelState message={t("workspace.git.diff.noTurnSnapshot")} />;
+  } else if (payload.error) {
+    body = <PanelState message={payload.error.message} tone="error" />;
+  } else if (payload.files.length === 0) {
+    body = <PanelState message={t("panels.diff.empty")} />;
+  } else {
+    body = (
+      <DiffDocument
+        files={payload.files}
+        displayPreferences={panelPreferences.displayPreferences}
+        mode={mode}
+        collapseState={collapseState}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.container} testID="turn-diff-panel">
+      {panelPreferences.canUseSplitLayout ? (
+        <PaneContentToolbar style={styles.toolbar}>
+          <View style={styles.toolbarActions}>
+            <DiffLayoutToggle
+              layout={panelPreferences.preferences.layout}
+              isMobile={panelPreferences.isCompact}
+              testID="turn-diff-toggle-layout"
+              onToggle={panelPreferences.toggleLayout}
+            />
+          </View>
+        </PaneContentToolbar>
+      ) : null}
+      <View style={styles.body}>{body}</View>
+    </View>
+  );
+}
+
+function useTurnDiffPanelDescriptor(
+  target: Extract<WorkspaceTabTarget, { kind: "turn_diff" }>,
+  context: PanelDescriptorContext,
+): PanelDescriptor {
+  const { t } = useTranslation();
+  const turns = useAgentTurnDiffs({
+    serverId: context.serverId,
+    agentId: target.agentId,
+    enabled: true,
+  });
+  const completedAt = turns.find((turn) => turn.turnId === target.turnId)?.completedAt;
+  const time = completedAt
+    ? new Date(completedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : null;
+  return {
+    label: time ? t("panels.diff.turnLabel", { time }) : t("panels.diff.turnSubtitle"),
+    subtitle: t("panels.diff.turnSubtitle"),
+    tooltip: t("panels.diff.turnSubtitle"),
+    titleState: "ready",
+    icon: ThemedDiff,
+    statusBucket: null,
+  };
+}
+
 const workingDiffPresentation = {
   label: (t) => t("panels.diff.diffLabel"),
   subtitle: (t) => t("panels.diff.changesSubtitle"),
@@ -251,6 +359,11 @@ export const changesTreePanelRegistration = definePanel("changes_tree", {
 export const commitDiffPanelRegistration = definePanel("commit_diff", {
   component: CommitDiffPanel,
   useDescriptor: useCommitDiffPanelDescriptor,
+});
+
+export const turnDiffPanelRegistration = definePanel("turn_diff", {
+  component: TurnDiffPanel,
+  useDescriptor: useTurnDiffPanelDescriptor,
 });
 
 const styles = StyleSheet.create((theme) => ({

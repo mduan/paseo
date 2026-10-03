@@ -199,7 +199,11 @@ import {
   archiveWorkspaceContents,
 } from "./workspace-archive-service.js";
 import type { ServiceProxySubsystem } from "./service-proxy.js";
-import { renameCurrentBranch as renameCurrentBranchDefault } from "../utils/checkout-git.js";
+import {
+  getCheckoutDiff,
+  renameCurrentBranch as renameCurrentBranchDefault,
+} from "../utils/checkout-git.js";
+import { toCheckoutError } from "./checkout-git-utils.js";
 import {
   createGitMutationService,
   type GitMutationService,
@@ -2634,6 +2638,10 @@ export class Session {
         return this.handleAgentTimelineSearchRequest(msg, source);
       case "agent.timeline.list_prompts.request":
         return this.handleAgentTimelineListPromptsRequest(msg, source);
+      case "agent.turn_diffs.list.request":
+        return this.handleAgentTurnDiffsListRequest(msg, source);
+      case "agent.turn_diffs.get_diff.request":
+        return this.handleAgentTurnDiffsGetDiffRequest(msg, source);
       case "agent.provider_subagents.list.request":
         return this.handleProviderSubagentListRequest(msg);
       case "agent.provider_subagents.timeline.get.request":
@@ -7866,6 +7874,93 @@ export class Session {
             epoch: "",
             prompts: [],
             error: error instanceof Error ? error.message : String(error),
+          },
+        },
+        source,
+      );
+    }
+  }
+
+  private async handleAgentTurnDiffsListRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.turn_diffs.list.request" }>,
+    source?: object,
+  ): Promise<void> {
+    const base = { requestId: msg.requestId, agentId: msg.agentId };
+    try {
+      const turns = (await this.agentManager.turnDiffs?.list(msg.agentId)) ?? [];
+      this.emitForSource(
+        { type: "agent.turn_diffs.list.response", payload: { ...base, turns, error: null } },
+        source,
+      );
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error, agentId: msg.agentId },
+        "Failed to handle agent.turn_diffs.list.request",
+      );
+      const message = error instanceof Error ? error.message : String(error);
+      this.emitForSource(
+        { type: "agent.turn_diffs.list.response", payload: { ...base, turns: [], error: message } },
+        source,
+      );
+    }
+  }
+
+  private async handleAgentTurnDiffsGetDiffRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.turn_diffs.get_diff.request" }>,
+    source?: object,
+  ): Promise<void> {
+    const base = { requestId: msg.requestId, agentId: msg.agentId };
+    const range = await this.agentManager.turnDiffs
+      ?.resolveRange(msg.agentId, msg.target)
+      .catch((error: unknown) => {
+        this.sessionLogger.error({ err: error, agentId: msg.agentId }, "Failed to read turn diffs");
+        return null;
+      });
+    if (!range) {
+      this.emitForSource(
+        {
+          type: "agent.turn_diffs.get_diff.response",
+          payload: { ...base, cwd: "", files: [], error: null, available: false },
+        },
+        source,
+      );
+      return;
+    }
+    try {
+      const result = await getCheckoutDiff(range.repoRoot, {
+        mode: "range",
+        baseRef: range.fromTree,
+        targetRef: range.toTree,
+        ignoreWhitespace: msg.ignoreWhitespace === true,
+        includeStructured: true,
+      });
+      const files = [...(result.structured ?? [])].sort((a, b) => (a.path < b.path ? -1 : 1));
+      this.emitForSource(
+        {
+          type: "agent.turn_diffs.get_diff.response",
+          payload: {
+            ...base,
+            cwd: range.repoRoot,
+            files,
+            error: result.diffTooLarge
+              ? toCheckoutError(new Error("Diff too large to display"))
+              : null,
+            ...(result.diffTooLarge ? { diffTooLarge: true } : {}),
+            available: true,
+          },
+        },
+        source,
+      );
+    } catch (error) {
+      this.emitForSource(
+        {
+          type: "agent.turn_diffs.get_diff.response",
+          payload: {
+            ...base,
+            cwd: range.repoRoot,
+            files: [],
+            error: toCheckoutError(error),
+            available: true,
           },
         },
         source,

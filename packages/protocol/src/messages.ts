@@ -843,6 +843,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   archivedAt: z.string().nullable().optional(),
   providerUnavailable: z.boolean().optional(),
+  // Changes whenever the daemon records a turn diff; clients refetch the turn diff list.
+  latestTurnDiffAt: z.string().optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -1872,6 +1874,28 @@ export const AgentTimelineListPromptsRequestMessageSchema = z.object({
   type: z.literal("agent.timeline.list_prompts.request"),
   agentId: z.string(),
   requestId: z.string(),
+});
+
+export const AgentTurnDiffsListRequestMessageSchema = z.object({
+  type: z.literal("agent.turn_diffs.list.request"),
+  agentId: z.string(),
+  requestId: z.string(),
+});
+
+export const AgentTurnDiffTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("turn"), turnId: z.string() }),
+  z.object({ kind: z.literal("last_turn") }),
+  z.object({ kind: z.literal("session") }),
+]);
+
+export type AgentTurnDiffTarget = z.infer<typeof AgentTurnDiffTargetSchema>;
+
+export const AgentTurnDiffsGetDiffRequestMessageSchema = z.object({
+  type: z.literal("agent.turn_diffs.get_diff.request"),
+  agentId: z.string(),
+  requestId: z.string(),
+  target: AgentTurnDiffTargetSchema,
+  ignoreWhitespace: z.boolean().optional(),
 });
 
 export const ProviderSubagentListRequestMessageSchema = z.object({
@@ -3283,6 +3307,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentTimelineRequestMessageSchema,
   AgentTimelineSearchRequestMessageSchema,
   AgentTimelineListPromptsRequestMessageSchema,
+  AgentTurnDiffsListRequestMessageSchema,
+  AgentTurnDiffsGetDiffRequestMessageSchema,
   ProviderSubagentListRequestMessageSchema,
   ProviderSubagentTimelineRequestMessageSchema,
   SetAgentTimelineSubscriptionRequestMessageSchema,
@@ -3586,6 +3612,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceLabels: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
         workspaceSetupRun: z.boolean().optional(),
+        // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
+        turnDiffs: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
         workspaceTerminals: z.boolean().optional(),
         // COMPAT(checkoutSetBaseRef): added in v0.11.0, remove gate after 2027-04-02.
@@ -5439,6 +5467,47 @@ export const CheckoutDiffGetResponseSchema = z.object({
   }),
 });
 
+export const TurnDiffFileStatSchema = z.object({
+  path: z.string(),
+  // null for binary files
+  additions: z.number().int().nonnegative().nullable(),
+  deletions: z.number().int().nonnegative().nullable(),
+});
+
+export type TurnDiffFileStat = z.infer<typeof TurnDiffFileStatSchema>;
+
+export const TurnDiffSummarySchema = z.object({
+  turnId: z.string(),
+  // Client and provider ids of the turn's first user message. Timeline rows rebuilt after a
+  // daemon restart carry no turn id, so clients match turns through these.
+  userMessageIds: z.array(z.string()),
+  completedAt: z.string(),
+  files: z.array(TurnDiffFileStatSchema),
+});
+
+export type TurnDiffSummary = z.infer<typeof TurnDiffSummarySchema>;
+
+export const AgentTurnDiffsListResponseMessageSchema = z.object({
+  type: z.literal("agent.turn_diffs.list.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentId: z.string(),
+    turns: z.array(TurnDiffSummarySchema),
+    error: z.string().nullable(),
+  }),
+});
+
+export const AgentTurnDiffsGetDiffResponseMessageSchema = z.object({
+  type: z.literal("agent.turn_diffs.get_diff.response"),
+  payload: CheckoutDiffSubscriptionPayloadSchema.omit({ subscriptionId: true }).extend({
+    requestId: z.string(),
+    agentId: z.string(),
+    // false when the daemon has no snapshot for the target (non-git folder, timed-out snapshot,
+    // or a turn that predates turn diffs).
+    available: z.boolean(),
+  }),
+});
+
 export const CheckoutDiffUpdateSchema = z.object({
   type: z.literal("checkout_diff_update"),
   payload: CheckoutDiffSubscriptionPayloadSchema,
@@ -6920,6 +6989,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   AgentTimelineReplacementMessageSchema,
   AgentTimelineSearchResponseMessageSchema,
   AgentTimelineListPromptsResponseMessageSchema,
+  AgentTurnDiffsListResponseMessageSchema,
+  AgentTurnDiffsGetDiffResponseMessageSchema,
   ProviderSubagentListResponseMessageSchema,
   ProviderSubagentTimelineResponseMessageSchema,
   ProviderSubagentUpdateMessageSchema,

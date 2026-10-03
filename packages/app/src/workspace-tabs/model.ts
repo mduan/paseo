@@ -17,6 +17,14 @@ export interface WorkspaceWorkingDiffTabTarget {
   focusRequestId?: number;
 }
 
+export interface WorkspaceTurnDiffTabTarget {
+  kind: "turn_diff";
+  agentId: string;
+  turnId: string;
+  focusPath?: string;
+  focusRequestId?: number;
+}
+
 export type PluginWorkspaceTabTarget =
   | {
       kind: "plugin";
@@ -46,7 +54,8 @@ export type WorkspaceTabTarget =
   | WorkspaceWorkingDiffTabTarget
   | PluginWorkspaceTabTarget
   | { kind: "setup"; workspaceId: string }
-  | { kind: "commit_diff"; sha: string };
+  | { kind: "commit_diff"; sha: string }
+  | WorkspaceTurnDiffTabTarget;
 
 export interface WorkspaceTab {
   tabId: string;
