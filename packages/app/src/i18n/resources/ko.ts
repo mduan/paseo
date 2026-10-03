@@ -1931,6 +1931,10 @@ export const ko: TranslationResources = {
       one: "Paseo를 {{count}}회 호출함",
       other: "Paseo를 {{count}}회 호출함",
     },
+    failed: {
+      one: "{{count}}개 실패",
+      other: "{{count}}개 실패",
+    },
     and: "그리고",
   },
   renameModal: {

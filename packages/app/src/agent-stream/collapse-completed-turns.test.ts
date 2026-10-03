@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StreamItem } from "@/types/stream";
+import type { AgentToolCallData, StreamItem } from "@/types/stream";
 import { foldCompletedTurns } from "./collapse-completed-turns";
 
 const timestamp = new Date("2026-01-01T00:00:00.000Z");
@@ -14,6 +14,24 @@ function assistant(id: string, turnId: string, blockGroupId?: string): StreamIte
 
 function thought(id: string, turnId: string): StreamItem {
   return { kind: "thought", id, text: id, timestamp, turnId, status: "ready" };
+}
+
+function tool(
+  id: string,
+  turnId: string,
+  detail: AgentToolCallData["detail"],
+  status: AgentToolCallData["status"],
+): StreamItem {
+  return {
+    kind: "tool_call",
+    id,
+    timestamp,
+    turnId,
+    payload: {
+      source: "agent",
+      data: { provider: "claude", callId: id, name: detail.type, status, error: null, detail },
+    },
+  };
 }
 
 // prompt, work, steer, more work, then a final answer split into two blocks.
@@ -41,7 +59,7 @@ function fold(input: { isTurnActive?: boolean; activeTurnId?: string; expanded?:
 
 describe("foldCompletedTurns", () => {
   it("hides work before the final message and keeps user messages", () => {
-    expect(fold({})).toEqual({
+    expect(fold({})).toMatchObject({
       ids: ["p1", "steer", "final:0", "final:1", "p2", "a2"],
       toggles: {
         steer: { turnKey: "t1", expanded: false },
@@ -53,7 +71,27 @@ describe("foldCompletedTurns", () => {
   it("keeps an expanded turn whole with the toggle above its first work row", () => {
     const { ids, toggles } = fold({ expanded: ["t1"] });
     expect(ids.slice(0, turn1.length)).toEqual(turn1.map((item) => item.id));
-    expect(toggles.w1).toEqual({ turnKey: "t1", expanded: true });
+    expect(toggles.w1).toMatchObject({ turnKey: "t1", expanded: true });
+  });
+
+  it("summarizes the hidden tool calls and counts failures", () => {
+    const folded = foldCompletedTurns({
+      tail: [
+        user("p", "t"),
+        tool("edit", "t", { type: "edit", filePath: "a.ts" }, "completed"),
+        tool("shell", "t", { type: "shell", command: "npm test" }, "failed"),
+        tool("read", "t", { type: "read", filePath: "a.ts" }, "canceled"),
+        assistant("a", "t"),
+      ],
+      head: [],
+      isTurnActive: false,
+      activeTurnId: null,
+      expandedTurnKeys: new Set(),
+    });
+    expect(folded.toggles.get("a")).toMatchObject({
+      toolSummary: { editedFileCount: 1, commandCount: 1, readFileCount: 1 },
+      failedToolCount: 1,
+    });
   });
 
   it("never folds the active turn", () => {

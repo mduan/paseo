@@ -19,20 +19,22 @@ interface OverviewGroupProps {
 const TOOL_CALL_GROUP_MAX_HEIGHT = 400;
 
 function joinSummaryParts(parts: string[], conjunction: string): string {
-  if (parts.length === 0) {
-    return "";
-  }
-  let joined = parts[0] ?? "";
   if (parts.length === 2) {
-    joined = `${parts[0]} ${conjunction} ${parts[1]}`;
-  } else if (parts.length > 2) {
-    joined = `${parts.slice(0, -1).join(", ")}, ${conjunction} ${parts.at(-1)}`;
+    return `${parts[0]} ${conjunction} ${parts[1]}`;
   }
-  const firstCharacter = joined[0];
-  return firstCharacter ? `${firstCharacter.toLocaleUpperCase()}${joined.slice(1)}` : joined;
+  if (parts.length > 2) {
+    return `${parts.slice(0, -1).join(", ")}, ${conjunction} ${parts.at(-1)}`;
+  }
+  return parts[0] ?? "";
 }
 
-function useOverviewSummary(summary: OverviewSummary): string {
+function capitalizeFirst(text: string): string {
+  const firstCharacter = text[0];
+  return firstCharacter ? `${firstCharacter.toLocaleUpperCase()}${text.slice(1)}` : text;
+}
+
+/** Lowercase summary, e.g. "edited 3 files and ran 2 commands"; empty when there were no tools. */
+export function useOverviewSummary(summary: OverviewSummary): string {
   const { t } = useTranslation();
   return useMemo(() => {
     const parts: string[] = [];
@@ -62,7 +64,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
 }: OverviewGroupProps) {
   const scrollRef = useRef<ScrollView>(null);
   const isCompact = useIsCompactFormFactor();
-  const aggregateSummary = useOverviewSummary(group.summary);
+  const aggregateSummary = capitalizeFirst(useOverviewSummary(group.summary));
   const scrollToLatest = useCallback(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, []);

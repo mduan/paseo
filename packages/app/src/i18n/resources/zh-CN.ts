@@ -1899,6 +1899,10 @@ export const zhCN: TranslationResources = {
       one: "调用了 Paseo {{count}} 次",
       other: "调用了 Paseo {{count}} 次",
     },
+    failed: {
+      one: "{{count}} 个失败",
+      other: "{{count}} 个失败",
+    },
     and: "并",
   },
   renameModal: {

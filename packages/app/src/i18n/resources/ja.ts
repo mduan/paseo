@@ -1941,6 +1941,10 @@ export const ja: TranslationResources = {
       one: "Paseoを{{count}}回呼び出し",
       other: "Paseoを{{count}}回呼び出し",
     },
+    failed: {
+      one: "{{count}}件失敗",
+      other: "{{count}}件失敗",
+    },
     and: "および",
   },
   renameModal: {

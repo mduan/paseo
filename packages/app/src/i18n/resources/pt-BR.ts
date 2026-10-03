@@ -1954,6 +1954,10 @@ export const ptBR: TranslationResources = {
       one: "chamou o Paseo {{count}} vez",
       other: "chamou o Paseo {{count}} vezes",
     },
+    failed: {
+      one: "{{count}} falhou",
+      other: "{{count}} falharam",
+    },
     and: "e",
   },
   renameModal: {

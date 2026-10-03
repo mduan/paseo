@@ -1954,6 +1954,10 @@ export const ru: TranslationResources = {
       one: "выполнен {{count}} вызов Paseo",
       other: "выполнены вызовы Paseo ({{count}})",
     },
+    failed: {
+      one: "ошибок: {{count}}",
+      other: "ошибок: {{count}}",
+    },
     and: "и",
   },
   renameModal: {

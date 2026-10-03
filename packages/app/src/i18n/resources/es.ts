@@ -1969,6 +1969,10 @@ export const es: TranslationResources = {
       one: "llamó a Paseo {{count}} vez",
       other: "llamó a Paseo {{count}} veces",
     },
+    failed: {
+      one: "{{count}} falló",
+      other: "{{count}} fallaron",
+    },
     and: "y",
   },
   renameModal: {
