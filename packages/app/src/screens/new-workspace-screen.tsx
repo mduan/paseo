@@ -14,7 +14,14 @@ import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Folder, FolderPlus, GitBranch, GitPullRequest } from "lucide-react-native";
+import {
+  ChevronDown,
+  Folder,
+  FolderPlus,
+  GitBranch,
+  GitPullRequest,
+  Link,
+} from "lucide-react-native";
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
@@ -373,6 +380,7 @@ function PickerOptionItem({
   onPress,
   isBranch,
   trailingLabel,
+  inSync,
   accessibilityLabel,
   iconColor,
   iconSize,
@@ -386,6 +394,7 @@ function PickerOptionItem({
   onPress: () => void;
   isBranch: boolean;
   trailingLabel?: string;
+  inSync?: boolean;
   accessibilityLabel?: string;
   iconColor: string;
   iconSize: number;
@@ -402,11 +411,11 @@ function PickerOptionItem({
     ),
     [isBranch, iconSize, iconColor],
   );
-  const trailingSlot = useMemo(
-    () =>
-      trailingLabel ? <Text style={styles.refDivergenceLabel}>{trailingLabel}</Text> : undefined,
-    [trailingLabel],
-  );
+  const trailingSlot = useMemo(() => {
+    if (trailingLabel) return <Text style={styles.refDivergenceLabel}>{trailingLabel}</Text>;
+    if (inSync) return <Link size={iconSize} color={iconColor} />;
+    return undefined;
+  }, [trailingLabel, inSync, iconSize, iconColor]);
   return (
     <ComboboxItem
       testID={testID}
@@ -559,6 +568,7 @@ function NewWorkspacePickerOption({
       onPress={onPress}
       isBranch={isBranch}
       trailingLabel={isBranch ? item.divergenceLabel : undefined}
+      inSync={isBranch ? item.inSync : undefined}
       accessibilityLabel={isBranch ? item.accessibilityLabel : undefined}
       iconColor={theme.colors.foregroundMuted}
       iconSize={theme.iconSize.sm}
