@@ -240,8 +240,9 @@ remain a separate pre-turn registry and retire on canonical acknowledgement.
 
 Canonical turns and visible responses are different boundaries. System-injected prompts are absent from
 the Paseo timeline, so one visible response can span several canonical turns without a user message
-between them. Layout and copy group that response together; lifecycle, timing, tool sequences, and exact
-fork positions retain the canonical `turnId` boundaries.
+between them. Each canonical turn keeps its own footer, copy, fork position, and "Worked for" fold; a
+turn without a prompt is timed from its first row. Only the idle footer crosses that boundary, so a
+trailing tool-only turn still shows the footer of the message above it.
 
 The compatibility boundary for older daemons is snapshot normalization: running/idle status becomes an
 anonymous active turn or idle state once, and downstream code consumes the same activity shape. The app

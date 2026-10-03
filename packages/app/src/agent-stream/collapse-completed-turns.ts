@@ -8,7 +8,10 @@ export interface WorkToggle {
   expanded: boolean;
   /** False when the turn has no work to fold; the row then only shows the duration. */
   hasWork: boolean;
-  /** From the turn's prompt to its last row; null when the prompt is not in the timeline. */
+  /**
+   * From the turn's prompt, or a hidden-prompt turn's first row, to its last row; null when the
+   * turn's start is not loaded.
+   */
   durationMs: number | null;
 }
 
@@ -70,9 +73,13 @@ export function foldCompletedTurns(input: {
       item.kind === "user_message" ||
       item.kind === "fork_marker";
     const firstWorkIndex = turn.findIndex((item, index) => !isVisibleWhenFolded(item, index));
-    const prompt = turn.find((item) => item.kind === "user_message");
-    const durationMs = prompt
-      ? Math.max(0, turn[turn.length - 1]!.timestamp.getTime() - prompt.timestamp.getTime())
+    // A turn without a prompt below another turn was started by a hidden system prompt, so it
+    // starts at its first row. The first loaded turn may instead be cut off by history paging.
+    const startedAt =
+      turn.find((item) => item.kind === "user_message")?.timestamp ??
+      (turnIndex > 0 ? first.timestamp : null);
+    const durationMs = startedAt
+      ? Math.max(0, turn[turn.length - 1]!.timestamp.getTime() - startedAt.getTime())
       : null;
     const turnKey = first.turnId ?? first.id;
 
