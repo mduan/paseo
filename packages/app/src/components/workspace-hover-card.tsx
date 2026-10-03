@@ -20,7 +20,9 @@ import {
   Folder,
   GitBranch,
   Server,
+  Tag,
 } from "lucide-react-native";
+import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import { ForgeBrandIcon } from "@/git/forge-icon";
 import type { Theme } from "@/styles/theme";
@@ -47,6 +49,8 @@ import {
 import { formatCheckPresentationCountsLabel } from "@/git/check-presentation-copy";
 import { CheckPresentationIcon, getCheckPresentationTone } from "@/git/check-presentation.view";
 import { buildForgeChecksUrl } from "@/git/forge-url";
+import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
+import { WorkspaceLabelChip } from "@/workspace-labels/chip";
 
 interface Rect {
   x: number;
@@ -328,6 +332,7 @@ function WorkspaceHoverCardContent({
               testID="hover-card-workspace-cwd"
             />
           ) : null}
+          <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
           {prHint?.checks && prHint.checks.length > 0 ? (
             <>
               <View style={styles.separator} />
@@ -348,6 +353,7 @@ const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedServer = withUnistyles(Server);
 const ThemedFileDiff = withUnistyles(FileDiff);
+const ThemedTag = withUnistyles(Tag);
 
 type CardInfoIcon = React.ComponentType<React.ComponentProps<typeof ThemedGitBranch>>;
 
@@ -357,6 +363,28 @@ function HostRow({ serverId }: { serverId: string }): ReactElement | null {
   const label = host?.label?.trim() || serverId;
 
   return <InfoRow icon={ThemedServer} value={label} testID="hover-card-workspace-host" />;
+}
+
+function LabelsRow({
+  serverId,
+  names,
+}: {
+  serverId: string;
+  names: readonly string[] | undefined;
+}): ReactElement | null {
+  const labels = useWorkspaceLabelDefinitions(serverId, names);
+  if (labels.length === 0) return null;
+
+  return (
+    <View style={styles.cardInfoRow} testID="hover-card-workspace-labels">
+      <ThemedTag size={12} uniProps={foregroundMutedColorMapping} />
+      <View style={styles.cardLabels}>
+        {labels.map((label) => (
+          <WorkspaceLabelChip key={workspaceLabelKey(label.name)} label={label} />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 const ThemedExternalLink = withUnistyles(ExternalLink);
@@ -610,6 +638,13 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.normal,
+  },
+  cardLabels: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[1],
   },
   cardInfoTextHovered: {
     color: theme.colors.foreground,
