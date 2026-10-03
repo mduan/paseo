@@ -19,6 +19,8 @@ export type PickerItem =
       refName: string;
       accessibilityLabel: string;
       divergenceLabel?: string;
+      // The local ref points at the same commit as its origin counterpart.
+      inSync?: boolean;
       committerDate?: number;
     }
   | {
@@ -69,6 +71,9 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
   for (const detail of details) {
     const hasKnownProvenance = detail.hasLocal !== undefined || detail.hasRemote !== undefined;
     if (!hasKnownProvenance) {
+      // COMPAT(branchProvenance): daemons predating hasLocal/hasRemote send bare names, so a
+      // remote-only branch reads like a local one here. Remove once the daemon floor reports
+      // provenance.
       items.push({
         kind: "branch",
         name: detail.name,
@@ -79,39 +84,21 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
       continue;
     }
 
-    const hasLocal = detail.hasLocal === true;
-    const hasRemote = detail.hasRemote === true;
-    const localAhead = detail.localAhead;
-    const localBehind = detail.localBehind;
-    const hasDivergence =
-      hasLocal && hasRemote && localAhead !== undefined && localBehind !== undefined;
-    const refsDiffer = hasDivergence && (localAhead > 0 || localBehind > 0);
-    // One row when the two refs point at the same commit, two rows when they differ or
-    // when the divergence is unknown.
-    const showsBothRefs = hasLocal && hasRemote && (!hasDivergence || refsDiffer);
-
-    // The origin row goes first because it is the default base, and it never states
-    // divergence: it is the reference point the local row is measured against.
-    if (hasRemote) {
-      items.push({
-        kind: "branch",
-        name: detail.name,
-        refName: `refs/remotes/origin/${detail.name}`,
-        accessibilityLabel: `${detail.name}, origin branch`,
-        committerDate: detail.committerDate,
-      });
-    }
-
-    if (hasLocal && (showsBothRefs || !hasRemote)) {
+    // Labels are short ref names, as git prints them: "main" is the local branch and
+    // "origin/main" is the remote-tracking ref, so both refs always get their own row.
+    if (detail.hasLocal) {
       const localItem: Extract<PickerItem, { kind: "branch" }> = {
         kind: "branch",
-        name: showsBothRefs ? `${detail.name} (local)` : detail.name,
+        name: detail.name,
         refName: `refs/heads/${detail.name}`,
         accessibilityLabel: `${detail.name}, local branch`,
         committerDate: detail.committerDate,
       };
-      if (hasDivergence) {
+      const localAhead = detail.localAhead;
+      const localBehind = detail.localBehind;
+      if (detail.hasRemote && localAhead !== undefined && localBehind !== undefined) {
         localItem.divergenceLabel = divergenceLabel(localAhead, localBehind);
+        localItem.inSync = localAhead === 0 && localBehind === 0;
         localItem.accessibilityLabel += `, ${divergenceAccessibility(
           localAhead,
           localBehind,
@@ -119,6 +106,16 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
         )}`;
       }
       items.push(localItem);
+    }
+
+    if (detail.hasRemote) {
+      items.push({
+        kind: "branch",
+        name: `origin/${detail.name}`,
+        refName: `refs/remotes/origin/${detail.name}`,
+        accessibilityLabel: `origin/${detail.name}, origin branch`,
+        committerDate: detail.committerDate,
+      });
     }
   }
 
@@ -130,27 +127,14 @@ export interface BaseRefCheckoutStatus {
   upstreamRef?: string | null;
 }
 
-// Display only. The exact ref is what every request carries; this is just how a ref reads in
-// a row label, so "refs/remotes/origin/other-name" shows as "other-name".
-function branchNameFromRef(refName: string): string {
+// Display only. The exact ref is what every request carries; this is how git prints it, so
+// "refs/remotes/origin/main" reads "origin/main" and "refs/heads/main" reads "main".
+function shortRefName(refName: string): string {
   if (refName.startsWith("refs/heads/")) return refName.slice("refs/heads/".length);
   if (refName.startsWith(REMOTE_TRACKING_PREFIX)) {
-    const remainder = refName.slice(REMOTE_TRACKING_PREFIX.length);
-    const separator = remainder.indexOf("/");
-    return separator === -1 ? remainder : remainder.slice(separator + 1);
+    return refName.slice(REMOTE_TRACKING_PREFIX.length);
   }
   return refName;
-}
-
-// Where a ref lives, for disambiguating two rows that would otherwise read the same.
-function refQualifier(refName: string): string | null {
-  if (refName.startsWith("refs/heads/")) return "local";
-  if (refName.startsWith(REMOTE_TRACKING_PREFIX)) {
-    const remainder = refName.slice(REMOTE_TRACKING_PREFIX.length);
-    const separator = remainder.indexOf("/");
-    return separator === -1 ? null : remainder.slice(0, separator);
-  }
-  return null;
 }
 
 // The one owner of "what do we branch off when the user picked nothing". The checkmarked
@@ -167,9 +151,7 @@ export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem
   // floor sends upstreamRef. Daemons that predate it omit the field, which lands on the
   // local ref — the base those daemons always used.
   const refName = status.upstreamRef ?? `refs/heads/${currentBranch}`;
-  // The upstream branch can be named differently from the local one, so the row reads the
-  // ref rather than the branch the user happens to be on.
-  const name = branchNameFromRef(refName);
+  const name = shortRefName(refName);
   return {
     kind: "branch",
     name,
@@ -235,8 +217,17 @@ export interface PickerOptionData {
   selectedOptionId: string;
 }
 
+// Rows sort by group, then newest first within a group.
+enum PickerGroup {
+  Base,
+  Local,
+  Remote,
+  ChangeRequest,
+}
+
 interface TimedOption {
   option: ComboboxOptionModel;
+  group: PickerGroup;
   timestamp: number;
 }
 
@@ -254,6 +245,9 @@ export function buildPickerOptionData(input: {
     itemById.set(id, branch);
     timedOptions.push({
       option: { id, label: pickerItemLabel(branch) },
+      group: branch.refName.startsWith(REMOTE_TRACKING_PREFIX)
+        ? PickerGroup.Remote
+        : PickerGroup.Local,
       timestamp: branch.committerDate ?? 0,
     });
   }
@@ -264,44 +258,43 @@ export function buildPickerOptionData(input: {
     itemById.set(id, { kind: "github-pr", item: pr });
     const updatedAtMs = pr.updatedAt ? Date.parse(pr.updatedAt) : 0;
     const timestamp = Number.isNaN(updatedAtMs) ? 0 : Math.floor(updatedAtMs / 1000);
-    timedOptions.push({ option: { id, label: formatPrLabel(pr) }, timestamp });
-  }
-
-  const baseItem = input.baseItem;
-  if (!baseItem) {
-    timedOptions.sort((a, b) => b.timestamp - a.timestamp);
-    return { options: timedOptions.map((t) => t.option), itemById, selectedOptionId: "" };
-  }
-
-  const selectedOptionId = pickerOptionId(baseItem);
-  if (!itemById.has(selectedOptionId)) {
-    // The label lives on the item, so the row and the trigger read it from the same place.
-    const labeledItem = disambiguate(baseItem, timedOptions);
-    itemById.set(selectedOptionId, labeledItem);
     timedOptions.push({
-      option: { id: selectedOptionId, label: pickerItemLabel(labeledItem) },
-      // The base sorts first: it is what a workspace is created from unless you pick something.
-      timestamp: Number.POSITIVE_INFINITY,
+      option: { id, label: formatPrLabel(pr) },
+      group: PickerGroup.ChangeRequest,
+      timestamp,
     });
   }
 
-  timedOptions.sort((a, b) => b.timestamp - a.timestamp);
+  const selectedOptionId = input.baseItem ? baseOptionId(input.baseItem, itemById) : "";
+  if (input.baseItem && !itemById.has(selectedOptionId)) {
+    itemById.set(selectedOptionId, input.baseItem);
+    timedOptions.push({
+      option: { id: selectedOptionId, label: pickerItemLabel(input.baseItem) },
+      group: PickerGroup.Base,
+      timestamp: 0,
+    });
+  }
+  // The base sorts first: it is what a workspace is created from unless you pick something.
+  for (const timed of timedOptions) {
+    if (timed.option.id === selectedOptionId) timed.group = PickerGroup.Base;
+  }
+
+  timedOptions.sort((a, b) => a.group - b.group || b.timestamp - a.timestamp);
   return { options: timedOptions.map((t) => t.option), itemById, selectedOptionId };
 }
 
-// Two rows reading "main" would be a coin flip for the user, so the added row says where its
-// ref lives. Only when it collides — a lone row needs no qualifier.
-function disambiguate(item: PickerItem, existing: readonly TimedOption[]): PickerItem {
-  if (item.kind !== "branch") return item;
-  if (!existing.some((entry) => entry.option.label === item.name)) return item;
-  const qualifier = refQualifier(item.refName);
-  if (!qualifier) return item;
-  const name = `${item.name} (${qualifier})`;
-  return {
-    ...item,
-    name,
-    // Accessibility labels are built as `${name}${suffix}`, so re-prefixing keeps the spoken
-    // label and the visible one the same string.
-    accessibilityLabel: `${name}${item.accessibilityLabel.slice(item.name.length)}`,
-  };
+function baseOptionId(baseItem: PickerItem, itemById: ReadonlyMap<string, PickerItem>): string {
+  const id = pickerOptionId(baseItem);
+  // COMPAT(branchProvenance): a daemon without provenance lists local main as the bare row
+  // "main", which is the same branch as the default base refs/heads/main. Remove with the
+  // bare rows in buildBranchPickerItems.
+  if (
+    !itemById.has(id) &&
+    baseItem.kind === "branch" &&
+    baseItem.refName.startsWith("refs/heads/")
+  ) {
+    const bareId = branchPickerOptionId(shortRefName(baseItem.refName));
+    if (itemById.has(bareId)) return bareId;
+  }
+  return id;
 }

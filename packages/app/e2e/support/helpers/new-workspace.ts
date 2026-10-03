@@ -386,7 +386,7 @@ export async function searchAndSelectBranchInPicker(page: Page, name: string): P
   await selectBranchInPicker(page, name);
 }
 
-// Ref picker rows are named for a user: "main, origin branch" is the upstream copy and
+// Ref picker rows are named for a user: "origin/main, origin branch" is the upstream copy and
 // "main, local branch, 2 commits ahead of origin main" is the local one.
 export function startingRefRow(page: Page, accessibleName: string) {
   return page.getByRole("button", { name: accessibleName, exact: true });
