@@ -11,6 +11,7 @@ import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-
 import { useToast } from "@/contexts/toast-context";
 import { useBranchSwitcher } from "@/hooks/use-branch-switcher";
 import { ToolbarLabelSelectTrigger } from "@/components/ui/toolbar-label-trigger";
+import { usePendingCheckoutSwitch } from "@/git/pending-switch-store";
 
 interface BranchSwitcherProps {
   currentBranchName: string | null;
@@ -54,6 +55,8 @@ export function BranchSwitcher({
   });
 
   const handleOpen = useCallback(() => setIsOpen(true), [setIsOpen]);
+  const pendingBranch = usePendingCheckoutSwitch(serverId, workspaceDirectory)?.branch;
+  const displayedBranchName = pendingBranch ?? currentBranchName;
 
   const branchLeadingSlot = useMemo(
     () => <ThemedGitBranch size={14} uniProps={foregroundMutedIconColorMapping} />,
@@ -73,7 +76,7 @@ export function BranchSwitcher({
     [branchLeadingSlot],
   );
 
-  if (!currentBranchName) {
+  if (!displayedBranchName) {
     return null;
   }
 
@@ -83,12 +86,12 @@ export function BranchSwitcher({
         <TooltipTrigger asChild>
           <ToolbarLabelSelectTrigger
             testID={testID}
-            label={currentBranchName}
+            label={displayedBranchName}
             open={isOpen}
             onPress={handleOpen}
             accessibilityRole="button"
             accessibilityLabel={t("branchSwitcher.currentBranch", {
-              branchName: currentBranchName,
+              branchName: displayedBranchName,
             })}
           />
         </TooltipTrigger>
@@ -98,7 +101,7 @@ export function BranchSwitcher({
       </Tooltip>
       <Combobox
         options={branchOptions}
-        value={currentBranchName}
+        value={displayedBranchName}
         onSelect={handleBranchSelect}
         searchable
         placeholder={t("branchSwitcher.placeholder")}

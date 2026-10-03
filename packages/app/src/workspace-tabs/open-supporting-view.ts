@@ -9,6 +9,7 @@ import {
 } from "@/stores/workspace-layout-store";
 import type { OpenInSidePanePreferences, PullRequestOpenLocation } from "@/hooks/use-settings";
 import type { ExplorerCheckoutContext } from "@/stores/explorer-checkout-context";
+import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import {
   isExplorerSidebarOpen,
   openExplorerSidebarView,
@@ -74,6 +75,33 @@ export function openWorkspacePullRequest(input: OpenWorkspacePullRequestInput): 
     workspaceKey: input.workspaceKey,
     target: { kind: "pull_request" },
     location: input.destination,
+  });
+}
+
+/** Opens a turn's diff at the "Opening a turn's changes from a chat" destination. */
+export function openTurnDiff(input: {
+  isCompact: boolean;
+  workspaceKey: string | null;
+  target: Extract<WorkspaceTabTarget, { kind: "turn_diff" }>;
+  destination: PullRequestOpenLocation;
+}): string | null {
+  if (input.destination === "explorer" && !usesCompactExplorerSidebar(input)) {
+    if (!input.workspaceKey) return null;
+    const store = useWorkspaceLayoutStore.getState();
+    const paneId = store.showExplorerSidebar(input.workspaceKey);
+    return store.openTab({
+      workspaceKey: input.workspaceKey,
+      target: input.target,
+      intent: "reveal",
+      placement: paneId ? { mode: "pane", paneId } : undefined,
+    });
+  }
+  // Compact layouts have no Explorer pane to hold a diff, so it opens full screen.
+  return openWorkspaceTargetAtLocation({
+    isCompact: input.isCompact,
+    workspaceKey: input.workspaceKey,
+    target: input.target,
+    location: input.destination === "side" ? "side" : "main",
   });
 }
 

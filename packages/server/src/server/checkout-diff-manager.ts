@@ -129,6 +129,24 @@ export class CheckoutDiffManager {
     }
   }
 
+  /** Refreshes now, skipping the debounce, and resolves once subscribers have the new diff. */
+  async refreshForCwdNow(cwd: string): Promise<void> {
+    const resolvedCwd = expandTilde(cwd);
+    const refreshes: Promise<void>[] = [];
+    for (const target of this.targets.values()) {
+      if (target.cwd !== resolvedCwd && target.diffCwd !== resolvedCwd) {
+        continue;
+      }
+      if (target.debounceTimer) {
+        clearTimeout(target.debounceTimer);
+        target.debounceTimer = null;
+        target.pendingDebounceForce = false;
+      }
+      refreshes.push(this.refreshTarget(target, true));
+    }
+    await Promise.all(refreshes);
+  }
+
   getMetrics(): CheckoutDiffMetrics {
     let checkoutDiffSubscriptionCount = 0;
 
@@ -300,6 +318,8 @@ export class CheckoutDiffManager {
     if (target.refreshPromise) {
       target.refreshQueued = true;
       target.refreshQueuedForce ||= force;
+      // The running refresh loops until the queue drains, so this resolves after ours.
+      await target.refreshPromise;
       return;
     }
 

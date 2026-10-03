@@ -5,6 +5,7 @@ import {
   DEFAULT_PANE_ID,
   findPaneById,
   findPaneContainingTab,
+  resolveExplorerSidebarPaneId,
   useWorkspaceLayoutStore,
   type WorkspaceTabPlacement,
 } from "@/stores/workspace-layout-store";
@@ -58,6 +59,24 @@ function resolveMainPane(input: {
     panes.find((pane) => pane.id !== input.explorerSidebarPaneId && pane.hidden !== true) ??
     null
   );
+}
+
+/** Moves a tab from the Explorer sidebar or a side pane into the main panel and focuses it. */
+export function moveWorkspaceTabToMain(input: { workspaceKey: string; tabId: string }): void {
+  const store = useWorkspaceLayoutStore.getState();
+  const layout = store.layoutByWorkspace[input.workspaceKey];
+  if (!layout) return;
+  const mainPane = resolveMainPane({
+    workspaceKey: input.workspaceKey,
+    explorerSidebarPaneId: resolveExplorerSidebarPaneId(
+      layout,
+      store.explorerSidebarPaneIdByWorkspace[input.workspaceKey],
+    ),
+    lastMainPaneId: null,
+  });
+  if (!mainPane) return;
+  store.moveTabToPane(input.workspaceKey, input.tabId, mainPane.id);
+  store.focusTab(input.workspaceKey, input.tabId);
 }
 
 function canReplacePreview(input: {

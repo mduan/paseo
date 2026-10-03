@@ -127,6 +127,7 @@ export interface CheckoutDiffSubscriber {
     listener: (snapshot: CheckoutDiffSnapshotPayload) => void,
   ): Promise<CheckoutDiffSubscription>;
   scheduleRefreshForCwd(cwd: string): void;
+  refreshForCwdNow(cwd: string): Promise<void>;
 }
 
 export interface CheckoutSessionOptions {
@@ -592,7 +593,9 @@ export class CheckoutSession {
 
     try {
       const checkoutResult = await this.gitMutation.checkoutExistingBranch(cwd, branch);
-      this.scheduleDiffRefresh(cwd);
+      // The client shows the switch as pending until this response, so the new diff
+      // must reach it first.
+      await this.checkoutDiffManager.refreshForCwdNow(cwd);
 
       // Push a workspace_update immediately so the sidebar/header reflect
       // the new branch name without waiting for the background git watcher.
@@ -684,7 +687,7 @@ export class CheckoutSession {
     try {
       await setCurrentBranchBaseRef(cwd, baseRef);
       await this.gitMutation.notifyGitMutation(cwd, "set-base-ref", { invalidateForge: true });
-      this.scheduleDiffRefresh(cwd);
+      await this.checkoutDiffManager.refreshForCwdNow(cwd);
       this.host.emit({
         type: "checkout.set_base_ref.response",
         payload: { cwd, success: true, error: null, requestId },
