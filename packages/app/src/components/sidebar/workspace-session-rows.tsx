@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from "react";
+import { createContext, memo, useCallback, useContext, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -40,6 +40,9 @@ export interface WorkspaceSessionRows {
   /** The focused tab is one of the visible nested rows, so it carries the highlight. */
   showsFocusedRow: boolean;
 }
+
+/** Runs before a nested row navigates; the mobile sidebar uses it to close itself. */
+export const WorkspaceSessionPressContext = createContext<(() => void) | undefined>(undefined);
 
 const EMPTY_TABS: WorkspaceTab[] = [];
 const EMPTY_IDS: string[] = [];
@@ -217,9 +220,11 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
     }),
     [row],
   );
+  const onSessionPress = useContext(WorkspaceSessionPressContext);
   const handlePress = useCallback(() => {
+    onSessionPress?.();
     navigateToWorkspace({ serverId, workspaceId, target: row.target });
-  }, [row.target, serverId, workspaceId]);
+  }, [onSessionPress, row.target, serverId, workspaceId]);
   const pressableStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,

@@ -35,6 +35,7 @@ import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
 import {
   useWorkspaceSessionRows,
+  WorkspaceSessionPressContext,
   WorkspaceSessionRowList,
 } from "@/components/sidebar/workspace-session-rows";
 import { type GestureType } from "react-native-gesture-handler";
@@ -2029,7 +2030,11 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return content;
+  return (
+    <WorkspaceSessionPressContext.Provider value={onWorkspacePress}>
+      {content}
+    </WorkspaceSessionPressContext.Provider>
+  );
 }
 
 /**
