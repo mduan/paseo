@@ -2001,6 +2001,8 @@ export const fr: TranslationResources = {
       cancelAccessibility: "Annuler le commentaire de révision",
       save: "Commentaire",
       saveAccessibility: "Enregistrer le commentaire de l'avis",
+      line: "Ligne {{line}}",
+      lines: "Lignes {{start}}–{{end}}",
     },
   },
   settings: {

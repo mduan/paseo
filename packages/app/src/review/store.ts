@@ -27,6 +27,7 @@ export type { ReviewDraftComment, ReviewDraftMode, ReviewDraftSide } from "@/rev
 // v2 dropped the legacy persisted activeModesByScope field.
 const STORE_VERSION = 2;
 const CONTEXT_RADIUS = 3;
+const MAX_CONTEXT_LINES = 80;
 const EMPTY_REVIEW_DRAFT_COMMENTS: ReviewDraftComment[] = [];
 
 type ReviewAttachment = Extract<AgentAttachment, { type: "review" }>;
@@ -117,6 +118,8 @@ function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment 
     filePath: input.filePath,
     side: input.side,
     lineNumber: input.lineNumber,
+    startSide: input.startSide,
+    startLineNumber: input.startLineNumber,
     body: input.body,
     createdAt: input.createdAt ?? now,
     updatedAt: input.updatedAt ?? input.createdAt ?? now,
@@ -171,34 +174,66 @@ function toContextLine(line: NumberedDiffLine): ReviewAttachmentContextLine | nu
   };
 }
 
-function findTarget(input: { comment: ReviewDraftComment; diffFiles: readonly ParsedDiffFile[] }): {
-  hunkHeader: string;
-  hunkLines: NumberedDiffLine[];
-  targetIndex: number;
-  targetLine: NumberedDiffLine;
-} | null {
-  const file = input.diffFiles.find((candidate) => candidate.path === input.comment.filePath);
+function findLineIndex(input: {
+  lines: readonly NumberedDiffLine[];
+  side: ReviewDraftSide;
+  lineNumber: number;
+}): number {
+  return input.lines.findIndex((line) => {
+    const cell = input.side === "old" ? line.oldCell : line.newCell;
+    return cell?.lineNumber === input.lineNumber;
+  });
+}
+
+function buildCommentContext(input: {
+  comment: ReviewDraftComment;
+  diffFiles: readonly ParsedDiffFile[];
+}): ReviewAttachment["comments"][number]["context"] | null {
+  const { comment } = input;
+  const file = input.diffFiles.find((candidate) => candidate.path === comment.filePath);
   if (!file) {
     return null;
   }
 
-  for (const hunk of buildNumberedDiffHunks(file)) {
-    const targetIndex = hunk.lines.findIndex((line) => {
-      const cell = input.comment.side === "old" ? line.oldCell : line.newCell;
-      return cell?.lineNumber === input.comment.lineNumber;
-    });
-    const targetLine = hunk.lines[targetIndex];
-    if (targetLine) {
-      return {
-        hunkHeader: hunk.hunkHeader,
-        hunkLines: hunk.lines,
-        targetIndex,
-        targetLine,
-      };
-    }
+  // Ranges may span hunks of one file, so search the file's lines in display order.
+  const fileLines = buildNumberedDiffHunks(file).flatMap((hunk) => hunk.lines);
+  const endIndex = findLineIndex({
+    lines: fileLines,
+    side: comment.side,
+    lineNumber: comment.lineNumber,
+  });
+  const startIndex =
+    comment.startLineNumber === undefined
+      ? endIndex
+      : findLineIndex({
+          lines: fileLines,
+          side: comment.startSide ?? comment.side,
+          lineNumber: comment.startLineNumber,
+        });
+  const startLine = fileLines[startIndex];
+  const endLine = fileLines[endIndex];
+  if (!startLine || !endLine || startIndex > endIndex) {
+    return null;
+  }
+  const targetLine = toContextLine(endLine);
+  if (!targetLine) {
+    return null;
   }
 
-  return null;
+  // Context stays inside the hunks that contain the range ends.
+  const startHunkFirstIndex = fileLines.findIndex((line) => line.hunkIndex === startLine.hunkIndex);
+  const endHunkLastIndex = fileLines.findLastIndex((line) => line.hunkIndex === endLine.hunkIndex);
+  const contextStart = Math.max(startHunkFirstIndex, startIndex - CONTEXT_RADIUS);
+  const contextEnd = Math.min(endHunkLastIndex, endIndex + CONTEXT_RADIUS) + 1;
+
+  // The server tells the agent to read the file when the range end is cut off.
+  const lines = fileLines
+    .slice(contextStart, contextEnd)
+    .map(toContextLine)
+    .filter((line): line is ReviewAttachmentContextLine => line !== null)
+    .slice(0, MAX_CONTEXT_LINES);
+
+  return { hunkHeader: startLine.hunkHeader, targetLine, lines };
 }
 
 export function buildReviewAttachmentSnapshot(
@@ -207,36 +242,22 @@ export function buildReviewAttachmentSnapshot(
   const comments: ReviewAttachment["comments"] = [];
 
   for (const draftComment of input.comments) {
-    const target = findTarget({
+    const context = buildCommentContext({
       comment: draftComment,
       diffFiles: input.diffFiles,
     });
-    if (!target) {
+    if (!context) {
       continue;
     }
-
-    const targetLine = toContextLine(target.targetLine);
-    if (!targetLine) {
-      continue;
-    }
-
-    const contextStart = Math.max(0, target.targetIndex - CONTEXT_RADIUS);
-    const contextEnd = Math.min(target.hunkLines.length, target.targetIndex + CONTEXT_RADIUS + 1);
-    const lines = target.hunkLines
-      .slice(contextStart, contextEnd)
-      .map(toContextLine)
-      .filter((line): line is ReviewAttachmentContextLine => line !== null);
 
     comments.push({
       filePath: draftComment.filePath,
       side: draftComment.side,
       lineNumber: draftComment.lineNumber,
+      startSide: draftComment.startSide,
+      startLineNumber: draftComment.startLineNumber,
       body: draftComment.body,
-      context: {
-        hunkHeader: target.hunkHeader,
-        targetLine,
-        lines,
-      },
+      context,
     });
   }
 

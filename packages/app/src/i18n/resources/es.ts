@@ -1996,6 +1996,8 @@ export const es: TranslationResources = {
       cancelAccessibility: "Cancelar comentario de revisión",
       save: "Comentario",
       saveAccessibility: "Guardar comentario de revisión",
+      line: "Línea {{line}}",
+      lines: "Líneas {{start}}–{{end}}",
     },
   },
   settings: {

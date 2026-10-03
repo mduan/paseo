@@ -1968,6 +1968,8 @@ export const ja: TranslationResources = {
       cancelAccessibility: "レビューコメントをキャンセル",
       save: "コメント",
       saveAccessibility: "レビューコメントを保存",
+      line: "{{line}} 行",
+      lines: "{{start}}–{{end}} 行",
     },
   },
   settings: {

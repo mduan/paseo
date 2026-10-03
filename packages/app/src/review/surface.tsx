@@ -23,6 +23,7 @@ import type { Theme } from "@/styles/theme";
 import { useReviewDraftComments, useReviewDraftStore, type ReviewDraftComment } from "./store";
 import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
 import {
+  editorLineRange,
   INLINE_REVIEW_EDITOR_HEIGHT,
   INLINE_REVIEW_GAP,
   INLINE_REVIEW_VERTICAL_PADDING,
@@ -30,6 +31,15 @@ import {
   type InlineReviewActions,
   type InlineReviewEditorState,
 } from "./geometry";
+import {
+  commentLineRange,
+  isSameReviewLineRange,
+  isSingleLineRange,
+  reviewLineLabel,
+  singleLineRange,
+  toggleLineHighlight,
+  type ReviewLineRange,
+} from "./range";
 
 type PressableState = PressableStateCallbackType & { hovered?: boolean };
 function iconButtonStyle({ hovered, pressed }: PressableState): StyleProp<ViewStyle> {
@@ -58,32 +68,17 @@ const ThemedPencil = withUnistyles(Pencil);
 const ThemedPlus = withUnistyles(Plus);
 const ThemedTrash2 = withUnistyles(Trash2);
 
-function InlineReviewAddIcon({ style, testID }: { style?: StyleProp<ViewStyle>; testID?: string }) {
+export function InlineReviewAddIcon({
+  style,
+  testID,
+}: {
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+}) {
   return (
     <View style={[styles.gutterActionVisual, style]} testID={testID}>
       <ThemedPlus size={16} strokeWidth={2.4} uniProps={accentForegroundIconColorMapping} />
     </View>
-  );
-}
-
-export function InlineReviewAddButton({
-  onPress,
-  style,
-}: {
-  onPress: () => void;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("review.comment.add")}
-      hitSlop={SMALL_ACTION_HIT_SLOP}
-      onPress={onPress}
-      style={[styles.gutterActionVisual, style]}
-    >
-      <ThemedPlus size={16} strokeWidth={2.4} uniProps={accentForegroundIconColorMapping} />
-    </Pressable>
   );
 }
 
@@ -105,84 +100,165 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
     [reviewComments],
   );
   const [editor, setEditor] = useState<InlineReviewEditorState | null>(null);
+  const [highlight, setHighlight] = useState<ReviewLineRange>();
+  // The editor owns its text; this mirror lets opening another editor save it first.
+  const editorBodyRef = useRef("");
   const addComment = useReviewDraftStore((state) => state.addComment);
   const updateComment = useReviewDraftStore((state) => state.updateComment);
   const deleteComment = useReviewDraftStore((state) => state.deleteComment);
 
   useEffect(() => {
     setEditor(null);
+    setHighlight(undefined);
   }, [input.reviewDraftKey]);
 
-  const handleStartComment = useCallback((target: ReviewableDiffTarget) => {
-    setEditor({ target, commentId: null, body: "" });
-  }, []);
-
-  const handleEditComment = useCallback(
-    (target: ReviewableDiffTarget, comment: ReviewDraftComment) => {
-      setEditor({ target, commentId: comment.id, body: comment.body });
-    },
-    [],
-  );
-
-  const handleCancelEditor = useCallback(() => {
-    setEditor(null);
-  }, []);
-
-  const handleSaveEditor = useCallback(
-    (body: string) => {
+  const saveEditorBody = useCallback(
+    (current: InlineReviewEditorState, body: string) => {
       const trimmedBody = body.trim();
-      if (!editor || trimmedBody.length === 0) {
-        return;
+      if (trimmedBody.length === 0) {
+        return false;
       }
 
-      if (editor.commentId) {
+      if (current.commentId) {
         updateComment({
           key: input.reviewDraftKey,
-          id: editor.commentId,
+          id: current.commentId,
           updates: { body: trimmedBody },
         });
       } else {
         addComment({
           key: input.reviewDraftKey,
           comment: {
-            filePath: editor.target.filePath,
-            side: editor.target.side,
-            lineNumber: editor.target.lineNumber,
+            filePath: current.target.filePath,
+            side: current.target.side,
+            lineNumber: current.target.lineNumber,
+            startSide: current.start?.side,
+            startLineNumber: current.start?.lineNumber,
             body: trimmedBody,
           },
         });
       }
-      setEditor(null);
+      return true;
     },
-    [addComment, editor, input.reviewDraftKey, updateComment],
+    [addComment, input.reviewDraftKey, updateComment],
+  );
+
+  const openEditor = useCallback(
+    (next: { range: ReviewLineRange; commentId: string | null; body: string }) => {
+      setHighlight(next.range);
+      const isOpen =
+        editor?.commentId === next.commentId &&
+        isSameReviewLineRange(editorLineRange(editor), next.range);
+      if (editor && isOpen) {
+        setEditor({ ...editor, focusRequestId: editor.focusRequestId + 1 });
+        return;
+      }
+      if (editor) {
+        saveEditorBody(editor, editorBodyRef.current);
+      }
+      editorBodyRef.current = next.body;
+      setEditor({
+        target: next.range.end,
+        start: isSingleLineRange(next.range) ? undefined : next.range.start,
+        commentId: next.commentId,
+        body: next.body,
+        focusRequestId: 0,
+      });
+    },
+    [editor, saveEditorBody],
+  );
+
+  const closeEditor = useCallback(() => {
+    if (editor && isSameReviewLineRange(highlight, editorLineRange(editor))) {
+      setHighlight(undefined);
+    }
+    setEditor(null);
+  }, [editor, highlight]);
+
+  const handleStartComment = useCallback(
+    (target: ReviewableDiffTarget) => {
+      openEditor({ range: singleLineRange(target), commentId: null, body: "" });
+    },
+    [openEditor],
+  );
+
+  const handleStartHighlightComment = useCallback(() => {
+    if (!highlight) {
+      return;
+    }
+    // Whether it is a new comment or a pencil edit, an editor already on this range gets focus.
+    if (editor && isSameReviewLineRange(editorLineRange(editor), highlight)) {
+      setEditor({ ...editor, focusRequestId: editor.focusRequestId + 1 });
+      return;
+    }
+    openEditor({ range: highlight, commentId: null, body: "" });
+  }, [editor, highlight, openEditor]);
+
+  const handleEditComment = useCallback(
+    (target: ReviewableDiffTarget, comment: ReviewDraftComment) => {
+      openEditor({
+        range: commentLineRange(comment, target),
+        commentId: comment.id,
+        body: comment.body,
+      });
+    },
+    [openEditor],
+  );
+
+  const handleToggleHighlight = useCallback((target: ReviewableDiffTarget) => {
+    setHighlight((current) => toggleLineHighlight(current, target));
+  }, []);
+
+  const handleEditorBodyChange = useCallback((body: string) => {
+    editorBodyRef.current = body;
+  }, []);
+
+  const handleSaveEditor = useCallback(
+    (body: string) => {
+      if (editor && saveEditorBody(editor, body)) {
+        closeEditor();
+      }
+    },
+    [closeEditor, editor, saveEditorBody],
   );
 
   const handleDeleteComment = useCallback(
     (id: string) => {
       deleteComment({ key: input.reviewDraftKey, id });
-      setEditor((current) => (current?.commentId === id ? null : current));
+      if (editor?.commentId === id) {
+        closeEditor();
+      }
     },
-    [deleteComment, input.reviewDraftKey],
+    [closeEditor, deleteComment, editor?.commentId, input.reviewDraftKey],
   );
 
   return useMemo<InlineReviewActions>(
     () => ({
       commentsByTarget,
       editor,
+      highlight,
+      onHighlight: setHighlight,
+      onToggleHighlight: handleToggleHighlight,
       onStartComment: handleStartComment,
+      onStartHighlightComment: handleStartHighlightComment,
       onEditComment: handleEditComment,
-      onCancelEditor: handleCancelEditor,
+      onEditorBodyChange: handleEditorBodyChange,
+      onCancelEditor: closeEditor,
       onSaveEditor: handleSaveEditor,
       onDeleteComment: handleDeleteComment,
     }),
     [
+      closeEditor,
       commentsByTarget,
       editor,
-      handleCancelEditor,
       handleDeleteComment,
       handleEditComment,
+      handleEditorBodyChange,
       handleSaveEditor,
       handleStartComment,
+      handleStartHighlightComment,
+      handleToggleHighlight,
+      highlight,
     ],
   );
 }
@@ -320,8 +396,11 @@ export function InlineReviewThread({
 
   const editorElement = editor ? (
     <InlineReviewEditor
-      key={editingCommentId ?? "new"}
+      key={`${editingCommentId ?? "new"}:${editor.start ? buildReviewableDiffTargetKey(editor.start) : ""}`}
+      range={editorLineRange(editor)}
       initialBody={editor.body}
+      focusRequestId={editor.focusRequestId}
+      onChangeBody={reviewActions.onEditorBodyChange}
       onCancel={reviewActions.onCancelEditor}
       onSave={reviewActions.onSaveEditor}
       testID="inline-review-editor"
@@ -374,6 +453,7 @@ function CommentRow({
     () => onEditComment(reviewTarget, comment),
     [onEditComment, reviewTarget, comment],
   );
+  const range = useMemo(() => commentLineRange(comment, reviewTarget), [comment, reviewTarget]);
 
   const handleDelete = useCallback(
     () => onDeleteComment(comment.id),
@@ -386,6 +466,7 @@ function CommentRow({
         {comment.body}
       </Text>
       <View style={styles.commentActions}>
+        <ReviewLinesLabel range={range} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("review.comment.edit")}
@@ -427,13 +508,34 @@ export function getInlineReviewThreadViewportStyle({
   return [stickyStyle, widthStyle];
 }
 
+function ReviewLinesLabel({ range }: { range: ReviewLineRange }) {
+  const { t } = useTranslation();
+  const label = isSingleLineRange(range)
+    ? t("review.comment.line", { line: reviewLineLabel(range.end) })
+    : t("review.comment.lines", {
+        start: reviewLineLabel(range.start),
+        end: reviewLineLabel(range.end),
+      });
+  return (
+    <Text style={styles.linesLabel} numberOfLines={1}>
+      {label}
+    </Text>
+  );
+}
+
 export function InlineReviewEditor({
+  range,
   initialBody,
+  focusRequestId,
+  onChangeBody,
   onCancel,
   onSave,
   testID,
 }: {
+  range: ReviewLineRange;
   initialBody: string;
+  focusRequestId: number;
+  onChangeBody: (body: string) => void;
   onCancel: () => void;
   onSave: (body: string) => void;
   testID?: string;
@@ -447,7 +549,15 @@ export function InlineReviewEditor({
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [focusRequestId]);
+
+  const handleChangeText = useCallback(
+    (text: string) => {
+      setBody(text);
+      onChangeBody(text);
+    },
+    [onChangeBody],
+  );
 
   const handleFocus = useCallback(() => {
     setIsFocused(true);
@@ -506,12 +616,15 @@ export function InlineReviewEditor({
         placeholderTextColor={styles.placeholderColor.color}
         multiline
         initialValue={body}
-        onChangeText={setBody}
+        onChangeText={handleChangeText}
         onFocus={handleFocus}
         onBlur={handleBlur}
         style={inputStyle}
       />
       <View style={styles.editorActions}>
+        <View style={styles.editorLabel}>
+          <ReviewLinesLabel range={range} />
+        </View>
         <Button
           accessibilityLabel={t("review.comment.cancelAccessibility")}
           testID={testID ? `${testID}-cancel` : undefined}
@@ -606,6 +719,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
     flexShrink: 0,
   },
+  linesLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    flexShrink: 1,
+  },
   iconButton: {
     width: 26,
     height: 26,
@@ -661,8 +779,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   editorActions: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     alignItems: "center",
     gap: theme.spacing[2],
+  },
+  editorLabel: {
+    flex: 1,
+    minWidth: 0,
   },
 }));

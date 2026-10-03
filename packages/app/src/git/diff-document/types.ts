@@ -1,5 +1,5 @@
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
-import type { InlineReviewActions } from "@/review";
+import type { InlineReviewActions, InlineReviewGeometry } from "@/review";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
 
 interface DiffDocumentBaseProps {
@@ -182,7 +182,7 @@ export interface BuildDiffDocumentModelInput {
   typography: DiffTypography;
   measureText: TextMeasurer;
   palette: DiffPalette;
-  reviewActions?: InlineReviewActions;
+  reviewActions?: InlineReviewGeometry;
   labels: { binary: string; tooLarge: string };
   materializationWindow?: { top: number; height: number };
   /** A geometry-compatible model whose unchanged file measurements may be reused. */

@@ -1948,6 +1948,8 @@ export const ar: TranslationResources = {
       cancelAccessibility: "إلغاء تعليق المراجعة",
       save: "تعليق",
       saveAccessibility: "حفظ تعليق المراجعة",
+      line: "السطر {{line}}",
+      lines: "الأسطر {{start}}–{{end}}",
     },
   },
   settings: {

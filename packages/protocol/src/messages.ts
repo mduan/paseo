@@ -1129,6 +1129,9 @@ export const ReviewAttachmentCommentSchema = z.object({
   filePath: z.string(),
   side: z.enum(["old", "new"]),
   lineNumber: z.number().int().positive(),
+  // Top end of a range comment; side/lineNumber are the bottom end.
+  startSide: z.enum(["old", "new"]).optional(),
+  startLineNumber: z.number().int().positive().optional(),
   body: z.string(),
   context: z.object({
     hunkHeader: z.string(),

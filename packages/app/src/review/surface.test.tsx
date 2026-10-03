@@ -19,6 +19,7 @@ import {
   useInlineReviewController,
   type InlineReviewActions,
 } from "./index";
+import { singleLineRange } from "./range";
 
 void testI18n;
 
@@ -144,8 +145,12 @@ function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): Inlin
   return {
     commentsByTarget: new Map(),
     editor: null,
+    onHighlight: vi.fn(),
+    onToggleHighlight: vi.fn(),
     onStartComment: vi.fn(),
+    onStartHighlightComment: vi.fn(),
     onEditComment: vi.fn(),
+    onEditorBodyChange: vi.fn(),
     onCancelEditor: vi.fn(),
     onSaveEditor: vi.fn(),
     onDeleteComment: vi.fn(),
@@ -186,7 +191,12 @@ describe("useInlineReviewController", () => {
     );
 
     act(() => result.current.onStartComment(reviewTarget));
-    expect(result.current.editor).toEqual({ target: reviewTarget, commentId: null, body: "" });
+    expect(result.current.editor).toEqual({
+      target: reviewTarget,
+      commentId: null,
+      body: "",
+      focusRequestId: 0,
+    });
 
     act(() => result.current.onSaveEditor(" first comment "));
     const savedComment = useReviewDraftStore.getState().drafts[firstKey]?.[0];
@@ -206,6 +216,7 @@ describe("useInlineReviewController", () => {
       target: reviewTarget,
       commentId: savedComment?.id,
       body: "first comment",
+      focusRequestId: 0,
     });
 
     act(() => result.current.onSaveEditor(" updated comment "));
@@ -224,6 +235,108 @@ describe("useInlineReviewController", () => {
     act(() => result.current.onStartComment(reviewTarget));
     rerender({ reviewDraftKey: secondKey });
     expect(result.current.editor).toBeNull();
+    expect(result.current.highlight).toBeUndefined();
+  });
+
+  it("comments on the highlighted range and stores its start line", () => {
+    const start = target({ side: "old", lineNumber: 368, oldLineNumber: 368, newLineNumber: null });
+    const end = target({ lineNumber: 386, newLineNumber: 386 });
+    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+
+    act(() => result.current.onHighlight({ start, end }));
+    act(() => result.current.onStartHighlightComment());
+    expect(result.current.editor).toMatchObject({ target: end, start, commentId: null });
+
+    act(() => result.current.onSaveEditor("range note"));
+    expect(useReviewDraftStore.getState().drafts.review?.[0]).toMatchObject({
+      side: "new",
+      lineNumber: 386,
+      startSide: "old",
+      startLineNumber: 368,
+      body: "range note",
+    });
+    expect(result.current.editor).toBeNull();
+    expect(result.current.highlight).toBeUndefined();
+
+    const saved = useReviewDraftStore.getState().drafts.review![0]!;
+    act(() => result.current.onEditComment(end, saved));
+    expect(result.current.highlight?.start).toMatchObject({ side: "old", lineNumber: 368 });
+    act(() => result.current.onSaveEditor("edited"));
+    expect(useReviewDraftStore.getState().drafts.review?.[0]).toMatchObject({
+      id: saved.id,
+      startLineNumber: 368,
+      body: "edited",
+    });
+  });
+
+  it("focuses the open editor instead of reopening the same range", () => {
+    const reviewTarget = target();
+    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+
+    act(() => result.current.onStartComment(reviewTarget));
+    act(() => result.current.onEditorBodyChange("typed"));
+    act(() => result.current.onStartHighlightComment());
+
+    expect(result.current.editor?.focusRequestId).toBe(1);
+    expect(useReviewDraftStore.getState().drafts.review ?? []).toEqual([]);
+  });
+
+  it("focuses a pencil edit when its range is the highlight instead of opening a new editor", () => {
+    const start = target({ lineNumber: 3, newLineNumber: 3 });
+    const end = target({ lineNumber: 5, newLineNumber: 5 });
+    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+
+    act(() => result.current.onHighlight({ start, end }));
+    act(() => result.current.onStartHighlightComment());
+    act(() => result.current.onSaveEditor("range note"));
+    const saved = useReviewDraftStore.getState().drafts.review![0]!;
+    act(() => result.current.onEditComment(end, saved));
+    act(() => result.current.onEditorBodyChange("edited"));
+    act(() => result.current.onStartHighlightComment());
+
+    expect(result.current.editor).toMatchObject({ commentId: saved.id, focusRequestId: 1 });
+    expect(useReviewDraftStore.getState().drafts.review).toEqual([saved]);
+  });
+
+  it("saves a non-empty open editor before opening another and discards an empty one", () => {
+    const first = target({ lineNumber: 3, newLineNumber: 3 });
+    const second = target({ lineNumber: 5, newLineNumber: 5 });
+    const third = target({ lineNumber: 7, newLineNumber: 7 });
+    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+
+    act(() => result.current.onStartComment(first));
+    act(() => result.current.onEditorBodyChange("  keep me  "));
+    act(() => result.current.onStartComment(second));
+    act(() => result.current.onEditorBodyChange("   "));
+    act(() => result.current.onStartComment(third));
+
+    expect(useReviewDraftStore.getState().drafts.review).toEqual([
+      expect.objectContaining({ lineNumber: 3, body: "keep me", startSide: undefined }),
+    ]);
+    expect(result.current.editor?.target).toBe(third);
+    expect(result.current.highlight).toEqual(singleLineRange(third));
+  });
+
+  it("toggles a single highlighted line and leaves another highlight when the editor closes", () => {
+    const first = target({ lineNumber: 3, newLineNumber: 3 });
+    const second = target({ lineNumber: 5, newLineNumber: 5 });
+    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+
+    act(() => result.current.onToggleHighlight(first));
+    expect(result.current.highlight).toEqual(singleLineRange(first));
+    act(() => result.current.onToggleHighlight(second));
+    expect(result.current.highlight).toEqual(singleLineRange(second));
+    act(() => result.current.onToggleHighlight(second));
+    expect(result.current.highlight).toBeUndefined();
+
+    act(() => result.current.onHighlight({ start: first, end: second }));
+    act(() => result.current.onToggleHighlight(second));
+    expect(result.current.highlight).toEqual(singleLineRange(second));
+
+    act(() => result.current.onStartComment(first));
+    act(() => result.current.onToggleHighlight(second));
+    act(() => result.current.onCancelEditor());
+    expect(result.current.highlight).toEqual(singleLineRange(second));
   });
 });
 
@@ -259,7 +372,7 @@ describe("git diff inline review helpers", () => {
     const rightComment = comment();
     const actions = buildReviewActions({
       commentsByTarget: groupInlineReviewCommentsByTarget([rightComment]),
-      editor: { target: rightTarget, commentId: null, body: "" },
+      editor: { target: rightTarget, commentId: null, body: "", focusRequestId: 0 },
     });
 
     const rowState = getSplitInlineReviewThreadState({
@@ -276,7 +389,7 @@ describe("git diff inline review helpers", () => {
   it("includes thread padding in the inline editor height", () => {
     const reviewTarget = target();
     const actions = buildReviewActions({
-      editor: { target: reviewTarget, commentId: null, body: "" },
+      editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0 },
     });
 
     expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(148);
@@ -385,7 +498,10 @@ describe("InlineReviewEditor", () => {
     const onSave = vi.fn();
     const { getByTestId } = render(
       <InlineReviewEditor
+        range={singleLineRange(target())}
         initialBody=" initial "
+        focusRequestId={0}
+        onChangeBody={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -405,7 +521,10 @@ describe("InlineReviewEditor", () => {
     const onSave = vi.fn();
     const { getByTestId } = render(
       <InlineReviewEditor
+        range={singleLineRange(target())}
         initialBody="ready"
+        focusRequestId={0}
+        onChangeBody={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -429,7 +548,10 @@ describe("InlineReviewEditor", () => {
     });
     const { getByTestId, queryByText } = render(
       <InlineReviewEditor
+        range={singleLineRange(target())}
         initialBody="ready"
+        focusRequestId={0}
+        onChangeBody={vi.fn()}
         onCancel={vi.fn()}
         onSave={vi.fn()}
         testID="editor"
@@ -470,5 +592,34 @@ describe("InlineReviewThread", () => {
     expect(actions.onEditComment).toHaveBeenCalledWith(reviewTarget, draftComment);
     fireEvent.click(getByTestId("review-comment-delete-comment-1"));
     expect(actions.onDeleteComment).toHaveBeenCalledWith("comment-1");
+  });
+
+  it("labels single-line and range comments and the editor by side and line", () => {
+    const reviewTarget = target({ lineNumber: 386, newLineNumber: 386 });
+    const single = comment({ lineNumber: 386 });
+    const range = comment({
+      id: "comment-2",
+      lineNumber: 386,
+      startSide: "old",
+      startLineNumber: 368,
+    });
+    const actions = buildReviewActions({
+      commentsByTarget: groupInlineReviewCommentsByTarget([single, range]),
+      editor: {
+        target: reviewTarget,
+        start: { filePath: "src/example.ts", side: "new", lineNumber: 380 },
+        commentId: null,
+        body: "",
+        focusRequestId: 0,
+      },
+    });
+
+    const { getByText } = render(
+      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={300} />,
+    );
+
+    expect(getByText("Line R386")).toBeTruthy();
+    expect(getByText("Lines L368–R386")).toBeTruthy();
+    expect(getByText("Lines R380–R386")).toBeTruthy();
   });
 });

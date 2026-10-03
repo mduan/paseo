@@ -1,5 +1,6 @@
-import type { ReviewableDiffTarget } from "@/utils/diff-layout";
+import type { ReviewableDiffTarget, ReviewableDiffTargetKeyInput } from "@/utils/diff-layout";
 import { buildReviewableDiffTargetKey } from "@/utils/diff-layout";
+import type { ReviewLineRange } from "./range";
 import type { ReviewDraftComment } from "./store";
 
 export const INLINE_REVIEW_COMMENT_HEIGHT = 72;
@@ -9,18 +10,36 @@ export const INLINE_REVIEW_VERTICAL_PADDING = 8;
 
 export interface InlineReviewEditorState {
   target: ReviewableDiffTarget;
+  /** Top end of a range comment; absent for a single line. */
+  start?: ReviewableDiffTargetKeyInput;
   commentId: string | null;
   body: string;
+  /** Bumped to move focus back into the open editor. */
+  focusRequestId: number;
 }
 
 export interface InlineReviewActions {
   commentsByTarget: ReadonlyMap<string, ReviewDraftComment[]>;
   editor: InlineReviewEditorState | null;
+  /** Highlighted diff lines; the open editor's range or a gutter selection. */
+  highlight?: ReviewLineRange;
+  onHighlight: (range: ReviewLineRange) => void;
+  onToggleHighlight: (target: ReviewableDiffTarget) => void;
   onStartComment: (target: ReviewableDiffTarget) => void;
+  /** Opens the editor for the highlighted range, or focuses it when it is already open. */
+  onStartHighlightComment: () => void;
   onEditComment: (target: ReviewableDiffTarget, comment: ReviewDraftComment) => void;
+  onEditorBodyChange: (body: string) => void;
   onCancelEditor: () => void;
   onSaveEditor: (body: string) => void;
   onDeleteComment: (id: string) => void;
+}
+
+/** The review state that shapes diff layout; the highlight and callbacks only repaint. */
+export type InlineReviewGeometry = Pick<InlineReviewActions, "commentsByTarget" | "editor">;
+
+export function editorLineRange(editor: InlineReviewEditorState): ReviewLineRange {
+  return { start: editor.start ?? editor.target, end: editor.target };
 }
 
 export function isInlineReviewEditorForTarget(
@@ -36,7 +55,7 @@ export function isInlineReviewEditorForTarget(
 
 export function getInlineReviewThreadState(input: {
   reviewTarget: ReviewableDiffTarget | null | undefined;
-  reviewActions?: InlineReviewActions;
+  reviewActions?: InlineReviewGeometry;
 }): {
   comments: ReviewDraftComment[];
   hasEditor: boolean;
@@ -70,7 +89,7 @@ export function getInlineReviewThreadState(input: {
 export function getSplitInlineReviewThreadState(input: {
   left: ReviewableDiffTarget | null | undefined;
   right: ReviewableDiffTarget | null | undefined;
-  reviewActions?: InlineReviewActions;
+  reviewActions?: InlineReviewGeometry;
 }): {
   left: ReturnType<typeof getInlineReviewThreadState>;
   right: ReturnType<typeof getInlineReviewThreadState>;

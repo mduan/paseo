@@ -72,7 +72,7 @@ export function characterOffsetAtPoint(input: {
   return fragment.end;
 }
 
-function rowAtOffset(
+export function rowAtOffset(
   rows: readonly DiffDocumentModel["rows"][number][],
   start: number,
   end: number,

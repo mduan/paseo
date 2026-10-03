@@ -1926,6 +1926,8 @@ export const zhCN: TranslationResources = {
       cancelAccessibility: "取消 review 评论",
       save: "评论",
       saveAccessibility: "保存 review 评论",
+      line: "第 {{line}} 行",
+      lines: "第 {{start}}–{{end}} 行",
     },
   },
   settings: {

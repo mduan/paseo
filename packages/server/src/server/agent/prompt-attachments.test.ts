@@ -115,11 +115,149 @@ describe("prompt attachments", () => {
         "CWD: /tmp/repo",
         "Base: main",
         "",
-        "Comment 1: src/index.ts:new:42",
+        "Comment 1: src/index.ts:R42",
         "Please guard this nullable value.",
         "@@ -40,3 +40,4 @@",
         "  41 41  const before = true;",
         ">  - 42 +const value = maybeNull.name;",
+      ].join("\n"),
+    );
+  });
+
+  it("renders a mixed-side range with every range line marked", () => {
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "uncommitted",
+        comments: [
+          {
+            filePath: "src/index.ts",
+            side: "new",
+            lineNumber: 11,
+            startSide: "old",
+            startLineNumber: 10,
+            body: "Rename both.",
+            context: {
+              hunkHeader: "@@ -9,3 +9,3 @@",
+              targetLine: { oldLineNumber: null, newLineNumber: 11, type: "add", content: "b2" },
+              lines: [
+                { oldLineNumber: 9, newLineNumber: 9, type: "context", content: "a" },
+                { oldLineNumber: 10, newLineNumber: null, type: "remove", content: "b" },
+                { oldLineNumber: null, newLineNumber: 10, type: "add", content: "b1" },
+                { oldLineNumber: null, newLineNumber: 11, type: "add", content: "b2" },
+                { oldLineNumber: 11, newLineNumber: 12, type: "context", content: "c" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (uncommitted)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/index.ts:L10-R11",
+        "Rename both.",
+        "@@ -9,3 +9,3 @@",
+        "   9  9  a",
+        "> 10  - -b",
+        ">  - 10 +b1",
+        ">  - 11 +b2",
+        "  11 12  c",
+      ].join("\n"),
+    );
+  });
+
+  it("renders a cross-hunk range without a gap marker", () => {
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "uncommitted",
+        comments: [
+          {
+            filePath: "src/index.ts",
+            side: "new",
+            lineNumber: 50,
+            startSide: "new",
+            startLineNumber: 3,
+            body: "Same bug in both places.",
+            context: {
+              hunkHeader: "@@ -1,3 +1,3 @@",
+              targetLine: { oldLineNumber: 50, newLineNumber: 50, type: "context", content: "z" },
+              lines: [
+                { oldLineNumber: 2, newLineNumber: 2, type: "context", content: "x" },
+                { oldLineNumber: 3, newLineNumber: 3, type: "context", content: "y" },
+                { oldLineNumber: 50, newLineNumber: 50, type: "context", content: "z" },
+                { oldLineNumber: 51, newLineNumber: 51, type: "context", content: "w" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (uncommitted)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/index.ts:R3-R50",
+        "Same bug in both places.",
+        "@@ -1,3 +1,3 @@",
+        "   2  2  x",
+        ">  3  3  y",
+        "> 50 50  z",
+        "  51 51  w",
+      ].join("\n"),
+    );
+  });
+
+  it("notes a range whose end was cut from the context", () => {
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "uncommitted",
+        comments: [
+          {
+            filePath: "src/index.ts",
+            side: "old",
+            lineNumber: 200,
+            startSide: "old",
+            startLineNumber: 2,
+            body: "Delete this block.",
+            context: {
+              hunkHeader: "@@ -1,200 +0,0 @@",
+              targetLine: {
+                oldLineNumber: 200,
+                newLineNumber: null,
+                type: "remove",
+                content: "end",
+              },
+              lines: [
+                { oldLineNumber: 1, newLineNumber: null, type: "remove", content: "one" },
+                { oldLineNumber: 2, newLineNumber: null, type: "remove", content: "two" },
+                { oldLineNumber: 3, newLineNumber: null, type: "remove", content: "three" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (uncommitted)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/index.ts:L2-L200",
+        "Delete this block.",
+        "@@ -1,200 +0,0 @@",
+        "   1  - -one",
+        ">  2  - -two",
+        ">  3  - -three",
+        "  (Range truncated. Read src/index.ts for the rest.)",
       ].join("\n"),
     );
   });

@@ -1981,6 +1981,8 @@ export const ru: TranslationResources = {
       cancelAccessibility: "Отменить ввод комментария к ревью",
       save: "Сохранить",
       saveAccessibility: "Сохранить комментарий к ревью",
+      line: "Строка {{line}}",
+      lines: "Строки {{start}}–{{end}}",
     },
   },
   settings: {

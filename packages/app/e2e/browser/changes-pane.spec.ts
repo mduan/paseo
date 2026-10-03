@@ -1064,13 +1064,13 @@ test("scrolling clears the hovered review affordance", async ({ page }) => {
   await openWorkspaceChanges(page, workspace);
 
   await hoverFirstChangedGutter(page);
-  await expect(page.getByRole("button", { name: "Add review comment" })).toBeVisible();
+  await expect(page.getByTestId("diff-hover-add-comment")).toBeVisible();
   await page.getByTestId("git-diff-scroll").evaluate((element) => {
     element.scrollTop += 80;
     element.dispatchEvent(new Event("scroll", { bubbles: false }));
   });
 
-  await expect(page.getByRole("button", { name: "Add review comment" })).toHaveCount(0);
+  await expect(page.getByTestId("diff-hover-add-comment")).toHaveCount(0);
 });
 
 test("canvas diff uses the overlay scrollbar and its thumb controls vertical scrolling", async ({
@@ -1137,7 +1137,7 @@ test("the whole reviewable row reveals the gutter affordance and uses a text cur
   const lineHeight = Math.round(fontSize * 1.5);
   await page.mouse.move(bodyBounds.x + bodyBounds.width - 32, bodyBounds.y + lineHeight * 1.5);
 
-  const affordance = page.getByRole("button", { name: "Add review comment" });
+  const affordance = page.getByTestId("diff-hover-add-comment");
   await expect(affordance).toBeVisible();
   await expect(affordance.locator("svg")).toBeVisible();
   const affordanceBounds = await affordance.boundingBox();
@@ -1859,7 +1859,7 @@ async function startReviewOnFirstChangedLine(
   const lineHeight = Math.round(fontSize * 1.5);
   const columnLeft = side === "right" ? bodyBounds.x + bodyBounds.width / 2 : bodyBounds.x;
   await page.mouse.move(columnLeft + 20, bodyBounds.y + lineHeight * 1.5);
-  await page.getByRole("button", { name: "Add review comment" }).click();
+  await page.getByTestId("diff-hover-add-comment").click();
   await expect(page.getByTestId("inline-review-editor")).toBeVisible();
 }
 
