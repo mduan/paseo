@@ -2367,6 +2367,14 @@ export const CheckoutRenameBranchRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// baseRef is a qualified branch ref: "refs/heads/main" or "refs/remotes/origin/main".
+export const CheckoutSetBaseRefRequestSchema = z.object({
+  type: z.literal("checkout.set_base_ref.request"),
+  cwd: z.string(),
+  baseRef: z.string(),
+  requestId: z.string(),
+});
+
 export const StashSaveRequestSchema = z.object({
   type: z.literal("stash_save_request"),
   cwd: z.string(),
@@ -3286,6 +3294,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   PullRequestTimelineRequestSchema,
   CheckoutSwitchBranchRequestSchema,
   CheckoutRenameBranchRequestSchema,
+  CheckoutSetBaseRefRequestSchema,
   StashSaveRequestSchema,
   StashPopRequestSchema,
   StashListRequestSchema,
@@ -3554,6 +3563,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
         workspaceTerminals: z.boolean().optional(),
+        // COMPAT(checkoutSetBaseRef): added in v0.11.0, remove gate after 2027-04-02.
+        checkoutSetBaseRef: z.boolean().optional(),
         // COMPAT(checkoutForgeSetAutoMerge): added in v0.2.0-beta.1. Remove the
         // feature gate and checkoutGithubSetAutoMerge fallback after 2027-01-17
         // once the supported daemon floor is >= v0.2.0.
@@ -5170,6 +5181,9 @@ const CheckoutStatusCommonSchema = z.object({
   // upstream branch name is not necessarily currentBranch, so composing one is wrong.
   // aheadOfOrigin/behindOfOrigin are measured against exactly this ref.
   upstreamRef: z.string().nullable().optional(),
+  // The ref the checkout is compared against, for display: "origin/main" or "main".
+  // Clients still send baseRef back in requests.
+  baseRefLabel: z.string().nullable().optional(),
 });
 
 const CheckoutStatusNotGitSchema = CheckoutStatusCommonSchema.extend({
@@ -5776,6 +5790,16 @@ export const CheckoutRenameBranchResponseSchema = z.object({
     success: z.boolean(),
     cwd: z.string(),
     currentBranch: z.string().nullable(),
+    error: CheckoutErrorSchema.nullable(),
+  }),
+});
+
+export const CheckoutSetBaseRefResponseSchema = z.object({
+  type: z.literal("checkout.set_base_ref.response"),
+  payload: z.object({
+    requestId: z.string(),
+    success: z.boolean(),
+    cwd: z.string(),
     error: CheckoutErrorSchema.nullable(),
   }),
 });
@@ -6935,6 +6959,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   PullRequestTimelineResponseSchema,
   CheckoutSwitchBranchResponseSchema,
   CheckoutRenameBranchResponseSchema,
+  CheckoutSetBaseRefResponseSchema,
   StashSaveResponseSchema,
   StashPopResponseSchema,
   StashListResponseSchema,
@@ -7338,6 +7363,8 @@ export type CheckoutSwitchBranchRequest = z.infer<typeof CheckoutSwitchBranchReq
 export type CheckoutSwitchBranchResponse = z.infer<typeof CheckoutSwitchBranchResponseSchema>;
 export type CheckoutRenameBranchRequest = z.infer<typeof CheckoutRenameBranchRequestSchema>;
 export type CheckoutRenameBranchResponse = z.infer<typeof CheckoutRenameBranchResponseSchema>;
+export type CheckoutSetBaseRefRequest = z.infer<typeof CheckoutSetBaseRefRequestSchema>;
+export type CheckoutSetBaseRefResponse = z.infer<typeof CheckoutSetBaseRefResponseSchema>;
 export type StashSaveRequest = z.infer<typeof StashSaveRequestSchema>;
 export type StashSaveResponse = z.infer<typeof StashSaveResponseSchema>;
 export type StashPopRequest = z.infer<typeof StashPopRequestSchema>;

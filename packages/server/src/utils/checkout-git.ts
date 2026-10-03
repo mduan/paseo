@@ -61,6 +61,7 @@ export type GitMutationRefreshReason =
   | "create-pr"
   | "switch-branch"
   | "rename-branch"
+  | "set-base-ref"
   | "create-branch"
   | "stash-push"
   | "stash-pop"
@@ -841,6 +842,7 @@ export interface CheckoutStatusGitNonPaseo {
   currentBranch: string | null;
   isDirty: boolean;
   baseRef: string | null;
+  baseRefLabel?: string | null;
   aheadBehind: AheadBehind | null;
   // Remote-tracking ref for currentBranch, e.g. "refs/remotes/origin/main". Null when the
   // branch has no upstream or git could not resolve it. aheadOfOrigin/behindOfOrigin are
@@ -860,6 +862,7 @@ export interface CheckoutStatusGitPaseo {
   currentBranch: string | null;
   isDirty: boolean;
   baseRef: string;
+  baseRefLabel?: string | null;
   aheadBehind: AheadBehind | null;
   upstreamRef: string | null;
   aheadOfOrigin: number | null;
@@ -1242,12 +1245,43 @@ function readPaseoWorktreeBaseRef(worktreeRoot: string): string | null {
   return storedBaseRefFromMetadata(readPaseoWorktreeMetadata(worktreeRoot));
 }
 
+// The base the user picked for a branch. It lives in git config so it follows the branch
+// across checkouts and renames (`git branch -m` moves the section), and it takes precedence
+// over the base stored in worktree.json.
+function branchBaseRefConfigKey(branch: string): string {
+  return `branch.${branch}.paseoBaseRef`;
+}
+
+async function getBranchBaseRef(
+  cwd: string,
+  branch: string,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  return getGitConfigValue(cwd, branchBaseRefConfigKey(branch), context);
+}
+
+export async function setCurrentBranchBaseRef(cwd: string, baseRef: string): Promise<void> {
+  if (!isQualifiedBranchRef(baseRef) || !(await doesGitRefExist(cwd, baseRef))) {
+    throw new Error(`Base ref not found: ${baseRef}`);
+  }
+  const branch = await getCurrentBranch(cwd);
+  if (!branch) {
+    throw new Error("Cannot set a base branch in detached HEAD state");
+  }
+  await runGitCommand(["config", branchBaseRefConfigKey(branch), baseRef], { cwd });
+}
+
 async function getStoredBaseRefForCwd(
   cwd: string,
   context?: CheckoutContext,
 ): Promise<string | null> {
   if (context?.facts?.isGit) {
     return context.facts.storedBaseRef;
+  }
+  const currentBranch = await getCurrentBranch(cwd, context);
+  const branchBaseRef = currentBranch ? await getBranchBaseRef(cwd, currentBranch, context) : null;
+  if (branchBaseRef) {
+    return branchBaseRef;
   }
   const paseoWorktree = await getPaseoWorktreeForCwd(cwd, { context });
   if (!paseoWorktree.isPaseoOwnedWorktree) {
@@ -2040,7 +2074,10 @@ export async function getCheckoutSnapshotFacts(
   const paseoWorktreeMetadata = inspected.paseoWorktree.isPaseoOwnedWorktree
     ? readPaseoWorktreeMetadata(inspected.paseoWorktree.worktreeRoot)
     : null;
-  const storedBaseRef = storedBaseRefFromMetadata(paseoWorktreeMetadata);
+  const branchBaseRef = inspected.currentBranch
+    ? await getBranchBaseRef(cwd, inspected.currentBranch, context)
+    : null;
+  const storedBaseRef = branchBaseRef ?? storedBaseRefFromMetadata(paseoWorktreeMetadata);
   const resolvedBaseRef = storedBaseRef ?? (await resolveBaseRef(cwd, context));
   const mainRepoRoot = await getMainRepoRootFromCommonDir(
     cwd,
@@ -2284,6 +2321,10 @@ export async function getCheckoutStatus(
   // request diffs and merges. The exact ref stays in worktree.json and in facts, where the
   // comparisons and actions read it.
   const displayBaseRef = baseRef ? branchNameFromRef(baseRef) : null;
+  // The label names the ref actually compared against, so a bare "main" reads "origin/main"
+  // when the comparison picks the remote.
+  const labelRef = facts.comparisonBaseRef ?? baseRef;
+  const baseRefLabel = labelRef ? labelRef.replace(/^refs\/(heads|remotes)\//, "") : null;
   const upstreamRef = upstreamStatus?.ref ?? null;
   const aheadOfOrigin = upstreamStatus?.aheadBehind.ahead ?? null;
   const behindOfOrigin = upstreamStatus?.aheadBehind.behind ?? null;
@@ -2296,6 +2337,7 @@ export async function getCheckoutStatus(
       currentBranch,
       isDirty,
       baseRef: displayBaseRef ?? baseRef,
+      baseRefLabel,
       aheadBehind,
       upstreamRef,
       aheadOfOrigin,
@@ -2314,6 +2356,7 @@ export async function getCheckoutStatus(
     currentBranch,
     isDirty,
     baseRef: displayBaseRef,
+    baseRefLabel,
     aheadBehind,
     upstreamRef,
     aheadOfOrigin,

@@ -1572,6 +1572,13 @@ export const fr: TranslationResources = {
     later: "Plus tard",
     stashRestored: "Modifications cachées restaurées",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "Changer la branche de base",
+    currentBase: "Branche de base : {{baseRef}}. Appuyez pour changer la branche de base.",
+    placeholder: "Changer la branche de base...",
+    title: "Branche de base",
+    failedToSet: "Impossible de changer la branche de base",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Recherche dans l'espace de travail...",
     loadingCommands: "Chargement des commandes...",

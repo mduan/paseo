@@ -49,3 +49,15 @@ export function buildBranchComboOptions(input: {
 
   return Array.from(branchSet).map((name) => ({ id: name, label: name }));
 }
+
+/** Local and origin variants of each branch, keyed by the qualified ref the daemon stores. */
+export function buildBaseRefComboOptions(
+  branches: { name: string; hasLocal?: boolean; hasRemote?: boolean }[],
+): BranchComboOption[] {
+  return branches.flatMap((branch) => [
+    ...(branch.hasRemote
+      ? [{ id: `refs/remotes/origin/${branch.name}`, label: `origin/${branch.name}` }]
+      : []),
+    ...(branch.hasLocal ? [{ id: `refs/heads/${branch.name}`, label: branch.name }] : []),
+  ]);
+}

@@ -1568,6 +1568,13 @@ export const es: TranslationResources = {
     later: "Más tarde",
     stashRestored: "Se restauraron los cambios ocultos",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "Cambiar rama base",
+    currentBase: "Rama base: {{baseRef}}. Pulsa para cambiar la rama base.",
+    placeholder: "Cambiar rama base...",
+    title: "Rama base",
+    failedToSet: "No se pudo cambiar la rama base",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Buscando espacio de trabajo...",
     loadingCommands: "Cargando comandos...",

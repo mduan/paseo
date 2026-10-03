@@ -1553,6 +1553,13 @@ export const ptBR: TranslationResources = {
     later: "Depois",
     stashRestored: "Alterações em stash restauradas",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "Alterar branch base",
+    currentBase: "Branch base: {{baseRef}}. Pressione para alterar a branch base.",
+    placeholder: "Alterar branch base...",
+    title: "Branch base",
+    failedToSet: "Falha ao alterar a branch base",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Buscando workspace...",
     loadingCommands: "Carregando comandos...",

@@ -1551,6 +1551,13 @@ export const ru: TranslationResources = {
     later: "Позже",
     stashRestored: "Изменения из stash восстановлены.",
   },
+  baseRefSwitcher: {
+    triggerTooltip: "Изменить базовую ветку",
+    currentBase: "Базовая ветка: {{baseRef}}. Нажмите, чтобы изменить базовую ветку.",
+    placeholder: "Изменить базовую ветку...",
+    title: "Базовая ветка",
+    failedToSet: "Не удалось изменить базовую ветку",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Поиск в рабочем пространстве...",
     loadingCommands: "Загрузка команд...",
