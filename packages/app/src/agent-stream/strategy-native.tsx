@@ -344,6 +344,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         bottomAnchorController.prepareForStickyViewportChange();
         markNativeViewportSettling();
       },
+      detachFromBottom: () => bottomAnchorController.detachByUser(),
     };
     viewportRef.current = handle;
     return () => {

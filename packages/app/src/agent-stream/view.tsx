@@ -26,7 +26,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useMutation } from "@tanstack/react-query";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import { Check, ChevronDown, X } from "lucide-react-native";
+import { Check, ChevronDown, ChevronRight, X } from "lucide-react-native";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import {
@@ -107,6 +107,13 @@ import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { CompactChatContext, useCompactChat } from "./compact-chat";
+import {
+  useFoldedTail,
+  useWorkToggle,
+  WorkToggleContext,
+  type WorkToggle,
+  type WorkToggleContextValue,
+} from "./collapse-completed-turns";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
 
 function renderLiveAuxiliaryNode(input: {
@@ -360,6 +367,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const toolCallDetailLevel = useSettings((settings) => settings.toolCallDetailLevel);
     const chatOutlineEnabled = useSettings((settings) => settings.chatOutlineEnabled);
     const compactChat = useSettings((settings) => settings.compactChat);
+    const collapseCompletedTurns = useSettings((settings) => settings.collapseCompletedTurns);
     const contentMaxWidth = useSettings(resolveContentMaxWidth);
     const viewportRef = useRef<StreamViewportHandle | null>(null);
     const pendingClientMessageIds = useMemo(
@@ -565,6 +573,17 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         isTurnActive,
       ],
     );
+    const detachFromBottom = useCallback(() => viewportRef.current?.detachFromBottom?.(), []);
+    const { tail: displayTail, workToggles } = useFoldedTail({
+      enabled: collapseCompletedTurns,
+      chatKey: `${resolvedServerId}:${agentId}`,
+      tail: presentation.tail,
+      head: presentation.head,
+      isTurnActive,
+      activeTurnId: effectiveTurnPresentation.turnId,
+      // Expanding near the bottom must not follow output past the work it reveals.
+      onBeforeToggle: detachFromBottom,
+    });
     const {
       start: historyWindowStart,
       hasLocalHistory,
@@ -572,7 +591,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       loadOlder,
     } = useStreamHistoryWindow({
       agentId,
-      items: presentation.tail,
+      items: displayTail,
       loadRemoteOlder,
     });
     const isLoadingOlder = remoteIsLoadingOlder;
@@ -583,7 +602,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       return buildAgentStreamRenderModel({
         isTurnActive,
         activeTurnStartedAt: effectiveTurnPresentation.startedAt,
-        tail: presentation.tail,
+        tail: displayTail,
         head: presentation.head,
         platform: isWeb ? "web" : "native",
         isMobileBreakpoint: isMobile,
@@ -593,7 +612,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       isMobile,
       isTurnActive,
       presentation.head,
-      presentation.tail,
+      displayTail,
       effectiveTurnPresentation.startedAt,
       historyWindowStart,
     ]);
@@ -1177,17 +1196,23 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       </ChatFind>
     );
     return (
-      <StreamCustomizationProviders compactChat={compactChat}>
+      <StreamCustomizationProviders compactChat={compactChat} workToggles={workToggles}>
         {stream}
       </StreamCustomizationProviders>
     );
   },
 );
 
-function StreamCustomizationProviders(props: { compactChat: boolean; children: ReactNode }) {
+function StreamCustomizationProviders(props: {
+  compactChat: boolean;
+  workToggles: WorkToggleContextValue | undefined;
+  children: ReactNode;
+}) {
   return (
     <CompactChatContext.Provider value={props.compactChat}>
-      {props.children}
+      <WorkToggleContext.Provider value={props.workToggles}>
+        {props.children}
+      </WorkToggleContext.Provider>
     </CompactChatContext.Provider>
   );
 }
@@ -1681,6 +1706,20 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignSelf: "center",
     paddingHorizontal: theme.spacing[2],
   },
+  workToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[1],
+    marginBottom: theme.spacing[4],
+    paddingBottom: theme.spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  workToggleText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+  },
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -1812,11 +1851,54 @@ interface StreamItemWrapperProps {
   children: ReactNode;
 }
 
-function StreamItemWrapper({ gapBelow, compactGapBelow, children }: StreamItemWrapperProps) {
+function StreamItemWrapper({
+  itemId,
+  gapBelow,
+  compactGapBelow,
+  children,
+}: StreamItemWrapperProps) {
   const marginBottom = useCompactChat() ? compactGapBelow : gapBelow;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],
   );
-  return <View style={wrapperStyle}>{children}</View>;
+  return (
+    <View style={wrapperStyle}>
+      <WorkToggleButton itemId={itemId} />
+      {children}
+    </View>
+  );
+}
+
+const ThemedChevronRight = withUnistyles(ChevronRight);
+const ThemedChevronDown = withUnistyles(ChevronDown);
+
+function WorkToggleButton({ itemId }: { itemId: string }) {
+  const toggle = useWorkToggle(itemId);
+  return toggle ? <WorkToggleRow {...toggle} /> : null;
+}
+
+function WorkToggleRow({
+  turnKey,
+  expanded,
+  onToggle,
+}: WorkToggle & { onToggle: (turnKey: string) => void }) {
+  const { t } = useTranslation();
+  const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
+  const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
+  const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      onPress={handlePress}
+      style={stylesheet.workToggle}
+      testID="work-toggle"
+    >
+      <Text style={stylesheet.workToggleText}>
+        {t(expanded ? "settings.customizations.hideWork" : "settings.customizations.showWork")}
+      </Text>
+      <Chevron size={14} uniProps={mutedColorMapping} />
+    </Pressable>
+  );
 }
