@@ -1,4 +1,5 @@
 import { isSyntaxThemeId, type SyntaxThemeId } from "@getpaseo/highlight";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
 import type { QueryClient } from "@tanstack/react-query";
 import type { DesktopSettings } from "@/desktop/settings/desktop-settings";
@@ -108,6 +109,8 @@ export interface AppSettings {
   compactChat: boolean;
   keepChatPosition: boolean;
   worktreeIndicator: boolean;
+  /** Last fork mode chosen in the fork menu, per provider. */
+  forkModeByProvider: Record<string, AgentForkMode>;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
@@ -168,6 +171,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   compactChat: false,
   keepChatPosition: false,
   worktreeIndicator: false,
+  forkModeByProvider: {},
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
 };
@@ -273,6 +277,7 @@ const StoredAppSettingsSchema = z
     compactChat: z.boolean().catch(false),
     keepChatPosition: z.boolean().catch(false),
     worktreeIndicator: z.boolean().catch(false),
+    forkModeByProvider: z.record(z.string(), z.enum(AgentForkMode)).catch({}),
     openInSidePane: z
       .object({
         explorerFiles: z.boolean().catch(false),

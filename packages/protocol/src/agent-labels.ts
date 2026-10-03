@@ -29,3 +29,46 @@ export function hasOpenAgentTab(labels: Record<string, unknown> | null | undefin
     ([label, value]) => isOpenAgentTabLabel(label) && value === "true",
   );
 }
+
+export const FORKED_FROM_AGENT_ID_LABEL = "paseo.forked-from-agent-id";
+export const FORK_MODE_LABEL = "paseo.fork-mode";
+// Number of user messages the fork copied from its source. The fork marker goes
+// right before the next user message, so it survives timeline rebuilds.
+export const FORK_USER_MESSAGE_COUNT_LABEL = "paseo.fork-user-message-count";
+
+export enum AgentForkMode {
+  Full = "full",
+  Summary = "summary",
+}
+
+export interface AgentForkOrigin {
+  sourceAgentId: string;
+  mode: AgentForkMode;
+  userMessageCount: number;
+}
+
+export function buildAgentForkLabels(origin: AgentForkOrigin): Record<string, string> {
+  return {
+    [FORKED_FROM_AGENT_ID_LABEL]: origin.sourceAgentId,
+    [FORK_MODE_LABEL]: origin.mode,
+    [FORK_USER_MESSAGE_COUNT_LABEL]: String(origin.userMessageCount),
+  };
+}
+
+export function getAgentForkOriginFromLabels(
+  labels: Record<string, unknown> | null | undefined,
+): AgentForkOrigin | undefined {
+  const sourceAgentId = labels?.[FORKED_FROM_AGENT_ID_LABEL];
+  const mode = labels?.[FORK_MODE_LABEL];
+  const userMessageCount = Number(labels?.[FORK_USER_MESSAGE_COUNT_LABEL]);
+  if (
+    typeof sourceAgentId !== "string" ||
+    !sourceAgentId ||
+    (mode !== AgentForkMode.Full && mode !== AgentForkMode.Summary) ||
+    !Number.isInteger(userMessageCount) ||
+    userMessageCount < 0
+  ) {
+    return undefined;
+  }
+  return { sourceAgentId, mode, userMessageCount };
+}

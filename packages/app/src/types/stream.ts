@@ -4,6 +4,7 @@ import type {
   JsonValue,
   ToolCallDetail,
 } from "@getpaseo/protocol/agent-types";
+import type { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
 import type { AgentAttachment, AgentStreamEventPayload } from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
@@ -85,6 +86,7 @@ export type StreamItem =
   | TodoListItem
   | NotificationItem
   | CompactionItem
+  | ForkMarkerItem
   | PluginTimelineStreamItem;
 
 export type UserMessageImageAttachment = AttachmentMetadata;
@@ -786,6 +788,16 @@ export interface NotificationItem {
   timestamp: Date;
   level: NotificationLevel;
   message: string;
+}
+
+export interface ForkMarkerItem {
+  kind: "fork_marker";
+  id: string;
+  timelineCursor?: TimelinePosition;
+  turnId?: string;
+  timestamp: Date;
+  sourceAgentId: string;
+  mode: AgentForkMode;
 }
 
 export interface CompactionItem {
@@ -1572,6 +1584,17 @@ function reduceTimelineEvent(
       return finalizeActiveThoughts(
         reduceTimelineCompaction(state, item, timestamp, timelineCursor),
       );
+    case "fork_marker": {
+      const marker: ForkMarkerItem = {
+        kind: "fork_marker",
+        id: createUniqueTimelineId(state, "fork_marker", item.sourceAgentId, timestamp),
+        ...(timelineCursor ? { timelineCursor } : {}),
+        timestamp,
+        sourceAgentId: item.sourceAgentId,
+        mode: item.mode,
+      };
+      return finalizeActiveThoughts([...state, marker]);
+    }
     case "plugin":
       return finalizeActiveThoughts(
         appendPluginTimelineItem(state, item, timestamp, timelineCursor),

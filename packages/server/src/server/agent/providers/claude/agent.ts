@@ -83,6 +83,7 @@ import {
   type ClaudeRewindSdk,
 } from "./rewind.js";
 import { normalizeProviderReplayTimestamp } from "../../provider-history-timestamps.js";
+import { placeClaudeForkTranscript } from "./fork.js";
 import { claudeConfigDir, claudeProjectDirSync } from "./project-dir.js";
 import { THINKING_APPLIES_NEXT_TURN_NOTICE } from "../../provider-notices.js";
 import {
@@ -322,6 +323,7 @@ const CLAUDE_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: true,
   supportsRewindBoth: true,
+  supportsFork: true,
 };
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -2782,6 +2784,40 @@ class ClaudeAgentSession implements AgentSession {
         this.rebindConversationSession(sessionId);
       },
     });
+  }
+
+  async forkConversation(input: {
+    beforeMessageId?: string;
+    cwd: string;
+  }): Promise<{ providerHandleId: string }> {
+    if (!this.claudeSessionId) {
+      throw new Error("Claude session is not ready for fork");
+    }
+    let upToMessageId: string | undefined;
+    if (input.beforeMessageId) {
+      const target = this.resolveConversationRewindTarget(input.beforeMessageId);
+      if (target.kind === "fresh-session") {
+        throw new Error("Claude has no answered turn to fork from");
+      }
+      upToMessageId = target.messageId;
+    }
+    const sourceHistoryPath = this.resolveHistoryPath(this.claudeSessionId);
+    if (!sourceHistoryPath) {
+      throw new Error("Claude session has no transcript to fork");
+    }
+    const fork = await this.rewindSdk.forkSession(
+      this.claudeSessionId,
+      upToMessageId ? { upToMessageId } : {},
+    );
+    await placeClaudeForkTranscript({
+      sourceHistoryPath,
+      forkSessionId: fork.sessionId,
+      targetProjectDir: claudeProjectDirSync(input.cwd, {
+        configDir: claudeConfigDir(this.buildSdkEnv()),
+      }),
+      cwd: input.cwd,
+    });
+    return { providerHandleId: fork.sessionId };
   }
 
   async revertFiles(input: { messageId: string }): Promise<void> {

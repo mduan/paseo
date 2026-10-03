@@ -79,7 +79,11 @@ import { loadPersistedConfig } from "./persisted-config.js";
 import { releaseWorkspaceServicePortPlan } from "./workspace-service-port-registry.js";
 import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-utils";
 import { getAgentStatusPriority } from "@getpaseo/protocol/agent-state-bucket";
-import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import {
+  AgentForkMode,
+  buildAgentForkLabels,
+  getParentAgentIdFromLabels,
+} from "@getpaseo/protocol/agent-labels";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
 import {
@@ -2674,6 +2678,8 @@ export class Session {
       }
       case "agent.fork_context.request":
         return this.handleAgentForkContextRequest(msg);
+      case "agent.fork.request":
+        return this.handleAgentForkRequest(msg);
       default:
         return undefined;
     }
@@ -4344,13 +4350,33 @@ export class Session {
     }
 
     let config = request.config;
+    let labels = request.labels;
+    const chatHistory = request.attachments?.find(
+      (attachment) => attachment.type === "text" && attachment.contextKind === "chat_history",
+    );
+    const summaryForkSourceId =
+      chatHistory?.type === "text" ? chatHistory.sourceAgentId : undefined;
+    if (summaryForkSourceId) {
+      labels = {
+        ...labels,
+        ...buildAgentForkLabels({
+          sourceAgentId: summaryForkSourceId,
+          mode: AgentForkMode.Summary,
+          userMessageCount: 0,
+        }),
+      };
+      const sourceTitle = (await this.agentStorage.get(summaryForkSourceId))?.title;
+      if (!config.title && sourceTitle) {
+        config = { ...config, title: `${sourceTitle} copy` };
+      }
+    }
 
     const intent = await resolveCreateAgentIntent({
       explicitWorkspaceId: createdWorktree?.workspace.workspaceId ?? request.workspaceId,
       caller: callerAgent
         ? { id: callerAgent.id, cwd: callerAgent.cwd, workspaceId: callerAgent.workspaceId }
         : null,
-      labels: request.labels,
+      labels,
       resolveWorkspace: async (workspaceId) => {
         if (createdWorktree?.workspace.workspaceId === workspaceId) {
           return { workspaceId, cwd: createdWorktree.workspace.cwd };
@@ -7993,6 +8019,7 @@ export class Session {
         limit: 0,
       });
       const forkContext = buildAgentForkContextAttachment({
+        agentId: msg.agentId,
         rows: timeline.rows,
         cursorBoundary: msg.boundaryCursor
           ? { timelineEpoch: timeline.epoch, cursor: msg.boundaryCursor }
@@ -8028,6 +8055,54 @@ export class Session {
           itemCount: 0,
           boundaryCursor: msg.boundaryCursor ?? null,
           boundaryMessageId: msg.boundaryMessageId ?? null,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
+
+  private async handleAgentForkRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.fork.request" }>,
+  ): Promise<void> {
+    try {
+      const source = await ensureAgentLoaded(msg.agentId, {
+        agentManager: this.agentManager,
+        agentStorage: this.agentStorage,
+        logger: this.sessionLogger,
+      });
+      const sourcePayload = await this.buildAgentPayload(source);
+      const workspaceId = msg.workspaceId ?? source.workspaceId;
+      if (!workspaceId) {
+        throw new Error("Fork requires a workspace");
+      }
+      const fork = await this.agentManager.forkAgent({
+        sourceAgentId: msg.agentId,
+        boundaryCursor: msg.boundaryCursor,
+        boundaryMessageId: msg.boundaryMessageId,
+        cwd: msg.cwd,
+        workspaceId,
+        title: sourcePayload.title ? `${sourcePayload.title} copy` : null,
+      });
+      this.emit({
+        type: "agent.fork.response",
+        payload: {
+          requestId: msg.requestId,
+          agentId: msg.agentId,
+          agent: await this.buildAgentPayload(fork),
+          error: null,
+        },
+      });
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error, agentId: msg.agentId },
+        "Failed to handle agent.fork.request",
+      );
+      this.emit({
+        type: "agent.fork.response",
+        payload: {
+          requestId: msg.requestId,
+          agentId: msg.agentId,
+          agent: null,
           error: error instanceof Error ? error.message : String(error),
         },
       });

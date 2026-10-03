@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { createContext, memo, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Split } from "lucide-react-native";
@@ -9,13 +9,34 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSettings } from "@/hooks/use-settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { AgentForkMode } from "@getpaseo/protocol/agent-labels";
 
 export type AssistantForkTarget = "tab" | "workspace";
 
+export interface AssistantForkRequest {
+  target: AssistantForkTarget;
+  mode: AgentForkMode;
+}
+
+export interface AssistantForkMenuContextValue {
+  provider?: string;
+  /** The provider can fork its session with full history. */
+  supportsFullHistory: boolean;
+}
+
+/** Provided by the agent stream so every fork menu in it knows its agent's provider. */
+export const AssistantForkMenuContext = createContext<AssistantForkMenuContextValue>({
+  supportsFullHistory: false,
+});
+
 interface AssistantForkMenuProps {
-  onFork: (target: AssistantForkTarget) => Promise<void> | void;
+  onFork: (request: AssistantForkRequest) => Promise<void> | void;
+  /** The turn is still running, so the provider hasn't saved it for a full-history fork. */
+  inFlight?: boolean;
   testID?: string;
 }
 
@@ -26,12 +47,47 @@ const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.for
 
 export const AssistantForkMenu = memo(function AssistantForkMenu({
   onFork,
+  inFlight = false,
   testID = "assistant-fork-menu",
 }: AssistantForkMenuProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<AssistantForkTarget | null>(null);
   const isLocked = pendingTarget !== null;
+  const { settings, updateSettings } = useSettings();
+  const { provider, supportsFullHistory } = useContext(AssistantForkMenuContext);
+  const isFullHistoryUnsupported = !supportsFullHistory;
+  const mode = isFullHistoryUnsupported
+    ? AgentForkMode.Summary
+    : ((provider ? settings.forkModeByProvider[provider] : undefined) ?? AgentForkMode.Full);
+  const isFullHistoryPending = mode === AgentForkMode.Full && inFlight;
+
+  const handleModeChange = useCallback(
+    (next: AgentForkMode) => {
+      if (!provider) return;
+      void updateSettings({
+        forkModeByProvider: { ...settings.forkModeByProvider, [provider]: next },
+      });
+    },
+    [provider, settings.forkModeByProvider, updateSettings],
+  );
+
+  const modeOptions = useMemo(
+    () => [
+      {
+        value: AgentForkMode.Full,
+        label: t("message.actions.forkModeFull"),
+        disabled: isFullHistoryUnsupported,
+        testID: `${testID}-mode-full`,
+      },
+      {
+        value: AgentForkMode.Summary,
+        label: t("message.actions.forkModeSummary"),
+        testID: `${testID}-mode-summary`,
+      },
+    ],
+    [isFullHistoryUnsupported, t, testID],
+  );
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -46,14 +102,18 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
       if (isLocked) return;
       setPendingTarget(target);
       try {
-        await onFork(target);
+        await onFork({ target, mode });
       } finally {
         setPendingTarget(null);
         setIsOpen(false);
       }
     },
-    [isLocked, onFork],
+    [isLocked, mode, onFork],
   );
+
+  const pendingDescription = isFullHistoryPending
+    ? t("message.actions.forkFullHistoryPending")
+    : undefined;
 
   const triggerStyle = useCallback(
     () => [styles.trigger, isLocked ? styles.triggerDisabled : null],
@@ -97,10 +157,20 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
         </TooltipTrigger>
         {tooltipContent}
       </Tooltip>
-      <DropdownMenuContent align="start" minWidth={220} side="bottom" testID={`${testID}-content`}>
+      <DropdownMenuContent align="start" minWidth={240} side="bottom" testID={`${testID}-content`}>
+        <View style={styles.modeRow}>
+          <SegmentedControl
+            options={modeOptions}
+            value={mode}
+            onValueChange={handleModeChange}
+            size="sm"
+            testID={`${testID}-mode`}
+          />
+        </View>
         <DropdownMenuItem
           closeOnSelect={false}
-          disabled={isLocked && pendingTarget !== "tab"}
+          description={pendingDescription}
+          disabled={isFullHistoryPending || (isLocked && pendingTarget !== "tab")}
           leading={forkIcon}
           onSelect={handleSelect("tab")}
           status={pendingTarget === "tab" ? "pending" : undefined}
@@ -110,7 +180,8 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
         </DropdownMenuItem>
         <DropdownMenuItem
           closeOnSelect={false}
-          disabled={isLocked && pendingTarget !== "workspace"}
+          description={pendingDescription}
+          disabled={isFullHistoryPending || (isLocked && pendingTarget !== "workspace")}
           leading={forkIcon}
           onSelect={handleSelect("workspace")}
           status={pendingTarget === "workspace" ? "pending" : undefined}
@@ -135,6 +206,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   triggerSlot: {
     alignSelf: "center",
+  },
+  modeRow: {
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[2],
+    paddingBottom: theme.spacing[1],
   },
   tooltipText: {
     color: theme.colors.foreground,

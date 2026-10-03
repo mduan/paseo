@@ -732,6 +732,11 @@ export interface AgentForkContextOptions {
   requestId?: string;
 }
 
+export type ForkAgentOptions = AgentForkContextOptions & {
+  cwd: string;
+  workspaceId?: string;
+};
+
 type AgentRefreshedStatusPayload = z.infer<typeof AgentRefreshedStatusPayloadSchema>;
 type RestartRequestedStatusPayload = z.infer<typeof RestartRequestedStatusPayloadSchema>;
 type ShutdownRequestedStatusPayload = z.infer<typeof ShutdownRequestedStatusPayloadSchema>;
@@ -3434,6 +3439,41 @@ export class DaemonClient {
     }
 
     return payload;
+  }
+
+  /** Forks the agent's provider session with its full history into a new agent. */
+  async forkAgent(agentId: string, options: ForkAgentOptions): Promise<AgentSnapshotPayload> {
+    const resolvedRequestId = this.createRequestId(options.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "agent.fork.request",
+      agentId,
+      cwd: options.cwd,
+      requestId: resolvedRequestId,
+      ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
+      ...(options.boundaryCursor ? { boundaryCursor: options.boundaryCursor } : {}),
+      ...(options.boundaryMessageId ? { boundaryMessageId: options.boundaryMessageId } : {}),
+    });
+
+    const payload = await this.sendRequest({
+      requestId: resolvedRequestId,
+      message,
+      timeout: 120000,
+      options: { skipQueue: true },
+      select: (msg) => {
+        if (msg.type !== "agent.fork.response") {
+          return null;
+        }
+        if (msg.payload.requestId !== resolvedRequestId) {
+          return null;
+        }
+        return msg.payload;
+      },
+    });
+
+    if (!payload.agent) {
+      throw new Error(payload.error ?? "Fork failed");
+    }
+    return payload.agent;
   }
 
   // ============================================================================

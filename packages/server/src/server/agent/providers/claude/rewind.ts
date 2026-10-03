@@ -3,7 +3,7 @@ import { forkSession as claudeForkSession, type Query } from "@anthropic-ai/clau
 export interface ClaudeRewindSdk {
   forkSession(
     sessionId: string,
-    options: { upToMessageId: string },
+    options: { upToMessageId?: string },
   ): Promise<{ sessionId: string }>;
 }
 

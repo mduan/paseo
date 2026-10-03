@@ -99,6 +99,7 @@ import { isEmptyWorkspaceSubmission, runCreateEmptyWorkspace } from "./new-works
 import {
   getWorkspaceNamingAttachments,
   remapDraftCwdToWorkspace,
+  runCreateNativeFork,
 } from "./new-workspace-fork-context";
 import {
   buildPickerOptionData,
@@ -2104,12 +2105,33 @@ export function NewWorkspaceScreen({
     ],
   );
 
+  const clearChatDraft = chatDraft.clear;
   const handleSubmitNewWorkspace = useCallback(
     async (payload: MessagePayload) => {
       try {
         setErrorMessage(null);
         await composerState?.persistFormPreferences();
         await updateFormPreferences({ launchTarget });
+        const nativeFork = forkDraftSetup?.nativeFork;
+        if (forkDraftSetup && nativeFork) {
+          setPendingAction("chat");
+          await runCreateNativeFork({
+            payload,
+            forkSetup: { ...forkDraftSetup, nativeFork },
+            ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
+            client: withConnectedClient(),
+            serverId: selectedServerId,
+            navigate: ({ serverId: targetServerId, workspaceId, agentId }) => {
+              clearChatDraft("sent");
+              navigateToWorkspace({
+                serverId: targetServerId,
+                workspaceId,
+                target: { kind: "agent", agentId },
+              });
+            },
+          });
+          return;
+        }
         if (isEmptyWorkspaceSubmission(payload)) {
           setPendingAction("empty");
           let outcome: SubmitOutcome = "background";
@@ -2140,7 +2162,7 @@ export function NewWorkspaceScreen({
           forkDraftSetup,
           ensureWorkspace,
           serverId: selectedServerId,
-          clearDraft: chatDraft.clear,
+          clearDraft: clearChatDraft,
           draftKey,
           draftId: creationIdentity.draftId,
           draftContextScopeKey,
@@ -2166,7 +2188,7 @@ export function NewWorkspaceScreen({
       composerState,
       draftContextScopeKey,
       creationIdentity,
-      chatDraft.clear,
+      clearChatDraft,
       draftKey,
       ensureWorkspace,
       forkDraftSetup,

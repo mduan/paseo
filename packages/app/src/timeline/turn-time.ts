@@ -45,6 +45,10 @@ export function deriveStreamTurnTiming(params: {
       currentLastItemAt = null;
       currentAssistantIds = [];
     }
+    // A fork marker opens its turn, so the turn's prompt is the user message after it.
+    if (item.kind === "user_message" && previousItem?.kind === "fork_marker") {
+      currentUserAt = item.timestamp;
+    }
     currentLastItemAt = item.timestamp;
     if (item.kind === "assistant_message") {
       currentAssistantIds.push(item.id);

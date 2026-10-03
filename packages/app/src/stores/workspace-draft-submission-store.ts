@@ -1,4 +1,7 @@
-import type { CreateAgentRequestOptions } from "@getpaseo/client/internal/daemon-client";
+import type {
+  AgentForkContextOptions as CreateAgentForkOptions,
+  CreateAgentRequestOptions,
+} from "@getpaseo/client/internal/daemon-client";
 import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import { create } from "zustand";
 import type { ComposerAttachment } from "@/attachments/types";
@@ -30,6 +33,13 @@ export interface PendingWorkspaceDraftSubmission {
 export interface PendingWorkspaceDraftSetup {
   setup: WorkspaceDraftTabSetup;
   sourceDirectory?: string | null;
+  /** Set for a full-history fork: the new workspace gets a fork of this agent instead of a draft. */
+  nativeFork?: PendingNativeFork;
+}
+
+export interface PendingNativeFork {
+  sourceAgentId: string;
+  boundary: Pick<CreateAgentForkOptions, "boundaryCursor" | "boundaryMessageId">;
 }
 
 interface WorkspaceDraftSubmissionState {
@@ -41,6 +51,7 @@ interface WorkspaceDraftSubmissionState {
     draftId: string;
     setup: WorkspaceDraftTabSetup;
     sourceDirectory?: string | null;
+    nativeFork?: PendingNativeFork;
   }) => void;
   clearDraftSetup: (input: { draftId: string }) => void;
   consumePending: (input: {
@@ -80,13 +91,13 @@ export const useWorkspaceDraftSubmissionStore = create<WorkspaceDraftSubmissionS
           [submission.draftId]: submission,
         },
       })),
-    setDraftSetup: ({ draftId, setup, sourceDirectory }) => {
+    setDraftSetup: ({ draftId, setup, sourceDirectory, nativeFork }) => {
       const normalizedDraftId = normalizeDraftId(draftId);
       if (!normalizedDraftId) return;
       set((state) => ({
         setupByDraftId: {
           ...state.setupByDraftId,
-          [normalizedDraftId]: { setup, sourceDirectory: sourceDirectory ?? null },
+          [normalizedDraftId]: { setup, sourceDirectory: sourceDirectory ?? null, nativeFork },
         },
       }));
     },

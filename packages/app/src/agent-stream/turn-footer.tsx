@@ -9,14 +9,9 @@ import {
   type StreamStrategy,
 } from "./strategy";
 import { resolveAssistantTurnForkBoundary, type AssistantTurnForkBoundary } from "./turn-boundary";
-import {
-  AssistantTurnFooter,
-  LiveElapsed,
-  STREAM_METADATA_FONT_SIZE,
-  type AssistantForkTarget,
-} from "@/components/message";
+import { AssistantTurnFooter, LiveElapsed, STREAM_METADATA_FONT_SIZE } from "@/components/message";
 import type { TurnFooterHost } from "./layout";
-import { AssistantForkMenu } from "@/components/assistant-fork-menu";
+import { AssistantForkMenu, type AssistantForkRequest } from "@/components/assistant-fork-menu";
 import { SyncedLoader } from "@/components/synced-loader";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCompactChat } from "./compact-chat";
@@ -27,10 +22,9 @@ export const TURN_FOOTER_BOTTOM_SPACING = SPACING[8];
 export const COMPACT_TURN_FOOTER_BOTTOM_SPACING = SPACING[2];
 
 export type TurnContentStrategy = StreamStrategy;
-export type AssistantTurnForkHandler = (input: {
-  target: AssistantForkTarget;
-  boundary: AssistantTurnForkBoundary;
-}) => Promise<void> | void;
+export type AssistantTurnForkHandler = (
+  input: AssistantForkRequest & { boundary: AssistantTurnForkBoundary },
+) => Promise<void> | void;
 /**
  * Fork handler for the turn that is still streaming. It deliberately takes no
  * boundary: `selectForkContextRows` projects the entire timeline when neither
@@ -41,7 +35,7 @@ export type AssistantTurnForkHandler = (input: {
  * Kept separate from `AssistantTurnForkHandler` (whose `boundary` stays
  * required) so the compiler keeps enforcing that completed turns always pin one.
  */
-export type InFlightTurnForkHandler = (target: AssistantForkTarget) => Promise<void> | void;
+export type InFlightTurnForkHandler = (request: AssistantForkRequest) => Promise<void> | void;
 
 export const TurnFooter = memo(function TurnFooter({
   isRunning,
@@ -128,7 +122,7 @@ const WorkingIndicator = memo(function WorkingIndicator({
         <ThemedSyncedLoader size={14} uniProps={workingIndicatorColorMapping} />
       </View>
       {/* Match the completed-turn footer: actions precede timing metadata. */}
-      {onForkInFlightTurn ? <AssistantForkMenu onFork={onForkInFlightTurn} /> : null}
+      {onForkInFlightTurn ? <AssistantForkMenu onFork={onForkInFlightTurn} inFlight /> : null}
       {inFlightTurnStartedAt ? (
         <LiveElapsed
           startedAt={inFlightTurnStartedAt}
@@ -188,11 +182,11 @@ function CompletedTurnFooter({
     supportsTimelineCursor,
   });
   const handleFork = useCallback(
-    (target: AssistantForkTarget) => {
+    (request: AssistantForkRequest) => {
       if (!boundary) {
         return;
       }
-      return onForkAssistantTurn?.({ target, boundary });
+      return onForkAssistantTurn?.({ ...request, boundary });
     },
     [boundary, onForkAssistantTurn],
   );

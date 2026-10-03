@@ -103,7 +103,7 @@ import { isWeb, isNative } from "@/constants/platform";
 import type { AgentCapabilityFlags } from "@getpaseo/protocol/agent-types";
 import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
-import { AssistantForkMenu, type AssistantForkTarget } from "@/components/assistant-fork-menu";
+import { AssistantForkMenu, type AssistantForkRequest } from "@/components/assistant-fork-menu";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useCompactChat } from "@/agent-stream/compact-chat";
 import {
@@ -114,7 +114,6 @@ import {
 } from "@/assistant-selection-copy/markup";
 import { capAssistantMessageForRender, getUtf8ByteLength } from "./assistant-message-render-limit";
 export type { InlinePathTarget } from "@/assistant-file-links";
-export type { AssistantForkTarget };
 
 interface UserMessageProps {
   serverId?: string;
@@ -451,7 +450,7 @@ export const UserMessage = memo(function UserMessage({
   messageId,
   message,
   images = [],
-  attachments = [],
+  attachments: allAttachments = [],
   timestamp,
   capabilities,
   client,
@@ -470,6 +469,14 @@ export const UserMessage = memo(function UserMessage({
     [lightboxMetadata],
   );
   const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
+  // A summary fork's chat history is shown by its "Continued from" divider instead.
+  const attachments = useMemo(
+    () =>
+      allAttachments.filter(
+        (attachment) => !(attachment.type === "text" && attachment.contextKind === "chat_history"),
+      ),
+    [allAttachments],
+  );
   const hasText = message.trim().length > 0;
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
@@ -543,6 +550,10 @@ export const UserMessage = memo(function UserMessage({
     ],
     [showTrailingRow],
   );
+
+  if (!hasText && !hasImages && !hasAttachments) {
+    return null;
+  }
 
   return (
     <View style={containerStyle} testID="user-message" aria-busy={isPending}>
@@ -622,7 +633,7 @@ interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
   durationMs?: number | null;
-  onFork?: (target: AssistantForkTarget) => Promise<void> | void;
+  onFork?: (request: AssistantForkRequest) => Promise<void> | void;
 }
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
@@ -711,8 +722,8 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
     }, TIMESTAMP_REVEAL_MS);
   }, [canSwap]);
   const handleFork = useCallback(
-    (target: AssistantForkTarget) => {
-      return onFork?.(target);
+    (request: AssistantForkRequest) => {
+      return onFork?.(request);
     },
     [onFork],
   );

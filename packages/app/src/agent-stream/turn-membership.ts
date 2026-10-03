@@ -9,7 +9,13 @@ export function continuesTurn(previous: StreamItem | null, next: StreamItem | nu
   if (previous.turnId !== undefined && next.turnId !== undefined) {
     return previous.turnId === next.turnId;
   }
-  return next.kind !== "user_message";
+  // A fork marker opens the turn of the user message that follows it.
+  if (previous.kind === "fork_marker") return true;
+  return !opensTurn(next);
+}
+
+function opensTurn(item: StreamItem): boolean {
+  return item.kind === "user_message" || item.kind === "fork_marker";
 }
 
 /**
@@ -18,7 +24,7 @@ export function continuesTurn(previous: StreamItem | null, next: StreamItem | nu
  */
 export function continuesResponse(previous: StreamItem | null, next: StreamItem | null): boolean {
   if (!previous || !next) return false;
-  return continuesTurn(previous, next) || next.kind !== "user_message";
+  return continuesTurn(previous, next) || !opensTurn(next);
 }
 
 export function isTurnBoundary(previous: StreamItem | null, next: StreamItem | null): boolean {

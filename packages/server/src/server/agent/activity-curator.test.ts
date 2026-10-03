@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentForkContextAttachment, curateAgentActivity } from "./activity-curator.js";
+import {
+  buildAgentForkContextAttachment,
+  curateAgentActivity,
+  stripChatHistorySummary,
+} from "./activity-curator.js";
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
 import type { AgentTimelineRow } from "./agent-timeline-store-types.js";
 
@@ -269,6 +273,7 @@ second line'`,
 
   it("builds fork context from user messages, assistant messages, and tool summaries", () => {
     const result = buildAgentForkContextAttachment({
+      agentId: "source-agent",
       agentTitle: "Source Agent",
       cwd: "/repo",
       boundaryMessageId: "assistant-1",
@@ -337,6 +342,7 @@ second line'`,
       }),
     );
     const result = buildAgentForkContextAttachment({
+      agentId: "source-agent",
       boundaryMessageId: "assistant-1",
       rows: [
         ...messageRows,
@@ -357,6 +363,7 @@ second line'`,
   it("rejects a checkpoint whose projected tool state changed later", () => {
     expect(() =>
       buildAgentForkContextAttachment({
+        agentId: "source-agent",
         boundaryMessageId: "assistant-1",
         rows: [
           row(1, { type: "user_message", text: "Run it", messageId: "user-1" }),
@@ -396,6 +403,7 @@ second line'`,
 
   it("selects a synthetic assistant error by its timeline cursor", () => {
     const result = buildAgentForkContextAttachment({
+      agentId: "source-agent",
       cursorBoundary: {
         timelineEpoch: "timeline-1",
         cursor: { epoch: "timeline-1", seq: 2 },
@@ -420,6 +428,7 @@ second line'`,
   it("rejects a cursor from a previous timeline epoch", () => {
     expect(() =>
       buildAgentForkContextAttachment({
+        agentId: "source-agent",
         cursorBoundary: {
           timelineEpoch: "timeline-2",
           cursor: { epoch: "timeline-1", seq: 2 },
@@ -432,9 +441,21 @@ second line'`,
   it("rejects missing assistant boundaries instead of silently using the wrong context", () => {
     expect(() =>
       buildAgentForkContextAttachment({
+        agentId: "source-agent",
         boundaryMessageId: "missing",
         rows: [row(1, { type: "assistant_message", text: "Done.", messageId: "assistant-1" })],
       }),
     ).toThrow("Selected assistant message is no longer available.");
+  });
+});
+
+describe("stripChatHistorySummary", () => {
+  it("removes a summary fork's chat history and keeps the typed prompt", () => {
+    const { attachment } = buildAgentForkContextAttachment({
+      agentId: "source-agent",
+      rows: [row(1, { type: "assistant_message", text: "Done.", messageId: "assistant-1" })],
+    });
+
+    expect(stripChatHistorySummary(`${attachment.text}\nKeep going`)).toBe("Keep going");
   });
 });
