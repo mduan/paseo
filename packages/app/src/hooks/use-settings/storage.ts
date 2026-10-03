@@ -104,6 +104,10 @@ export interface AppSettings {
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
   vimKeybindings: boolean;
+  collapseCompletedTurns: boolean;
+  compactChat: boolean;
+  keepChatPosition: boolean;
+  worktreeIndicator: boolean;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
@@ -160,6 +164,10 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
   vimKeybindings: false,
+  collapseCompletedTurns: false,
+  compactChat: false,
+  keepChatPosition: false,
+  worktreeIndicator: false,
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
 };
@@ -261,6 +269,10 @@ const StoredAppSettingsSchema = z
     compactToolCalls: z.boolean().optional().catch(undefined),
     chatOutlineEnabled: z.boolean().catch(true),
     vimKeybindings: z.boolean().catch(false),
+    collapseCompletedTurns: z.boolean().catch(false),
+    compactChat: z.boolean().catch(false),
+    keepChatPosition: z.boolean().catch(false),
+    worktreeIndicator: z.boolean().catch(false),
     openInSidePane: z
       .object({
         explorerFiles: z.boolean().catch(false),

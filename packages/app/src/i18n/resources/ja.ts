@@ -2005,6 +2005,8 @@ export const ja: TranslationResources = {
       diagnostics: "診断",
       about: "アプリ情報",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "エディター",

@@ -2018,6 +2018,8 @@ export const ru: TranslationResources = {
       diagnostics: "Диагностика",
       about: "О приложении",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "Редактор",

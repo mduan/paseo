@@ -1995,6 +1995,8 @@ export const ko: TranslationResources = {
       diagnostics: "진단",
       about: "정보",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "편집기",

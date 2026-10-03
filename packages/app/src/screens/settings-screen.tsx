@@ -41,6 +41,7 @@ import {
   PanelLeft,
   MessageSquare,
   ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
@@ -52,6 +53,7 @@ import { AppearanceSection } from "@/screens/settings/appearance/appearance-sect
 import { OpenLocationSection } from "@/screens/settings/open-location/open-location-section";
 import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
+import { CustomizationsSection } from "@/screens/settings/customizations-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
 import {
@@ -215,6 +217,17 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
   { id: "diagnostics", labelKey: "settings.sections.diagnostics", icon: Stethoscope },
   { id: "about", labelKey: "settings.sections.about", icon: Info },
 ];
+
+const CUSTOMIZATION_SECTION_ITEMS: SidebarSectionItem[] = [
+  {
+    id: "customizations",
+    labelKey: "settings.customizations.all",
+    icon: SlidersHorizontal,
+    Content: CustomizationsSection,
+  },
+];
+
+const ALL_SECTION_ITEMS = [...SIDEBAR_SECTION_ITEMS, ...CUSTOMIZATION_SECTION_ITEMS];
 
 function isSectionAvailable(item: SidebarSectionItem, isDesktopApp: boolean): boolean {
   return (!item.desktopOnly || isDesktopApp) && (!item.webOnly || isWeb);
@@ -1032,6 +1045,19 @@ function SettingsSidebar({
           ) : null}
         </View>
       )}
+      <View style={sidebarStyles.list}>
+        <Text style={sidebarStyles.groupLabel}>{t("settings.customizations.group")}</Text>
+        {CUSTOMIZATION_SECTION_ITEMS.map((item) => (
+          <SidebarSectionButton
+            key={item.id}
+            itemId={item.id}
+            label={t(item.labelKey)}
+            icon={item.icon}
+            isSelected={selectedSectionId === item.id}
+            onSelect={onSelectSection}
+          />
+        ))}
+      </View>
     </>
   );
 
@@ -1317,7 +1343,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
       return item ? t(item.labelKey) : undefined;
     }
     if (view.kind === "section") {
-      const item = SIDEBAR_SECTION_ITEMS.find((s) => s.id === view.section);
+      const item = ALL_SECTION_ITEMS.find((s) => s.id === view.section);
       return item ? t(item.labelKey) : undefined;
     }
     if (view.kind === "project") {
@@ -1351,7 +1377,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
       );
     }
     if (view.kind === "section") {
-      const item = SIDEBAR_SECTION_ITEMS.find((candidate) => candidate.id === view.section);
+      const item = ALL_SECTION_ITEMS.find((candidate) => candidate.id === view.section);
       if (!item || !isSectionAvailable(item, isDesktopApp)) return null;
       switch (view.section) {
         case "general":

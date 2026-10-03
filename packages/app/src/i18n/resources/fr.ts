@@ -2038,6 +2038,8 @@ export const fr: TranslationResources = {
       diagnostics: "Diagnostic",
       about: "À propos",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "Éditeur",

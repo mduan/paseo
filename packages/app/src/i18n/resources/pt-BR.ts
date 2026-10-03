@@ -2018,6 +2018,8 @@ export const ptBR: TranslationResources = {
       diagnostics: "Diagnósticos",
       about: "Sobre",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "Editor",

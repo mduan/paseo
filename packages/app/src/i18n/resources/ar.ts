@@ -1985,6 +1985,8 @@ export const ar: TranslationResources = {
       diagnostics: "التشخيص",
       about: "عن",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "المحرر",

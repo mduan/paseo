@@ -1963,6 +1963,8 @@ export const zhCN: TranslationResources = {
       diagnostics: "诊断",
       about: "关于",
     },
+    // ponytail: English only; translate if this goes upstream.
+    customizations: en.settings.customizations,
     layout: en.settings.layout,
     editor: {
       title: "编辑器",
