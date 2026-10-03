@@ -4,11 +4,13 @@
 
 Projects are allocated for the exact root selected by the caller, normalized lexically with `path.resolve` (never `realpath`). New project IDs are opaque `prj_<16 hex>` values. Existing remote-shaped or path-shaped IDs are retained as readable compatibility records and are never rekeyed. An active exact root is idempotent; archived-only matches do not resurrect an old project. Workspace `projectId` is stable membership: reconciliation may update git-derived kind and branch metadata, but never rehomes a workspace or changes a project's root, ID, or default name.
 
-`projectKey` is a persisted, opaque equivalence key used only to group the same logical project
-across hosts. It is separate from the host-local `projectId`; today's producer prefers a normalized
-Git remote and otherwise uses the local project root. Consumers never derive it from live Git.
-Creation persists it with the project, and normal boot reconciliation fills it for
-older records where the field is absent—there is no migration.
+`projectKey` is a persisted, opaque equivalence key that matches the same logical project across
+hosts, for example to keep the selected project when you switch hosts. The app does not merge
+projects by it: each host's project is its own project in the sidebar and Projects screen, so a
+host-specific custom name stays on that host. It is separate from the host-local `projectId`;
+today's producer prefers a normalized Git remote and otherwise uses the local project root.
+Consumers never derive it from live Git. Creation persists it with the project, and normal boot
+reconciliation fills it for older records where the field is absent—there is no migration.
 
 `kind` and `projectKey` are mutable metadata, not identity. Workspace reconciliation watches active project roots and
 updates those fields and `updatedAt` when Git facts change, preserving the project's ID, root path,
@@ -463,7 +465,7 @@ Array of project records.
 | Field                | Type                        | Description                                                                                                                                |
 | -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `projectId`          | `string`                    | Host-local primary key; new records use opaque `prj_<16 hex>` IDs                                                                          |
-| `projectKey`         | `string \| null`            | Persisted opaque cross-host grouping key; reconciliation backfills absent values                                                           |
+| `projectKey`         | `string \| null`            | Persisted opaque cross-host equivalence key; reconciliation backfills absent values                                                        |
 | `rootPath`           | `string`                    | Exact lexically normalized selected root; never realpathed                                                                                 |
 | `kind`               | `"git" \| "non_git"`        | Mutable Git observation about `rootPath`, never a membership key                                                                           |
 | `displayName`        | `string`                    | Selected-root basename, stable across remote and Git changes                                                                               |
