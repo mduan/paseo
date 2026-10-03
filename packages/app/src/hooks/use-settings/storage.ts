@@ -105,9 +105,7 @@ export interface AppSettings {
   chatOutlineEnabled: boolean;
   vimKeybindings: boolean;
   turnDiffs: boolean;
-  compactChat: boolean;
   keepChatPosition: boolean;
-  worktreeIndicator: boolean;
   /** Last fork mode chosen in the fork menu, per provider. */
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
@@ -167,9 +165,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   chatOutlineEnabled: true,
   vimKeybindings: false,
   turnDiffs: true,
-  compactChat: false,
   keepChatPosition: false,
-  worktreeIndicator: false,
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
   turnDiffOpenLocation: "explorer",
@@ -273,9 +269,7 @@ const StoredAppSettingsSchema = z
     chatOutlineEnabled: z.boolean().catch(true),
     vimKeybindings: z.boolean().catch(false),
     turnDiffs: z.boolean().catch(true),
-    compactChat: z.boolean().catch(false),
     keepChatPosition: z.boolean().catch(false),
-    worktreeIndicator: z.boolean().catch(false),
     openInSidePane: z
       .object({
         explorerFiles: z.boolean().catch(false),

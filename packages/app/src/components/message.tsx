@@ -105,7 +105,6 @@ import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { AssistantForkMenu, type AssistantForkRequest } from "@/components/assistant-fork-menu";
 import { useRetainedPanelActive } from "@/components/retained-panel";
-import { useCompactChat } from "@/agent-stream/compact-chat";
 import {
   markdownCopyDataSet,
   markdownCopyOrderedListDataSet,
@@ -126,7 +125,6 @@ interface UserMessageProps {
   capabilities?: AgentCapabilityFlags;
   client?: DaemonClient | null;
   isFirstInGroup?: boolean;
-  isLastInGroup?: boolean;
   isPending?: boolean;
   disableOuterSpacing?: boolean;
 }
@@ -333,50 +331,26 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
   },
   content: {
     alignItems: "flex-end",
-    maxWidth: "100%",
+    maxWidth: "75%",
     cursor: "auto",
   },
   containerSpacing: {
+    marginTop: theme.spacing[3],
     marginBottom: theme.spacing[1],
   },
   containerFirstInGroup: {
-    marginTop: theme.spacing[4],
-  },
-  containerLastInGroup: {
-    marginBottom: theme.spacing[4],
+    marginTop: theme.spacing[6],
   },
   bubble: {
-    backgroundColor: theme.colors.surface3,
-    borderRadius: theme.borderRadius["2xl"],
-    borderTopRightRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colorScheme === "dark" ? "#183d76" : "#e8f3fe",
+    borderRadius: 20,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[4],
     minWidth: 0,
     flexShrink: 1,
   },
-  // Compact chat: Codex-style bubbles.
-  containerCompact: {
-    marginTop: theme.spacing[3],
-    marginBottom: theme.spacing[1],
-  },
-  containerCompactFirstInGroup: {
-    marginTop: theme.spacing[6],
-  },
-  contentCompact: {
-    maxWidth: "75%",
-  },
-  bubbleCompact: {
-    backgroundColor: theme.colorScheme === "dark" ? "#183d76" : "#e8f3fe",
-    borderRadius: 20,
-    // The base bubble's tail corner would otherwise win over the shorthand.
-    borderTopRightRadius: 20,
-    padding: theme.spacing[3],
-  },
-  textCompact: {
-    color: theme.colorScheme === "dark" ? "#ffffff" : "#0c264a",
-  },
   text: {
-    color: theme.colors.foreground,
+    color: theme.colorScheme === "dark" ? "#ffffff" : "#0c264a",
     fontSize: theme.fontSize.content,
     ...(isWeb
       ? {
@@ -455,7 +429,6 @@ export const UserMessage = memo(function UserMessage({
   capabilities,
   client,
   isFirstInGroup = true,
-  isLastInGroup = true,
   isPending = false,
   disableOuterSpacing,
 }: UserMessageProps) {
@@ -497,35 +470,15 @@ export const UserMessage = memo(function UserMessage({
     [rewindMutation],
   );
 
-  const compact = useCompactChat();
   const containerStyle = useMemo(
     () => [
       userMessageStylesheet.container,
-      !resolvedDisableOuterSpacing &&
-        (compact
-          ? [
-              userMessageStylesheet.containerCompact,
-              isFirstInGroup ? userMessageStylesheet.containerCompactFirstInGroup : null,
-            ]
-          : [
-              isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
-              isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,
-              !isFirstInGroup || !isLastInGroup ? userMessageStylesheet.containerSpacing : null,
-            ]),
+      !resolvedDisableOuterSpacing && [
+        userMessageStylesheet.containerSpacing,
+        isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
+      ],
     ],
-    [compact, resolvedDisableOuterSpacing, isFirstInGroup, isLastInGroup],
-  );
-  const contentStyle = useMemo(
-    () => [userMessageStylesheet.content, compact && userMessageStylesheet.contentCompact],
-    [compact],
-  );
-  const bubbleStyle = useMemo(
-    () => [userMessageStylesheet.bubble, compact && userMessageStylesheet.bubbleCompact],
-    [compact],
-  );
-  const textStyle = useMemo(
-    () => [userMessageStylesheet.text, compact && userMessageStylesheet.textCompact],
-    [compact],
+    [resolvedDisableOuterSpacing, isFirstInGroup],
   );
   const imagePreviewContainerStyle = useMemo(
     () => [
@@ -558,11 +511,11 @@ export const UserMessage = memo(function UserMessage({
   return (
     <View style={containerStyle} testID="user-message" aria-busy={isPending}>
       <View
-        style={contentStyle}
+        style={userMessageStylesheet.content}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
       >
-        <View style={bubbleStyle}>
+        <View style={userMessageStylesheet.bubble}>
           {hasImages ? (
             <View style={imagePreviewContainerStyle}>
               {images.map((image) => (
@@ -594,7 +547,7 @@ export const UserMessage = memo(function UserMessage({
             </View>
           ) : null}
           {hasText ? (
-            <Text selectable style={textStyle} dataSet={MESSAGE_TEXT_DATASET}>
+            <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
               {message}
             </Text>
           ) : null}
@@ -770,25 +723,12 @@ interface AssistantMessageProps {
   workspaceRoot?: string;
   serverId?: string;
   client?: DaemonClient | null;
-  spacing?: "default" | "compactTop" | "compactBottom" | "compactBoth";
   phase: MarkdownPhase;
 }
 
+const ASSISTANT_MESSAGE_SELECTABLE = isWeb ? ({ userSelect: "text" } as ViewStyle) : undefined;
+
 export const assistantMessageStylesheet = StyleSheet.create((theme) => ({
-  container: {
-    paddingVertical: theme.spacing[3],
-    ...(isWeb ? { userSelect: "text" as const } : {}),
-  },
-  containerCompactTop: {
-    paddingTop: 0,
-  },
-  containerCompactBottom: {
-    paddingBottom: 0,
-  },
-  containerCompactChat: {
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
   cappedNotice: {
     marginTop: theme.spacing[3],
     fontFamily: theme.fontFamily.ui,
@@ -1122,12 +1062,6 @@ export const TurnCopyButton = memo(function TurnCopyButton({
 const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   container: {
     marginHorizontal: -13,
-  },
-  containerSpacing: {
-    marginBottom: theme.spacing[1],
-  },
-  containerLastInSequence: {
-    marginBottom: theme.spacing[4],
   },
   pressable: {
     borderRadius: theme.borderRadius.lg,
@@ -1519,7 +1453,6 @@ export const AssistantMessage = memo(function AssistantMessage({
   workspaceRoot,
   serverId,
   client,
-  spacing = "default",
   phase,
 }: AssistantMessageProps) {
   const { t } = useTranslation();
@@ -1983,18 +1916,6 @@ export const AssistantMessage = memo(function AssistantMessage({
     [blocks],
   );
 
-  const compactChat = useCompactChat();
-  const assistantContainerStyle = useMemo(
-    () => [
-      assistantMessageStylesheet.container,
-      (spacing === "compactTop" || spacing === "compactBoth") &&
-        assistantMessageStylesheet.containerCompactTop,
-      (spacing === "compactBottom" || spacing === "compactBoth") &&
-        assistantMessageStylesheet.containerCompactBottom,
-      compactChat && assistantMessageStylesheet.containerCompactChat,
-    ],
-    [compactChat, spacing],
-  );
   const revealDataSet = useMemo(
     () =>
       isRenderProfileEnabled()
@@ -2008,7 +1929,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   );
 
   return (
-    <View testID="assistant-message" dataSet={revealDataSet} style={assistantContainerStyle}>
+    <View testID="assistant-message" dataSet={revealDataSet} style={ASSISTANT_MESSAGE_SELECTABLE}>
       {keyedBlocks.map(({ key, block }, index) => (
         <AssistantMessageBlockContainer
           key={key}
@@ -2256,7 +2177,6 @@ export const CompactionMarker = memo(function CompactionMarker({
 interface TodoListCardProps {
   items: TodoEntry[];
   activity: TaskActivity;
-  disableOuterSpacing?: boolean;
 }
 
 function taskActivityIcon(activity: TaskActivity) {
@@ -2285,11 +2205,7 @@ const todoListCardStylesheet = StyleSheet.create((theme) => ({
   },
 }));
 
-export const TodoListCard = memo(function TodoListCard({
-  items,
-  activity,
-  disableOuterSpacing,
-}: TodoListCardProps) {
+export const TodoListCard = memo(function TodoListCard({ items, activity }: TodoListCardProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const activityDisplay = useMemo(() => {
@@ -2331,7 +2247,6 @@ export const TodoListCard = memo(function TodoListCard({
       isExpanded={isExpanded}
       onToggle={handleToggle}
       renderDetails={renderDetails}
-      disableOuterSpacing={disableOuterSpacing}
     />
   );
 });
@@ -2348,8 +2263,6 @@ interface ExpandableBadgeProps {
   renderDetails?: () => ReactNode;
   isLoading?: boolean;
   isError?: boolean;
-  isLastInSequence?: boolean;
-  disableOuterSpacing?: boolean;
   borderlessWhenExpanded?: boolean;
   testID?: string;
 }
@@ -2711,12 +2624,9 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   renderDetails,
   isLoading = false,
   isError = false,
-  isLastInSequence = false,
-  disableOuterSpacing,
   borderlessWhenExpanded = false,
   testID,
 }: ExpandableBadgeProps) {
-  const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
   const [isHovered, setIsHovered] = useState(false);
   const [isOpenFileHovered, setIsOpenFileHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
@@ -2867,19 +2777,7 @@ export const ExpandableBadge = memo(function ExpandableBadge({
     ],
   );
 
-  const compactChat = useCompactChat();
-  const containerStyle = useMemo(
-    () => [
-      expandableBadgeStylesheet.container,
-      !resolvedDisableOuterSpacing &&
-        !compactChat &&
-        (isLastInSequence
-          ? expandableBadgeStylesheet.containerLastInSequence
-          : expandableBadgeStylesheet.containerSpacing),
-      style,
-    ],
-    [compactChat, isLastInSequence, resolvedDisableOuterSpacing, style],
-  );
+  const containerStyle = useMemo(() => [expandableBadgeStylesheet.container, style], [style]);
 
   const pressableStyle = useMemo(
     () => [
@@ -3034,8 +2932,6 @@ function areExpandableBadgePropsEqual(previous: ExpandableBadgeProps, next: Expa
   if (previous.style !== next.style) return false;
   if (previous.isLoading !== next.isLoading) return false;
   if (previous.isError !== next.isError) return false;
-  if (previous.isLastInSequence !== next.isLastInSequence) return false;
-  if (previous.disableOuterSpacing !== next.disableOuterSpacing) return false;
   if (previous.borderlessWhenExpanded !== next.borderlessWhenExpanded) return false;
   if (previous.testID !== next.testID) return false;
   if (previous.onToggle !== next.onToggle) return false;
@@ -3054,7 +2950,6 @@ interface ToolCallProps {
   detail?: ToolCallDetail;
   cwd?: string;
   metadata?: Record<string, unknown>;
-  isLastInSequence?: boolean;
   disableOuterSpacing?: boolean;
   onInlineDetailsHoverChange?: (hovered: boolean) => void;
   onInlineDetailsExpandedChange?: (expanded: boolean) => void;
@@ -3073,7 +2968,6 @@ export const ToolCall = memo(function ToolCall({
   detail,
   cwd,
   metadata,
-  isLastInSequence = false,
   disableOuterSpacing,
   onInlineDetailsHoverChange,
   onInlineDetailsExpandedChange,
@@ -3220,8 +3114,6 @@ export const ToolCall = memo(function ToolCall({
       renderDetails={presentation.canOpenDetails && shouldRenderInline ? renderDetails : undefined}
       isLoading={status === "running" || status === "executing"}
       isError={status === "failed"}
-      isLastInSequence={isLastInSequence}
-      disableOuterSpacing={disableOuterSpacing}
       onDetailHoverChange={onInlineDetailsHoverChange}
     />
   );
@@ -3236,7 +3128,6 @@ function areToolCallPropsEqual(previous: ToolCallProps, next: ToolCallProps) {
   if (previous.detail !== next.detail) return false;
   if (previous.cwd !== next.cwd) return false;
   if (previous.metadata !== next.metadata) return false;
-  if (previous.isLastInSequence !== next.isLastInSequence) return false;
   if (previous.disableOuterSpacing !== next.disableOuterSpacing) return false;
   if (previous.onOpenFilePath !== next.onOpenFilePath) return false;
   if (previous.defaultExpanded !== next.defaultExpanded) return false;

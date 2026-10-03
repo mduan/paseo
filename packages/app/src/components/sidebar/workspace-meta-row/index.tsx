@@ -14,7 +14,6 @@ import type { PrHint } from "@/git/pr-hint";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { useSidebarMetaPreferences } from "@/components/sidebar/display-preferences/model";
-import { useAppSettings } from "@/hooks/use-settings";
 import type { Theme } from "@/styles/theme";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { CheckIndicator } from "./check-indicator";
@@ -80,7 +79,6 @@ export function WorkspaceMetaRow({
   isWorktree?: boolean;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
-  const worktreeIndicator = useAppSettings().settings.worktreeIndicator;
   const items = selectMetaRowItems({
     currentBranch,
     projectName,
@@ -103,7 +101,7 @@ export function WorkspaceMetaRow({
             item={item}
             hostBadge={hostBadge}
             leading={index === 0}
-            showWorktree={isWorktree && worktreeIndicator}
+            showWorktree={isWorktree}
           />
         </Fragment>
       ))}
