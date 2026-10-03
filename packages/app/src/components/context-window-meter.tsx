@@ -11,6 +11,8 @@ interface ContextWindowMeterProps {
   totalCostUsd?: number | null;
   /** The provider estimates cost but could not load its price list. */
   totalCostUnavailable?: boolean;
+  /** A turn is running, so the cost is the total before it. */
+  costExcludesCurrentTurn?: boolean;
   showPercentage?: boolean;
   /** Reserve the meter footprint and show a loading ring while usage is pending. */
   pending?: boolean;
@@ -97,6 +99,7 @@ export function ContextWindowMeter({
   usedTokens,
   totalCostUsd,
   totalCostUnavailable = false,
+  costExcludesCurrentTurn = false,
   showPercentage = false,
   pending = false,
   glyphSize,
@@ -205,7 +208,11 @@ export function ContextWindowMeter({
           {formattedSessionCost ? (
             <>
               <Text style={styles.tooltipDetail}>
-                {t("contextWindow.sessionCost", { cost: formattedSessionCost })}
+                {t("contextWindow.sessionCost", {
+                  cost: costExcludesCurrentTurn
+                    ? `${formattedSessionCost} ${t("contextWindow.sessionCostBeforeTurn")}`
+                    : formattedSessionCost,
+                })}
               </Text>
               <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
             </>

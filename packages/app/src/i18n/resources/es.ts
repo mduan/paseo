@@ -2020,6 +2020,7 @@ export const es: TranslationResources = {
     sessionCost: "Costo de la sesión{{cost}}",
     sessionCostEstimate: "Estimado con precios de lista de la API",
     sessionCostUnavailable: "No disponible",
+    sessionCostBeforeTurn: "(antes de este turno)",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {

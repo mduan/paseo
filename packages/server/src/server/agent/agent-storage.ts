@@ -42,6 +42,16 @@ const PERSISTENCE_HANDLE_SCHEMA = z
   .nullable()
   .optional();
 
+const STORED_USAGE_SCHEMA = z.object({
+  inputTokens: z.number().optional(),
+  cachedInputTokens: z.number().optional(),
+  outputTokens: z.number().optional(),
+  totalCostUsd: z.number().optional(),
+  totalCostUnavailable: z.boolean().optional(),
+  contextWindowMaxTokens: z.number().optional(),
+  contextWindowUsedTokens: z.number().optional(),
+});
+
 const STORED_AGENT_SCHEMA = z.object({
   id: z.string(),
   provider: z.string(),
@@ -69,6 +79,8 @@ const STORED_AGENT_SCHEMA = z.object({
   features: z.array(AgentFeatureSchema).optional(),
   persistence: PERSISTENCE_HANDLE_SCHEMA,
   lastError: z.string().nullable().optional(),
+  // Kept so the session cost survives a daemon restart.
+  lastUsage: STORED_USAGE_SCHEMA.optional(),
   requiresAttention: z.boolean().optional(),
   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
   attentionTimestamp: z.string().nullable().optional(),

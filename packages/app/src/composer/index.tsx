@@ -284,6 +284,7 @@ function renderContextWindowMeter({
   contextWindowUsedTokens,
   totalCostUsd,
   totalCostUnavailable,
+  costExcludesCurrentTurn,
   showPercentage,
   pending,
   glyphSize,
@@ -292,6 +293,7 @@ function renderContextWindowMeter({
   contextWindowUsedTokens: number | null;
   totalCostUsd: number | null;
   totalCostUnavailable: boolean;
+  costExcludesCurrentTurn: boolean;
   showPercentage: boolean;
   pending: boolean;
   glyphSize: number;
@@ -306,6 +308,7 @@ function renderContextWindowMeter({
       usedTokens={contextWindowUsedTokens}
       totalCostUsd={totalCostUsd}
       totalCostUnavailable={totalCostUnavailable}
+      costExcludesCurrentTurn={costExcludesCurrentTurn}
       showPercentage={showPercentage}
       pending={pending}
       glyphSize={glyphSize}
@@ -2091,6 +2094,8 @@ function ComposerContentImpl({
         contextWindowUsedTokens,
         totalCostUsd: agentState.totalCostUsd,
         totalCostUnavailable: agentState.totalCostUnavailable,
+        // Providers report cost when a turn ends, so mid-turn it is the previous total.
+        costExcludesCurrentTurn: isAgentRunning,
         showPercentage: false,
         pending: contextWindowPending,
         glyphSize: contextWindowMeterGlyphSize,
@@ -2100,6 +2105,7 @@ function ComposerContentImpl({
       contextWindowUsedTokens,
       agentState.totalCostUsd,
       agentState.totalCostUnavailable,
+      isAgentRunning,
       contextWindowPending,
       contextWindowMeterGlyphSize,
     ],

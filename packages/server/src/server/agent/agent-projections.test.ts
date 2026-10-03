@@ -223,6 +223,17 @@ describe("toStoredAgentRecord", () => {
       expect(record.lastStatus).toBe(status);
     }
   });
+
+  it("keeps the session cost so a closed agent still shows it", () => {
+    const agent = createManagedAgent({ lastUsage: { totalCostUsd: 1.25, outputTokens: 20 } });
+    const record = toStoredAgentRecord(agent);
+
+    expect(record.lastUsage).toEqual({ totalCostUsd: 1.25, outputTokens: 20 });
+    expect(buildStoredAgentPayload(record, ["codex"]).lastUsage).toEqual({
+      totalCostUsd: 1.25,
+      outputTokens: 20,
+    });
+  });
 });
 
 describe("toAgentPayload", () => {

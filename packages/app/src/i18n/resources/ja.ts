@@ -1992,6 +1992,7 @@ export const ja: TranslationResources = {
     sessionCost: "セッションコスト: {{cost}}",
     sessionCostEstimate: "API の定価に基づく推定",
     sessionCostUnavailable: "利用不可",
+    sessionCostBeforeTurn: "(このターンより前)",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {

@@ -2005,6 +2005,7 @@ export const ptBR: TranslationResources = {
     sessionCost: "Custo da sessão {{cost}}",
     sessionCostEstimate: "Estimativa com preços de tabela da API",
     sessionCostUnavailable: "Indisponível",
+    sessionCostBeforeTurn: "(antes deste turno)",
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
   review: {

@@ -6977,6 +6977,13 @@ test("applies live autonomous events and preserves usage omitted from completion
   capturedSession!.pushEvent({
     type: "usage_updated",
     provider: "codex",
+    usage: { totalCostUsd: 0.5, contextWindowMaxTokens: 200_000, contextWindowUsedTokens: 100 },
+    turnId: autonomousTurnId,
+  });
+  // A later mid-turn update without cost keeps the cost from before it.
+  capturedSession!.pushEvent({
+    type: "usage_updated",
+    provider: "codex",
     usage: {
       inputTokens: 10,
       contextWindowMaxTokens: 200_000,
@@ -7002,6 +7009,7 @@ test("applies live autonomous events and preserves usage omitted from completion
   expect(updated ? toAgentPayload(updated).activeTurn : null).toBeNull();
   expect(updated?.lastUsage).toEqual({
     inputTokens: 10,
+    totalCostUsd: 0.5,
     contextWindowMaxTokens: 200_000,
     contextWindowUsedTokens: 175,
   });

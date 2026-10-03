@@ -1997,6 +1997,7 @@ export const en = {
     sessionCost: "Session cost: {{cost}}",
     sessionCostEstimate: "Estimated at API list prices",
     sessionCostUnavailable: "Unavailable",
+    sessionCostBeforeTurn: "(before this turn)",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

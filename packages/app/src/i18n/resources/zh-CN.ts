@@ -1950,6 +1950,7 @@ export const zhCN: TranslationResources = {
     sessionCost: "会话费用 {{cost}}",
     sessionCostEstimate: "按 API 标价估算",
     sessionCostUnavailable: "不可用",
+    sessionCostBeforeTurn: "(本轮之前)",
     accessibility: "上下文窗口已使用 {{percentage}}%",
   },
   review: {
