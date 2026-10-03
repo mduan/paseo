@@ -38,7 +38,7 @@ function workspace(id: string, projectId: string, root: string): WorkspaceDescri
 }
 
 describe("buildWorkspaceStructureProjects", () => {
-  test("groups the same project key across hosts and keeps host-local ids", () => {
+  test("keeps the same project key on different hosts separate", () => {
     const key = "remote:github.com/acme/app";
     const result = buildWorkspaceStructureProjects({
       sessions: [
@@ -55,16 +55,40 @@ describe("buildWorkspaceStructureProjects", () => {
       ],
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      viewKey: key,
-      projectKey: key,
-      hosts: [
-        { serverId: "host-a", projectId: "prj_a" },
-        { serverId: "host-b", projectId: "prj_b" },
+    expect(result).toEqual([
+      expect.objectContaining({
+        viewKey: createProjectViewKey({ serverId: "host-a", projectId: "prj_a" }),
+        projectKey: key,
+        hosts: [expect.objectContaining({ serverId: "host-a", projectId: "prj_a" })],
+        workspaceKeys: ["host-a:ws-a"],
+      }),
+      expect.objectContaining({
+        viewKey: createProjectViewKey({ serverId: "host-b", projectId: "prj_b" }),
+        projectKey: key,
+        hosts: [expect.objectContaining({ serverId: "host-b", projectId: "prj_b" })],
+        workspaceKeys: ["host-b:ws-b"],
+      }),
+    ]);
+  });
+
+  test("keeps projects with the same name on different hosts separate", () => {
+    const result = buildWorkspaceStructureProjects({
+      sessions: [
+        {
+          serverId: "host-a",
+          projects: [project({ id: "prj_a", key: "remote:a", root: "/a/app", name: "app" })],
+          workspaces: [],
+        },
+        {
+          serverId: "host-b",
+          projects: [project({ id: "prj_b", key: "remote:b", root: "/b/app", name: "app" })],
+          workspaces: [],
+        },
       ],
-      workspaceKeys: ["host-a:ws-a", "host-b:ws-b"],
     });
+
+    expect(result.map((item) => item.projectName)).toEqual(["app", "app"]);
+    expect(result.map((item) => item.hosts[0]?.serverId)).toEqual(["host-a", "host-b"]);
   });
 
   test("keeps two clones with the same key on one host separate", () => {
@@ -94,39 +118,6 @@ describe("buildWorkspaceStructureProjects", () => {
     ]);
   });
 
-  test("does not let project order choose which same-host clone groups with another host", () => {
-    const key = "remote:github.com/acme/app";
-    const hostAProjects = [
-      project({ id: "prj_one", key, root: "/repos/one" }),
-      project({ id: "prj_two", key, root: "/repos/two" }),
-    ];
-    const build = (projects: ProjectDescriptor[]) =>
-      buildWorkspaceStructureProjects({
-        sessions: [
-          { serverId: "host-a", projects, workspaces: [] },
-          {
-            serverId: "host-b",
-            projects: [project({ id: "prj_remote", key, root: "/repos/remote" })],
-            workspaces: [],
-          },
-        ],
-      });
-    const identitiesByProjectId = (projects: ReturnType<typeof build>) => {
-      const identities: Record<string, string> = {};
-      for (const group of projects) {
-        for (const host of group.hosts) identities[host.projectId] = group.viewKey;
-      }
-      return identities;
-    };
-
-    const forward = build(hostAProjects);
-    const reversed = build(hostAProjects.toReversed());
-
-    expect(forward).toHaveLength(3);
-    expect(identitiesByProjectId(forward)).toEqual(identitiesByProjectId(reversed));
-    expect(new Set(Object.values(identitiesByProjectId(forward))).size).toBe(3);
-  });
-
   test("keeps projects without persisted keys scoped to their host", () => {
     const result = buildWorkspaceStructureProjects({
       sessions: [
@@ -146,31 +137,5 @@ describe("buildWorkspaceStructureProjects", () => {
     expect(result).toHaveLength(2);
     expect(result.map((item) => item.projectKey)).toEqual([null, null]);
     expect(new Set(result.map((item) => item.viewKey)).size).toBe(2);
-  });
-
-  test("keeps opaque project keys separate from placement view keys", () => {
-    const placementShapedKey = createProjectViewKey({
-      kind: "placement",
-      serverId: "host-a",
-      projectId: "prj_b",
-    });
-    const result = buildWorkspaceStructureProjects({
-      sessions: [
-        {
-          serverId: "host-a",
-          projects: [
-            project({ id: "prj_a", key: placementShapedKey, root: "/repos/a" }),
-            project({ id: "prj_b", key: null, root: "/repos/b" }),
-          ],
-          workspaces: [],
-        },
-      ],
-    });
-
-    expect(result).toHaveLength(2);
-    expect(new Set(result.map((item) => item.viewKey)).size).toBe(2);
-    expect(result.find((item) => item.projectKey === placementShapedKey)?.viewKey).toBe(
-      placementShapedKey,
-    );
   });
 });

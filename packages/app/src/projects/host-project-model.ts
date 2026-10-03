@@ -32,7 +32,7 @@ export function hostProjectFromRoute(route: HostProjectRouteContext): HostProjec
     return null;
   }
   return {
-    viewKey: createProjectViewKey({ kind: "placement", serverId: route.serverId, projectId }),
+    viewKey: createProjectViewKey({ serverId: route.serverId, projectId }),
     projectKey: null,
     projectName: trimOptional(route.displayName) || projectId,
     projectKind: "unknown",
@@ -67,7 +67,6 @@ export function hostProjectFromWorkspace(input: {
   const canCreate = canCreateWorktreeForProjectKind(input.workspace.projectKind);
   return {
     viewKey: createProjectViewKey({
-      kind: "placement",
       serverId: input.serverId,
       projectId,
     }),

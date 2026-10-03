@@ -40,7 +40,7 @@ function workspace(id: string, projectId: string, root: string): WorkspaceDescri
 }
 
 describe("buildProjects", () => {
-  test("uses the grouped project list while retaining each host project id", () => {
+  test("lists the same repo on two hosts as separate projects", () => {
     const key = "remote:github.com/acme/app";
     const result = buildProjects({
       hosts: [
@@ -63,16 +63,24 @@ describe("buildProjects", () => {
 
     expect(result.projects).toEqual([
       expect.objectContaining({
-        viewKey: createProjectViewKey({ kind: "equivalence", projectKey: key }),
-        hostCount: 2,
+        viewKey: createProjectViewKey({ serverId: "host-a", projectId: "prj_a" }),
+        hostCount: 1,
         onlineHostCount: 1,
-        totalWorkspaceCount: 2,
+        totalWorkspaceCount: 1,
         hosts: [
           expect.objectContaining({
             serverId: "host-a",
             projectId: "prj_a",
             iconRevision: "revision-a",
           }),
+        ],
+      }),
+      expect.objectContaining({
+        viewKey: createProjectViewKey({ serverId: "host-b", projectId: "prj_b" }),
+        hostCount: 1,
+        onlineHostCount: 0,
+        totalWorkspaceCount: 1,
+        hosts: [
           expect.objectContaining({
             serverId: "host-b",
             projectId: "prj_b",
