@@ -2110,6 +2110,10 @@ export const en = {
             label: "Clicking a pull request in the Explorer sidebar",
             description: "Open pull request details beside Changes",
           },
+          turnDiffs: {
+            label: "Opening a turn's changes from a chat",
+            description: "Open the diff of the files a turn changed",
+          },
           serviceUrls: {
             label: "Clicking a script's service URL",
           },

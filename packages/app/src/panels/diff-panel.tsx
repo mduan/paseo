@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Diff, FileDiff, GitCommitHorizontal } from "lucide-react-native";
+import { Diff, FileDiff, GitCommitHorizontal, Maximize } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { PaneContentToolbar } from "@/components/ui/pane-content-toolbar";
+import { PaneContentToolbar, ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { isWeb } from "@/constants/platform";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { DiffDocument } from "@/git/diff-document";
@@ -23,16 +23,21 @@ import {
 } from "@/panels/panel-registry";
 import { useAddFileToChat } from "@/panels/use-add-file-to-chat";
 import { useWorkspaceDirectory } from "@/stores/session-store-hooks";
-import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { buildWorkspaceTabPersistenceKey, type WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { moveWorkspaceTabToMain } from "@/workspace-tabs/open-beside";
+import { findPaneContainingTab, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import { defaultChangesState, changesStateSchema } from "@/panels/changes/state";
 import { usePanelState } from "@/panels/use-panel-state";
 import { RenderProfile } from "@/utils/render-profiler";
+import type { Theme } from "@/styles/theme";
 import { useAgentTurnDiff, useAgentTurnDiffs } from "@/turn-diffs/queries";
 
 const ThemedFileDiff = withUnistyles(FileDiff);
 const ThemedGitCommitHorizontal = withUnistyles(GitCommitHorizontal);
 const ThemedDiff = withUnistyles(Diff);
+const ThemedMaximize = withUnistyles(Maximize);
+const mutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 function useDiffPanelPreferences() {
   const { settings } = useAppSettings();
@@ -230,7 +235,19 @@ function CommitDiffPanel() {
 
 function TurnDiffPanel() {
   const { t } = useTranslation();
-  const { serverId, workspaceId, target, openPreferredTarget } = usePaneContext();
+  const { serverId, workspaceId, host, tabId, target, openPreferredTarget } = usePaneContext();
+  const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
+  const isInSidePane = useWorkspaceLayoutStore((state) => {
+    const layout = workspaceKey ? state.layoutByWorkspace[workspaceKey] : undefined;
+    const sidePaneId = workspaceKey ? state.sidePaneIdByWorkspace[workspaceKey] : undefined;
+    return Boolean(
+      layout && sidePaneId && findPaneContainingTab(layout.root, tabId)?.id === sidePaneId,
+    );
+  });
+  const canOpenInMainPanel = host === "explorer" || isInSidePane;
+  const handleOpenInMainPanel = useCallback(() => {
+    if (workspaceKey) moveWorkspaceTabToMain({ workspaceKey, tabId });
+  }, [tabId, workspaceKey]);
   const isActive = useRetainedPanelActive();
   const panelPreferences = useDiffPanelPreferences();
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
@@ -295,15 +312,26 @@ function TurnDiffPanel() {
 
   return (
     <View style={styles.container} testID="turn-diff-panel">
-      {panelPreferences.canUseSplitLayout ? (
+      {panelPreferences.canUseSplitLayout || canOpenInMainPanel ? (
         <PaneContentToolbar style={styles.toolbar}>
           <View style={styles.toolbarActions}>
-            <DiffLayoutToggle
-              layout={panelPreferences.preferences.layout}
-              isMobile={panelPreferences.isCompact}
-              testID="turn-diff-toggle-layout"
-              onToggle={panelPreferences.toggleLayout}
-            />
+            {panelPreferences.canUseSplitLayout ? (
+              <DiffLayoutToggle
+                layout={panelPreferences.preferences.layout}
+                isMobile={panelPreferences.isCompact}
+                testID="turn-diff-toggle-layout"
+                onToggle={panelPreferences.toggleLayout}
+              />
+            ) : null}
+            {canOpenInMainPanel ? (
+              <ToolbarButton
+                label={t("workspace.tabs.menu.moveToMain")}
+                onPress={handleOpenInMainPanel}
+                testID="turn-diff-open-in-main"
+              >
+                <ThemedMaximize size={14} uniProps={mutedIconColorMapping} />
+              </ToolbarButton>
+            ) : null}
           </View>
         </PaneContentToolbar>
       ) : null}

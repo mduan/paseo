@@ -84,7 +84,7 @@ import {
 } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-import { openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
+import { openTurnDiff, openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
 import { useSettings } from "@/hooks/use-settings";
 import type { Theme } from "@/styles/theme";
 import type { PendingPermission } from "@/types/shared";
@@ -1390,21 +1390,25 @@ const AgentStreamSection = memo(function AgentStreamSection({
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
-  const { openPreferredTarget } = usePaneContext();
+  const turnDiffOpenLocation = useSettings((settings) => settings.turnDiffOpenLocation);
   const handleOpenTurnDiff = useCallback(
     ({ turnId, focusPath }: OpenTurnDiffInput) => {
       if (!agentId) return;
-      openPreferredTarget(
-        {
+      const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
+      const tabId = openTurnDiff({
+        isCompact: isCompactFormFactor,
+        workspaceKey,
+        target: {
           kind: "turn_diff",
           agentId,
           turnId,
           ...(focusPath ? { focusPath, focusRequestId: Date.now() } : {}),
         },
-        "diffs",
-      );
+        destination: turnDiffOpenLocation,
+      });
+      if (tabId && workspaceKey) useWorkspaceLayoutStore.getState().focusTab(workspaceKey, tabId);
     },
-    [agentId, openPreferredTarget],
+    [agentId, isCompactFormFactor, serverId, turnDiffOpenLocation, workspaceId],
   );
   const hasWorkspaceDiffStat = useWorkspaceHasDiffStat(serverId, workspaceId);
   const hasVisibleComposerTracks =

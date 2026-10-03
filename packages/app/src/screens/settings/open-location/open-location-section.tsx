@@ -24,7 +24,7 @@ const SERVICE_URL_LABEL_KEYS: Record<ServiceUrlBehavior, string> = {
   external: "settings.general.serviceUrls.options.external",
 };
 
-type OpenLocationSource = keyof OpenInSidePanePreferences | "pullRequests";
+type OpenLocationSource = keyof OpenInSidePanePreferences | "pullRequests" | "turnDiffs";
 
 function OpenLocationRow({
   source,
@@ -93,6 +93,10 @@ export function OpenLocationSection() {
         void updateSettings({ pullRequestOpenLocation: destination });
         return;
       }
+      if (source === "turnDiffs") {
+        void updateSettings({ turnDiffOpenLocation: destination });
+        return;
+      }
       void updateSettings({
         openInSidePane: { ...settings.openInSidePane, [source]: destination === "side" },
       });
@@ -113,6 +117,12 @@ export function OpenLocationSection() {
         <OpenLocationRow
           source="pullRequests"
           destination={settings.pullRequestOpenLocation}
+          allowExplorer
+          onDestinationChange={handleDestinationChange}
+        />
+        <OpenLocationRow
+          source="turnDiffs"
+          destination={settings.turnDiffOpenLocation}
           allowExplorer
           onDestinationChange={handleDestinationChange}
         />
