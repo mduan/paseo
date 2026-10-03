@@ -25,11 +25,14 @@ export function UsageWindowBar({
   onTogglePin,
   pinLabel,
   pinTestID,
+  valueText,
 }: {
   window: UsageWindow;
   displayAs: UsageDisplayAs;
   pinned: boolean;
   onTogglePin: () => void;
+  /** Shown in place of the percent, e.g. a balance's "$279.87 / $1,500.00". */
+  valueText?: string;
   /** What the row pins, naming the source and window: "Pin Claude Session". */
   pinLabel: string;
   pinTestID: string;
@@ -42,7 +45,7 @@ export function UsageWindowBar({
     ? `runs out ${formatResetLabel(window.runsOutAt)?.replace("resets ", "") ?? ""}`.trim()
     : formatResetLabel(window.resetsAt);
 
-  const value = shownPct != null ? formatDisplayPct(shownPct, displayAs) : "—";
+  const value = valueText ?? (shownPct != null ? formatDisplayPct(shownPct, displayAs) : "—");
   const accessibilityState = useMemo(() => ({ checked: pinned }), [pinned]);
 
   // The whole row pins the window to the sidebar Usage item. Pinned or not, it keeps the same

@@ -7,7 +7,9 @@ import {
   unavailable,
   type UsageAccount,
   toneFromUsedPct,
+  usedPctOf,
   windowFromReportedDuration,
+  type UsageBalance,
   type UsageReport,
   type UsageWindow,
 } from "@getpaseo/plugin/server/usage";
@@ -47,7 +49,21 @@ const responseSchema = z.object({
     )
     .nullish(),
   code_review_rate_limit: rateLimitSchema.nullish(),
-  credits: z.object({ balance: number.optional() }).nullish(),
+  // Enterprise workspaces send `balance: null`; coercing that would read as "0 left".
+  credits: z.object({ balance: number.nullish() }).nullish(),
+  // Validated on its own so a reshaped entry cannot fail the windows that parsed.
+  spend_control: z.unknown().optional(),
+});
+// Amounts are decimal strings in `unit`; `reset_at` is in seconds.
+const spendLimitSchema = z.object({
+  individual_limit: z
+    .object({
+      unit: z.string(),
+      limit: number,
+      used: number.nullish(),
+      reset_at: number.nullish(),
+    })
+    .nullish(),
 });
 
 interface Auth {
@@ -188,24 +204,48 @@ export async function fetchUsage(
     }),
   ];
   const balance = usage.credits?.balance;
+  const balances: UsageBalance[] = spendLimitBalances(usage.spend_control);
+  if (balance != null)
+    balances.push({
+      id: "credits",
+      label: "Credits",
+      remaining: balance,
+      unit: "credits",
+      tone: balanceToneFromRemaining(balance),
+    });
   return {
     status: "available",
     planLabel: usage.plan_type,
     windows,
-    balances:
-      balance === undefined
-        ? []
-        : [
-            {
-              id: "credits",
-              label: "Credits",
-              remaining: balance,
-              unit: "credits",
-              tone: balanceToneFromRemaining(balance),
-            },
-          ],
+    balances,
     details: [],
   };
+}
+
+/** The per-user budget a workspace admin sets through spend controls. */
+function spendLimitBalances(spendControl: unknown): UsageBalance[] {
+  if (spendControl == null) return [];
+  const parsed = spendLimitSchema.safeParse(spendControl);
+  if (!parsed.success) {
+    console.warn({ err: parsed.error }, "Skipping unparseable Codex spend control");
+    return [];
+  }
+  const individual = parsed.data.individual_limit;
+  if (!individual) return [];
+  const { unit, limit, used, reset_at } = individual;
+  // UsageBalance has no other currencies.
+  if (unit.toLowerCase() !== "usd" || limit <= 0) return [];
+  return [
+    {
+      id: "spend_limit",
+      label: "Spend limit",
+      used: used ?? null,
+      limit,
+      unit: "usd",
+      resetsAt: reset_at != null ? new Date(reset_at * 1000).toISOString() : null,
+      tone: toneFromUsedPct(usedPctOf(used, limit)),
+    },
+  ];
 }
 
 /** JWT claims are decoded locally; no token or email becomes an account key. */

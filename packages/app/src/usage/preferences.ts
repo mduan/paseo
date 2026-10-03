@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { displayPercent } from "./model";
+import { displayPercent, summaryWindows } from "./model";
 import type { UsageReportEntry } from "./types";
 
 /** Whether percentages read as the share used or the share left. */
@@ -56,7 +56,7 @@ export function effectiveUsagePins(
   const pins: UsagePin[] = [];
   for (const entry of reports) {
     if (entry.report.status !== "available") continue;
-    const withPercent = entry.report.windows.filter(
+    const withPercent = summaryWindows(entry.report).filter(
       (window) => displayPercent(window, preferences.displayAs) !== null,
     );
     const marked = withPercent.filter((window) => window.summary);

@@ -189,6 +189,73 @@ describe("claude usage source", () => {
     });
   });
 
+  it("shows an Enterprise usage-credit budget in dollars instead of the extra-usage toggle", async () => {
+    writeClaudeCredentials(claudeHome, "at_valid", "rt_test", "enterprise", "default_zero");
+    // Recorded from an Enterprise account with a $1,500 monthly budget.
+    fetchApi = mockFetch(
+      new Map([
+        [
+          "https://api.anthropic.com/api/oauth/usage",
+          () =>
+            jsonResponse({
+              five_hour: null,
+              seven_day: null,
+              extra_usage: {
+                is_enabled: true,
+                monthly_limit: 150000,
+                used_credits: 27987,
+                utilization: 18.658,
+                currency: "USD",
+                decimal_places: 2,
+                disabled_reason: null,
+              },
+              limits: [],
+            }),
+        ],
+      ]),
+    );
+    const now = new Date(2026, 9, 3, 16).getTime();
+
+    const report = await fetchUsage(credentialInput(claudeHome), fetchApi, { now: () => now });
+
+    expect(report).toMatchObject({
+      status: "available",
+      planLabel: "Enterprise zero",
+      windows: [],
+      details: [],
+      balances: [
+        {
+          id: "usage_credits",
+          label: "Usage credits",
+          used: 279.87,
+          limit: 1500,
+          unit: "usd",
+          resetsAt: new Date(2026, 10, 1).toISOString(),
+          tone: "ok",
+        },
+      ],
+    });
+  });
+
+  it("keeps the extra-usage toggle when the plan reports no budget", async () => {
+    writeClaudeCredentials(claudeHome, "at_valid");
+    fetchApi = mockFetch(
+      new Map([
+        [
+          "https://api.anthropic.com/api/oauth/usage",
+          () => jsonResponse({ ...makeClaudeResponse(), extra_usage: { is_enabled: false } }),
+        ],
+      ]),
+    );
+
+    const report = await fetchUsage(credentialInput(claudeHome), fetchApi);
+
+    expect(report).toMatchObject({
+      balances: [],
+      details: [{ id: "extra_usage", value: "Disabled" }],
+    });
+  });
+
   it.each(["empty home", "unrelated files"])(
     "discovers no Claude logins in %s",
     async (scenario) => {
