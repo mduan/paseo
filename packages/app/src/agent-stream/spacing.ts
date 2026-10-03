@@ -67,3 +67,23 @@ export function getGapBetweenStreamItems(
   }
   return SPACING[4];
 }
+
+// ponytail: assumes assistant text ends in a paragraph margin; lists or code blocks that end a
+// message can land a few px off.
+const TOOL_ROW_INSET = SPACING[1] + 1; // padding + border of a tool row
+const PARAGRAPH_TRAILING_MARGIN = SPACING[3];
+const COMPACT_ROW_GAP = SPACING[1];
+
+/** Compact chat gaps, so text between tool rows sits at the same spacing as the rows themselves. */
+export function getCompactGapBetweenStreamItems(
+  item: StreamItem,
+  belowItem: StreamItem | null,
+): number {
+  if (isToolSequenceItem(item) && belowItem?.kind === "assistant_message") {
+    return COMPACT_ROW_GAP + TOOL_ROW_INSET;
+  }
+  if (item.kind === "assistant_message" && isToolSequenceItem(belowItem)) {
+    return COMPACT_ROW_GAP + TOOL_ROW_INSET - PARAGRAPH_TRAILING_MARGIN;
+  }
+  return COMPACT_ROW_GAP;
+}

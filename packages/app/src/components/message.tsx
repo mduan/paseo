@@ -360,12 +360,17 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
     marginTop: theme.spacing[3],
     marginBottom: theme.spacing[1],
   },
+  containerCompactFirstInGroup: {
+    marginTop: theme.spacing[6],
+  },
   contentCompact: {
     maxWidth: "75%",
   },
   bubbleCompact: {
     backgroundColor: theme.colorScheme === "dark" ? "#183d76" : "#e8f3fe",
     borderRadius: 20,
+    // The base bubble's tail corner would otherwise win over the shorthand.
+    borderTopRightRadius: 20,
     padding: theme.spacing[3],
   },
   textCompact: {
@@ -491,7 +496,10 @@ export const UserMessage = memo(function UserMessage({
       userMessageStylesheet.container,
       !resolvedDisableOuterSpacing &&
         (compact
-          ? userMessageStylesheet.containerCompact
+          ? [
+              userMessageStylesheet.containerCompact,
+              isFirstInGroup ? userMessageStylesheet.containerCompactFirstInGroup : null,
+            ]
           : [
               isFirstInGroup ? userMessageStylesheet.containerFirstInGroup : null,
               isLastInGroup ? userMessageStylesheet.containerLastInGroup : null,

@@ -102,11 +102,12 @@ import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store"
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
-import { SPACING, type Theme } from "@/styles/theme";
+import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { CompactChatContext, useCompactChat } from "./compact-chat";
+import { getCompactGapBetweenStreamItems } from "./spacing";
 import {
   useFoldedTail,
   useWorkToggle,
@@ -189,7 +190,7 @@ function renderStreamItemWithTurnFooter(input: {
       compactGapBelow={
         input.layoutItem.item.kind === "user_message" || input.layoutItem.completedFooter
           ? input.layoutItem.gapBelow
-          : SPACING[1]
+          : getCompactGapBetweenStreamItems(input.layoutItem.item, input.layoutItem.belowItem)
       }
     >
       {input.content}

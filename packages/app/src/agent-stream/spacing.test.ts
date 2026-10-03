@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { StreamItem } from "@/types/stream";
-import { getAssistantBlockSpacing, isSameAssistantBlockGroup } from "./spacing";
+import {
+  getAssistantBlockSpacing,
+  getCompactGapBetweenStreamItems,
+  isSameAssistantBlockGroup,
+} from "./spacing";
 
 function assistantBlock(params: {
   id: string;
@@ -131,5 +135,19 @@ describe("getAssistantBlockSpacing", () => {
     expect(
       getAssistantBlockSpacing({ item: headBlock, aboveItem: tailBlock, belowItem: null }),
     ).toBe("compactTop");
+  });
+});
+
+describe("getCompactGapBetweenStreamItems", () => {
+  it("spaces text between tool rows like the tool rows themselves", () => {
+    const text = assistantBlock({ id: "a", blockGroupId: "g", blockIndex: 0 });
+    const tool = toolCallBlock("t");
+    const toolInset = 5;
+    const paragraphMargin = 12;
+    const betweenTools = toolInset + getCompactGapBetweenStreamItems(tool, tool) + toolInset;
+    expect(toolInset + getCompactGapBetweenStreamItems(tool, text)).toBe(betweenTools);
+    expect(paragraphMargin + getCompactGapBetweenStreamItems(text, tool) + toolInset).toBe(
+      betweenTools,
+    );
   });
 });
