@@ -54,7 +54,8 @@ import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
-import { estimateCodexCostUsd, type CodexCostInput } from "./codex-pricing.js";
+import { estimateCodexCostUsd, type CodexCostInput } from "./codex/pricing.js";
+import { CodexRolloutCost } from "./codex/rollout-cost.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -1064,6 +1065,7 @@ export function toAgentUsage(
           cachedInputTokens:
             typeof total.cachedInputTokens === "number" ? total.cachedInputTokens : 0,
           outputTokens: typeof total.outputTokens === "number" ? total.outputTokens : 0,
+          isSingleRequest: false,
         })
       : undefined;
   const contextWindowMaxTokens = firstPositiveFiniteNumber(
@@ -3508,6 +3510,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   private warnedInvalidNotificationPayloads = new Set<string>();
   private warnedIncompleteEditToolCallIds = new Set<string>();
   private latestUsage: AgentUsage | undefined;
+  private rolloutCost: CodexRolloutCost | undefined;
+  private rolloutCostThreadId: string | null = null;
+  private rolloutCostUsd: number | undefined;
   private latestPlanResult: { callId: string; text: string; turnId: string | null } | null = null;
   private readonly userMessageTurnIndexes = new Map<string, number>();
   private readonly userMessageTurnIds: string[] = [];
@@ -6162,6 +6167,8 @@ export class CodexAppServerAgentSession implements AgentSession {
         provider: CODEX_PROVIDER,
         usage: this.latestUsage,
       });
+      // The rollout may record the turn's last request after its token-usage notification.
+      void this.refreshRolloutCost();
     }
     this.activeForegroundTurnId = null;
     this.activeClientMessageId = null;
@@ -6227,12 +6234,50 @@ export class CodexAppServerAgentSession implements AgentSession {
       serviceTier: this.serviceTier,
     });
     if (this.latestUsage) {
+      // The rollout estimate prices each request; the thread-total estimate is only a fallback.
+      if (this.rolloutCostUsd !== undefined) this.latestUsage.totalCostUsd = this.rolloutCostUsd;
       this.notifySubscribers({
         type: "usage_updated",
         provider: CODEX_PROVIDER,
         usage: this.latestUsage,
       });
     }
+    void this.refreshRolloutCost();
+  }
+
+  private async refreshRolloutCost(): Promise<void> {
+    const threadId = this.currentThreadId;
+    if (!threadId || !this.client) return;
+    try {
+      if (this.rolloutCostThreadId !== threadId) {
+        this.rolloutCostThreadId = threadId;
+        this.rolloutCostUsd = undefined;
+        this.rolloutCost = await this.openRolloutCost(threadId);
+      }
+      const costUsd = await this.rolloutCost?.read(this.serviceTier);
+      if (costUsd === undefined || this.currentThreadId !== threadId) return;
+      this.rolloutCostUsd = costUsd;
+      if (!this.latestUsage || this.latestUsage.totalCostUsd === costUsd) return;
+      this.latestUsage = { ...this.latestUsage, totalCostUsd: costUsd };
+      this.notifySubscribers({
+        type: "usage_updated",
+        provider: CODEX_PROVIDER,
+        usage: this.latestUsage,
+      });
+    } catch (error) {
+      this.logger.warn({ error, threadId }, "Failed to read Codex rollout for the cost estimate");
+    }
+  }
+
+  private async openRolloutCost(threadId: string): Promise<CodexRolloutCost | undefined> {
+    if (!this.client) return undefined;
+    const response = toObjectRecord(
+      await this.client.request("thread/read", { threadId, includeTurns: false }),
+    );
+    // Thread.path is marked unstable in the app-server schema; without it the estimate falls back
+    // to pricing the thread token total.
+    const rolloutPath = toObjectRecord(response?.thread)?.path;
+    return typeof rolloutPath === "string" ? new CodexRolloutCost(rolloutPath) : undefined;
   }
 
   private resolveContextCompactionTrigger(itemId?: string): "auto" | "manual" | undefined {
