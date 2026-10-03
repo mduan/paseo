@@ -313,11 +313,6 @@ function reviewActionsForFirstAddition(): NonNullable<
   };
   return {
     commentsByTarget: new Map(),
-    editor: { target, commentId: null, body: "" },
-    onStartComment() {},
-    onCancelEditor() {},
-    onSaveEditor() {},
-    onEditComment() {},
-    onDeleteComment() {},
+    editor: { target, commentId: null, body: "", focusRequestId: 0 },
   };
 }

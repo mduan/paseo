@@ -48,6 +48,7 @@ import {
   isDescendantPath,
   warmCheckoutShortstatInBackground,
 } from "./checkout-git.js";
+import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import { startGitCommandMetrics, stopGitCommandMetrics } from "./run-git-command.js";
 import { createForgeResolver } from "../services/forge-resolver.js";
 import { GitHubCommandError, GitHubCliMissingError } from "../services/github-service.js";
@@ -108,6 +109,11 @@ function initRepo(): { tempDir: string; repoDir: string } {
   execFileSync("git", ["add", "."], { cwd: repoDir });
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "initial"], { cwd: repoDir });
   return { tempDir, repoDir };
+}
+
+function summarizeHunkLines(file: ParsedDiffFile): { path: string; lines: string[] } {
+  const lines = file.hunks.flatMap((hunk) => hunk.lines).filter((l) => l.type !== "header");
+  return { path: file.path, lines: lines.map((line) => `${line.type}:${line.content}`) };
 }
 
 function readTextFile(path: string): string {
@@ -637,6 +643,24 @@ describe("checkout git utilities", () => {
     });
     expect(hiddenDiff.diff).toBe("");
     expect(hiddenDiff.structured).toEqual([]);
+  });
+
+  it.each([
+    ["diff.mnemonicprefix", "true"],
+    ["diff.noprefix", "true"],
+    ["diff.srcPrefix", "src/"],
+  ])("parses structured hunks when the repo sets %s=%s", async (key, value) => {
+    execFileSync("git", ["config", key, value], { cwd: repoDir });
+    writeFileSync(join(repoDir, "file.txt"), "goodbye\n");
+    writeFileSync(join(repoDir, "untracked.txt"), "new\n");
+
+    const diff = await getCheckoutDiff(repoDir, { mode: "uncommitted", includeStructured: true });
+
+    expect(diff.diff).toContain("diff --git a/file.txt b/file.txt");
+    expect(diff.structured?.map(summarizeHunkLines)).toEqual([
+      { path: "file.txt", lines: ["remove:hello", "add:goodbye"] },
+      { path: "untracked.txt", lines: ["add:new"] },
+    ]);
   });
 
   it("preserves removed-line syntax highlighting with structured diffs", async () => {
@@ -1536,8 +1560,10 @@ const x = 1;
     expect(diff.diff).toContain("# generated.js: diff too large omitted");
     expect(diff.diff).toContain(`-export const value = "old";`);
     expect(diff.diff).toContain(`+export const value = "new";`);
-    expect(commands).toContain("diff --numstat HEAD");
-    expect(commands).toContain("diff HEAD -- :(literal)generated.js :(literal)small.ts");
+    expect(commands).toContain("diff --src-prefix=a/ --dst-prefix=b/ --numstat HEAD");
+    expect(commands).toContain(
+      "diff --src-prefix=a/ --dst-prefix=b/ HEAD -- :(literal)generated.js :(literal)small.ts",
+    );
     expect(metrics.maxConcurrent).toBeLessThanOrEqual(8);
   });
 

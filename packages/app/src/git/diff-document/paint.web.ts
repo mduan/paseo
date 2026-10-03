@@ -1,4 +1,5 @@
 import { selectionRectangles } from "./hit-testing";
+import { isLineHighlighted, type ResolvedLineHighlight } from "./line-range";
 import {
   DIFF_BODY_BORDER_HEIGHT,
   expandedBodyBorderTop,
@@ -33,6 +34,7 @@ import type {
 } from "./types";
 
 const CODE_LEFT_PADDING = 8;
+const LINE_HIGHLIGHT_ALPHA = 0.2;
 
 export interface PaintWebViewportInput {
   context: CanvasRenderingContext2D;
@@ -46,6 +48,7 @@ export interface PaintWebViewportInput {
   viewportHeight: number;
   horizontalOffsets: ReadonlyMap<string, number>;
   selection: DiffSelection | null;
+  lineHighlight?: ResolvedLineHighlight;
   activeHeaderPath: string | null;
   devicePixelRatio: number;
   paintTop?: number;
@@ -284,6 +287,13 @@ function paintLine(
       );
     }
     if (!cell) return;
+    if (isLineHighlighted(input.lineHighlight, input.row, cellIndex)) {
+      input.context.save();
+      input.context.globalAlpha = LINE_HIGHLIGHT_ALPHA;
+      input.context.fillStyle = input.palette.selection;
+      input.context.fillRect(x, input.y, columnWidth, input.row.height - input.row.reviewHeight);
+      input.context.restore();
+    }
     input.context.fillStyle = input.palette.border;
     input.context.fillRect(x + file.gutterWidth, input.y, 1, reviewDividerHeight(input.row.height));
     if (cell.lineNumber !== null) {

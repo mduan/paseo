@@ -303,4 +303,148 @@ describe("buildReviewAttachmentSnapshot", () => {
       },
     });
   });
+
+  function contextLine(lineNumber: number) {
+    return { type: "context" as const, content: `line ${lineNumber}` };
+  }
+
+  function makeTwoHunkFile(): ParsedDiffFile {
+    return {
+      path: "src/example.ts",
+      isNew: false,
+      isDeleted: false,
+      additions: 2,
+      deletions: 1,
+      status: "ok",
+      hunks: [
+        {
+          oldStart: 1,
+          oldCount: 6,
+          newStart: 1,
+          newCount: 7,
+          lines: [
+            { type: "header", content: "@@ -1,6 +1,7 @@" },
+            contextLine(1),
+            contextLine(2),
+            contextLine(3),
+            { type: "remove", content: "old 4" },
+            { type: "add", content: "new 4" },
+            { type: "add", content: "new 5" },
+            contextLine(5),
+            contextLine(6),
+          ],
+        },
+        {
+          oldStart: 20,
+          oldCount: 4,
+          newStart: 21,
+          newCount: 4,
+          lines: [
+            { type: "header", content: "@@ -20,4 +21,4 @@" },
+            contextLine(20),
+            contextLine(21),
+            contextLine(22),
+            contextLine(23),
+          ],
+        },
+      ],
+    };
+  }
+
+  function snapshotComments(comments: ReviewDraftComment[], diffFiles: ParsedDiffFile[]) {
+    return (
+      buildReviewAttachmentSnapshot({
+        reviewDraftKey: "review:key",
+        cwd: "/repo",
+        mode: "uncommitted",
+        comments,
+        diffFiles,
+      })?.attachment.comments ?? []
+    );
+  }
+
+  function lineLabels(comment: {
+    context: { lines: { oldLineNumber: number | null; newLineNumber: number | null }[] };
+  }) {
+    return comment.context.lines.map(
+      (line) => `${line.oldLineNumber ?? "-"}/${line.newLineNumber ?? "-"}`,
+    );
+  }
+
+  it("spans a mixed-side range from the start's context to the end's context", () => {
+    const [comment] = snapshotComments(
+      [makeComment({ startSide: "old", startLineNumber: 4, side: "new", lineNumber: 5 })],
+      [makeTwoHunkFile()],
+    );
+
+    expect(comment).toMatchObject({
+      side: "new",
+      lineNumber: 5,
+      startSide: "old",
+      startLineNumber: 4,
+      context: {
+        hunkHeader: "@@ -1,6 +1,7 @@",
+        targetLine: { oldLineNumber: null, newLineNumber: 5, type: "add", content: "new 5" },
+      },
+    });
+    expect(lineLabels(comment!)).toEqual(["1/1", "2/2", "3/3", "4/-", "-/4", "-/5", "5/6", "6/7"]);
+  });
+
+  it("spans hunks for a cross-hunk range and keeps context inside the end hunks", () => {
+    const [comment] = snapshotComments(
+      [makeComment({ startSide: "new", startLineNumber: 7, side: "new", lineNumber: 22 })],
+      [makeTwoHunkFile()],
+    );
+
+    expect(comment?.context.hunkHeader).toBe("@@ -1,6 +1,7 @@");
+    expect(lineLabels(comment!)).toEqual([
+      "-/4",
+      "-/5",
+      "5/6",
+      "6/7",
+      "20/21",
+      "21/22",
+      "22/23",
+      "23/24",
+    ]);
+  });
+
+  it("drops a range comment when either end left the diff", () => {
+    expect(
+      snapshotComments(
+        [makeComment({ startSide: "new", startLineNumber: 15, side: "new", lineNumber: 22 })],
+        [makeTwoHunkFile()],
+      ),
+    ).toEqual([]);
+  });
+
+  it("caps range context at 80 lines", () => {
+    const lines = Array.from({ length: 120 }, (_, index) => contextLine(index + 1));
+    const file: ParsedDiffFile = {
+      path: "src/example.ts",
+      isNew: false,
+      isDeleted: false,
+      additions: 0,
+      deletions: 0,
+      status: "ok",
+      hunks: [
+        {
+          oldStart: 1,
+          oldCount: 120,
+          newStart: 1,
+          newCount: 120,
+          lines: [{ type: "header", content: "@@ -1,120 +1,120 @@" }, ...lines],
+        },
+      ],
+    };
+
+    const [comment] = snapshotComments(
+      [makeComment({ startSide: "new", startLineNumber: 10, side: "new", lineNumber: 110 })],
+      [file],
+    );
+
+    expect(comment?.context.lines).toHaveLength(80);
+    expect(comment?.context.lines[0]?.newLineNumber).toBe(7);
+    expect(comment?.context.lines[79]?.newLineNumber).toBe(86);
+  });
 });

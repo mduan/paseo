@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/context-menu";
 import { useToast } from "@/contexts/toast-context";
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { InlineReviewAddButton, InlineReviewThread } from "@/review";
+import {
+  InlineReviewAddIcon,
+  InlineReviewThread,
+  type InlineReviewActions,
+  type InlineReviewGeometry,
+} from "@/review";
+import { isSameReviewLineRange, type ReviewLineRange } from "@/review/range";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
 import { DocumentFileHeader } from "./document-file-header";
@@ -28,6 +34,14 @@ import {
 } from "./hit-testing";
 import { retainHorizontalOffsetMapForPaths } from "./horizontal-offsets";
 import { HorizontalScroll } from "./horizontal-scroll.web";
+import {
+  addButtonPosition,
+  hitTestLineGutter,
+  lineDragRange,
+  LineGutterPart,
+  resolveLineHighlight,
+  type LineGutterHit,
+} from "./line-range";
 import { buildDiffDocumentModel, FILE_HEADER_HEIGHT, resolveRelayoutScrollTop } from "./model";
 import { paintWebFileHeader, paintWebViewport } from "./paint.web";
 import { hasPointerDragStarted } from "./pointer-gesture";
@@ -55,6 +69,16 @@ interface StickyHeaderCanvasSlot {
   ratio: number;
   palette: DiffSurfaceProps["palette"] | null;
   typography: DiffSurfaceProps["headerTypography"] | null;
+}
+
+interface LineDrag extends LineGutterHit {
+  startX: number;
+  /** Client Y plus scroll offset, so scrolling while the button is held counts as movement. */
+  startY: number;
+  clientX: number;
+  clientY: number;
+  moved: boolean;
+  range?: ReviewLineRange;
 }
 
 function emptyStickyHeaderCanvasSlot(): StickyHeaderCanvasSlot {
@@ -95,6 +119,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     moved: boolean;
     dismissSelectionOnClick: boolean;
   } | null>(null);
+  const lineDragRef = useRef<LineDrag | undefined>(undefined);
   const frameRef = useRef<number | null>(null);
   const activeHeaderPathRef = useRef<string | null>(null);
   const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -159,6 +184,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const measurement =
     readyTypographyResource === typographyResource ? typographyResource.measureText : null;
   const reviewActions = props.mode.kind === "working" ? props.mode.reviewActions : undefined;
+  const reviewGeometry = useReviewGeometry(reviewActions);
   const model = useMemo(() => {
     if (!loadedTypography || !measurement) {
       return emptyDiffDocumentModel({
@@ -177,7 +203,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       typography: loadedTypography,
       measureText: measurement,
       palette: props.palette,
-      reviewActions,
+      reviewActions: reviewGeometry,
       labels: {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
@@ -193,7 +219,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     props.displayPreferences.wrapLines,
     props.files,
     props.palette,
-    reviewActions,
+    reviewGeometry,
     t,
     desiredTypography.lineHeight,
     loadedTypography,
@@ -202,6 +228,12 @@ export function DiffSurface(props: DiffSurfaceProps) {
     workspaceCache,
   ]);
   modelRef.current = model;
+  const lineHighlight = useMemo(
+    () => resolveLineHighlight(model, reviewActions?.highlight),
+    [model, reviewActions?.highlight],
+  );
+  const lineHighlightRef = useRef(lineHighlight);
+  lineHighlightRef.current = lineHighlight;
 
   const paintStickyHeaderPool = useCallback(
     (currentModel: ReturnType<typeof buildDiffDocumentModel>, scrollTop: number) => {
@@ -338,6 +370,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       viewportHeight: canvasHeight,
       horizontalOffsets: horizontalOffsetsRef.current,
       selection: selectionRef.current,
+      lineHighlight: lineHighlightRef.current,
       activeHeaderPath: activeHeaderPathRef.current,
       devicePixelRatio: ratio,
       paintTop,
@@ -460,6 +493,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
     paintStickyHeaderPool(model, scrollTopRef.current);
     updateInteractionFiles(scrollTopRef.current);
   }, [model, paintStickyHeaderPool, schedulePaint, updateInteractionFiles]);
+  useLayoutEffect(() => {
+    schedulePaint();
+  }, [lineHighlight, schedulePaint]);
   useEffect(
     () => () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -486,6 +522,35 @@ export function DiffSurface(props: DiffSurfaceProps) {
     }
   }, [collapsedFilePaths, mode, model.files, onToggleFile]);
 
+  const documentPointAt = useCallback((clientX: number, clientY: number) => {
+    const root = rootRef.current;
+    if (!root) return null;
+    const bounds = root.getBoundingClientRect();
+    return { x: clientX - bounds.left, documentY: clientY - bounds.top + scrollTopRef.current };
+  }, []);
+  // Scrolling during a line drag extends the range, so this re-reads the last pointer position.
+  const extendLineDrag = useStableEvent(() => {
+    const drag = lineDragRef.current;
+    const currentModel = modelRef.current;
+    const point = drag ? documentPointAt(drag.clientX, drag.clientY) : null;
+    if (!drag || !currentModel || !point || !reviewActions) return;
+    drag.moved = hasPointerDragStarted({
+      startX: drag.startX,
+      startY: drag.startY,
+      x: drag.clientX,
+      y: drag.clientY + scrollTopRef.current,
+      alreadyDragging: drag.moved,
+    });
+    if (!drag.moved) return;
+    const range = lineDragRange({
+      model: currentModel,
+      anchor: drag.anchor,
+      documentY: point.documentY,
+    });
+    if (isSameReviewLineRange(drag.range, range)) return;
+    drag.range = range;
+    reviewActions.onHighlight(range);
+  });
   const handleVerticalScroll = useCallback(
     (scrollElement: HTMLDivElement) => {
       const scrollTop = scrollElement.scrollTop;
@@ -496,6 +561,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         schedulePaint();
       }
       updateInteractionFiles(scrollTop);
+      extendLineDrag();
       if (hasHoveredAffordanceRef.current) {
         hasHoveredAffordanceRef.current = false;
         setHoveredAffordance(null);
@@ -521,7 +587,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       const nextTop = Math.round(requestedTop * ratio) / ratio;
       if (nextTop !== currentWindow.top) schedulePaint(false);
     },
-    [paintStickyHeaderPool, schedulePaint, updateInteractionFiles, viewport.height],
+    [extendLineDrag, paintStickyHeaderPool, schedulePaint, updateInteractionFiles, viewport.height],
   );
   useEffect(() => {
     const scroll = scrollRef.current;
@@ -537,26 +603,40 @@ export function DiffSurface(props: DiffSurfaceProps) {
     },
     [schedulePaint],
   );
-  const pointHitAt = useCallback((clientX: number, clientY: number) => {
-    const currentModel = modelRef.current;
-    const root = rootRef.current;
-    if (!currentModel || !root) return null;
-    const bounds = root.getBoundingClientRect();
-    const x = clientX - bounds.left;
-    const documentY = clientY - bounds.top + scrollTopRef.current;
-    const file = currentModel.files.find(
-      (entry) => entry.top <= documentY && documentY < entry.bottom,
-    );
-    return hitTestDiffDocument({
-      model: currentModel,
-      x,
-      documentY,
-      horizontalOffset: file ? (horizontalOffsetsRef.current.get(file.path) ?? 0) : 0,
-    });
-  }, []);
+  const pointHitAt = useCallback(
+    (clientX: number, clientY: number) => {
+      const currentModel = modelRef.current;
+      const point = documentPointAt(clientX, clientY);
+      if (!currentModel || !point) return null;
+      const file = currentModel.files.find(
+        (entry) => entry.top <= point.documentY && point.documentY < entry.bottom,
+      );
+      return hitTestDiffDocument({
+        model: currentModel,
+        x: point.x,
+        documentY: point.documentY,
+        horizontalOffset: file ? (horizontalOffsetsRef.current.get(file.path) ?? 0) : 0,
+      });
+    },
+    [documentPointAt],
+  );
   const pointHit = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => pointHitAt(event.clientX, event.clientY),
     [pointHitAt],
+  );
+  const lineGutterHitAt = useCallback(
+    (hit: DiffHit | null, clientX: number, clientY: number) => {
+      const currentModel = modelRef.current;
+      const point = documentPointAt(clientX, clientY);
+      if (!reviewActions || !currentModel || !point) return undefined;
+      return hitTestLineGutter({
+        model: currentModel,
+        hit,
+        x: point.x,
+        documentY: point.documentY,
+      });
+    },
+    [documentPointAt, reviewActions],
   );
   const setSelection = useStableEvent((selection: DiffSelection | null) => {
     selectionRef.current = selection;
@@ -570,6 +650,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   // repaint callback (header typography, palette, viewport height) does not.
   useEffect(() => {
     dragRef.current = null;
+    lineDragRef.current = undefined;
     setSelection(null);
   }, [
     props.collapsedFilePaths,
@@ -589,11 +670,29 @@ export function DiffSurface(props: DiffSurfaceProps) {
         )
       )
         return;
+      const hit = pointHit(event);
+      const lineGutterHit =
+        event.pointerType === "mouse"
+          ? lineGutterHitAt(hit, event.clientX, event.clientY)
+          : undefined;
+      if (lineGutterHit) {
+        if (selectionRef.current) setSelection(null);
+        lineDragRef.current = {
+          ...lineGutterHit,
+          startX: event.clientX,
+          startY: event.clientY + scrollTopRef.current,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          moved: false,
+        };
+        event.currentTarget.focus();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
       const dismissSelectionOnClick = selectionRef.current !== null;
       if (dismissSelectionOnClick) {
         setSelection(null);
       }
-      const hit = pointHit(event);
       if (hit?.kind !== "cell") return;
       dragRef.current = {
         anchor: hit.position,
@@ -606,7 +705,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       event.currentTarget.focus();
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [pointHit, setSelection],
+    [lineGutterHitAt, pointHit, setSelection],
   );
   const updateActiveHeader = useCallback(
     (target: EventTarget | null) => {
@@ -624,6 +723,21 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const pointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       updateActiveHeader(event.target);
+      const lineDrag = lineDragRef.current;
+      if (lineDrag) {
+        lineDrag.clientX = event.clientX;
+        lineDrag.clientY = event.clientY;
+        extendLineDrag();
+        if (lineDrag.moved && hasHoveredAffordanceRef.current) {
+          hasHoveredAffordanceRef.current = false;
+          setHoveredAffordance(null);
+        }
+        return;
+      }
+      const hit = pointHit(event);
+      event.currentTarget.style.cursor = lineGutterHitAt(hit, event.clientX, event.clientY)
+        ? "pointer"
+        : "text";
       const drag = dragRef.current;
       if (drag) {
         drag.moved = hasPointerDragStarted({
@@ -634,23 +748,23 @@ export function DiffSurface(props: DiffSurfaceProps) {
           alreadyDragging: drag.moved,
         });
       }
-      const hit = pointHit(event);
       if (hit?.kind === "cell") {
-        const row = modelRef.current?.rows[hit.position.rowIndex];
-        const file = modelRef.current?.files[hit.position.fileIndex];
-        const sideIndex =
-          row?.kind === "line" && row.cells.length === 2 && hit.position.side === "new" ? 1 : 0;
-        if (row && file) {
-          const columnWidth = viewport.width / (row.kind === "line" ? row.cells.length : 1);
-          const gutterBorder = sideIndex * columnWidth + file.gutterWidth;
+        const currentModel = modelRef.current;
+        const row = currentModel?.rows[hit.position.rowIndex];
+        if (currentModel && row?.kind === "line") {
           const rootBounds = rootRef.current?.getBoundingClientRect();
           const pointerX = rootBounds ? event.clientX - rootBounds.left : Number.NaN;
           if (hit.target && Number.isFinite(pointerX)) {
+            const button = addButtonPosition({
+              model: currentModel,
+              row,
+              cellIndex: hit.position.cellIndex,
+            });
             hasHoveredAffordanceRef.current = true;
             setHoveredAffordance({
               hit,
-              left: gutterBorder - 12,
-              top: row.top - scrollTopRef.current + (modelRef.current!.lineHeight - 22) / 2,
+              left: button.left,
+              top: button.top,
             });
           } else {
             hasHoveredAffordanceRef.current = false;
@@ -664,10 +778,38 @@ export function DiffSurface(props: DiffSurfaceProps) {
       if (!drag || hit?.kind !== "cell") return;
       setSelection({ anchor: drag.anchor, focus: hit.position });
     },
-    [pointHit, setSelection, updateActiveHeader, viewport.width],
+    [extendLineDrag, lineGutterHitAt, pointHit, setSelection, updateActiveHeader],
+  );
+  // The pinned add button sits on the bottom line of a highlight that resolves in this layout.
+  const pinnedTargetKey = lineHighlight?.addButtonTargetKey;
+  const pressLineGutter = useCallback(
+    ({ part, anchor }: LineGutterHit) => {
+      if (!reviewActions) return;
+      if (part === LineGutterPart.LineNumber) {
+        reviewActions.onToggleHighlight(anchor.target);
+        return;
+      }
+      if (anchor.target.key === pinnedTargetKey) reviewActions.onStartHighlightComment();
+      else reviewActions.onStartComment(anchor.target);
+    },
+    [pinnedTargetKey, reviewActions],
   );
   const pointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      const lineDrag = lineDragRef.current;
+      if (lineDrag) {
+        lineDrag.clientX = event.clientX;
+        lineDrag.clientY = event.clientY;
+        extendLineDrag();
+        lineDragRef.current = undefined;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        if (!lineDrag.moved && reviewActions) {
+          pressLineGutter(lineDrag);
+        }
+        return;
+      }
       const drag = dragRef.current;
       const hit = pointHit(event);
       dragRef.current = null;
@@ -699,10 +841,11 @@ export function DiffSurface(props: DiffSurfaceProps) {
         reviewActions.onStartComment(hit.target);
       }
     },
-    [pointHit, reviewActions, setSelection],
+    [extendLineDrag, pointHit, pressLineGutter, reviewActions, setSelection],
   );
   const cancelPointer = useCallback(() => {
     dragRef.current = null;
+    lineDragRef.current = undefined;
   }, []);
   const pointerLeave = useCallback(() => updateActiveHeader(null), [updateActiveHeader]);
   const copy = useCallback(
@@ -788,10 +931,15 @@ export function DiffSurface(props: DiffSurfaceProps) {
     }),
     [hoveredAffordance?.left, hoveredAffordance?.top],
   );
-  const addHoveredComment = useCallback(() => {
-    const target = hoveredAffordance?.hit.target;
-    if (target) reviewActions?.onStartComment(target);
-  }, [hoveredAffordance?.hit.target, reviewActions]);
+  const showHoveredAffordance = isHoverAddButtonVisible({
+    hoveredTarget: hoveredAffordance?.hit.target,
+    pinnedTargetKey,
+    canReview: Boolean(reviewActions),
+  });
+  const pinnedAffordanceStyle = useMemo<ViewStyle | undefined>(
+    () => (lineHighlight ? { ...AFFORDANCE_STYLE, ...lineHighlight.addButton } : undefined),
+    [lineHighlight],
+  );
   const canvasStyle = useMemo<React.CSSProperties>(
     () => ({
       ...CANVAS_STYLE,
@@ -872,12 +1020,15 @@ export function DiffSurface(props: DiffSurfaceProps) {
                 });
               })
             : null}
+          {pinnedAffordanceStyle ? (
+            <InlineReviewAddIcon style={pinnedAffordanceStyle} testID="diff-pinned-add-comment" />
+          ) : null}
+          {showHoveredAffordance ? (
+            <InlineReviewAddIcon style={affordanceStyle} testID="diff-hover-add-comment" />
+          ) : null}
         </div>
       </div>
       <DomOverlayScrollbar scrollContainerRef={scrollRef} onUserScrollUp={noop} />
-      {hoveredAffordance?.hit.target && reviewActions ? (
-        <InlineReviewAddButton onPress={addHoveredComment} style={affordanceStyle} />
-      ) : null}
     </div>
   );
 
@@ -1020,6 +1171,29 @@ function WebFileHeaderSection({
   );
 }
 
+// The highlight changes on every line-drag step; only comments and the editor shape layout.
+function useReviewGeometry(
+  reviewActions: InlineReviewActions | undefined,
+): InlineReviewGeometry | undefined {
+  const commentsByTarget = reviewActions?.commentsByTarget;
+  const editor = reviewActions?.editor ?? null;
+  return useMemo(
+    () => (commentsByTarget ? { commentsByTarget, editor } : undefined),
+    [commentsByTarget, editor],
+  );
+}
+
+// The hover button would cover the pinned one and take its press.
+function isHoverAddButtonVisible(input: {
+  hoveredTarget: ReviewableDiffTarget | null | undefined;
+  pinnedTargetKey: string | undefined;
+  canReview: boolean;
+}): boolean {
+  return Boolean(
+    input.canReview && input.hoveredTarget && input.hoveredTarget.key !== input.pinnedTargetKey,
+  );
+}
+
 function preventDocumentMouseSelection(event: React.MouseEvent): void {
   if (event.detail < 2) return;
   const target = event.target;
@@ -1125,7 +1299,8 @@ const BODY_MARKER_STYLE: React.CSSProperties = {
   right: 0,
   pointerEvents: "none",
 };
-const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 4, userSelect: "text" };
+// Like the add buttons: above the canvas, below the sticky header canvases (zIndex 2).
+const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 1, userSelect: "text" };
 const CANVAS_STYLE: React.CSSProperties = {
   position: "absolute",
   top: 0,
@@ -1133,9 +1308,11 @@ const CANVAS_STYLE: React.CSSProperties = {
   zIndex: 1,
   pointerEvents: "none",
 };
+// Add buttons sit in the scrolled content after the canvas (zIndex 1) and below the sticky
+// header canvases (zIndex 2). Presses bubble to the scroll container, which hit-tests them.
 const AFFORDANCE_STYLE: ViewStyle = {
   position: "absolute",
-  zIndex: 5,
+  zIndex: 1,
 };
 
 function emptyDiffDocumentModel(input: {

@@ -1980,6 +1980,8 @@ export const en = {
       cancelAccessibility: "Cancel review comment",
       save: "Comment",
       saveAccessibility: "Save review comment",
+      line: "Line {{line}}",
+      lines: "Lines {{start}}–{{end}}",
     },
   },
   settings: {

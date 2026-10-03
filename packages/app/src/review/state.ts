@@ -8,6 +8,9 @@ export interface ReviewDraftComment {
   filePath: string;
   side: ReviewDraftSide;
   lineNumber: number;
+  // Top end of a range comment; `side`/`lineNumber` are the bottom end, where the thread anchors.
+  startSide?: ReviewDraftSide;
+  startLineNumber?: number;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +31,8 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   filePath: z.string(),
   side: z.enum(["old", "new"]),
   lineNumber: z.number().int().positive(),
+  startSide: z.enum(["old", "new"]).optional(),
+  startLineNumber: z.number().int().positive().optional(),
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
@@ -131,12 +136,8 @@ function applyCommentUpdates(
     return comment;
   }
   return {
-    id: comment.id,
-    filePath: comment.filePath,
-    side: comment.side,
-    lineNumber: comment.lineNumber,
+    ...comment,
     body: updates.body ?? comment.body,
-    createdAt: comment.createdAt,
     updatedAt,
   };
 }

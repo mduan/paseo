@@ -387,12 +387,8 @@ describe("diff document model", () => {
             },
             body: "",
             commentId: null,
+            focusRequestId: 0,
           },
-          onStartComment() {},
-          onCancelEditor() {},
-          onSaveEditor() {},
-          onEditComment() {},
-          onDeleteComment() {},
         },
       }),
     );
@@ -788,11 +784,6 @@ function reviewActionsWithEditor(
 ): NonNullable<BuildDiffDocumentModelInput["reviewActions"]> {
   return {
     commentsByTarget: new Map(),
-    editor: target ? { target, body: "", commentId: null } : null,
-    onStartComment() {},
-    onCancelEditor() {},
-    onSaveEditor() {},
-    onEditComment() {},
-    onDeleteComment() {},
+    editor: target ? { target, body: "", commentId: null, focusRequestId: 0 } : null,
   };
 }

@@ -94,23 +94,36 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
         lines.push(`Base: ${attachment.baseRef}`);
       }
       attachment.comments.forEach((comment, index) => {
+        const end: ReviewLineRef = { side: comment.side, lineNumber: comment.lineNumber };
+        const start: ReviewLineRef =
+          comment.startLineNumber === undefined
+            ? end
+            : { side: comment.startSide ?? comment.side, lineNumber: comment.startLineNumber };
+        const isSingleLine = start.side === end.side && start.lineNumber === end.lineNumber;
+        const location = isSingleLine
+          ? formatReviewLine(end)
+          : `${formatReviewLine(start)}-${formatReviewLine(end)}`;
         lines.push(
           "",
-          `Comment ${index + 1}: ${comment.filePath}:${comment.side}:${comment.lineNumber}`,
+          `Comment ${index + 1}: ${comment.filePath}:${location}`,
           comment.body,
           comment.context.hunkHeader,
         );
-        const target = comment.context.targetLine;
-        for (const line of comment.context.lines) {
-          const isTarget =
-            line.oldLineNumber === target.oldLineNumber &&
-            line.newLineNumber === target.newLineNumber &&
-            line.type === target.type &&
-            line.content === target.content;
-          const prefix = isTarget ? "> " : "  ";
+        const contextLines = comment.context.lines;
+        const startIndex = contextLines.findIndex((line) => isReviewLine(line, start));
+        const endIndex = contextLines.findIndex((line) => isReviewLine(line, end));
+        // The client caps context, so a long range can end past the last context line.
+        const lastMarkedIndex = endIndex === -1 ? contextLines.length - 1 : endIndex;
+        contextLines.forEach((line, lineIndex) => {
+          const isMarked =
+            startIndex !== -1 && lineIndex >= startIndex && lineIndex <= lastMarkedIndex;
+          const prefix = isMarked ? "> " : "  ";
           const oldLn = padLineNumber(line.oldLineNumber);
           const newLn = padLineNumber(line.newLineNumber);
           lines.push(`${prefix}${oldLn} ${newLn} ${REVIEW_LINE_MARKERS[line.type]}${line.content}`);
+        });
+        if (startIndex !== -1 && endIndex === -1) {
+          lines.push(`  (Range truncated. Read ${comment.filePath} for the rest.)`);
         }
       });
       return lines.join("\n");
@@ -192,6 +205,20 @@ function formatChangeRequestNumber(forge: string, number: number): string {
 
 function formatIssueNumber(forge: string, number: number): string {
   return `${getForgeDefinitionOrNeutral(forge).issueNumberPrefix}${number}`;
+}
+
+type ReviewComment = Extract<AgentAttachment, { type: "review" }>["comments"][number];
+type ReviewLineRef = Pick<ReviewComment, "side" | "lineNumber">;
+
+function formatReviewLine(ref: ReviewLineRef): string {
+  return `${ref.side === "old" ? "L" : "R"}${ref.lineNumber}`;
+}
+
+function isReviewLine(
+  line: ReviewComment["context"]["lines"][number],
+  ref: ReviewLineRef,
+): boolean {
+  return (ref.side === "old" ? line.oldLineNumber : line.newLineNumber) === ref.lineNumber;
 }
 
 function padLineNumber(lineNumber: number | null): string {

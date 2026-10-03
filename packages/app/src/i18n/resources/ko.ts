@@ -1965,6 +1965,8 @@ export const ko: TranslationResources = {
       cancelAccessibility: "리뷰 댓글 취소",
       save: "댓글",
       saveAccessibility: "리뷰 댓글 저장",
+      line: "{{line}}줄",
+      lines: "{{start}}–{{end}}줄",
     },
   },
   settings: {

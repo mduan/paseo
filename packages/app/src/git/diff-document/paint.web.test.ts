@@ -180,6 +180,75 @@ describe("web diff text shaping", () => {
     expect(fills).toContainEqual({ color: "border", x: 20, y: 0, width: 1, height: 58 });
   });
 
+  it("tints the text area of highlighted lines under the code", () => {
+    const fills: Array<{ color: string; alpha: number; y: number; height: number }> = [];
+    let fillStyle = "";
+    const context = {
+      setTransform() {},
+      clearRect() {},
+      fillRect(_x: number, y: number, _width: number, height: number) {
+        fills.push({ color: fillStyle, alpha: context.globalAlpha, y, height });
+      },
+      save() {},
+      restore() {},
+      beginPath() {},
+      rect() {},
+      clip() {},
+      fillText() {},
+      get fillStyle() {
+        return fillStyle;
+      },
+      set fillStyle(value: string | CanvasGradient | CanvasPattern) {
+        fillStyle = String(value);
+      },
+      globalAlpha: 1,
+      font: "",
+      textBaseline: "alphabetic",
+    } as unknown as CanvasRenderingContext2D;
+    const row = modelWithReview.rows[0] as DiffLineRow;
+    const reviewTarget = {
+      key: "src/a.ts:new:1",
+      filePath: "src/a.ts",
+      hunkHeader: "@@",
+      hunkIndex: 0,
+      lineIndex: 1,
+      oldLineNumber: null,
+      newLineNumber: 1,
+      side: "new" as const,
+      lineNumber: 1,
+      lineType: "add" as const,
+      content: "fi",
+    };
+
+    paintWebViewport({
+      context,
+      model: {
+        ...modelWithReview,
+        rows: [{ ...row, cells: [{ ...row.cells[0]!, reviewTarget }] }],
+      },
+      palette,
+      typography: { family: "monospace", size: 12, lineHeight: 18 },
+      headerTypography,
+      measureText: { measure: () => 0 },
+      scrollTop: 0,
+      viewportWidth: 200,
+      viewportHeight: 100,
+      horizontalOffsets: new Map(),
+      selection: null,
+      lineHighlight: {
+        startRowIndex: 0,
+        endRowIndex: 0,
+        cellIndex: 0,
+        addButton: { left: 8, top: -2 },
+        addButtonTargetKey: "src/a.ts:new:1",
+      },
+      activeHeaderPath: null,
+      devicePixelRatio: 1,
+    });
+
+    expect(fills).toContainEqual({ color: palette.selection, alpha: 0.2, y: 0, height: 18 });
+  });
+
   it("paints every expanded file body's bottom border", () => {
     const fills: Array<{ color: string; x: number; y: number; width: number; height: number }> = [];
     let fillStyle = "";

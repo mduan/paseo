@@ -19,12 +19,13 @@ export {
   isInlineReviewEditorForTarget,
   type InlineReviewActions,
   type InlineReviewEditorState,
+  type InlineReviewGeometry,
 } from "./geometry";
 
 export {
   getInlineReviewThreadViewportStyle,
   groupInlineReviewCommentsByTarget,
-  InlineReviewAddButton,
+  InlineReviewAddIcon,
   InlineReviewEditor,
   InlineReviewGutterCell,
   InlineReviewThread,

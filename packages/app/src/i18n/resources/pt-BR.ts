@@ -1988,6 +1988,8 @@ export const ptBR: TranslationResources = {
       cancelAccessibility: "Cancelar comentário de revisão",
       save: "Comentar",
       saveAccessibility: "Salvar comentário de revisão",
+      line: "Linha {{line}}",
+      lines: "Linhas {{start}}–{{end}}",
     },
   },
   settings: {
