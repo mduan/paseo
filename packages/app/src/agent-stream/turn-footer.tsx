@@ -75,6 +75,7 @@ export const TurnFooter = memo(function TurnFooter({
       startIndex={host.startIndex}
       supportsTimelineCursor={supportsTimelineCursor}
       onForkAssistantTurn={onForkAssistantTurn}
+      alwaysShowActions
     />
   );
 });
@@ -86,6 +87,7 @@ export const CompletedTurnFooterRow = memo(function CompletedTurnFooterRow({
   startIndex,
   supportsTimelineCursor,
   onForkAssistantTurn,
+  alwaysShowActions,
 }: {
   strategy: TurnContentStrategy;
   items: StreamItem[];
@@ -93,6 +95,7 @@ export const CompletedTurnFooterRow = memo(function CompletedTurnFooterRow({
   startIndex: number;
   supportsTimelineCursor: boolean;
   onForkAssistantTurn?: AssistantTurnForkHandler;
+  alwaysShowActions?: boolean;
 }) {
   return (
     <TurnFooterRow>
@@ -103,6 +106,7 @@ export const CompletedTurnFooterRow = memo(function CompletedTurnFooterRow({
         startIndex={startIndex}
         supportsTimelineCursor={supportsTimelineCursor}
         onForkAssistantTurn={onForkAssistantTurn}
+        alwaysShowActions={alwaysShowActions}
       />
     </TurnFooterRow>
   );
@@ -159,6 +163,7 @@ function CompletedTurnFooter({
   startIndex,
   supportsTimelineCursor,
   onForkAssistantTurn,
+  alwaysShowActions,
 }: {
   strategy: TurnContentStrategy;
   items: StreamItem[];
@@ -166,6 +171,7 @@ function CompletedTurnFooter({
   startIndex: number;
   supportsTimelineCursor: boolean;
   onForkAssistantTurn?: AssistantTurnForkHandler;
+  alwaysShowActions?: boolean;
 }) {
   const getContent = useCallback(
     () =>
@@ -197,6 +203,7 @@ function CompletedTurnFooter({
         getContent={getContent}
         completedAt={timing?.completedAt}
         onFork={boundary && onForkAssistantTurn ? handleFork : undefined}
+        alwaysShowActions={alwaysShowActions}
       />
     </View>
   );
