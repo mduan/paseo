@@ -568,7 +568,7 @@ describe("toAssistantPreview", () => {
   });
 
   it("caps the length and skips empty text", () => {
-    expect(toAssistantPreview("a".repeat(500))).toHaveLength(200);
+    expect(toAssistantPreview("a".repeat(1000))).toHaveLength(600);
     expect(toAssistantPreview("  \n ")).toBeUndefined();
   });
 });

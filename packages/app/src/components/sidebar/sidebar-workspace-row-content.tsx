@@ -16,7 +16,6 @@ import {
   WorkspaceMetaRow,
   type WorkspaceServiceSummary,
 } from "@/components/sidebar/workspace-meta-row";
-import { WorkspaceHoverCard } from "@/components/workspace-hover-card";
 import type { HostBadgeModel } from "@/hosts/appearance";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import {
@@ -53,11 +52,9 @@ const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedChevronRight = withUnistyles(ChevronRight);
 
 export function SidebarWorkspaceRowFrame({
-  workspace,
   isDragging = false,
   children,
 }: {
-  workspace: SidebarWorkspaceEntry;
   isDragging?: boolean;
   children: (input: {
     isHovered: boolean;
@@ -81,21 +78,12 @@ export function SidebarWorkspaceRowFrame({
     [handlePointerEnter, handlePointerLeave],
   );
 
-  return (
-    <WorkspaceHoverCard
-      workspace={workspace}
-      prHint={workspace.prHint}
-      isDragging={isDragging}
-      disabled={contextMenuOpen}
-    >
-      {children({
-        isHovered: isHovered && !contextMenuOpen && !isDragging,
-        contextMenuOpen,
-        onContextMenuOpenChange: handleContextMenuOpenChange,
-        hoverHandlers,
-      })}
-    </WorkspaceHoverCard>
-  );
+  return children({
+    isHovered: isHovered && !contextMenuOpen && !isDragging,
+    contextMenuOpen,
+    onContextMenuOpenChange: handleContextMenuOpenChange,
+    hoverHandlers,
+  });
 }
 
 export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowContent({

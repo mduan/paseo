@@ -1,4 +1,12 @@
-import { createContext, memo, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactElement,
+} from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -10,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
@@ -269,8 +278,10 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   return (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
       {(presentation) => (
-        <View
-          style={styles.hoverTarget}
+        <SessionRowHoverTarget
+          row={row}
+          serverId={serverId}
+          label={presentation.label}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
@@ -288,7 +299,11 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                     <WorkspaceTabIcon
                       presentation={presentation}
                       active={selected}
-                      backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                      backdrop={resolveBackdrop({
+                        hovered: Boolean(hovered),
+                        pressed,
+                        selected,
+                      })}
                     />
                   </View>
                   <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
@@ -314,11 +329,49 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
               </>
             )}
           </Pressable>
-        </View>
+        </SessionRowHoverTarget>
       )}
     </WorkspaceTabPresentationResolver>
   );
 });
+
+/**
+ * Carries the row's hover View. The tooltip shows the full tab name
+ * and, for agents, the last response the row truncates to one line.
+ */
+function SessionRowHoverTarget({
+  row,
+  serverId,
+  label,
+  onPointerEnter,
+  onPointerLeave,
+  children,
+}: {
+  row: WorkspaceSessionRow;
+  serverId: string;
+  label: string;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+  children: ReactElement;
+}) {
+  return (
+    <View
+      style={styles.hoverTarget}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent side="right" align="start" offset={8} maxWidth={360}>
+          <Text style={styles.tooltipTitle}>{label}</Text>
+          {row.target.kind === "agent" ? (
+            <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+          ) : null}
+        </TooltipContent>
+      </Tooltip>
+    </View>
+  );
+}
 
 function WorkspaceSessionKebab({
   layoutKey,
@@ -392,15 +445,27 @@ function resolveBackdrop(input: {
   return "surfaceSidebar";
 }
 
-function AgentPreview({ serverId, agentId }: { serverId: string; agentId: string }) {
+function AgentPreview({
+  serverId,
+  agentId,
+  full = false,
+}: {
+  serverId: string;
+  agentId: string;
+  /** The tooltip shows the whole preview instead of the row's single line. */
+  full?: boolean;
+}) {
   const preview = useSessionStore(
     (state) => state.sessions[serverId]?.agents?.get(agentId)?.lastAssistantPreview,
   );
-  return preview ? (
+  if (!preview) return null;
+  return full ? (
+    <Text style={styles.tooltipPreview}>{preview}</Text>
+  ) : (
     <Text style={styles.preview} numberOfLines={1}>
       {preview}
     </Text>
-  ) : null;
+  );
 }
 
 function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: string }) {
@@ -455,6 +520,17 @@ const styles = StyleSheet.create((theme) => ({
   // Starts under the title, past the 14px tab icon and its gap.
   preview: {
     paddingLeft: 14 + theme.spacing[2],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
+  },
+  tooltipTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+  },
+  tooltipPreview: {
+    marginTop: theme.spacing[1],
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,

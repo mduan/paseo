@@ -1,3 +1,4 @@
+import { WorkspaceHoverCard } from "@/components/workspace-hover-card";
 import {
   memo,
   useCallback,
@@ -833,7 +834,7 @@ function StatusWorkspaceRowInnerContent({
   }, [endDragPress]);
 
   return (
-    <SidebarWorkspaceRowFrame workspace={workspace} isDragging={isDragging}>
+    <SidebarWorkspaceRowFrame isDragging={isDragging}>
       {({ isHovered, contextMenuOpen, onContextMenuOpenChange, hoverHandlers }) => {
         // The focused workspace group keeps its own background instead of switching to hover.
         const isRowHovered = isHovered && !groupSelected;
@@ -873,83 +874,92 @@ function StatusWorkspaceRowInnerContent({
             ref={dragHandleProps?.setActivatorNodeRef as unknown as Ref<View>}
             style={[
               styles.workspaceRowContainer,
+              selected && styles.workspaceRowContainerSelected,
               // Hovering a workspace highlights it together with its nested session rows.
               isHovered && sessions.rows.length > 0 && styles.workspaceRowGroupHovered,
               groupSelected && styles.workspaceRowGroupSelected,
             ]}
             {...hoverHandlers}
           >
-            <SidebarWorkspaceContextMenu
-              contextMenuOpen={contextMenuOpen}
-              onContextMenuOpenChange={onContextMenuOpenChange}
+            {/* Scoped to the workspace row so nested session rows show their own tooltip. */}
+            <WorkspaceHoverCard
               workspace={workspace}
-              leadingProjectName={projectName}
-              hostBadgeLabel={hostBadge?.label}
-              serviceSummary={serviceSummary}
-              workspaceKey={workspace.workspaceKey}
-              onCopyPath={onCopyPath}
-              onCopyBranchName={onCopyBranchName}
-              onRename={onRename}
-              onMarkAsRead={onMarkAsRead}
-              onMarkAsUnread={onMarkAsUnread}
-              onArchive={onArchive}
-              archiveLabel={archiveLabel}
-              archiveStatus={archiveStatus}
-              archivePendingLabel={archivePendingLabel}
-              archiveShortcutKeys={archiveShortcutKeys}
-              isPinned={isPinned}
-              onTogglePin={onTogglePin}
-              openInFileManagerPath={workspace.workspaceDirectory}
-              disabled={isArchiving}
-              accessibilityRole="button"
-              accessibilityState={accessibilityState}
-              style={workspaceRowStyle}
-              highlightStyle={styles.workspaceRowPressed}
-              onPressIn={handlePressIn}
-              onTouchMove={moveDragPress}
-              onPressOut={handlePressOut}
-              onPress={handlePress}
-              testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
+              prHint={workspace.prHint}
+              isDragging={isDragging}
+              disabled={contextMenuOpen}
             >
-              <SidebarWorkspaceRowContent
+              <SidebarWorkspaceContextMenu
+                contextMenuOpen={contextMenuOpen}
+                onContextMenuOpenChange={onContextMenuOpenChange}
                 workspace={workspace}
-                hostBadge={hostBadge}
                 leadingProjectName={projectName}
-                leadingProjectIconDataUri={projectIconDataUri}
+                hostBadgeLabel={hostBadge?.label}
                 serviceSummary={serviceSummary}
-                backdrop={backdrop}
-                isHovered={isHovered}
-                isLoading={isArchiving}
-                shortcutNumber={shortcutNumber}
-                showShortcutBadge={showShortcutBadge}
-                reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-                expandToggle={sessions.expandToggle}
+                workspaceKey={workspace.workspaceKey}
+                onCopyPath={onCopyPath}
+                onCopyBranchName={onCopyBranchName}
+                onRename={onRename}
+                onMarkAsRead={onMarkAsRead}
+                onMarkAsUnread={onMarkAsUnread}
+                onArchive={onArchive}
+                archiveLabel={archiveLabel}
+                archiveStatus={archiveStatus}
+                archivePendingLabel={archivePendingLabel}
+                archiveShortcutKeys={archiveShortcutKeys}
+                isPinned={isPinned}
+                onTogglePin={onTogglePin}
+                openInFileManagerPath={workspace.workspaceDirectory}
+                disabled={isArchiving}
+                accessibilityRole="button"
+                accessibilityState={accessibilityState}
+                style={workspaceRowStyle}
+                highlightStyle={styles.workspaceRowPressed}
+                onPressIn={handlePressIn}
+                onTouchMove={moveDragPress}
+                onPressOut={handlePressOut}
+                onPress={handlePress}
+                testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
               >
-                {renderSlot ? (
-                  <StatusWorkspaceActionSlot
-                    workspace={workspace}
-                    backdrop={backdrop}
-                    trailing={trailing}
-                    trailingPresentation={trailingPresentation}
-                    showKebab={showKebabInSlot}
-                    showScrim={showScrim}
-                    reserveSlotWidth={reserveSlotWidth}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                    onCopyPath={onCopyPath}
-                    onCopyBranchName={onCopyBranchName}
-                    onRename={onRename}
-                    onMarkAsRead={onMarkAsRead}
-                    onMarkAsUnread={onMarkAsUnread}
-                    onArchive={onArchive}
-                    archiveLabel={archiveLabel}
-                    archiveStatus={archiveStatus}
-                    archivePendingLabel={archivePendingLabel}
-                    archiveShortcutKeys={archiveShortcutKeys}
-                  />
-                ) : null}
-              </SidebarWorkspaceRowContent>
-            </SidebarWorkspaceContextMenu>
+                <SidebarWorkspaceRowContent
+                  workspace={workspace}
+                  hostBadge={hostBadge}
+                  leadingProjectName={projectName}
+                  leadingProjectIconDataUri={projectIconDataUri}
+                  serviceSummary={serviceSummary}
+                  backdrop={backdrop}
+                  isHovered={isHovered}
+                  isLoading={isArchiving}
+                  shortcutNumber={shortcutNumber}
+                  showShortcutBadge={showShortcutBadge}
+                  reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+                  expandToggle={sessions.expandToggle}
+                >
+                  {renderSlot ? (
+                    <StatusWorkspaceActionSlot
+                      workspace={workspace}
+                      backdrop={backdrop}
+                      trailing={trailing}
+                      trailingPresentation={trailingPresentation}
+                      showKebab={showKebabInSlot}
+                      showScrim={showScrim}
+                      reserveSlotWidth={reserveSlotWidth}
+                      isPinned={isPinned}
+                      onTogglePin={onTogglePin}
+                      onCopyPath={onCopyPath}
+                      onCopyBranchName={onCopyBranchName}
+                      onRename={onRename}
+                      onMarkAsRead={onMarkAsRead}
+                      onMarkAsUnread={onMarkAsUnread}
+                      onArchive={onArchive}
+                      archiveLabel={archiveLabel}
+                      archiveStatus={archiveStatus}
+                      archivePendingLabel={archivePendingLabel}
+                      archiveShortcutKeys={archiveShortcutKeys}
+                    />
+                  ) : null}
+                </SidebarWorkspaceRowContent>
+              </SidebarWorkspaceContextMenu>
+            </WorkspaceHoverCard>
             <WorkspaceSessionRowList
               workspace={workspace}
               sessions={sessions}
@@ -1131,8 +1141,16 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     flexShrink: 1,
   },
+  // The border and gap set each workspace apart from its neighbours' nested session rows.
   workspaceRowContainer: {
     position: "relative",
+    marginBottom: 2,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+  },
+  workspaceRowContainerSelected: {
+    borderColor: theme.colors.surface4,
   },
   workspaceRowGroupHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
