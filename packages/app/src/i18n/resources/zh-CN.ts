@@ -2552,6 +2552,16 @@ export const zhCN: TranslationResources = {
           submit: "重命名",
         },
         restart: {
+          ssh: {
+            title: "启动守护进程",
+            hint: "通过 SSH 在此主机上运行 paseo daemon start",
+            confirm: "启动",
+            confirmTitle: "启动 {{name}}",
+            confirmMessage:
+              "这会通过 SSH 在主机上运行 paseo daemon start。守护进程就绪后，应用会自动重新连接。",
+            starting: "正在启动...",
+            failedTitle: "启动失败",
+          },
           title: "重启 Daemon",
           hint: "重启 Daemon 进程。应用会自动重新连接",
           confirm: "重启",
@@ -2569,6 +2579,15 @@ export const zhCN: TranslationResources = {
           dialogFailedMessage: "无法打开重启确认对话框。",
         },
         update: {
+          ssh: {
+            hint: "通过 SSH 在此主机上安装最新的 @mduan/paseo-cli 并重启守护进程",
+            confirmTitle: "在 {{name}} 上安装 @mduan/paseo-cli",
+            confirmMessage:
+              "这会通过 SSH 将 {{name}} 上的 Paseo CLI 替换为最新的 @mduan/paseo-cli，然后停止并启动守护进程。正在运行的代理会被中断。",
+            installing: "正在通过 SSH 安装...",
+            completeTitle: "守护进程已安装",
+            completeDescription: "守护进程就绪后，应用会自动重新连接。",
+          },
           desktopManagedHint: "此 Daemon 由 Paseo Desktop 管理。请在 Host 上更新 Paseo Desktop。",
           title: "Update daemon",
           hint: "Update the daemon to the latest version and restart it",

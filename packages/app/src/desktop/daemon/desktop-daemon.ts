@@ -303,6 +303,20 @@ export async function closeLocalTransportSession(sessionId: string): Promise<voi
   await invokeDesktopCommand("close_local_daemon_transport", { sessionId });
 }
 
+// Values match `RemoteSshDaemonOperation` in packages/desktop/src/daemon/remote-ssh-daemon.ts,
+// which builds the command each operation runs on the host.
+export enum RemoteSshDaemonOperation {
+  InstallForkDaemon = "install_fork_daemon",
+  StartDaemon = "start_daemon",
+}
+
+export async function runRemoteSshDaemonOperation(input: {
+  target: RemoteSshTransportTarget;
+  operation: RemoteSshDaemonOperation;
+}): Promise<void> {
+  await invokeDesktopCommand("run_remote_ssh_daemon_operation", input);
+}
+
 // ---------------------------------------------------------------------------
 // Integrations
 // ---------------------------------------------------------------------------

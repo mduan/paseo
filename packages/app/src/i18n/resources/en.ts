@@ -2748,6 +2748,16 @@ export const en = {
           submit: "Rename",
         },
         restart: {
+          ssh: {
+            title: "Start daemon",
+            hint: "Runs paseo daemon start on this host over SSH",
+            confirm: "Start",
+            confirmTitle: "Start {{name}}",
+            confirmMessage:
+              "This runs paseo daemon start on the host over SSH. The app reconnects when the daemon is ready.",
+            starting: "Starting...",
+            failedTitle: "Start failed",
+          },
           title: "Restart daemon",
           hint: "Restarts the daemon process. The app will reconnect automatically",
           confirm: "Restart",
@@ -2770,6 +2780,15 @@ export const en = {
           dialogFailedMessage: "Unable to open the restart confirmation dialog.",
         },
         update: {
+          ssh: {
+            hint: "Install the latest @mduan/paseo-cli on this host over SSH and restart the daemon",
+            confirmTitle: "Install @mduan/paseo-cli on {{name}}",
+            confirmMessage:
+              "This replaces the Paseo CLI on {{name}} with the latest @mduan/paseo-cli over SSH, then stops and starts the daemon. Running agents will be interrupted.",
+            installing: "Installing over SSH...",
+            completeTitle: "Daemon installed",
+            completeDescription: "The app reconnects when the daemon is ready.",
+          },
           desktopManagedHint:
             "This daemon is managed by Paseo Desktop. Update Paseo Desktop on the host.",
           title: "Update daemon",

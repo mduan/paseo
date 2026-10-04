@@ -2580,6 +2580,16 @@ export const ar: TranslationResources = {
           submit: "إعادة تسمية",
         },
         restart: {
+          ssh: {
+            title: "تشغيل الخدمة",
+            hint: "يشغّل paseo daemon start على هذا المضيف عبر SSH",
+            confirm: "تشغيل",
+            confirmTitle: "تشغيل {{name}}",
+            confirmMessage:
+              "سيتم تشغيل paseo daemon start على المضيف عبر SSH. يعيد التطبيق الاتصال عندما تصبح الخدمة جاهزة.",
+            starting: "جارٍ التشغيل...",
+            failedTitle: "فشل التشغيل",
+          },
           title: "إعادة تشغيل البرنامج الخفي",
           hint: "إعادة تشغيل عملية البرنامج الخفي. سيتم إعادة الاتصال بالتطبيق تلقائيًا",
           confirm: "إعادة التشغيل",
@@ -2601,6 +2611,15 @@ export const ar: TranslationResources = {
           dialogFailedMessage: "غير قادر على فتح مربع حوار تأكيد إعادة التشغيل.",
         },
         update: {
+          ssh: {
+            hint: "يثبّت أحدث @mduan/paseo-cli على هذا المضيف عبر SSH ويعيد تشغيل الخدمة",
+            confirmTitle: "تثبيت @mduan/paseo-cli على {{name}}",
+            confirmMessage:
+              "سيتم استبدال Paseo CLI على {{name}} بأحدث @mduan/paseo-cli عبر SSH، ثم إيقاف الخدمة وتشغيلها. ستتم مقاطعة الوكلاء قيد التشغيل.",
+            installing: "جارٍ التثبيت عبر SSH...",
+            completeTitle: "تم تثبيت الخدمة",
+            completeDescription: "يعيد التطبيق الاتصال عندما تصبح الخدمة جاهزة.",
+          },
           desktopManagedHint:
             "يدير Paseo Desktop هذا البرنامج الخفي. حدّث Paseo Desktop على المضيف.",
           title: "Update daemon",
