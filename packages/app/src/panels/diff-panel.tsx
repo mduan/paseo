@@ -6,7 +6,11 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { PaneContentToolbar, ToolbarButton } from "@/components/ui/pane-content-toolbar";
+import {
+  PaneContentToolbar,
+  ToolbarButton,
+  paneContentToolbarTrailingPadding,
+} from "@/components/ui/pane-content-toolbar";
 import { isWeb } from "@/constants/platform";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { DiffDocument } from "@/git/diff-document";
@@ -342,7 +346,12 @@ function TurnDiffPanel() {
 
   return (
     <View style={styles.container} testID="turn-diff-panel">
-      <PaneContentToolbar style={styles.toolbar}>
+      <PaneContentToolbar
+        style={[
+          styles.toolbar,
+          { paddingRight: paneContentToolbarTrailingPadding(panelPreferences.isCompact, "glyph") },
+        ]}
+      >
         <View style={styles.toolbarActions}>
           <ChangesDiffToolbar options={diffOptions} compact={panelPreferences.isCompact} />
           {canOpenInMainPanel ? (
