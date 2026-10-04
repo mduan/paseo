@@ -94,6 +94,8 @@
     "dev:win:desktop": "npm run dev:win --workspace=@getpaseo/desktop",
     "build:desktop": "npm run build:app-deps:clean && cd packages/app && cross-env PASEO_WEB_PLATFORM=electron npx expo export --platform web && cd ../.. && npm run build --workspace=@getpaseo/desktop --",
     "release:fork:cli": "node scripts/pack-fork-cli.mjs",
+    "version:fork": "node scripts/bump-fork-version.mjs",
+    "release:fork": "npm run version:fork && npm run release:fork:cli -- --publish && npm run build:fork",
     "build:fork": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:desktop -- --publish never --mac dmg --arm64 -c.mac.notarize=false -c.mac.identity=- -c.mac.hardenedRuntime=false",
     "db:query": "npm run db:query --workspace=@getpaseo/server --",
     "cli": "./scripts/dev-home.sh npx tsx packages/cli/src/index.js",
