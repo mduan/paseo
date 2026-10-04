@@ -62,7 +62,7 @@ function getWebTextInputElement(input: EditingTextInputHandle | null): HTMLEleme
 }
 
 export const SMALL_ACTION_HIT_SLOP = 8;
-const EDITOR_MAX_LINES = 30;
+const EDITOR_MAX_LINES = 15;
 const COMMENT_MAX_LINES = 30;
 const foregroundMutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const destructiveIconColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
