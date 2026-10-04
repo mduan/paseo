@@ -1096,13 +1096,19 @@ function WorkspaceRowInner({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
 
+  const sessions = useWorkspaceSessionRows(workspace);
   const handlePress = useCallback(() => {
     if (interaction.didLongPressRef.current) {
       interaction.didLongPressRef.current = false;
       return;
     }
+    // Pressing the workspace you're already on collapses or expands its nested rows.
+    if (selected && sessions.expandToggle?.visible) {
+      sessions.expandToggle.onToggle();
+      return;
+    }
     onPress();
-  }, [interaction.didLongPressRef, onPress]);
+  }, [interaction.didLongPressRef, onPress, selected, sessions.expandToggle]);
   const handleWorkspacePressIn = useCallback(
     (event: GestureResponderEvent) => {
       setIsPressed(true);
@@ -1115,7 +1121,6 @@ function WorkspaceRowInner({
     interaction.handlePressOut();
   }, [interaction]);
 
-  const sessions = useWorkspaceSessionRows(workspace);
   // An expanded workspace hands its highlight to the nested row of the focused tab.
   const rowSelected = selected && !sessions.showsFocusedRow;
   const groupSelected = selected && sessions.rows.length > 0;

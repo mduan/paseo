@@ -819,8 +819,13 @@ function StatusWorkspaceRowInnerContent({
       didLongPressRef.current = false;
       return;
     }
+    // Pressing the workspace you're already on collapses or expands its nested rows.
+    if (selected && sessions.expandToggle?.visible) {
+      sessions.expandToggle.onToggle();
+      return;
+    }
     onPress();
-  }, [didLongPressRef, onPress]);
+  }, [didLongPressRef, onPress, selected, sessions.expandToggle]);
   const handlePressIn = useCallback(
     (event: GestureResponderEvent) => {
       setIsPressed(true);
