@@ -443,14 +443,13 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[2],
-    paddingRight: theme.spacing[2],
   },
   toolbarActions: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
     flex: 1,
-    gap: theme.spacing[1],
+    gap: 1,
   },
   body: {
     flex: 1,
