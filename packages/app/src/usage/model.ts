@@ -1,12 +1,47 @@
 import { formatCompactTimeAgoAsProse } from "@/utils/time";
 import { usageCopy } from "./copy";
 import type { UsageDisplayAs } from "./preferences";
-import type { UsageReportEntry, UsageView, UsageWindow } from "./types";
+import type {
+  AvailableUsageReport,
+  UsageBalance,
+  UsageReportEntry,
+  UsageView,
+  UsageWindow,
+} from "./types";
 
 export function usedPercent(window: UsageWindow): number | null {
   if (window.usedPct != null) return window.usedPct;
   if (window.remainingPct != null) return 100 - window.remainingPct;
   return null;
+}
+
+/** How much of a balance is spent, from what the source sent. */
+export function balanceUsed(balance: UsageBalance): number | null {
+  if (balance.used != null) return balance.used;
+  if (balance.limit != null && balance.remaining != null) return balance.limit - balance.remaining;
+  return null;
+}
+
+/** A balance spent against a limit has a share used, so it pins like a window. */
+export function balanceWindow(balance: UsageBalance): UsageWindow | null {
+  const used = balanceUsed(balance);
+  if (used == null || balance.limit == null || balance.limit <= 0) return null;
+  const usedPct = (used / balance.limit) * 100;
+  return {
+    id: `balance:${balance.id}`,
+    label: balance.label,
+    shortLabel: balance.unit === "usd" ? "$" : "",
+    usedPct,
+    remainingPct: Math.max(0, 100 - usedPct),
+    resetsAt: balance.resetsAt ?? null,
+    tone: balance.tone,
+  };
+}
+
+/** What a report can put in the sidebar summary: its windows, then its capped balances. */
+export function summaryWindows(report: AvailableUsageReport): UsageWindow[] {
+  const balances = (report.balances ?? []).flatMap((balance) => balanceWindow(balance) ?? []);
+  return [...report.windows, ...balances];
 }
 
 /** The percent a window shows under the user's used/remaining preference. */

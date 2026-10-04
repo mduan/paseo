@@ -6,7 +6,7 @@ import {
   type PinnedUsageSource,
   type PinnedUsageWindow,
 } from "./pinned";
-import type { UsageReportEntry, UsageWindow } from "./types";
+import type { UsageBalance, UsageReportEntry, UsageWindow } from "./types";
 
 function report(input: {
   sourceId: string;
@@ -14,6 +14,7 @@ function report(input: {
   account?: string;
   icon?: string;
   windows: UsageWindow[];
+  balances?: UsageBalance[];
 }): UsageReportEntry {
   return {
     id: `${input.sourceId}:${input.account ?? "default"}`,
@@ -22,7 +23,7 @@ function report(input: {
     sourceId: input.sourceId,
     sourceLabel: input.sourceLabel,
     ...(input.icon ? { icon: input.icon } : {}),
-    report: { status: "available", windows: input.windows },
+    report: { status: "available", windows: input.windows, balances: input.balances },
   };
 }
 
@@ -270,4 +271,46 @@ it("keeps unavailable and error reports out of the sidebar summary", () => {
     report: { status: "error", error: "Store deleted" },
   };
   expect(resolvePinnedUsage([expired, failed], preferences(null))).toEqual([]);
+});
+
+describe("resolvePinnedUsage with budgets", () => {
+  it("defaults to a budget spent against a limit when the account has no windows", () => {
+    const enterprise = report({
+      sourceId: "claude",
+      sourceLabel: "Claude",
+      windows: [],
+      balances: [
+        { id: "usage_credits", label: "Usage credits", used: 279.87, limit: 1500, unit: "usd" },
+        { id: "credits", label: "Credits", remaining: 40, unit: "credits" },
+      ],
+    });
+
+    expect(
+      windows([enterprise], preferences(null)).map((item) => [
+        item.key,
+        item.shortLabel,
+        item.percentText,
+      ]),
+    ).toEqual([["claude:default/balance:usage_credits", "$", "19%"]]);
+  });
+
+  it("shows a pinned budget beside the account's windows", () => {
+    const max = report({
+      sourceId: "claude",
+      sourceLabel: "Claude",
+      windows: [{ id: "five-hour", label: "Session", shortLabel: "5h", usedPct: 31 }],
+      balances: [
+        { id: "usage_credits", label: "Usage credits", used: 300, limit: 1500, unit: "usd" },
+      ],
+    });
+    const items = windows(
+      [max],
+      preferences([
+        { sourceId: "claude", windowId: "five-hour" },
+        { sourceId: "claude", windowId: "balance:usage_credits" },
+      ]),
+    );
+
+    expect(items.map((item) => item.percentText)).toEqual(["31%", "20%"]);
+  });
 });

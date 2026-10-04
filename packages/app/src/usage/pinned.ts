@@ -1,5 +1,5 @@
 import { formatPct } from "./format";
-import { displayPercent } from "./model";
+import { displayPercent, summaryWindows } from "./model";
 import { effectiveUsagePins, type UsagePreferences } from "./preferences";
 import { windowTone } from "./tone";
 import type { UsageReportEntry, UsageTone } from "./types";
@@ -73,7 +73,7 @@ export function resolvePinnedUsage(
   const meaning = preferences.displayAs === "remaining" ? "left" : "used";
   return groupBySource(reports).flatMap((entry) => {
     if (entry.report.status !== "available") return [];
-    const windows = entry.report.windows
+    const windows = summaryWindows(entry.report)
       .filter(
         (window) =>
           displayPercent(window, preferences.displayAs) !== null &&

@@ -1,5 +1,6 @@
 import { RotateCw } from "lucide-react-native";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View, type StyleProp, type TextStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -13,13 +14,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
 import { useCompactTimeAgo } from "@/hooks/use-time-ago";
-import { UsageBalanceBar } from "./balance-bar";
+import { formatBalanceAmount, UsageBalanceBar } from "./balance-bar";
 import { usageCopy } from "./copy";
 import type { UsageDisplay } from "./display";
-import { formatUsageFreshness, type UsageRefresh } from "./model";
+import { balanceWindow, formatUsageFreshness, type UsageRefresh } from "./model";
 import { useReportRefresh } from "./queries";
 import { UsageSourceIcon } from "./source-icon";
-import type { UsageReport, UsageReportEntry, UsageWindow } from "./types";
+import type { UsageBalance, UsageReport, UsageReportEntry, UsageWindow } from "./types";
 import { UsageWindowBar } from "./window-bar";
 
 function statusText(report: UsageReport): string | null {
@@ -114,7 +115,12 @@ export function UsageCard({
             <PinnableWindowBar key={window.id} entry={entry} window={window} display={display} />
           ))}
           {balances.map((balance) => (
-            <UsageBalanceBar key={balance.id} balance={balance} />
+            <PinnableBalanceBar
+              key={balance.id}
+              entry={entry}
+              balance={balance}
+              display={display}
+            />
           ))}
         </View>
       ) : null}
@@ -162,10 +168,12 @@ function PinnableWindowBar({
   entry,
   window,
   display,
+  valueText,
 }: {
   entry: UsageReportEntry;
   window: UsageWindow;
   display: UsageDisplay;
+  valueText?: string;
 }) {
   const pin = useMemo(
     () => ({ sourceId: entry.sourceId, windowId: window.id }),
@@ -181,6 +189,30 @@ function PinnableWindowBar({
       onTogglePin={toggle}
       pinLabel={`${usageCopy.pin} ${entry.sourceLabel} ${window.label}`}
       pinTestID={`usage-pin-${entry.sourceId}-${window.id}`}
+      valueText={valueText}
+    />
+  );
+}
+
+/** A balance spent against a limit pins like a window and keeps its amounts. */
+function PinnableBalanceBar({
+  entry,
+  balance,
+  display,
+}: {
+  entry: UsageReportEntry;
+  balance: UsageBalance;
+  display: UsageDisplay;
+}) {
+  const { i18n } = useTranslation();
+  const window = useMemo(() => balanceWindow(balance), [balance]);
+  if (!window) return <UsageBalanceBar balance={balance} />;
+  return (
+    <PinnableWindowBar
+      entry={entry}
+      window={window}
+      display={display}
+      valueText={formatBalanceAmount(balance, i18n.language)}
     />
   );
 }

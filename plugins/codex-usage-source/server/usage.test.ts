@@ -116,6 +116,63 @@ test("coerces credit balance and marks a 96 percent window dangerous", async () 
   ]);
 });
 
+test("shows an Enterprise spend limit and no credit balance when the balance is null", async () => {
+  // Recorded from an Enterprise workspace with a $1,500 per-user spend control.
+  const report = await fetchUsage(
+    authInput(fixtureHome),
+    async () =>
+      new Response(
+        JSON.stringify({
+          plan_type: "ent26",
+          rate_limit: null,
+          credits: { has_credits: true, unlimited: false, balance: null },
+          spend_control: {
+            reached: false,
+            individual_limit: {
+              source: "group_based_spend_controls",
+              unit: "usd",
+              limit: "1500.00",
+              used: "6.1339592933654785",
+              remaining: "1493.8660407066345",
+              used_percent: 0,
+              remaining_percent: 100,
+              reset_after_seconds: 2420501,
+              reset_at: 1793491200,
+            },
+          },
+        }),
+        { status: 200 },
+      ),
+  );
+  expect(report).toMatchObject({ status: "available", planLabel: "ent26", windows: [] });
+  expect(report.balances).toEqual([
+    {
+      id: "spend_limit",
+      label: "Spend limit",
+      used: 6.1339592933654785,
+      limit: 1500,
+      unit: "usd",
+      resetsAt: new Date(1793491200 * 1000).toISOString(),
+      tone: "ok",
+    },
+  ]);
+});
+
+test("keeps the windows when spend control is reshaped", async () => {
+  const report = await fetchUsage(
+    authInput(fixtureHome),
+    async () =>
+      new Response(
+        JSON.stringify({
+          rate_limit: { primary_window: { used_percent: 12, limit_window_seconds: 18000 } },
+          spend_control: { individual_limit: { limit: "not a number" } },
+        }),
+        { status: 200 },
+      ),
+  );
+  expect(report).toMatchObject({ windows: [{ id: "five_hour" }], balances: [] });
+});
+
 test("summarizes the session and weekly windows by default, not code review", async () => {
   const report = await fetchUsage(
     authInput(fixtureHome),

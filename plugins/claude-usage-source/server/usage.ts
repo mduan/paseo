@@ -14,7 +14,9 @@ import {
   windowFromUsedPct,
   type UsageReport,
   type UsageWindow,
+  type UsageBalance,
   type UsageDetail,
+  usedPctOf,
 } from "@getpaseo/plugin/server/usage";
 
 const ApiNumberSchema = z.coerce.number().finite();
@@ -64,9 +66,14 @@ const ClaudeUsageResponseSchema = z.object({
   // Deliberately permissive: an additive section must never regress the top-level
   // windows, so shape validation happens per entry rather than here.
   limits: z.array(z.unknown()).nullish(),
+  // Amounts are in minor units of `currency` (cents for USD), per Claude Code's own schema.
   extra_usage: z
     .object({
       is_enabled: z.boolean().optional(),
+      monthly_limit: ApiNumberSchema.nullish(),
+      used_credits: ApiNumberSchema.nullish(),
+      currency: z.string().nullish(),
+      decimal_places: ApiNumberSchema.nullish(),
     })
     .nullish(),
 });
@@ -513,9 +520,11 @@ export async function fetchUsage(
     console.warn("Claude usage response parsed but produced no windows");
   }
 
+  const balances = usageCreditBalances(resp, (credentialLookup.now ?? Date.now)());
   const details: UsageDetail[] = [];
   const extraUsageEnabled = resp.extra_usage?.is_enabled;
-  if (extraUsageEnabled !== undefined) {
+  // The balance already says the credits are on; the bare toggle is only news without it.
+  if (extraUsageEnabled !== undefined && balances.length === 0) {
     details.push({
       id: "extra_usage",
       label: "Extra usage",
@@ -527,9 +536,35 @@ export async function fetchUsage(
     status: "available",
     planLabel: plan ?? undefined,
     windows,
-    balances: [],
+    balances,
     details,
   };
+}
+
+/**
+ * The monthly usage-credit budget, as Claude Code's /usage shows it. The response carries no
+ * reset time; like Claude Code, assume the first of next month in local time.
+ */
+function usageCreditBalances(resp: ClaudeUsageResponse, now: number): UsageBalance[] {
+  const extra = resp.extra_usage;
+  if (extra?.monthly_limit == null || extra.monthly_limit <= 0) return [];
+  // UsageBalance has no other currencies.
+  if (extra.currency && extra.currency.toUpperCase() !== "USD") return [];
+  const scale = 10 ** (extra.decimal_places ?? 2);
+  const limit = extra.monthly_limit / scale;
+  const used = extra.used_credits == null ? null : extra.used_credits / scale;
+  const today = new Date(now);
+  return [
+    {
+      id: "usage_credits",
+      label: "Usage credits",
+      used,
+      limit,
+      unit: "usd",
+      resetsAt: new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString(),
+      tone: toneFromUsedPct(usedPctOf(used, limit)),
+    },
+  ];
 }
 
 // The OAuth usage endpoint meters the active organization selected by the token.

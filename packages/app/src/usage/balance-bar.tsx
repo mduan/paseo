@@ -1,81 +1,40 @@
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { clampPct, formatAmount, formatResetLabel } from "./format";
-import type { UsageBalance, UsageTone } from "./types";
+import { formatAmount, formatResetLabel } from "./format";
+import { balanceUsed } from "./model";
+import type { UsageBalance } from "./types";
 
-interface ResolvedBalance {
-  amountText: string;
-  usedPct: number | null;
-}
-
-function resolveBalance(balance: UsageBalance, locale: string): ResolvedBalance {
+export function formatBalanceAmount(balance: UsageBalance, locale: string): string {
   const { used, remaining, limit, unit } = balance;
   const format = (value: number) => formatAmount(value, unit, locale);
   if (limit != null && limit > 0) {
-    const usedAmount = used ?? (remaining != null ? limit - remaining : null);
-    const usedPct = usedAmount != null ? (usedAmount / limit) * 100 : null;
-    const usedText = usedAmount != null ? format(usedAmount) : "—";
-    return { amountText: `${usedText} / ${format(limit)}`, usedPct };
+    const usedAmount = balanceUsed(balance);
+    return `${usedAmount != null ? format(usedAmount) : "—"} / ${format(limit)}`;
   }
-  if (remaining != null) {
-    return { amountText: `${format(remaining)} left`, usedPct: null };
-  }
-  if (used != null) {
-    return { amountText: format(used), usedPct: null };
-  }
-  return { amountText: "—", usedPct: null };
+  if (remaining != null) return `${format(remaining)} left`;
+  if (used != null) return format(used);
+  return "—";
 }
 
-function fillToneStyle(tone: UsageTone) {
-  switch (tone) {
-    case "ok":
-      return styles.fillOk;
-    case "warning":
-      return styles.fillWarning;
-    case "danger":
-      return styles.fillDanger;
-    default:
-      return styles.fillDefault;
-  }
-}
-
+/** A balance with no share to show; one spent against a limit renders as a window row. */
 export function UsageBalanceBar({ balance }: { balance: UsageBalance }) {
   const { i18n } = useTranslation();
-  const { amountText, usedPct } = resolveBalance(balance, i18n.language);
-  const tone = balance.tone ?? "default";
   const resetLabel = formatResetLabel(balance.resetsAt);
-
-  const fillStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [styles.fill, fillToneStyle(tone), { width: `${clampPct(usedPct ?? 0)}%` }],
-    [usedPct, tone],
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label} numberOfLines={1}>
-          {balance.label}
-        </Text>
-        <Text style={styles.value}>
-          {amountText}
-          {resetLabel ? <Text style={styles.reset}>{` · ${resetLabel}`}</Text> : null}
-        </Text>
-      </View>
-      {usedPct != null ? (
-        <View style={styles.track}>
-          <View style={fillStyle} />
-        </View>
-      ) : null}
+    <View style={styles.labelRow}>
+      <Text style={styles.label} numberOfLines={1}>
+        {balance.label}
+      </Text>
+      <Text style={styles.value}>
+        {formatBalanceAmount(balance, i18n.language)}
+        {resetLabel ? <Text style={styles.reset}>{` · ${resetLabel}`}</Text> : null}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
-    gap: 3,
-  },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -95,27 +54,5 @@ const styles = StyleSheet.create((theme) => ({
   reset: {
     color: theme.colors.foregroundMuted,
     fontWeight: theme.fontWeight.normal,
-  },
-  track: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.surface3,
-    overflow: "hidden",
-  },
-  fill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  fillDefault: {
-    backgroundColor: theme.colors.foregroundMuted,
-  },
-  fillOk: {
-    backgroundColor: theme.colors.statusSuccess,
-  },
-  fillWarning: {
-    backgroundColor: theme.colors.statusWarning,
-  },
-  fillDanger: {
-    backgroundColor: theme.colors.statusDanger,
   },
 }));
