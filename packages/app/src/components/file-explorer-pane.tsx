@@ -131,7 +131,6 @@ interface TreeRowItemProps {
   onAddToChat?: (path: string) => void;
   onOpenFileToSide?: (path: string) => void;
   onNewEntry?: (parentPath: string, kind: "file" | "directory") => void;
-  onCollapseDirectory?: (path: string) => void;
   onExpandAllSubfolders: (path: string) => void;
   onCollapseAllSubfolders: (path: string) => void;
   onRenameEntry?: (entry: ExplorerEntry) => void;
@@ -259,7 +258,6 @@ function TreeRowItem({
   onAddToChat,
   onOpenFileToSide,
   onNewEntry,
-  onCollapseDirectory,
   onExpandAllSubfolders,
   onCollapseAllSubfolders,
   onRenameEntry,
@@ -336,10 +334,6 @@ function TreeRowItem({
     onNewEntry?.(entry.path, "directory");
   }, [onNewEntry, entry.path]);
 
-  const handleCollapseDirectory = useCallback(() => {
-    onCollapseDirectory?.(entry.path);
-  }, [entry.path, onCollapseDirectory]);
-
   const handleExpandAllSubfolders = useCallback(() => {
     onExpandAllSubfolders(entry.path);
   }, [entry.path, onExpandAllSubfolders]);
@@ -407,7 +401,6 @@ function TreeRowItem({
         onOpenToSide={!isDirectory && onOpenFileToSide ? handleOpenToSide : undefined}
         onNewFile={onNewEntry ? handleNewFile : undefined}
         onNewFolder={onNewEntry ? handleNewFolder : undefined}
-        onCollapseFolder={isDirectory && isExpanded ? handleCollapseDirectory : undefined}
         onExpandAllSubfolders={handleExpandAllSubfolders}
         onCollapseAllSubfolders={handleCollapseAllSubfolders}
         onRename={onRenameEntry ? handleRename : undefined}
@@ -590,18 +583,6 @@ export function FileExplorerPane({
       handleOpenFile(entry);
     },
     [handleOpenFile, handleSelectEntry, handleToggleDirectory],
-  );
-
-  const handleCollapseDirectory = useCallback(
-    (path: string) => {
-      if (!workspaceStateKey) {
-        return;
-      }
-      setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
-        currentPaths.filter((expandedPath) => !isExplorerPathWithin(expandedPath, path)),
-      );
-    },
-    [setExpandedPathsForWorkspace, workspaceStateKey],
   );
 
   const handleExpandAllSubfolders = useCallback(
@@ -1131,7 +1112,6 @@ export function FileExplorerPane({
           onAddToChat={onAddToChat}
           onOpenFileToSide={onOpenFileToSide}
           onNewEntry={fsEntryOpsEnabled ? handleNewEntry : undefined}
-          onCollapseDirectory={handleCollapseDirectory}
           onExpandAllSubfolders={handleExpandAllSubfolders}
           onCollapseAllSubfolders={handleCollapseAllSubfolders}
           onRenameEntry={fsEntryOpsEnabled && !isRoot ? handleRenameEntry : undefined}
@@ -1145,7 +1125,6 @@ export function FileExplorerPane({
       fsEntryDuplicateEnabled,
       fsEntryOpsEnabled,
       handleCollapseAllSubfolders,
-      handleCollapseDirectory,
       handleCopyPath,
       handleCopyRelativePath,
       handleOpenDirectoryInEditor,
@@ -1645,7 +1624,6 @@ function TreeRowDispatcher({
   onAddToChat,
   onOpenFileToSide,
   onNewEntry,
-  onCollapseDirectory,
   onExpandAllSubfolders,
   onCollapseAllSubfolders,
   onRenameEntry,
@@ -1671,7 +1649,6 @@ function TreeRowDispatcher({
   onAddToChat?: (path: string) => void;
   onOpenFileToSide?: (path: string) => void;
   onNewEntry?: (parentPath: string, kind: "file" | "directory") => void;
-  onCollapseDirectory?: (path: string) => void;
   onExpandAllSubfolders: (path: string) => void;
   onCollapseAllSubfolders: (path: string) => void;
   onRenameEntry?: (entry: ExplorerEntry) => void;
@@ -1706,7 +1683,6 @@ function TreeRowDispatcher({
       onAddToChat={onAddToChat}
       onOpenFileToSide={onOpenFileToSide}
       onNewEntry={onNewEntry}
-      onCollapseDirectory={onCollapseDirectory}
       onExpandAllSubfolders={onExpandAllSubfolders}
       onCollapseAllSubfolders={onCollapseAllSubfolders}
       onRenameEntry={onRenameEntry}
