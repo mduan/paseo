@@ -367,7 +367,13 @@ function SessionRowHoverTarget({
     >
       <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side="right" align="start" offset={8} maxWidth={360}>
+        <TooltipContent
+          side="right"
+          align="start"
+          offset={8}
+          maxWidth={360}
+          style={styles.tooltipCard}
+        >
           <View style={styles.tooltipHeader}>
             {/* ponytail: light themes paint popovers surface0; dark ones paint surface2, so the
                 running ring's knockout is slightly off there. */}
@@ -473,7 +479,10 @@ function AgentPreview({
   );
   if (!preview) return null;
   return full ? (
-    <Text style={styles.tooltipPreview}>{preview}</Text>
+    // Persisted previews from before the 300-character cap still run longer.
+    <Text style={styles.tooltipPreview} numberOfLines={6}>
+      {preview}
+    </Text>
   ) : (
     <Text style={styles.preview} numberOfLines={1}>
       {preview}
@@ -560,6 +569,13 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
+  },
+  // Matches the workspace hover card's surface and padding.
+  tooltipCard: {
+    backgroundColor: theme.colors.surface1,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
   },
   tooltipHeader: {
     flexDirection: "row",
