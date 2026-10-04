@@ -375,9 +375,9 @@ function SessionRowHoverTarget({
           style={styles.tooltipCard}
         >
           <View style={styles.tooltipHeader}>
-            {/* ponytail: light themes paint popovers surface0; dark ones paint surface2, so the
-                running ring's knockout is slightly off there. */}
-            <WorkspaceTabIcon presentation={presentation} active backdrop="surface0" />
+            <View style={styles.tooltipIconSlot}>
+              <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
+            </View>
             <Text style={styles.tooltipTitle}>{presentation.label}</Text>
           </View>
           {row.target.kind === "agent" ? (
@@ -533,6 +533,8 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
 // workspace status dot.
 const SESSION_ROW_INSET = 8 + 1 - 4;
 
+const TOOLTIP_TITLE_LINE_HEIGHT = 20;
+
 const styles = StyleSheet.create((theme) => ({
   // The gutter leaves a strip of the hovered workspace group's background around each row.
   list: {
@@ -579,8 +581,13 @@ const styles = StyleSheet.create((theme) => ({
   },
   tooltipHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: theme.spacing[2],
+  },
+  // One title line tall, so the icon centers on the first line of a wrapping name.
+  tooltipIconSlot: {
+    height: TOOLTIP_TITLE_LINE_HEIGHT,
+    justifyContent: "center",
   },
   // Matches the workspace hover card's title.
   tooltipTitle: {
@@ -588,6 +595,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
+    lineHeight: TOOLTIP_TITLE_LINE_HEIGHT,
     fontWeight: theme.fontWeight.normal,
   },
   tooltipMeta: {
