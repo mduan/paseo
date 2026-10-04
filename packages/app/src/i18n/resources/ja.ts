@@ -2606,6 +2606,16 @@ export const ja: TranslationResources = {
           submit: "名前を変更",
         },
         restart: {
+          ssh: {
+            title: "デーモンを起動",
+            hint: "SSH 経由でこのホストの paseo daemon start を実行します",
+            confirm: "起動",
+            confirmTitle: "{{name}}を起動",
+            confirmMessage:
+              "SSH 経由でホストの paseo daemon start を実行します。デーモンの準備ができるとアプリが再接続します。",
+            starting: "起動中...",
+            failedTitle: "起動に失敗しました",
+          },
           title: "デーモンを再起動",
           hint: "デーモンプロセスを再起動します。アプリは自動的に再接続します",
           confirm: "再起動",
@@ -2628,6 +2638,15 @@ export const ja: TranslationResources = {
           dialogFailedMessage: "再起動確認ダイアログを開けませんでした。",
         },
         update: {
+          ssh: {
+            hint: "SSH 経由でこのホストに最新の @mduan/paseo-cli をインストールし、デーモンを再起動します",
+            confirmTitle: "{{name}}に @mduan/paseo-cli をインストール",
+            confirmMessage:
+              "SSH 経由で{{name}}の Paseo CLI を最新の @mduan/paseo-cli に置き換え、デーモンを停止して起動します。実行中のエージェントは中断されます。",
+            installing: "SSH 経由でインストール中...",
+            completeTitle: "デーモンをインストールしました",
+            completeDescription: "デーモンの準備ができるとアプリが再接続します。",
+          },
           desktopManagedHint:
             "このデーモンはPaseo Desktopによって管理されています。ホスト上のPaseo Desktopを更新してください。",
           title: "デーモンを更新",

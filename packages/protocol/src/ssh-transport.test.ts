@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildSshTunnelArgs, parseSshTransportUri, validateSshHost } from "./ssh-transport.js";
+import {
+  buildSshCommandArgs,
+  buildSshTunnelArgs,
+  parseSshTransportUri,
+  validateSshHost,
+} from "./ssh-transport.js";
 
 describe("SSH transport", () => {
   it("parses SSH targets with Paseo's default daemon port", () => {
@@ -57,6 +62,28 @@ describe("SSH transport", () => {
       "-W",
       "127.0.0.1:7777",
       "deploy@build-box",
+    ]);
+  });
+
+  it("runs a command in a remote bash login shell", () => {
+    expect(
+      buildSshCommandArgs({
+        host: "deploy@build-box",
+        sshPort: 2222,
+        command: "echo 'hi' && paseo daemon start",
+      }),
+    ).toEqual([
+      "-T",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "ClearAllForwardings=yes",
+      "-p",
+      "2222",
+      "deploy@build-box",
+      "bash -lc 'echo '\\''hi'\\'' && paseo daemon start'",
     ]);
   });
 

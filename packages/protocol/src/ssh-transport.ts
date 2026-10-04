@@ -60,23 +60,41 @@ export function parseSshTransportUri(value: string): SshTransportTarget {
   };
 }
 
-export function buildSshTunnelArgs(target: SshTransportTarget): string[] {
-  const host = validateSshHost(target.host);
-  const daemonPort = validatePort(target.daemonPort, "Daemon port");
-  const args = [
-    "-T",
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "ClearAllForwardings=yes",
-    "-o",
-    "ExitOnForwardFailure=yes",
-  ];
+function buildSshOptionArgs(target: { sshPort?: number }, options: string[]): string[] {
+  const args = ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", ...options];
   if (target.sshPort !== undefined) {
     args.push("-p", String(validatePort(target.sshPort, "SSH port")));
   }
-  args.push("-W", `127.0.0.1:${daemonPort}`, host);
   return args;
+}
+
+export function buildSshTunnelArgs(target: SshTransportTarget): string[] {
+  const host = validateSshHost(target.host);
+  const daemonPort = validatePort(target.daemonPort, "Daemon port");
+  return [
+    ...buildSshOptionArgs(target, [
+      "-o",
+      "ClearAllForwardings=yes",
+      "-o",
+      "ExitOnForwardFailure=yes",
+    ]),
+    "-W",
+    `127.0.0.1:${daemonPort}`,
+    host,
+  ];
+}
+
+/** Runs `command` in a remote bash login shell, so PATH setup from profiles (nvm, fnm) applies. */
+export function buildSshCommandArgs(target: {
+  host: string;
+  sshPort?: number;
+  command: string;
+}): string[] {
+  const host = validateSshHost(target.host);
+  const quotedCommand = `'${target.command.replaceAll("'", "'\\''")}'`;
+  return [
+    ...buildSshOptionArgs(target, ["-o", "ClearAllForwardings=yes"]),
+    host,
+    `bash -lc ${quotedCommand}`,
+  ];
 }

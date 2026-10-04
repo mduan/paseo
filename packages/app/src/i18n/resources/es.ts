@@ -2637,6 +2637,16 @@ export const es: TranslationResources = {
           submit: "Cambiar nombre",
         },
         restart: {
+          ssh: {
+            title: "Iniciar daemon",
+            hint: "Ejecuta paseo daemon start en este host por SSH",
+            confirm: "Iniciar",
+            confirmTitle: "Iniciar {{name}}",
+            confirmMessage:
+              "Esto ejecuta paseo daemon start en el host por SSH. La app se reconecta cuando el daemon está listo.",
+            starting: "Iniciando...",
+            failedTitle: "Error al iniciar",
+          },
           title: "Reiniciar demonio",
           hint: "Reinicia el proceso del demonio. La aplicación se volverá a conectar automáticamente",
           confirm: "Reiniciar",
@@ -2660,6 +2670,15 @@ export const es: TranslationResources = {
             "No se puede abrir el cuadro de diálogo de confirmación de reinicio.",
         },
         update: {
+          ssh: {
+            hint: "Instala el @mduan/paseo-cli más reciente en este host por SSH y reinicia el daemon",
+            confirmTitle: "Instalar @mduan/paseo-cli en {{name}}",
+            confirmMessage:
+              "Esto reemplaza el Paseo CLI de {{name}} por el @mduan/paseo-cli más reciente por SSH y luego detiene e inicia el daemon. Los agentes en ejecución se interrumpirán.",
+            installing: "Instalando por SSH...",
+            completeTitle: "Daemon instalado",
+            completeDescription: "La app se reconecta cuando el daemon está listo.",
+          },
           desktopManagedHint:
             "Este daemon está administrado por Paseo Desktop. Actualiza Paseo Desktop en el host.",
           title: "Update daemon",

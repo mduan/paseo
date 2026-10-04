@@ -36,6 +36,7 @@ import {
   sendLocalTransportMessage,
   closeLocalTransportSession,
 } from "./local-transport.js";
+import { runRemoteSshDaemonOperation } from "./remote-ssh-daemon.js";
 import { createNodeEntrypointInvocation, resolveDaemonRunnerEntrypoint } from "./runtime-paths.js";
 import { runExternalCliJsonCommand, runExternalCliTextCommand } from "./cli/external.js";
 import {
@@ -449,6 +450,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
           : "";
       if (sessionId) closeLocalTransportSession(sessionId);
     },
+    run_remote_ssh_daemon_operation: (args) => runRemoteSshDaemonOperation(args),
     check_app_update: async (args) => {
       const currentVersion = resolveDesktopAppVersion();
       return checkForAppUpdate({

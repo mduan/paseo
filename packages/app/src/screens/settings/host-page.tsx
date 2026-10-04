@@ -33,7 +33,14 @@ import {
   ProfileDraft,
   TerminalProfileEditModal,
 } from "@/screens/settings/terminal-profile-edit-modal";
-import { startDesktopDaemon, stopDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
+import {
+  runRemoteSshDaemonOperation,
+  startDesktopDaemon,
+  stopDesktopDaemon,
+  type RemoteSshDaemonOperation,
+  type RemoteSshTransportTarget,
+} from "@/desktop/daemon/desktop-daemon";
+import { getIsElectron } from "@/constants/platform";
 import { LocalDaemonSection } from "@/desktop/components/desktop-updates-section";
 import { useDaemonStatus } from "@/desktop/hooks/use-daemon-status";
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
@@ -66,6 +73,11 @@ import type { Theme } from "@/styles/theme";
 import { useProviderIcon } from "@/components/provider-icons";
 import { BrowserToolsOptInCard } from "./browser-tools-card";
 import { restartDaemonFromSettings, updateDaemonFromSettings } from "./daemon-lifecycle";
+import {
+  resolveRemoteSshRestartOperation,
+  resolveRemoteSshTarget,
+  resolveRemoteSshUpdateOperation,
+} from "./remote-ssh-daemon-actions";
 
 const ThemedRestart = withUnistyles(RotateCw);
 const ThemedUpdate = withUnistyles(ArrowUpToLine);
@@ -563,6 +575,14 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
   const runtime = getHostRuntimeStore();
   const [isRestarting, setIsRestarting] = useState(false);
   const isMountedRef = useRef(true);
+  const remoteSshTarget = useMemo(
+    () => resolveRemoteSshTarget({ host, isElectron: getIsElectron() }),
+    [host],
+  );
+  const sshOperation = resolveRemoteSshRestartOperation({
+    hasRemoteSshTarget: remoteSshTarget !== undefined,
+    isConnected,
+  });
 
   useEffect(() => {
     return () => {
@@ -591,7 +611,41 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
     [t],
   );
 
+  const startOverSsh = useCallback(
+    (target: RemoteSshTransportTarget, operation: RemoteSshDaemonOperation) => {
+      const start = async () => {
+        const confirmed = await confirmDialog({
+          title: t("settings.host.daemon.restart.ssh.confirmTitle", { name: host.label }),
+          message: t("settings.host.daemon.restart.ssh.confirmMessage"),
+          confirmLabel: t("settings.host.daemon.restart.ssh.confirm"),
+          cancelLabel: t("common.actions.cancel"),
+          destructive: false,
+        });
+        if (!confirmed) return;
+        setIsRestarting(true);
+        await runRemoteSshDaemonOperation({ target, operation });
+        void runtime.runProbeCycleNow(host.serverId);
+      };
+      void start()
+        .catch((error) => {
+          console.error(`[HostPage] Failed to start daemon ${host.label} over SSH`, error);
+          Alert.alert(
+            t("settings.host.daemon.restart.ssh.failedTitle"),
+            error instanceof Error ? error.message : String(error),
+          );
+        })
+        .finally(() => {
+          if (isMountedRef.current) setIsRestarting(false);
+        });
+    },
+    [host.label, host.serverId, runtime, t],
+  );
+
   const handleRestart = useCallback(() => {
+    if (sshOperation && remoteSshTarget) {
+      startOverSsh(remoteSshTarget, sshOperation);
+      return;
+    }
     if (!daemonClient) {
       Alert.alert(
         t("settings.host.daemon.restart.unavailableTitle"),
@@ -639,26 +693,49 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
           t("settings.host.daemon.restart.dialogFailedMessage"),
         );
       });
-  }, [daemonClient, host.label, host.serverId, isHostConnected, t, waitForDaemonRestart]);
+  }, [
+    daemonClient,
+    host.label,
+    host.serverId,
+    isHostConnected,
+    remoteSshTarget,
+    sshOperation,
+    startOverSsh,
+    t,
+    waitForDaemonRestart,
+  ]);
+
+  const title = sshOperation
+    ? t("settings.host.daemon.restart.ssh.title")
+    : t("settings.host.daemon.restart.title");
+  const hint = sshOperation
+    ? t("settings.host.daemon.restart.ssh.hint")
+    : t("settings.host.daemon.restart.hint");
+  let buttonLabel = t("settings.host.daemon.restart.confirm");
+  if (sshOperation) {
+    buttonLabel = isRestarting
+      ? t("settings.host.daemon.restart.ssh.starting")
+      : t("settings.host.daemon.restart.ssh.confirm");
+  } else if (isRestarting) {
+    buttonLabel = t("settings.host.daemon.restart.restarting");
+  }
 
   return (
     <View style={settingsStyles.card} testID="host-page-restart-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.host.daemon.restart.title")}</Text>
-          <Text style={settingsStyles.rowHint}>{t("settings.host.daemon.restart.hint")}</Text>
+          <Text style={settingsStyles.rowTitle}>{title}</Text>
+          <Text style={settingsStyles.rowHint}>{hint}</Text>
         </View>
         <Button
           variant="outline"
           size="sm"
           leftIcon={restartIcon}
           onPress={handleRestart}
-          disabled={isRestarting || !daemonClient || !isConnected}
+          disabled={isRestarting || (!sshOperation && (!daemonClient || !isConnected))}
           testID="host-page-restart-button"
         >
-          {isRestarting
-            ? t("settings.host.daemon.restart.restarting")
-            : t("settings.host.daemon.restart.confirm")}
+          {buttonLabel}
         </Button>
       </View>
     </View>
@@ -668,6 +745,7 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
 type DaemonUpdateState =
   | { status: "idle" }
   | { status: "complete"; workerVersion: string }
+  | { status: "installedOverSsh" }
   | { status: "updating"; phase: string }
   | { status: "failed"; title: string; message: string };
 
@@ -692,6 +770,15 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
 
   const appVersion = resolveAppVersion();
   const hasVersionMismatch = isVersionMismatch(appVersion, daemonVersion);
+  const remoteSshTarget = useMemo(
+    () => resolveRemoteSshTarget({ host, isElectron: getIsElectron() }),
+    [host],
+  );
+  const sshOperation = resolveRemoteSshUpdateOperation({
+    hasRemoteSshTarget: remoteSshTarget !== undefined,
+    isConnected,
+    daemonVersion,
+  });
 
   useEffect(() => {
     return () => {
@@ -704,7 +791,45 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
     () => isHostRuntimeConnected(runtime.getSnapshot(host.serverId)),
     [host.serverId, runtime],
   );
+  const installOverSsh = useCallback(
+    (target: RemoteSshTransportTarget, operation: RemoteSshDaemonOperation) => {
+      const install = async () => {
+        const confirmed = await confirmDialog({
+          title: t("settings.host.daemon.update.ssh.confirmTitle", { name: host.label }),
+          message: t("settings.host.daemon.update.ssh.confirmMessage", { name: host.label }),
+          confirmLabel: t("settings.host.daemon.update.confirm"),
+          cancelLabel: t("common.actions.cancel"),
+          destructive: false,
+        });
+        if (!confirmed || !isMountedRef.current) return;
+        setUpdateState({
+          status: "updating",
+          phase: t("settings.host.daemon.update.ssh.installing"),
+        });
+        await runRemoteSshDaemonOperation({ target, operation });
+        void runtime.runProbeCycleNow(host.serverId);
+        if (isMountedRef.current) setUpdateState({ status: "installedOverSsh" });
+      };
+      void install().catch((error) => {
+        console.error(`[HostPage] Failed to install the daemon on ${host.label} over SSH`, error);
+        if (!isMountedRef.current) return;
+        setUpdateState({
+          status: "failed",
+          title: t("settings.host.daemon.update.requestFailedTitle"),
+          message: t("settings.host.daemon.update.requestFailedMessage", {
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
+        });
+      });
+    },
+    [host.label, host.serverId, runtime, t],
+  );
+
   const handleUpdate = useCallback(() => {
+    if (sshOperation && remoteSshTarget) {
+      installOverSsh(remoteSshTarget, sshOperation);
+      return;
+    }
     if (!daemonClient) {
       setUpdateState({
         status: "failed",
@@ -802,33 +927,51 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
           message: t("settings.host.daemon.update.dialogFailedMessage"),
         });
       });
-  }, [daemonClient, host.label, host.serverId, isHostConnected, t]);
+  }, [
+    daemonClient,
+    host.label,
+    host.serverId,
+    installOverSsh,
+    isHostConnected,
+    remoteSshTarget,
+    sshOperation,
+    t,
+  ]);
 
-  const shouldShowUpdate = hasVersionMismatch && (supportsSelfUpdate || desktopManaged);
-  if (!shouldShowUpdate && updateState.status !== "complete") {
+  const shouldShowUpdate =
+    sshOperation !== undefined || (hasVersionMismatch && (supportsSelfUpdate || desktopManaged));
+  if (
+    !shouldShowUpdate &&
+    updateState.status !== "complete" &&
+    updateState.status !== "installedOverSsh"
+  ) {
     return null;
   }
 
   const isUpdating = updateState.status === "updating";
   const buttonLabel = isUpdating ? updateState.phase : t("settings.host.daemon.update.confirm");
+  let hint = t("settings.host.daemon.update.hint");
+  if (sshOperation) {
+    hint = t("settings.host.daemon.update.ssh.hint");
+  } else if (desktopManaged) {
+    hint = t("settings.host.daemon.update.desktopManagedHint");
+  }
 
   return (
     <View style={settingsStyles.card} testID="host-page-update-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>{t("settings.host.daemon.update.title")}</Text>
-          <Text style={settingsStyles.rowHint}>
-            {desktopManaged
-              ? t("settings.host.daemon.update.desktopManagedHint")
-              : t("settings.host.daemon.update.hint")}
-          </Text>
+          <Text style={settingsStyles.rowHint}>{hint}</Text>
         </View>
         <Button
           variant="outline"
           size="sm"
           leftIcon={updateIcon}
           onPress={handleUpdate}
-          disabled={desktopManaged || isUpdating || !daemonClient || !isConnected}
+          disabled={
+            isUpdating || (!sshOperation && (desktopManaged || !daemonClient || !isConnected))
+          }
           testID="host-page-update-button"
         >
           {buttonLabel}
@@ -842,6 +985,14 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
             version: updateState.workerVersion,
           })}
           description={t("desktop.daemon.lifecycle.supervisorRefresh")}
+        />
+      ) : null}
+      {updateState.status === "installedOverSsh" ? (
+        <InlineAlert
+          size="sm"
+          variant="success"
+          title={t("settings.host.daemon.update.ssh.completeTitle")}
+          description={t("settings.host.daemon.update.ssh.completeDescription")}
         />
       ) : null}
       {updateState.status === "failed" ? (

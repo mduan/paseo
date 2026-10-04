@@ -2628,6 +2628,16 @@ export const ru: TranslationResources = {
           submit: "Переименовать",
         },
         restart: {
+          ssh: {
+            title: "Запустить демон",
+            hint: "Выполняет paseo daemon start на этом хосте по SSH",
+            confirm: "Запустить",
+            confirmTitle: "Запустить {{name}}",
+            confirmMessage:
+              "Будет выполнена команда paseo daemon start на хосте по SSH. Приложение переподключится, когда демон будет готов.",
+            starting: "Запуск...",
+            failedTitle: "Не удалось запустить",
+          },
           title: "Перезапустить демон",
           hint: "Перезапускает процесс демона. Приложение автоматически переподключится",
           confirm: "Перезапустить",
@@ -2650,6 +2660,15 @@ export const ru: TranslationResources = {
           dialogFailedMessage: "Не удалось открыть диалог подтверждения перезапуска.",
         },
         update: {
+          ssh: {
+            hint: "Устанавливает последнюю версию @mduan/paseo-cli на этот хост по SSH и перезапускает демон",
+            confirmTitle: "Установить @mduan/paseo-cli на {{name}}",
+            confirmMessage:
+              "Paseo CLI на {{name}} будет заменён последней версией @mduan/paseo-cli по SSH, затем демон будет остановлен и запущен. Работающие агенты будут прерваны.",
+            installing: "Установка по SSH...",
+            completeTitle: "Демон установлен",
+            completeDescription: "Приложение переподключится, когда демон будет готов.",
+          },
           desktopManagedHint:
             "Этот демон управляется Paseo Desktop. Обновите Paseo Desktop на хосте.",
           title: "Обновить демон",

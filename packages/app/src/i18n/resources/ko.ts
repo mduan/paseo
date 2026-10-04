@@ -2592,6 +2592,16 @@ export const ko: TranslationResources = {
           submit: "이름 변경",
         },
         restart: {
+          ssh: {
+            title: "데몬 시작",
+            hint: "SSH로 이 호스트에서 paseo daemon start를 실행합니다",
+            confirm: "시작",
+            confirmTitle: "{{name}} 시작",
+            confirmMessage:
+              "SSH로 호스트에서 paseo daemon start를 실행합니다. 데몬이 준비되면 앱이 다시 연결됩니다.",
+            starting: "시작 중...",
+            failedTitle: "시작 실패",
+          },
           title: "데몬 재시작",
           hint: "데몬 프로세스를 재시작합니다. 앱이 자동으로 다시 연결됩니다",
           confirm: "재시작",
@@ -2614,6 +2624,15 @@ export const ko: TranslationResources = {
           dialogFailedMessage: "재시작 확인 대화 상자를 열 수 없습니다.",
         },
         update: {
+          ssh: {
+            hint: "SSH로 이 호스트에 최신 @mduan/paseo-cli를 설치하고 데몬을 다시 시작합니다",
+            confirmTitle: "{{name}}에 @mduan/paseo-cli 설치",
+            confirmMessage:
+              "SSH로 {{name}}의 Paseo CLI를 최신 @mduan/paseo-cli로 교체한 다음 데몬을 중지하고 시작합니다. 실행 중인 에이전트가 중단됩니다.",
+            installing: "SSH로 설치 중...",
+            completeTitle: "데몬 설치됨",
+            completeDescription: "데몬이 준비되면 앱이 다시 연결됩니다.",
+          },
           desktopManagedHint:
             "이 데몬은 Paseo Desktop에서 관리됩니다. 호스트에서 Paseo 데스크톱을 업데이트합니다.",
           title: "데몬 업데이트",

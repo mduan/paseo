@@ -2646,6 +2646,16 @@ export const fr: TranslationResources = {
           submit: "Renommer",
         },
         restart: {
+          ssh: {
+            title: "Démarrer le daemon",
+            hint: "Exécute paseo daemon start sur cet hôte via SSH",
+            confirm: "Démarrer",
+            confirmTitle: "Démarrer {{name}}",
+            confirmMessage:
+              "Cette action exécute paseo daemon start sur l'hôte via SSH. L'app se reconnecte quand le daemon est prêt.",
+            starting: "Démarrage...",
+            failedTitle: "Échec du démarrage",
+          },
           title: "Redémarrer le démon",
           hint: "Redémarre le processus démon. L'application se reconnectera automatiquement",
           confirm: "Redémarrer",
@@ -2669,6 +2679,15 @@ export const fr: TranslationResources = {
             "Impossible d'ouvrir la boîte de dialogue de confirmation de redémarrage.",
         },
         update: {
+          ssh: {
+            hint: "Installe le dernier @mduan/paseo-cli sur cet hôte via SSH et redémarre le daemon",
+            confirmTitle: "Installer @mduan/paseo-cli sur {{name}}",
+            confirmMessage:
+              "Cette action remplace le Paseo CLI de {{name}} par le dernier @mduan/paseo-cli via SSH, puis arrête et démarre le daemon. Les agents en cours seront interrompus.",
+            installing: "Installation via SSH...",
+            completeTitle: "Daemon installé",
+            completeDescription: "L'app se reconnecte quand le daemon est prêt.",
+          },
           desktopManagedHint:
             "Ce daemon est géré par Paseo Desktop. Mettez à jour Paseo Desktop sur l’hôte.",
           title: "Update daemon",
