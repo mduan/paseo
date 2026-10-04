@@ -425,16 +425,16 @@ const SESSION_ROW_INSET = 8 + 1 - 4;
 const styles = StyleSheet.create((theme) => ({
   // The gutter leaves a strip of the hovered workspace group's background around each row.
   list: {
-    // Tuck under the workspace row's bottom padding; leave room before the group's edge.
+    // Tuck under the workspace row's bottom padding; the bottom gutter matches the side gutters.
     marginTop: -theme.spacing[1],
-    paddingBottom: theme.spacing[1.5],
+    paddingBottom: theme.spacing[1],
     paddingLeft: theme.spacing[1],
     paddingRight: theme.spacing[1],
   },
   listIndented: {
-    // Tuck under the workspace row's bottom padding; leave room before the group's edge.
+    // Tuck under the workspace row's bottom padding; the bottom gutter matches the side gutters.
     marginTop: -theme.spacing[1],
-    paddingBottom: theme.spacing[1.5],
+    paddingBottom: theme.spacing[1],
     paddingLeft: theme.spacing[1] + theme.spacing[2],
     paddingRight: theme.spacing[1],
   },
