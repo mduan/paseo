@@ -100,24 +100,33 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
             ? end
             : { side: comment.startSide ?? comment.side, lineNumber: comment.startLineNumber };
         const isSingleLine = start.side === end.side && start.lineNumber === end.lineNumber;
-        const location = isSingleLine
-          ? formatReviewLine(end)
-          : `${formatReviewLine(start)}-${formatReviewLine(end)}`;
-        lines.push(
-          "",
-          `Comment ${index + 1}: ${comment.filePath}:${location}`,
-          comment.body,
-          comment.context.hunkHeader,
-        );
+        const isFileView = comment.source === "file";
+        const location = isFileView
+          ? `${comment.filePath} ${isSingleLine ? `line ${end.lineNumber}` : `lines ${start.lineNumber}-${end.lineNumber}`} (file view)`
+          : `${comment.filePath}:${isSingleLine ? formatReviewLine(end) : `${formatReviewLine(start)}-${formatReviewLine(end)}`}`;
+        lines.push("", `Comment ${index + 1}: ${location}`, comment.body);
+        if (!isFileView && comment.context.hunkHeader) {
+          lines.push(comment.context.hunkHeader);
+        }
         const contextLines = comment.context.lines;
         const startIndex = contextLines.findIndex((line) => isReviewLine(line, start));
         const endIndex = contextLines.findIndex((line) => isReviewLine(line, end));
         // The client caps context, so a long range can end past the last context line.
         const lastMarkedIndex = endIndex === -1 ? contextLines.length - 1 : endIndex;
+        // File view excerpts are whole-file lines, so they carry no diff columns or markers.
+        const numberWidth = Math.max(
+          0,
+          ...contextLines.map((line) => String(line.newLineNumber ?? "").length),
+        );
         contextLines.forEach((line, lineIndex) => {
           const isMarked =
             startIndex !== -1 && lineIndex >= startIndex && lineIndex <= lastMarkedIndex;
           const prefix = isMarked ? "> " : "  ";
+          if (isFileView) {
+            const lineNumber = String(line.newLineNumber ?? "").padStart(numberWidth);
+            lines.push(`${prefix}${lineNumber} | ${line.content}`);
+            return;
+          }
           const oldLn = padLineNumber(line.oldLineNumber);
           const newLn = padLineNumber(line.newLineNumber);
           lines.push(`${prefix}${oldLn} ${newLn} ${REVIEW_LINE_MARKERS[line.type]}${line.content}`);

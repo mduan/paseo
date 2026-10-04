@@ -5,6 +5,7 @@ import { highlightCode, type HighlightToken } from "@getpaseo/highlight";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";
+import type { FileReviewConfig } from "../editor/review-layer.web";
 import { selectSourcePresentation } from "./presentation";
 
 interface FileSourceViewProps {
@@ -15,6 +16,8 @@ interface FileSourceViewProps {
   size: number;
   theme: EditorVisualTheme;
   tooLargeMessage: string;
+  /** Web only; native has no inline review comments. */
+  review?: FileReviewConfig;
 }
 
 interface SourceLine {

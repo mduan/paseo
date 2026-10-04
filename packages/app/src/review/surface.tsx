@@ -6,6 +6,7 @@ import {
   Pressable,
   type PressableStateCallbackType,
   Text,
+  type LayoutChangeEvent,
   type TextStyle,
   View,
   type StyleProp,
@@ -21,12 +22,12 @@ import { isWeb } from "@/constants/platform";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import type { Theme } from "@/styles/theme";
 import { useReviewDraftComments, useReviewDraftStore, type ReviewDraftComment } from "./store";
+import type { ReviewDraftCommentContext } from "./state";
 import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import {
   editorLineRange,
   INLINE_REVIEW_COMMENT_HEIGHT,
-  INLINE_REVIEW_EDITOR_HEIGHT,
   INLINE_REVIEW_GAP,
   INLINE_REVIEW_VERTICAL_PADDING,
   isInlineReviewEditorForTarget,
@@ -61,6 +62,8 @@ function getWebTextInputElement(input: EditingTextInputHandle | null): HTMLEleme
 }
 
 export const SMALL_ACTION_HIT_SLOP = 8;
+// The comment input and saved comment cards show up to this many lines.
+const MAX_TEXT_LINES = 15;
 const foregroundMutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const destructiveIconColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
 const accentForegroundIconColorMapping = (theme: Theme) => ({
@@ -95,7 +98,14 @@ export function groupInlineReviewCommentsByTarget(
   return grouped;
 }
 
-export function useInlineReviewController(input: { reviewDraftKey: string }): InlineReviewActions {
+export function useInlineReviewController(input: {
+  reviewDraftKey: string;
+  /** Surrounding lines for a new comment, read from the viewer it is made in. */
+  buildContext: (range: ReviewLineRange) => ReviewDraftCommentContext | undefined;
+  /** Set on new comments; absent means the diff viewer. */
+  source?: ReviewDraftComment["source"];
+}): InlineReviewActions {
+  const { buildContext, source } = input;
   const reviewComments = useReviewDraftComments(input.reviewDraftKey);
   const commentsByTarget = useMemo(
     () => groupInlineReviewCommentsByTarget(reviewComments),
@@ -103,6 +113,9 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
   );
   const [editor, setEditor] = useState<InlineReviewEditorState | null>(null);
   const [highlight, setHighlight] = useState<ReviewLineRange>();
+  const [commentHeights, setCommentHeights] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
   // The editor owns its text; this mirror lets opening another editor save it first.
   const editorBodyRef = useRef("");
   const addComment = useReviewDraftStore((state) => state.addComment);
@@ -137,13 +150,15 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
             startSide: current.start?.side,
             startLineNumber: current.start?.lineNumber,
             content: current.target.content,
+            context: buildContext(editorLineRange(current)),
+            source,
             body: trimmedBody,
           },
         });
       }
       return true;
     },
-    [addComment, input.reviewDraftKey, updateComment],
+    [addComment, buildContext, input.reviewDraftKey, source, updateComment],
   );
 
   const openEditor = useCallback(
@@ -216,6 +231,19 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
     editorBodyRef.current = body;
   }, []);
 
+  // ponytail: heights of deleted comments stay in the map; they are a few numbers per session.
+  const handleCommentHeightChange = useCallback((id: string, height: number) => {
+    setCommentHeights((current) =>
+      current.get(id) === height ? current : new Map(current).set(id, height),
+    );
+  }, []);
+
+  const handleEditorHeightChange = useCallback((height: number) => {
+    setEditor((current) =>
+      current && current.height !== height ? { ...current, height } : current,
+    );
+  }, []);
+
   const handleSaveEditor = useCallback(
     (body: string) => {
       if (editor && saveEditorBody(editor, body)) {
@@ -238,6 +266,7 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
   return useMemo<InlineReviewActions>(
     () => ({
       commentsByTarget,
+      commentHeights,
       editor,
       highlight,
       onHighlight: setHighlight,
@@ -246,16 +275,21 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
       onStartHighlightComment: handleStartHighlightComment,
       onEditComment: handleEditComment,
       onEditorBodyChange: handleEditorBodyChange,
+      onEditorHeightChange: handleEditorHeightChange,
+      onCommentHeightChange: handleCommentHeightChange,
       onCancelEditor: closeEditor,
       onSaveEditor: handleSaveEditor,
       onDeleteComment: handleDeleteComment,
     }),
     [
       closeEditor,
+      commentHeights,
       commentsByTarget,
       editor,
       handleDeleteComment,
       handleEditComment,
+      handleEditorHeightChange,
+      handleCommentHeightChange,
       handleEditorBodyChange,
       handleSaveEditor,
       handleStartComment,
@@ -404,6 +438,7 @@ export function InlineReviewThread({
       initialBody={editor.body}
       focusRequestId={editor.focusRequestId}
       onChangeBody={reviewActions.onEditorBodyChange}
+      onHeightChange={reviewActions.onEditorHeightChange}
       onCancel={reviewActions.onCancelEditor}
       onSave={reviewActions.onSaveEditor}
       testID="inline-review-editor"
@@ -432,6 +467,7 @@ export function InlineReviewThread({
             reviewTarget={reviewTarget}
             onEditComment={reviewActions.onEditComment}
             onDeleteComment={reviewActions.onDeleteComment}
+            onHeightChange={reviewActions.onCommentHeightChange}
           />
         );
       })}
@@ -445,13 +481,19 @@ function CommentRow({
   reviewTarget,
   onEditComment,
   onDeleteComment,
+  onHeightChange,
 }: {
   comment: ReviewDraftComment;
   reviewTarget: ReviewableDiffTarget;
   onEditComment: (target: ReviewableDiffTarget, comment: ReviewDraftComment) => void;
   onDeleteComment: (id: string) => void;
+  onHeightChange: (id: string, height: number) => void;
 }) {
   const { t } = useTranslation();
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => onHeightChange(comment.id, event.nativeEvent.layout.height),
+    [onHeightChange, comment.id],
+  );
   const handleEdit = useCallback(
     () => onEditComment(reviewTarget, comment),
     [onEditComment, reviewTarget, comment],
@@ -464,8 +506,8 @@ function CommentRow({
   );
 
   return (
-    <View style={styles.commentBlock}>
-      <Text style={styles.commentBody} numberOfLines={2}>
+    <View style={styles.commentBlock} onLayout={handleLayout}>
+      <Text style={styles.commentBody} numberOfLines={MAX_TEXT_LINES}>
         {comment.body}
       </Text>
       <View style={styles.commentActions}>
@@ -545,6 +587,7 @@ export function InlineReviewEditor({
   initialBody,
   focusRequestId,
   onChangeBody,
+  onHeightChange,
   onCancel,
   onSave,
   testID,
@@ -553,6 +596,8 @@ export function InlineReviewEditor({
   initialBody: string;
   focusRequestId: number;
   onChangeBody: (body: string) => void;
+  /** The thread reserves this height, so the input can grow with its text. */
+  onHeightChange: (height: number) => void;
   onCancel: () => void;
   onSave: (body: string) => void;
   testID?: string;
@@ -589,6 +634,9 @@ export function InlineReviewEditor({
     if (!element) {
       return;
     }
+    // Native multiline inputs grow with their text; a web textarea needs field-sizing.
+    // ponytail: Firefox lacks field-sizing, so there it stays one line and scrolls.
+    element.style.setProperty("field-sizing", "content");
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const hasModifier = event.shiftKey || event.altKey || event.metaKey || event.ctrlKey;
@@ -634,8 +682,13 @@ export function InlineReviewEditor({
     [isFocused],
   );
 
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => onHeightChange(event.nativeEvent.layout.height),
+    [onHeightChange],
+  );
+
   return (
-    <View style={styles.editorBlock} testID={testID}>
+    <View style={styles.editorBlock} onLayout={handleLayout} testID={testID}>
       <TextInput
         ref={inputRef}
         accessibilityLabel={t("review.comment.label")}
@@ -725,14 +778,13 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Fixed to the reserved row height so the diff layout and the card agree.
   commentBlock: {
-    height: INLINE_REVIEW_COMMENT_HEIGHT,
-    overflow: "hidden",
+    minHeight: INLINE_REVIEW_COMMENT_HEIGHT,
+    paddingVertical: theme.spacing[1.5],
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
@@ -776,7 +828,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface3,
   },
   editorBlock: {
-    minHeight: INLINE_REVIEW_EDITOR_HEIGHT,
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
@@ -786,8 +837,12 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
   },
   editorInput: {
-    flex: 1,
-    minHeight: 0,
+    // One line to the max, plus padding and border.
+    minHeight: theme.fontSize.content * 1.4 + theme.spacing[2] * 2 + theme.borderWidth[1] * 2,
+    maxHeight:
+      theme.fontSize.content * 1.4 * MAX_TEXT_LINES +
+      theme.spacing[2] * 2 +
+      theme.borderWidth[1] * 2,
     color: theme.colors.foreground,
     backgroundColor: theme.colors.surface1,
     borderWidth: theme.borderWidth[1],

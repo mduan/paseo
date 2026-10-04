@@ -1,7 +1,14 @@
 import { z } from "zod";
+import {
+  ReviewAttachmentCommentSchema,
+  ReviewCommentSourceSchema,
+} from "@getpaseo/protocol/messages";
 
 export type ReviewDraftMode = "uncommitted" | "base";
 export type ReviewDraftSide = "old" | "new";
+
+const ReviewDraftCommentContextSchema = ReviewAttachmentCommentSchema.shape.context;
+export type ReviewDraftCommentContext = z.infer<typeof ReviewDraftCommentContextSchema>;
 
 export interface ReviewDraftComment {
   id: string;
@@ -13,6 +20,10 @@ export interface ReviewDraftComment {
   startLineNumber?: number;
   /** The anchor line's text, so the comment still has context once that line is out of the diff. */
   content?: string;
+  /** Lines around the range, captured by the viewer the comment was made in. */
+  context?: ReviewDraftCommentContext;
+  /** Absent for diff comments; "file" when made in the file viewer. */
+  source?: z.infer<typeof ReviewCommentSourceSchema>;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +47,8 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   startSide: z.enum(["old", "new"]).optional(),
   startLineNumber: z.number().int().positive().optional(),
   content: z.string().optional(),
+  context: ReviewDraftCommentContextSchema.optional(),
+  source: ReviewCommentSourceSchema.optional(),
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
@@ -125,8 +138,28 @@ export function serializeReviewDraftState(
 export function normalizePersistedState(state: unknown): ReviewDraftStoreState {
   const result = SerializedReviewDraftStateSchema.safeParse(state);
   return {
-    drafts: result.success ? result.data.drafts : {},
+    drafts: result.success ? mergeDraftsByWorkspace(result.data.drafts) : {},
   };
+}
+
+// COMPAT(reviewDraftWorkspaceKey): added in v0.11, remove after 2027-04-03.
+// Keys before v3 also held the diff mode, base ref, and whitespace setting.
+const LEGACY_KEY_PART = /^(mode|base|ignoreWhitespace)=/;
+
+function mergeDraftsByWorkspace(
+  drafts: Record<string, ReviewDraftComment[]>,
+): Record<string, ReviewDraftComment[]> {
+  const merged: Record<string, ReviewDraftComment[]> = {};
+  for (const [key, comments] of Object.entries(drafts)) {
+    const workspaceKey = key
+      .split(":")
+      .filter((part) => !LEGACY_KEY_PART.test(part))
+      .join(":");
+    const existing = merged[workspaceKey] ?? [];
+    const ids = new Set(existing.map((comment) => comment.id));
+    merged[workspaceKey] = [...existing, ...comments.filter((comment) => !ids.has(comment.id))];
+  }
+  return merged;
 }
 
 function applyCommentUpdates(

@@ -3,12 +3,16 @@ import type { StateStorage } from "zustand/middleware";
 import type { ParsedDiffFile } from "@/git/use-diff-query";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 import { buildReviewAttachmentSnapshot, buildReviewDraftKey } from "./store";
+import { buildDiffReviewContext, buildFileReviewContext } from "./context";
+import type { ReviewLineRange } from "./range";
+import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
 import {
   addCommentToState,
   clearReviewInState,
   deleteCommentFromState,
   normalizePersistedState,
   type ReviewDraftComment,
+  type ReviewDraftCommentContext,
   type ReviewDraftStoreState,
   serializeReviewDraftState,
   SerializedReviewDraftStateSchema,
@@ -73,39 +77,13 @@ function createMemoryStorage(): StateStorage & { values: Map<string, string> } {
 }
 
 describe("buildReviewDraftKey", () => {
-  it("scopes by server, workspace-or-cwd, diff mode, base ref, and whitespace mode", () => {
-    const base = buildReviewDraftKey({
-      serverId: " local ",
-      workspaceId: " workspace-1 ",
-      cwd: "/repo",
-      mode: "base",
-      baseRef: " main ",
-      ignoreWhitespace: false,
-    });
-
-    expect(base).toBe(
-      "review:server=local:workspace=workspace-1:mode=base:base=main:ignoreWhitespace=false",
+  it("scopes by server and workspace-or-cwd only, so edits keep the same comments", () => {
+    expect(
+      buildReviewDraftKey({ serverId: " local ", workspaceId: " workspace-1 ", cwd: "/repo" }),
+    ).toBe("review:server=local:workspace=workspace-1");
+    expect(buildReviewDraftKey({ serverId: "local", workspaceId: null, cwd: "/repo/" })).toBe(
+      "review:server=local:cwd=%2Frepo",
     );
-    expect(
-      buildReviewDraftKey({
-        serverId: "local",
-        workspaceId: "workspace-1",
-        cwd: "/repo",
-        mode: "base",
-        baseRef: "main",
-        ignoreWhitespace: true,
-      }),
-    ).not.toBe(base);
-    expect(
-      buildReviewDraftKey({
-        serverId: "local",
-        workspaceId: null,
-        cwd: "/repo/",
-        mode: "base",
-        baseRef: "main",
-        ignoreWhitespace: false,
-      }),
-    ).toBe("review:server=local:cwd=%2Frepo:mode=base:base=main:ignoreWhitespace=false");
   });
 });
 
@@ -127,6 +105,42 @@ describe("normalizePersistedState", () => {
 
     expect(normalized.drafts["review:key"]).toEqual([makeComment()]);
     expect(backing.values.has("@paseo:review-draft-store")).toBe(true);
+  });
+
+  it("merges drafts saved per diff mode into one set per workspace", () => {
+    const normalized = normalizePersistedState({
+      drafts: {
+        "review:server=local:workspace=w1:mode=base:base=main:ignoreWhitespace=false": [
+          makeComment({ id: "a" }),
+        ],
+        "review:server=local:workspace=w1:mode=uncommitted:base=main:ignoreWhitespace=true": [
+          makeComment({ id: "b" }),
+          makeComment({ id: "a" }),
+        ],
+      },
+    });
+
+    expect(normalized.drafts).toEqual({
+      "review:server=local:workspace=w1": [makeComment({ id: "a" }), makeComment({ id: "b" })],
+    });
+  });
+
+  it("merges drafts saved per diff mode into one set per workspace", () => {
+    const normalized = normalizePersistedState({
+      drafts: {
+        "review:server=local:workspace=w1:mode=base:base=main:ignoreWhitespace=false": [
+          makeComment({ id: "a" }),
+        ],
+        "review:server=local:workspace=w1:mode=uncommitted:base=main:ignoreWhitespace=true": [
+          makeComment({ id: "b" }),
+          makeComment({ id: "a" }),
+        ],
+      },
+    });
+
+    expect(normalized.drafts).toEqual({
+      "review:server=local:workspace=w1": [makeComment({ id: "a" }), makeComment({ id: "b" })],
+    });
   });
 
   it("rejects the complete payload when any draft comment or field is invalid", () => {
@@ -217,34 +231,62 @@ describe("review draft reducers", () => {
   });
 });
 
+function diffTarget(input: {
+  side: "old" | "new";
+  lineNumber: number;
+  content?: string;
+}): ReviewableDiffTarget {
+  return {
+    key: buildReviewableDiffTargetKey({ filePath: "src/example.ts", ...input }),
+    filePath: "src/example.ts",
+    hunkHeader: "",
+    hunkIndex: 0,
+    lineIndex: 0,
+    oldLineNumber: input.side === "old" ? input.lineNumber : null,
+    newLineNumber: input.side === "new" ? input.lineNumber : null,
+    side: input.side,
+    lineNumber: input.lineNumber,
+    lineType: "context",
+    content: input.content ?? "",
+  };
+}
+
+function lineRange(
+  start: { side: "old" | "new"; lineNumber: number; content?: string },
+  end: { side: "old" | "new"; lineNumber: number; content?: string } = start,
+): ReviewLineRange {
+  return { start: diffTarget(start), end: diffTarget(end) };
+}
+
 describe("buildReviewAttachmentSnapshot", () => {
-  it("builds a bounded workspace review attachment and skips missing targets", () => {
+  const storedContext = {
+    hunkHeader: "@@ -40,4 +40,4 @@",
+    targetLine: {
+      oldLineNumber: null,
+      newLineNumber: 41,
+      type: "add" as const,
+      content: "const value = newValue;",
+    },
+    lines: [
+      {
+        oldLineNumber: 40,
+        newLineNumber: 40,
+        type: "context" as const,
+        content: "const before = true;",
+      },
+    ],
+  };
+
+  it("builds the attachment from stored context and skips comments without any", () => {
     const snapshot = buildReviewAttachmentSnapshot({
       reviewDraftKey: "review:key",
       cwd: "/repo",
       mode: "base",
       baseRef: "main",
       comments: [
-        {
-          id: "comment-1",
-          filePath: "src/example.ts",
-          side: "new",
-          lineNumber: 41,
-          body: "Please simplify this.",
-          createdAt: "2026-04-21T00:00:00.000Z",
-          updatedAt: "2026-04-21T00:00:00.000Z",
-        },
-        {
-          id: "comment-2",
-          filePath: "src/missing.ts",
-          side: "new",
-          lineNumber: 99,
-          body: "This target is stale.",
-          createdAt: "2026-04-21T00:00:00.000Z",
-          updatedAt: "2026-04-21T00:00:00.000Z",
-        },
+        makeComment({ context: storedContext }),
+        makeComment({ id: "comment-2", filePath: "src/missing.ts", lineNumber: 99 }),
       ],
-      diffFiles: [makeFile()],
     });
 
     expect(snapshot).toEqual({
@@ -263,47 +305,50 @@ describe("buildReviewAttachmentSnapshot", () => {
             side: "new",
             lineNumber: 41,
             body: "Please simplify this.",
-            context: {
-              hunkHeader: "@@ -40,4 +40,4 @@",
-              targetLine: {
-                oldLineNumber: null,
-                newLineNumber: 41,
-                type: "add",
-                content: "const value = newValue;",
-              },
-              lines: [
-                {
-                  oldLineNumber: 40,
-                  newLineNumber: 40,
-                  type: "context",
-                  content: "const before = true;",
-                },
-                {
-                  oldLineNumber: 41,
-                  newLineNumber: null,
-                  type: "remove",
-                  content: "const value = oldValue;",
-                },
-                {
-                  oldLineNumber: null,
-                  newLineNumber: 41,
-                  type: "add",
-                  content: "const value = newValue;",
-                },
-                {
-                  oldLineNumber: 42,
-                  newLineNumber: 42,
-                  type: "context",
-                  content: "return value;",
-                },
-              ],
-            },
+            context: storedContext,
           },
         ],
       },
     });
   });
 
+  it("forwards a file-view comment's source and stores it through the schema", () => {
+    const fileComment = makeComment({ context: storedContext, source: "file" });
+    expect(
+      SerializedReviewDraftStateSchema.safeParse({ drafts: { k: [fileComment] } }).success,
+    ).toBe(true);
+    const snapshot = buildReviewAttachmentSnapshot({
+      reviewDraftKey: "review:key",
+      cwd: "/repo",
+      mode: "base",
+      comments: [fileComment, makeComment({ id: "diff", context: storedContext })],
+    });
+    expect(snapshot?.attachment.comments[0]?.source).toBe("file");
+    expect(snapshot?.attachment.comments[1]).not.toHaveProperty("source");
+  });
+
+  it("falls back to the stored line for a comment saved without context", () => {
+    const snapshot = buildReviewAttachmentSnapshot({
+      reviewDraftKey: "review:key",
+      cwd: "/repo",
+      mode: "uncommitted",
+      comments: [makeComment({ lineNumber: 15, content: "const collapsed = true;" })],
+    });
+    const line = {
+      oldLineNumber: null,
+      newLineNumber: 15,
+      type: "context",
+      content: "const collapsed = true;",
+    };
+    expect(snapshot?.attachment.comments[0]?.context).toEqual({
+      hunkHeader: "",
+      targetLine: line,
+      lines: [line],
+    });
+  });
+});
+
+describe("buildDiffReviewContext", () => {
   function contextLine(lineNumber: number) {
     return { type: "context" as const, content: `line ${lineNumber}` };
   }
@@ -351,53 +396,48 @@ describe("buildReviewAttachmentSnapshot", () => {
     };
   }
 
-  function snapshotComments(comments: ReviewDraftComment[], diffFiles: ParsedDiffFile[]) {
-    return (
-      buildReviewAttachmentSnapshot({
-        reviewDraftKey: "review:key",
-        cwd: "/repo",
-        mode: "uncommitted",
-        comments,
-        diffFiles,
-      })?.attachment.comments ?? []
-    );
-  }
-
-  function lineLabels(comment: {
-    context: { lines: { oldLineNumber: number | null; newLineNumber: number | null }[] };
-  }) {
-    return comment.context.lines.map(
+  function lineLabels(context: ReviewDraftCommentContext | undefined) {
+    return (context?.lines ?? []).map(
       (line) => `${line.oldLineNumber ?? "-"}/${line.newLineNumber ?? "-"}`,
     );
   }
 
-  it("spans a mixed-side range from the start's context to the end's context", () => {
-    const [comment] = snapshotComments(
-      [makeComment({ startSide: "old", startLineNumber: 4, side: "new", lineNumber: 5 })],
-      [makeTwoHunkFile()],
-    );
-
-    expect(comment).toMatchObject({
-      side: "new",
-      lineNumber: 5,
-      startSide: "old",
-      startLineNumber: 4,
-      context: {
-        hunkHeader: "@@ -1,6 +1,7 @@",
-        targetLine: { oldLineNumber: null, newLineNumber: 5, type: "add", content: "new 5" },
-      },
+  it("takes the hunk header and surrounding lines of a single line", () => {
+    const context = buildDiffReviewContext({
+      range: lineRange({ side: "new", lineNumber: 41 }),
+      diffFiles: [makeFile()],
     });
-    expect(lineLabels(comment!)).toEqual(["1/1", "2/2", "3/3", "4/-", "-/4", "-/5", "5/6", "6/7"]);
+    expect(context?.hunkHeader).toBe("@@ -40,4 +40,4 @@");
+    expect(context?.targetLine).toEqual({
+      oldLineNumber: null,
+      newLineNumber: 41,
+      type: "add",
+      content: "const value = newValue;",
+    });
+    expect(lineLabels(context)).toEqual(["40/40", "41/-", "-/41", "42/42"]);
+  });
+
+  it("spans a mixed-side range from the start's context to the end's context", () => {
+    const context = buildDiffReviewContext({
+      range: lineRange({ side: "old", lineNumber: 4 }, { side: "new", lineNumber: 5 }),
+      diffFiles: [makeTwoHunkFile()],
+    });
+
+    expect(context).toMatchObject({
+      hunkHeader: "@@ -1,6 +1,7 @@",
+      targetLine: { oldLineNumber: null, newLineNumber: 5, type: "add", content: "new 5" },
+    });
+    expect(lineLabels(context)).toEqual(["1/1", "2/2", "3/3", "4/-", "-/4", "-/5", "5/6", "6/7"]);
   });
 
   it("spans hunks for a cross-hunk range and keeps context inside the end hunks", () => {
-    const [comment] = snapshotComments(
-      [makeComment({ startSide: "new", startLineNumber: 7, side: "new", lineNumber: 22 })],
-      [makeTwoHunkFile()],
-    );
+    const context = buildDiffReviewContext({
+      range: lineRange({ side: "new", lineNumber: 7 }, { side: "new", lineNumber: 22 }),
+      diffFiles: [makeTwoHunkFile()],
+    });
 
-    expect(comment?.context.hunkHeader).toBe("@@ -1,6 +1,7 @@");
-    expect(lineLabels(comment!)).toEqual([
+    expect(context?.hunkHeader).toBe("@@ -1,6 +1,7 @@");
+    expect(lineLabels(context)).toEqual([
       "-/4",
       "-/5",
       "5/6",
@@ -409,37 +449,29 @@ describe("buildReviewAttachmentSnapshot", () => {
     ]);
   });
 
-  it("drops a range comment when either end left the diff", () => {
+  it("has no context for a range whose start is not in the diff", () => {
     expect(
-      snapshotComments(
-        [makeComment({ startSide: "new", startLineNumber: 15, side: "new", lineNumber: 22 })],
-        [makeTwoHunkFile()],
-      ),
-    ).toEqual([]);
+      buildDiffReviewContext({
+        range: lineRange({ side: "new", lineNumber: 15 }, { side: "new", lineNumber: 22 }),
+        diffFiles: [makeTwoHunkFile()],
+      }),
+    ).toBeUndefined();
   });
 
-  it("falls back to the stored line when the commented line left the diff", () => {
-    const [comment] = snapshotComments(
-      [makeComment({ lineNumber: 15, content: "const collapsed = true;" })],
-      [makeTwoHunkFile()],
-    );
-    expect(comment?.context).toEqual({
-      hunkHeader: "",
-      targetLine: {
+  it("falls back to the commented line when it is not in the diff", () => {
+    const context = buildDiffReviewContext({
+      range: lineRange({ side: "new", lineNumber: 15, content: "const collapsed = true;" }),
+      diffFiles: [makeTwoHunkFile()],
+    });
+    expect(context?.hunkHeader).toBe("");
+    expect(context?.lines).toEqual([
+      {
         oldLineNumber: null,
         newLineNumber: 15,
         type: "context",
         content: "const collapsed = true;",
       },
-      lines: [
-        {
-          oldLineNumber: null,
-          newLineNumber: 15,
-          type: "context",
-          content: "const collapsed = true;",
-        },
-      ],
-    });
+    ]);
   });
 
   it("caps range context at 80 lines", () => {
@@ -462,13 +494,56 @@ describe("buildReviewAttachmentSnapshot", () => {
       ],
     };
 
-    const [comment] = snapshotComments(
-      [makeComment({ startSide: "new", startLineNumber: 10, side: "new", lineNumber: 110 })],
-      [file],
-    );
+    const context = buildDiffReviewContext({
+      range: lineRange({ side: "new", lineNumber: 10 }, { side: "new", lineNumber: 110 }),
+      diffFiles: [file],
+    });
 
-    expect(comment?.context.lines).toHaveLength(80);
-    expect(comment?.context.lines[0]?.newLineNumber).toBe(7);
-    expect(comment?.context.lines[79]?.newLineNumber).toBe(86);
+    expect(context?.lines).toHaveLength(80);
+    expect(context?.lines[0]?.newLineNumber).toBe(7);
+    expect(context?.lines[79]?.newLineNumber).toBe(86);
+  });
+});
+
+describe("buildFileReviewContext", () => {
+  const fileLines = Array.from({ length: 120 }, (_, index) => `line ${index + 1}`);
+  function fileContext(start: number, end: number = start) {
+    return buildFileReviewContext({
+      range: lineRange({ side: "new", lineNumber: start }, { side: "new", lineNumber: end }),
+      lineCount: fileLines.length,
+      lineText: (lineNumber) => fileLines[lineNumber - 1] ?? "",
+    });
+  }
+
+  it("takes three file lines on each side as new-side context without a hunk header", () => {
+    const context = fileContext(10);
+    expect(context?.hunkHeader).toBe("");
+    expect(context?.targetLine).toEqual({
+      oldLineNumber: null,
+      newLineNumber: 10,
+      type: "context",
+      content: "line 10",
+    });
+    expect(context?.lines.map((line) => line.newLineNumber)).toEqual([7, 8, 9, 10, 11, 12, 13]);
+    expect(context?.lines.every((line) => line.oldLineNumber === null)).toBe(true);
+  });
+
+  it("clamps the radius at the file edges", () => {
+    expect(fileContext(1)?.lines.map((line) => line.newLineNumber)).toEqual([1, 2, 3, 4]);
+    expect(fileContext(120)?.lines.map((line) => line.newLineNumber)).toEqual([117, 118, 119, 120]);
+  });
+
+  it("covers a range plus radius and caps at 80 lines", () => {
+    expect(fileContext(5, 8)?.lines.map((line) => line.newLineNumber)).toEqual([
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ]);
+    const capped = fileContext(10, 110);
+    expect(capped?.lines).toHaveLength(80);
+    expect(capped?.lines[0]?.newLineNumber).toBe(7);
+    expect(capped?.targetLine.newLineNumber).toBe(110);
+  });
+
+  it("has no context for a line past the end of the file", () => {
+    expect(fileContext(121)).toBeUndefined();
   });
 });

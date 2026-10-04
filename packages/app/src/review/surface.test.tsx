@@ -143,11 +143,13 @@ function target(overrides: Partial<ReviewableDiffTarget> = {}): ReviewableDiffTa
 }
 
 const EMPTY_COMMENTS: ReviewDraftComment[] = [];
+const noContext = () => undefined;
 const COMMENT_LIST: ReviewDraftComment[] = [comment()];
 
 function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): InlineReviewActions {
   return {
     commentsByTarget: new Map(),
+    commentHeights: new Map(),
     editor: null,
     onHighlight: vi.fn(),
     onToggleHighlight: vi.fn(),
@@ -155,6 +157,8 @@ function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): Inlin
     onStartHighlightComment: vi.fn(),
     onEditComment: vi.fn(),
     onEditorBodyChange: vi.fn(),
+    onEditorHeightChange: vi.fn(),
+    onCommentHeightChange: vi.fn(),
     onCancelEditor: vi.fn(),
     onSaveEditor: vi.fn(),
     onDeleteComment: vi.fn(),
@@ -190,7 +194,8 @@ describe("useInlineReviewController", () => {
     const firstKey = "review:key-1";
     const secondKey = "review:key-2";
     const { result, rerender } = renderHook(
-      ({ reviewDraftKey }) => useInlineReviewController({ reviewDraftKey }),
+      ({ reviewDraftKey }) =>
+        useInlineReviewController({ reviewDraftKey, buildContext: noContext }),
       { initialProps: { reviewDraftKey: firstKey } },
     );
 
@@ -245,7 +250,9 @@ describe("useInlineReviewController", () => {
   it("comments on the highlighted range and stores its start line", () => {
     const start = target({ side: "old", lineNumber: 368, oldLineNumber: 368, newLineNumber: null });
     const end = target({ lineNumber: 386, newLineNumber: 386 });
-    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext: noContext }),
+    );
 
     act(() => result.current.onHighlight({ start, end }));
     act(() => result.current.onStartHighlightComment());
@@ -273,9 +280,36 @@ describe("useInlineReviewController", () => {
     });
   });
 
+  it("stores the viewer's context for the range when a comment is created, not when edited", () => {
+    const start = target({ lineNumber: 3, newLineNumber: 3 });
+    const end = target({ lineNumber: 5, newLineNumber: 5 });
+    const context = {
+      hunkHeader: "",
+      targetLine: { oldLineNumber: null, newLineNumber: 5, type: "context" as const, content: "" },
+      lines: [],
+    };
+    const buildContext = vi.fn(() => context);
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext }),
+    );
+
+    act(() => result.current.onHighlight({ start, end }));
+    act(() => result.current.onStartHighlightComment());
+    act(() => result.current.onSaveEditor("range note"));
+    expect(buildContext).toHaveBeenCalledWith({ start, end });
+    const saved = useReviewDraftStore.getState().drafts.review![0]!;
+    expect(saved.context).toEqual(context);
+
+    act(() => result.current.onEditComment(end, saved));
+    act(() => result.current.onSaveEditor("edited"));
+    expect(buildContext).toHaveBeenCalledTimes(1);
+  });
+
   it("focuses the open editor instead of reopening the same range", () => {
     const reviewTarget = target();
-    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext: noContext }),
+    );
 
     act(() => result.current.onStartComment(reviewTarget));
     act(() => result.current.onEditorBodyChange("typed"));
@@ -288,7 +322,9 @@ describe("useInlineReviewController", () => {
   it("focuses a pencil edit when its range is the highlight instead of opening a new editor", () => {
     const start = target({ lineNumber: 3, newLineNumber: 3 });
     const end = target({ lineNumber: 5, newLineNumber: 5 });
-    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext: noContext }),
+    );
 
     act(() => result.current.onHighlight({ start, end }));
     act(() => result.current.onStartHighlightComment());
@@ -306,7 +342,9 @@ describe("useInlineReviewController", () => {
     const first = target({ lineNumber: 3, newLineNumber: 3 });
     const second = target({ lineNumber: 5, newLineNumber: 5 });
     const third = target({ lineNumber: 7, newLineNumber: 7 });
-    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext: noContext }),
+    );
 
     act(() => result.current.onStartComment(first));
     act(() => result.current.onEditorBodyChange("  keep me  "));
@@ -324,7 +362,9 @@ describe("useInlineReviewController", () => {
   it("toggles a single highlighted line and leaves another highlight when the editor closes", () => {
     const first = target({ lineNumber: 3, newLineNumber: 3 });
     const second = target({ lineNumber: 5, newLineNumber: 5 });
-    const { result } = renderHook(() => useInlineReviewController({ reviewDraftKey: "review" }));
+    const { result } = renderHook(() =>
+      useInlineReviewController({ reviewDraftKey: "review", buildContext: noContext }),
+    );
 
     act(() => result.current.onToggleHighlight(first));
     expect(result.current.highlight).toEqual(singleLineRange(first));
@@ -387,7 +427,27 @@ describe("git diff inline review helpers", () => {
 
     expect(rowState?.left).toBeNull();
     expect(rowState?.right?.comments).toEqual([rightComment]);
-    expect(rowState?.height).toBe(226);
+    expect(rowState?.height).toBe(155);
+  });
+
+  it("reserves the editor's laid-out height once it reports one", () => {
+    const reviewTarget = target();
+    const actions = buildReviewActions({
+      editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0, height: 300 },
+    });
+
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(308);
+  });
+
+  it("reserves a comment card's laid-out height once it reports one", () => {
+    const reviewTarget = target();
+    const saved = comment();
+    const actions = buildReviewActions({
+      commentsByTarget: groupInlineReviewCommentsByTarget([saved]),
+      commentHeights: new Map([[saved.id, 120]]),
+    });
+
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(128);
   });
 
   it("includes thread padding in the inline editor height", () => {
@@ -396,7 +456,7 @@ describe("git diff inline review helpers", () => {
       editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0 },
     });
 
-    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(148);
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(113);
   });
 
   it("pins no-wrap review threads to the visible diff viewport", () => {
@@ -506,6 +566,7 @@ describe("InlineReviewEditor", () => {
         initialBody=" initial "
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -529,6 +590,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -551,6 +613,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={vi.fn()}
         onSave={vi.fn()}
         testID="editor"
@@ -581,6 +644,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={vi.fn()}
         onSave={vi.fn()}
         testID="editor"
@@ -623,17 +687,21 @@ describe("InlineReviewThread", () => {
     expect(actions.onDeleteComment).toHaveBeenCalledWith("comment-1");
   });
 
-  it("renders each saved comment card at the height the diff layout reserves for it", () => {
+  it("keeps multiline comment text and starts each card at the one-line reservation", () => {
     const reviewTarget = target();
     const actions = buildReviewActions({
-      commentsByTarget: groupInlineReviewCommentsByTarget([comment()]),
+      commentsByTarget: groupInlineReviewCommentsByTarget([comment({ body: "line 1\nline 2" })]),
     });
     const { getByText } = render(
-      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={88} />,
+      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={44} />,
     );
 
-    const card = getByText("Please simplify this.").parentElement!;
-    expect(getComputedStyle(card).height).toBe(`${INLINE_REVIEW_COMMENT_HEIGHT}px`);
+    const body = getByText(/line 1/);
+    expect(body.textContent).toBe("line 1\nline 2");
+    expect(getComputedStyle(body).whiteSpace).not.toBe("nowrap");
+    expect(getComputedStyle(body.parentElement!).minHeight).toBe(
+      `${INLINE_REVIEW_COMMENT_HEIGHT}px`,
+    );
   });
 
   it("labels single-line and range comments and the editor by side and line", () => {

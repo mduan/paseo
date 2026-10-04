@@ -141,7 +141,7 @@ test.describe("Composer attachments", () => {
     }
   });
 
-  test.fixme("workspace-review pill suppresses on X-click and reappears after send", async () => {
+  test.fixme("workspace-review pill X-click deletes the review comments", async () => {
     // The review attachment is created via InlineReviewEditor in surface.tsx (addComment action).
     // Automating this requires: a workspace with staged changes, navigating to the diff panel,
     // hovering the gutter "+" button, typing a comment, and submitting. A dedicated

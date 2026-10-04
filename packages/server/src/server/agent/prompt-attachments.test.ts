@@ -262,6 +262,105 @@ describe("prompt attachments", () => {
     );
   });
 
+  it("omits the hunk header line for a comment without one", () => {
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "base",
+        comments: [
+          {
+            filePath: "src/index.ts",
+            side: "new",
+            lineNumber: 2,
+            body: "Rename this.",
+            context: {
+              hunkHeader: "",
+              targetLine: { oldLineNumber: null, newLineNumber: 2, type: "context", content: "b" },
+              lines: [
+                { oldLineNumber: null, newLineNumber: 1, type: "context", content: "a" },
+                { oldLineNumber: null, newLineNumber: 2, type: "context", content: "b" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (base)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/index.ts:R2",
+        "Rename this.",
+        "   -  1  a",
+        ">  -  2  b",
+      ].join("\n"),
+    );
+  });
+
+  it("renders file-view comments as numbered file excerpts", () => {
+    const line = (lineNumber: number, content: string) => ({
+      oldLineNumber: null,
+      newLineNumber: lineNumber,
+      type: "context" as const,
+      content,
+    });
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "base",
+        comments: [
+          {
+            filePath: "src/range.ts",
+            side: "new",
+            lineNumber: 9,
+            body: "Explain this.",
+            source: "file",
+            context: {
+              hunkHeader: "",
+              targetLine: line(9, "export function a() {"),
+              lines: [line(8, "}"), line(9, "export function a() {"), line(10, "  return 1;")],
+            },
+          },
+          {
+            filePath: "src/range.ts",
+            side: "new",
+            lineNumber: 11,
+            startSide: "new",
+            startLineNumber: 10,
+            body: "Simplify.",
+            source: "file",
+            context: {
+              hunkHeader: "",
+              targetLine: line(11, "}"),
+              lines: [line(9, "export function a() {"), line(10, "  return 1;"), line(11, "}")],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (base)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/range.ts line 9 (file view)",
+        "Explain this.",
+        "   8 | }",
+        ">  9 | export function a() {",
+        "  10 |   return 1;",
+        "",
+        "Comment 2: src/range.ts lines 10-11 (file view)",
+        "Simplify.",
+        "   9 | export function a() {",
+        "> 10 |   return 1;",
+        "> 11 | }",
+      ].join("\n"),
+    );
+  });
+
   it("renders github_issue attachments as readable text", () => {
     expect(
       renderPromptAttachmentAsText({

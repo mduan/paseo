@@ -7,7 +7,10 @@ import {
   buildReviewDraftKey,
   useInlineReviewController,
   useReviewAttachmentSnapshot,
+  type ReviewDraftMode,
 } from "@/review";
+import { buildDiffReviewContext } from "@/review/context";
+import type { ReviewLineRange } from "@/review/range";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { useCheckoutDiffQuery } from "@/git/use-diff-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -78,36 +81,25 @@ export function useWorkingDiff({
     ignoreWhitespace,
     enabled: enabled && isGit,
   });
-  const reviewDraftKey = useMemo(
-    () =>
-      buildReviewDraftKey({
-        serverId,
-        workspaceId,
-        cwd,
-        mode: checkoutMode,
-        baseRef,
-        ignoreWhitespace,
-      }),
-    [baseRef, checkoutMode, cwd, ignoreWhitespace, serverId, workspaceId],
-  );
-  const reviewActions = useInlineReviewController({ reviewDraftKey });
+  const { reviewDraftKey } = useReviewDraftScope({ serverId, workspaceId, cwd });
   const expansion = useWorkingDiffExpansion({
     serverId,
     cwd,
     ignoreWhitespace,
     reviewDraftKey,
+    checkoutMode,
+    baseRef,
     turnComparison,
     turnDiff,
     checkoutFiles: checkoutDiff.files,
   });
-  const reviewAttachment = useReviewAttachmentSnapshot({
-    key: reviewDraftKey,
-    // Expanded lines give review comments on them their surrounding context.
-    diffFiles: expansion.files,
-    cwd,
-    mode: checkoutMode,
-    baseRef,
-  });
+  // Expanded lines give review comments on them their surrounding context.
+  const diffFiles = expansion.files;
+  const buildContext = useCallback(
+    (range: ReviewLineRange) => buildDiffReviewContext({ range, diffFiles }),
+    [diffFiles],
+  );
+  const reviewActions = useInlineReviewController({ reviewDraftKey, buildContext });
 
   return {
     status,
@@ -131,7 +123,6 @@ export function useWorkingDiff({
           isDiffLoading: turnDiff.isLoading,
           // Turn snapshots are frozen; reviews act on the live checkout only.
           reviewActions: undefined,
-          reviewAttachment: null,
         }
       : {
           isTurnSnapshotMissing: false,
@@ -141,7 +132,6 @@ export function useWorkingDiff({
           diffTooLarge: checkoutDiff.diffTooLarge,
           isDiffLoading: checkoutDiff.isLoading,
           reviewActions,
-          reviewAttachment,
         }),
   };
 }
@@ -185,6 +175,8 @@ function useWorkingDiffExpansion(input: {
   cwd: string;
   ignoreWhitespace: boolean;
   reviewDraftKey: string;
+  checkoutMode: CheckoutDiffComparison;
+  baseRef?: string;
   turnComparison: TurnDiffComparison | null;
   turnDiff: { cwd: string; agentId: string | null; files: ParsedDiffFile[] };
   checkoutFiles: ParsedDiffFile[];
@@ -198,7 +190,12 @@ function useWorkingDiffExpansion(input: {
           scopeKey: `turn:${serverId}:${turnDiff.agentId}:${turnComparison}:${input.ignoreWhitespace}`,
           files: turnDiff.files,
         }
-      : { cwd: input.cwd, scopeKey: input.reviewDraftKey, files: input.checkoutFiles }),
+      : {
+          cwd: input.cwd,
+          // Expanded gaps belong to one checkout comparison.
+          scopeKey: `${input.reviewDraftKey}:mode=${input.checkoutMode}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
+          files: input.checkoutFiles,
+        }),
   });
 }
 
@@ -233,41 +230,70 @@ function useTurnComparisonDiff(input: {
   };
 }
 
-export function usePublishWorkingDiffAttachment({
+export interface ReviewDraftScope {
+  reviewDraftKey: string;
+  isGit: boolean;
+  mode: ReviewDraftMode;
+  baseRef?: string;
+}
+
+/**
+ * The workspace's review draft key, plus the checkout comparison the diff pane resolves, which
+ * the review attachment reports.
+ */
+export function useReviewDraftScope({
   serverId,
   workspaceId,
   cwd,
-  attachment,
-  enabled,
 }: {
   serverId: string;
   workspaceId?: string;
   cwd: string;
-  attachment: ReturnType<typeof useWorkingDiff>["reviewAttachment"];
-  enabled: boolean;
+}): ReviewDraftScope {
+  const { status } = useCheckoutStatusQuery({ serverId, cwd });
+  const gitStatus = status && status.isGit ? status : null;
+  const baseRef = gitStatus?.baseRef ?? undefined;
+  const { checkoutMode } = useResolvedDiffComparison({
+    serverId,
+    workspaceId,
+    cwd,
+    isDirty: Boolean(gitStatus?.isDirty),
+  });
+  const reviewDraftKey = useMemo(
+    () => buildReviewDraftKey({ serverId, workspaceId, cwd }),
+    [cwd, serverId, workspaceId],
+  );
+  return { reviewDraftKey, isGit: Boolean(gitStatus), mode: checkoutMode, baseRef };
+}
+
+/** Publishes the workspace's review comments as one composer attachment. Mount once per workspace. */
+export function usePublishReviewAttachment({
+  serverId,
+  workspaceId,
+  cwd,
+}: {
+  serverId: string;
+  workspaceId?: string;
+  cwd: string;
 }) {
+  const scope = useReviewDraftScope({ serverId, workspaceId, cwd });
+  const attachment = useReviewAttachmentSnapshot({
+    key: scope.reviewDraftKey,
+    cwd,
+    mode: scope.mode,
+    baseRef: scope.baseRef,
+  });
   const scopeKey = useMemo(
     () => buildWorkspaceAttachmentScopeKey({ serverId, workspaceId, cwd }),
     [cwd, serverId, workspaceId],
   );
-  const setWorkspaceAttachments = useWorkspaceAttachmentsStore(
-    (state) => state.setWorkspaceAttachments,
-  );
-  const clearWorkspaceAttachments = useWorkspaceAttachmentsStore(
-    (state) => state.clearWorkspaceAttachments,
-  );
+  const setReviewAttachment = useWorkspaceAttachmentsStore((state) => state.setReviewAttachment);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!scope.isGit) {
       return;
     }
-    const attachments = attachment ? [attachment] : [];
-    setWorkspaceAttachments({ scopeKey, attachments });
-    return () => {
-      const current = useWorkspaceAttachmentsStore.getState().attachmentsByScope[scopeKey];
-      if (current === attachments) {
-        clearWorkspaceAttachments({ scopeKey });
-      }
-    };
-  }, [attachment, clearWorkspaceAttachments, enabled, scopeKey, setWorkspaceAttachments]);
+    setReviewAttachment({ scopeKey, attachment });
+    return () => setReviewAttachment({ scopeKey, attachment: null });
+  }, [attachment, scope.isGit, scopeKey, setReviewAttachment]);
 }

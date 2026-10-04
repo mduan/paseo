@@ -34,6 +34,11 @@ interface WorkspaceAttachmentsStoreActions {
     scopeKey: string;
     attachment: WorkspaceComposerAttachment;
   }) => void;
+  /** Replaces the scope's review attachment and keeps its other attachments. */
+  setReviewAttachment: (input: {
+    scopeKey: string;
+    attachment: WorkspaceComposerAttachment | null;
+  }) => void;
   clearWorkspaceAttachments: (input: { scopeKey: string }) => void;
 }
 
@@ -113,8 +118,14 @@ export function appendWorkspaceAttachment(
   return [...next, attachment];
 }
 
-export const useWorkspaceAttachmentsStore = create<WorkspaceAttachmentsStore>()((set) => ({
+export const useWorkspaceAttachmentsStore = create<WorkspaceAttachmentsStore>()((set, get) => ({
   attachmentsByScope: {},
+  setReviewAttachment: ({ scopeKey, attachment }) => {
+    const current = get().attachmentsByScope[scopeKey] ?? EMPTY_WORKSPACE_ATTACHMENTS;
+    const others = current.filter((candidate) => candidate.kind !== "review");
+    const attachments = attachment ? [...others, attachment] : others;
+    get().setWorkspaceAttachments({ scopeKey, attachments });
+  },
   setWorkspaceAttachments: ({ scopeKey, attachments }) => {
     set((state) => {
       const current = state.attachmentsByScope[scopeKey] ?? EMPTY_WORKSPACE_ATTACHMENTS;

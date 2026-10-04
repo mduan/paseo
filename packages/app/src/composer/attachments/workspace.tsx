@@ -144,11 +144,6 @@ function useWorkspaceAttachmentBinding({
     [activeWorkspaceAttachments],
   );
 
-  const suppressWorkspaceAttachment = useCallback((attachment: WorkspaceComposerAttachment) => {
-    const key = getAttachmentKey(attachment);
-    setSuppressedKeys((current) => (current.includes(key) ? current : [...current, key]));
-  }, []);
-
   const clearSentAttachments = useCallback(
     (attachments: readonly ComposerAttachment[]) => {
       for (const attachment of attachments) {
@@ -164,22 +159,18 @@ function useWorkspaceAttachmentBinding({
   const removeAttachment = useCallback(
     ({ selectedAttachments: current, index }: RemoveWorkspaceAttachmentInput) => {
       const selected = current[index];
-      if (isWorkspaceAttachment(selected)) {
-        if (
-          selected.kind === "browser_element" ||
-          selected.kind === "chat_history" ||
-          isPullRequestContextAttachment(selected)
-        ) {
-          const selectedKey = getAttachmentKey(selected);
-          removeWorkspaceAttachmentsMatching(selectedKey);
-          return true;
-        }
-        suppressWorkspaceAttachment(selected);
+      if (!isWorkspaceAttachment(selected)) {
+        return false;
+      }
+      // Removing the review pill deletes its comments; the publisher then drops the pill.
+      if (selected.kind === "review") {
+        clearReviewDraft({ key: selected.reviewDraftKey });
         return true;
       }
-      return false;
+      removeWorkspaceAttachmentsMatching(getAttachmentKey(selected));
+      return true;
     },
-    [suppressWorkspaceAttachment],
+    [clearReviewDraft],
   );
 
   const openAttachment = useCallback(

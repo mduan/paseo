@@ -1190,10 +1190,12 @@ function useReviewGeometry(
   reviewActions: InlineReviewActions | undefined,
 ): InlineReviewGeometry | undefined {
   const commentsByTarget = reviewActions?.commentsByTarget;
+  const commentHeights = reviewActions?.commentHeights;
   const editor = reviewActions?.editor ?? null;
   return useMemo(
-    () => (commentsByTarget ? { commentsByTarget, editor } : undefined),
-    [commentsByTarget, editor],
+    () =>
+      commentsByTarget && commentHeights ? { commentsByTarget, commentHeights, editor } : undefined,
+    [commentsByTarget, commentHeights, editor],
   );
 }
 

@@ -3,47 +3,38 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ComposerAttachment } from "@/attachments/types";
-import type { ParsedDiffFile } from "@/git/use-diff-query";
 import {
   addCommentToState,
   clearReviewInState,
   deleteCommentFromState,
   normalizePersistedState,
   type ReviewDraftComment,
+  type ReviewDraftCommentContext,
   type ReviewDraftMode,
-  type ReviewDraftSide,
   type ReviewDraftStoreState,
   serializeReviewDraftState,
   SerializedReviewDraftStateSchema,
   updateCommentInState,
 } from "@/review/state";
 import { generateMessageId } from "@/types/stream";
-import { buildNumberedDiffHunks, type NumberedDiffLine } from "@/utils/diff-layout";
+import { singleLineReviewContext } from "@/review/context";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 
 export type { ReviewDraftComment, ReviewDraftMode, ReviewDraftSide } from "@/review/state";
 
-// v2 dropped the legacy persisted activeModesByScope field.
-const STORE_VERSION = 2;
-const CONTEXT_RADIUS = 3;
-const MAX_CONTEXT_LINES = 80;
+// v2 dropped the legacy persisted activeModesByScope field. v3 keys drafts by workspace only.
+const STORE_VERSION = 3;
 const EMPTY_REVIEW_DRAFT_COMMENTS: ReviewDraftComment[] = [];
 
 type ReviewAttachment = Extract<AgentAttachment, { type: "review" }>;
-type ReviewAttachmentContextLine = ReviewAttachment["comments"][number]["context"]["targetLine"];
 type ReviewComposerAttachment = Extract<ComposerAttachment, { kind: "review" }>;
 
 export interface BuildReviewDraftKeyInput {
   serverId: string;
   workspaceId?: string | null;
   cwd: string;
-  mode: ReviewDraftMode;
-  baseRef?: string | null;
-  ignoreWhitespace: boolean;
 }
-
-type BuildReviewDraftScopeKeyInput = Omit<BuildReviewDraftKeyInput, "mode">;
 
 export interface BuildReviewAttachmentSnapshotInput {
   reviewDraftKey: string;
@@ -51,7 +42,6 @@ export interface BuildReviewAttachmentSnapshotInput {
   mode: ReviewDraftMode;
   baseRef?: string | null;
   comments: readonly ReviewDraftComment[];
-  diffFiles: readonly ParsedDiffFile[];
 }
 
 export type ReviewDraftCommentInput = Omit<ReviewDraftComment, "id" | "createdAt" | "updatedAt"> &
@@ -87,28 +77,17 @@ function normalizeBaseRef(baseRef: string | null | undefined): string {
   return baseRef?.trim() ?? "";
 }
 
-function buildReviewDraftScopeParts(input: BuildReviewDraftScopeKeyInput): string[] {
+/**
+ * One comment set per workspace. The diff comparison is left out because its default follows
+ * whether the checkout is dirty, and an edit would otherwise switch to another set of comments.
+ */
+export function buildReviewDraftKey(input: BuildReviewDraftKeyInput): string {
   const workspaceId = input.workspaceId?.trim();
   // workspaceId is opaque; do not parse this key back into a path.
   const workspacePart = workspaceId
     ? `workspace=${encodeKeyPart(workspaceId)}`
     : `cwd=${encodeKeyPart(normalizeCwd(input.cwd))}`;
-
-  return [
-    "review",
-    `server=${encodeKeyPart(input.serverId)}`,
-    workspacePart,
-    `base=${encodeKeyPart(normalizeBaseRef(input.baseRef))}`,
-    `ignoreWhitespace=${input.ignoreWhitespace ? "true" : "false"}`,
-  ];
-}
-
-export function buildReviewDraftKey(input: BuildReviewDraftKeyInput): string {
-  const [prefix, serverPart, workspacePart, basePart, whitespacePart] =
-    buildReviewDraftScopeParts(input);
-  return [prefix, serverPart, workspacePart, `mode=${input.mode}`, basePart, whitespacePart].join(
-    ":",
-  );
+  return ["review", `server=${encodeKeyPart(input.serverId)}`, workspacePart].join(":");
 }
 
 function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment {
@@ -121,6 +100,8 @@ function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment 
     startSide: input.startSide,
     startLineNumber: input.startLineNumber,
     ...(input.content !== undefined ? { content: input.content } : {}),
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.source ? { source: input.source } : {}),
     body: input.body,
     createdAt: input.createdAt ?? now,
     updatedAt: input.updatedAt ?? input.createdAt ?? now,
@@ -163,93 +144,15 @@ export const useReviewDraftStore = create<ReviewDraftStore>()(
   ),
 );
 
-function toContextLine(line: NumberedDiffLine): ReviewAttachmentContextLine | null {
-  if (line.line.type === "header") {
-    return null;
-  }
-  return {
-    oldLineNumber: line.oldLineNumber,
-    newLineNumber: line.newLineNumber,
-    type: line.line.type,
-    content: line.line.content,
-  };
-}
-
-function findLineIndex(input: {
-  lines: readonly NumberedDiffLine[];
-  side: ReviewDraftSide;
-  lineNumber: number;
-}): number {
-  return input.lines.findIndex((line) => {
-    const cell = input.side === "old" ? line.oldCell : line.newCell;
-    return cell?.lineNumber === input.lineNumber;
-  });
-}
-
-function buildCommentContext(input: {
-  comment: ReviewDraftComment;
-  diffFiles: readonly ParsedDiffFile[];
-}): ReviewAttachment["comments"][number]["context"] | null {
-  const { comment } = input;
-  const file = input.diffFiles.find((candidate) => candidate.path === comment.filePath);
-  if (!file) {
-    return null;
-  }
-
-  // Ranges may span hunks of one file, so search the file's lines in display order.
-  const fileLines = buildNumberedDiffHunks(file).flatMap((hunk) => hunk.lines);
-  const endIndex = findLineIndex({
-    lines: fileLines,
+/** Context for a comment saved before comments captured their own context. */
+function storedCommentContext(comment: ReviewDraftComment): ReviewDraftCommentContext | undefined {
+  if (comment.context) return comment.context;
+  if (comment.content === undefined) return undefined;
+  return singleLineReviewContext({
     side: comment.side,
     lineNumber: comment.lineNumber,
-  });
-  if (endIndex < 0) return storedCommentContext(comment);
-  const startIndex =
-    comment.startLineNumber === undefined
-      ? endIndex
-      : findLineIndex({
-          lines: fileLines,
-          side: comment.startSide ?? comment.side,
-          lineNumber: comment.startLineNumber,
-        });
-  const startLine = fileLines[startIndex];
-  const endLine = fileLines[endIndex];
-  if (!startLine || !endLine || startIndex > endIndex) {
-    return null;
-  }
-  const targetLine = toContextLine(endLine);
-  if (!targetLine) {
-    return null;
-  }
-
-  // Context stays inside the hunks that contain the range ends.
-  const startHunkFirstIndex = fileLines.findIndex((line) => line.hunkIndex === startLine.hunkIndex);
-  const endHunkLastIndex = fileLines.findLastIndex((line) => line.hunkIndex === endLine.hunkIndex);
-  const contextStart = Math.max(startHunkFirstIndex, startIndex - CONTEXT_RADIUS);
-  const contextEnd = Math.min(endHunkLastIndex, endIndex + CONTEXT_RADIUS) + 1;
-
-  // The server tells the agent to read the file when the range end is cut off.
-  const lines = fileLines
-    .slice(contextStart, contextEnd)
-    .map(toContextLine)
-    .filter((line): line is ReviewAttachmentContextLine => line !== null)
-    .slice(0, MAX_CONTEXT_LINES);
-
-  return { hunkHeader: startLine.hunkHeader, targetLine, lines };
-}
-
-/** Context for a comment whose line is no longer in the diff, e.g. collapsed expanded context. */
-function storedCommentContext(
-  comment: ReviewDraftComment,
-): ReviewAttachment["comments"][number]["context"] | null {
-  if (comment.content === undefined) return null;
-  const targetLine: ReviewAttachmentContextLine = {
-    oldLineNumber: comment.side === "old" ? comment.lineNumber : null,
-    newLineNumber: comment.side === "new" ? comment.lineNumber : null,
-    type: "context",
     content: comment.content,
-  };
-  return { hunkHeader: "", targetLine, lines: [targetLine] };
+  });
 }
 
 export function buildReviewAttachmentSnapshot(
@@ -258,10 +161,7 @@ export function buildReviewAttachmentSnapshot(
   const comments: ReviewAttachment["comments"] = [];
 
   for (const draftComment of input.comments) {
-    const context = buildCommentContext({
-      comment: draftComment,
-      diffFiles: input.diffFiles,
-    });
+    const context = storedCommentContext(draftComment);
     if (!context) {
       continue;
     }
@@ -273,6 +173,7 @@ export function buildReviewAttachmentSnapshot(
       startSide: draftComment.startSide,
       startLineNumber: draftComment.startLineNumber,
       body: draftComment.body,
+      ...(draftComment.source ? { source: draftComment.source } : {}),
       context,
     });
   }
@@ -338,7 +239,6 @@ export function useReviewCommentCount(key: string): number {
 
 export function useReviewAttachmentSnapshot(input: {
   key: string;
-  diffFiles: readonly ParsedDiffFile[];
   cwd: string;
   mode: ReviewDraftMode;
   baseRef?: string | null;
@@ -352,8 +252,7 @@ export function useReviewAttachmentSnapshot(input: {
         mode: input.mode,
         baseRef: input.baseRef,
         comments,
-        diffFiles: input.diffFiles,
       }),
-    [comments, input.key, input.cwd, input.mode, input.baseRef, input.diffFiles],
+    [comments, input.key, input.cwd, input.mode, input.baseRef],
   );
 }
