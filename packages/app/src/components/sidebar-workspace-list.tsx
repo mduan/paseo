@@ -1117,24 +1117,27 @@ function WorkspaceRowInner({
   const sessions = useWorkspaceSessionRows(workspace);
   // An expanded workspace hands its highlight to the nested row of the focused tab.
   const rowSelected = selected && !sessions.showsFocusedRow;
+  const groupSelected = selected && sessions.rows.length > 0;
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
 
   return (
     <SidebarWorkspaceRowFrame workspace={workspace} isDragging={isDragging}>
       {({ isHovered, contextMenuOpen, onContextMenuOpenChange, hoverHandlers }) => {
+        // The focused workspace group keeps its own background instead of switching to hover.
+        const isRowHovered = isHovered && !groupSelected;
         const isDesktop = !isTouchPlatform;
         const serviceSummary = isDesktop ? selectWorkspaceServiceSummary(workspace.scripts) : null;
         const workspaceRowStyle = getProjectWorkspaceRowStyle({
           isDragging,
           isPressed,
           selected: rowSelected,
-          isHovered,
+          isHovered: isRowHovered,
         });
         const backdrop = getSidebarRowBackdrop({
           isDragging,
           isPressed,
           selected: rowSelected,
-          isHovered,
+          isHovered: isRowHovered,
         });
         return (
           <View
@@ -1145,6 +1148,7 @@ function WorkspaceRowInner({
               styles.workspaceRowContainer,
               // Hovering a workspace highlights it together with its nested session rows.
               isHovered && sessions.rows.length > 0 && styles.workspaceRowGroupHovered,
+              groupSelected && styles.workspaceRowGroupSelected,
             ]}
             {...hoverHandlers}
           >
@@ -2770,6 +2774,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceRowGroupHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
+    borderRadius: theme.borderRadius.lg,
+  },
+  workspaceRowGroupSelected: {
+    backgroundColor: theme.colors.surfaceSidebarGroupSelected,
     borderRadius: theme.borderRadius.lg,
   },
   workspaceStatusDot: {
