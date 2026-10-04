@@ -628,6 +628,7 @@ export const ru: TranslationResources = {
     },
     tabs: {
       loading: "Загрузка...",
+      effort: "Усилие: {{effort}}",
       modified: "Несохранённые изменения",
       loadingAgentTitle: "Загрузка названия агента",
       fallback: {

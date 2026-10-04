@@ -622,6 +622,7 @@ export const ko: TranslationResources = {
     },
     tabs: {
       loading: "불러오는 중...",
+      effort: "추론 {{effort}}",
       modified: "저장되지 않은 변경사항",
       loadingAgentTitle: "에이전트 제목 불러오는 중",
       fallback: {

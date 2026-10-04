@@ -626,6 +626,7 @@ export const ptBR: TranslationResources = {
     },
     tabs: {
       loading: "Carregando...",
+      effort: "Esforço {{effort}}",
       modified: "Alterações não salvas",
       loadingAgentTitle: "Carregando título do agente",
       fallback: {

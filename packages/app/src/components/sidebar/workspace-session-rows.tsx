@@ -37,7 +37,12 @@ import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import {
   WorkspaceTabIcon,
   WorkspaceTabPresentationResolver,
+  type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
+import { formatSessionCost } from "@/components/context-window-meter";
+import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
+import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
+import { filterSelectableModels } from "@/provider-selection/model-catalog";
 import {
   buildTerminalsQueryKey,
   collectScriptTerminalIds,
@@ -281,7 +286,7 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
         <SessionRowHoverTarget
           row={row}
           serverId={serverId}
-          label={presentation.label}
+          presentation={presentation}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
@@ -342,14 +347,14 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
 function SessionRowHoverTarget({
   row,
   serverId,
-  label,
+  presentation,
   onPointerEnter,
   onPointerLeave,
   children,
 }: {
   row: WorkspaceSessionRow;
   serverId: string;
-  label: string;
+  presentation: WorkspaceTabPresentation;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   children: ReactElement;
@@ -363,9 +368,17 @@ function SessionRowHoverTarget({
       <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent side="right" align="start" offset={8} maxWidth={360}>
-          <Text style={styles.tooltipTitle}>{label}</Text>
+          <View style={styles.tooltipHeader}>
+            {/* ponytail: light themes paint popovers surface0; dark ones paint surface2, so the
+                running ring's knockout is slightly off there. */}
+            <WorkspaceTabIcon presentation={presentation} active backdrop="surface0" />
+            <Text style={styles.tooltipTitle}>{presentation.label}</Text>
+          </View>
           {row.target.kind === "agent" ? (
-            <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+            <>
+              <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
+              <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+            </>
           ) : null}
         </TooltipContent>
       </Tooltip>
@@ -468,6 +481,30 @@ function AgentPreview({
   );
 }
 
+/** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
+function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: string }) {
+  const { t } = useTranslation();
+  const agent = useSessionStore((state) => state.sessions[serverId]?.agents?.get(agentId));
+  const { entries } = useProvidersSnapshot(serverId, { cwd: agent?.cwd });
+  const models = entries?.find((entry) => entry.provider === agent?.provider)?.models ?? null;
+  const selection = resolveAgentModelSelection({
+    models: filterSelectableModels(models),
+    runtimeModelId: agent?.runtimeInfo?.model,
+    configuredModelId: agent?.model,
+    runtimeThinkingOptionId: agent?.runtimeInfo?.thinkingOptionId,
+    explicitThinkingOptionId: agent?.thinkingOptionId,
+  });
+  const totalCostUsd = agent?.lastUsage?.totalCostUsd;
+  const parts = [
+    selection.activeModelId ? selection.displayModel : null,
+    selection.selectedThinkingId
+      ? t("workspace.tabs.effort", { effort: selection.displayThinking })
+      : null,
+    typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
+}
+
 function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: string }) {
   const lastActivityTime = useSessionStore((state) => {
     const lastActivityAt =
@@ -524,13 +561,27 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
   },
+  tooltipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+  },
+  // Matches the workspace hover card's title.
   tooltipTitle: {
+    flex: 1,
+    minWidth: 0,
     color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.normal,
+  },
+  tooltipMeta: {
+    marginTop: theme.spacing[1],
+    color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
+    lineHeight: 18,
   },
   tooltipPreview: {
-    marginTop: theme.spacing[1],
+    marginTop: theme.spacing[2],
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,

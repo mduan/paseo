@@ -618,6 +618,7 @@ export const en = {
     },
     tabs: {
       loading: "Loading...",
+      effort: "{{effort}} effort",
       modified: "Unsaved changes",
       loadingAgentTitle: "Loading agent title",
       fallback: {

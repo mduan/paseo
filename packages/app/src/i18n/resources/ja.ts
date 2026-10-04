@@ -627,6 +627,7 @@ export const ja: TranslationResources = {
     },
     tabs: {
       loading: "読み込み中...",
+      effort: "推論 {{effort}}",
       modified: "未保存の変更",
       loadingAgentTitle: "エージェントタイトルを読み込み中",
       fallback: {
