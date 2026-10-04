@@ -95,7 +95,7 @@ import {
   type ProviderSubagentStoreEvent,
 } from "./provider-subagents/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
-import type { WorkingTreeSnapshot } from "./turn-diffs/snapshot.js";
+import type { TurnStartSnapshot } from "./turn-diffs/snapshot.js";
 import type { TurnDiffStore } from "./turn-diffs/store.js";
 import { extractAttention } from "../persistence-hooks.js";
 
@@ -401,7 +401,7 @@ interface HandleStreamEventOptions {
 
 interface PendingTurnDiff {
   turnId: string;
-  start: WorkingTreeSnapshot;
+  start: TurnStartSnapshot;
   clientMessageId?: string;
 }
 

@@ -12,9 +12,11 @@ import {
 } from "../../messages.js";
 import {
   diffTreeStats,
+  resolveTurnFromTree,
+  snapshotTurnStart,
   snapshotWorkingTree,
   syncTreeRefs,
-  type WorkingTreeSnapshot,
+  type TurnStartSnapshot,
 } from "./snapshot.js";
 
 // The prompt waits for the start snapshot; past this, the turn goes without a diff.
@@ -32,10 +34,9 @@ const StoredTurnSchema = TreeRangeSchema.extend({
 
 const TurnDiffRecordSchema = z.object({
   repoRoot: z.string(),
-  // First snapshot of the chat; "Chat Session" diffs from here. Never trimmed.
-  sessionFromTree: z.string(),
-  // Most recent finished turn, kept even when it changed nothing.
-  lastTurn: TreeRangeSchema,
+  // Most recent finished turn, kept even when it changed nothing. Absent when the turn moved HEAD
+  // in a way its diff couldn't be separated from.
+  lastTurn: TreeRangeSchema.optional(),
   // Turns that changed files, oldest first.
   turns: z.array(StoredTurnSchema),
 });
@@ -50,13 +51,17 @@ export interface TurnDiffRange {
 
 export interface RecordTurnInput {
   agentId: string;
-  start: WorkingTreeSnapshot;
+  start: TurnStartSnapshot;
   turnId: string;
   userMessageIds: string[];
 }
 
 function referencedTrees(record: TurnDiffRecord): Set<string> {
-  const trees = new Set([record.sessionFromTree, record.lastTurn.fromTree, record.lastTurn.toTree]);
+  const trees = new Set<string>();
+  if (record.lastTurn) {
+    trees.add(record.lastTurn.fromTree);
+    trees.add(record.lastTurn.toTree);
+  }
   for (const turn of record.turns) {
     trees.add(turn.fromTree);
     trees.add(turn.toTree);
@@ -85,10 +90,10 @@ export class TurnDiffStore {
     private readonly logger: Logger,
   ) {}
 
-  async captureStart(cwd: string): Promise<WorkingTreeSnapshot | null> {
+  async captureStart(cwd: string): Promise<TurnStartSnapshot | null> {
     try {
       return await withTimeout({
-        promise: snapshotWorkingTree(cwd),
+        promise: snapshotTurnStart(cwd),
         timeoutMs: START_SNAPSHOT_TIMEOUT_MS,
         label: "Turn start snapshot",
       });
@@ -113,9 +118,11 @@ export class TurnDiffStore {
     const { repoRoot } = record;
     switch (target.kind) {
       case "last_turn":
-        return { repoRoot, ...record.lastTurn };
+        return record.lastTurn ? { repoRoot, ...record.lastTurn } : null;
+      // COMPAT(turnDiffSession): added in v0.11.0-beta.3, remove after 2027-01-04. Older clients
+      // can still ask for the removed Chat Session diff; it is always unavailable.
       case "session":
-        return { repoRoot, fromTree: record.sessionFromTree, toTree: record.lastTurn.toTree };
+        return null;
       case "turn": {
         const turn = record.turns.find((candidate) => candidate.turnId === target.turnId);
         return turn ? { repoRoot, fromTree: turn.fromTree, toTree: turn.toTree } : null;
@@ -137,26 +144,27 @@ export class TurnDiffStore {
   private async applyTurn({ agentId, start, turnId, userMessageIds }: RecordTurnInput) {
     const end = await snapshotWorkingTree(start.repoRoot);
     if (!end) return;
-    const files = await diffTreeStats({
-      repoRoot: start.repoRoot,
-      fromTree: start.tree,
-      toTree: end.tree,
-    });
+    const fromTree = await resolveTurnFromTree(start);
+    if (!fromTree) {
+      this.logger.info({ agentId, turnId }, "Turn moved HEAD in a way its diff can't separate");
+    }
+    const files = fromTree
+      ? await diffTreeStats({ repoRoot: start.repoRoot, fromTree, toTree: end.tree })
+      : [];
     const previous = await this.read(agentId);
     const isSameRepo = previous?.repoRoot === start.repoRoot;
     const record: TurnDiffRecord = {
       repoRoot: start.repoRoot,
-      sessionFromTree: isSameRepo ? previous.sessionFromTree : start.tree,
-      lastTurn: { fromTree: start.tree, toTree: end.tree },
+      lastTurn: fromTree ? { fromTree, toTree: end.tree } : undefined,
       turns: isSameRepo ? previous.turns : [],
     };
-    if (files.length > 0) {
+    if (fromTree && files.length > 0) {
       const completedAt = new Date().toISOString();
       const turn = {
         turnId,
         userMessageIds,
         completedAt,
-        fromTree: start.tree,
+        fromTree,
         toTree: end.tree,
         files,
       };

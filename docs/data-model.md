@@ -183,6 +183,15 @@ Terminal activity contributes to the workspace status bucket **per `workspaceId`
 
 The daemon snapshots the agent's whole git repo before each foreground turn starts and after it ends. A snapshot is a git tree written through a temporary copy of the index, so the user's staging area, HEAD and branches are never touched. Untracked files over 1 MiB and ignored files are left out. Non-git folders get no snapshots.
 
+A turn diff holds only the agent's edits and commits, not content a branch move brought in. When a turn moves HEAD, the daemon reads the HEAD reflog lines the turn appended: `commit`, `commit (initial)` and `commit (amend)` entries are the agent's own work, and anything else (checkout, reset, pull, merge, rebase, cherry-pick) is a move. The start snapshot's uncommitted changes are replayed onto where the last move landed with `git merge-tree`, and the turn diffs from that tree. The turn gets no diff when this can't be worked out:
+
+- The replay conflicts, for example after `checkout -f` or `reset --hard` discarded dirty changes that the new branch also changed.
+- There is no reflog to read: `core.logAllRefUpdates` is off, the repo uses the reftable backend, or the reflog was rewritten during the turn.
+- HEAD was unborn at the start or end of the turn.
+- git is too old to run `merge-tree --merge-base` on trees.
+
+Commits the agent made before a later move in the same turn (commit, then `pull --rebase`) count as part of the move and drop out of the diff.
+
 The JSON file only indexes tree SHAs. The trees live in the repo's object store and stay alive through one ref per tree, `refs/paseo/turns/{agentId}/{treeSha}`. Refs that point at trees stay out of `git branch`, `git log --all` and normal pushes. Trimming old turns (the file keeps 200) and deleting the agent remove the matching refs.
 
 ---

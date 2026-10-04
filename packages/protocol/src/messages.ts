@@ -1885,6 +1885,8 @@ export const AgentTurnDiffsListRequestMessageSchema = z.object({
 export const AgentTurnDiffTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("turn"), turnId: z.string() }),
   z.object({ kind: z.literal("last_turn") }),
+  // COMPAT(turnDiffSession): added in v0.11.0-beta.3, remove after 2027-01-04. The daemon no longer
+  // serves Chat Session diffs; older clients still send this target.
   z.object({ kind: z.literal("session") }),
 ]);
 

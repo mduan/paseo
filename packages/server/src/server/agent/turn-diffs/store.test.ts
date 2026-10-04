@@ -66,16 +66,65 @@ describe("TurnDiffStore", () => {
     expect(git(repo, "status", "--porcelain", "--", "new.txt")).toBe("?? new.txt");
   });
 
-  it("keeps the last turn even when it changed nothing, and spans the session", async () => {
+  it("keeps the last turn even when it changed nothing", async () => {
     await runTurn("t1", () => writeFileSync(path.join(repo, "a.txt"), "changed\n"));
     await runTurn("t2", () => undefined);
 
     expect((await store.list(AGENT_ID)).map((turn) => turn.turnId)).toEqual(["t1"]);
     const lastTurn = await store.resolveRange(AGENT_ID, { kind: "last_turn" });
     expect(lastTurn?.fromTree).toBe(lastTurn?.toTree);
-    const session = await store.resolveRange(AGENT_ID, { kind: "session" });
-    expect(session?.fromTree).not.toBe(session?.toTree);
+    expect(await store.resolveRange(AGENT_ID, { kind: "session" })).toBeNull();
     expect(await store.resolveRange(AGENT_ID, { kind: "turn", turnId: "t2" })).toBeNull();
+  });
+
+  async function changedFiles(turnId: string): Promise<string[] | undefined> {
+    const turn = (await store.list(AGENT_ID)).find((candidate) => candidate.turnId === turnId);
+    return turn?.files.map((file) => file.path);
+  }
+
+  it("leaves out content a checkout brought in but keeps edits and commits after it", async () => {
+    git(repo, "checkout", "-q", "-b", "other");
+    writeFileSync(path.join(repo, "other.txt"), "other\n");
+    git(repo, "add", ".");
+    git(repo, "commit", "-q", "-m", "other");
+    git(repo, "checkout", "-q", "main");
+    writeFileSync(path.join(repo, "dirty.txt"), "dirty\n");
+
+    await runTurn("t1", () => {
+      git(repo, "checkout", "-q", "other");
+      writeFileSync(path.join(repo, "committed.txt"), "committed\n");
+      git(repo, "add", "committed.txt");
+      git(repo, "commit", "-q", "-m", "agent");
+      writeFileSync(path.join(repo, "a.txt"), "edited\n");
+    });
+
+    expect(await changedFiles("t1")).toEqual(["a.txt", "committed.txt"]);
+  });
+
+  it("keeps the agent's own commits when HEAD only moved by committing", async () => {
+    await runTurn("t1", () => {
+      writeFileSync(path.join(repo, "a.txt"), "edited\n");
+      git(repo, "commit", "-q", "-am", "agent");
+      git(repo, "commit", "-q", "--amend", "-m", "agent amended");
+    });
+
+    expect(await changedFiles("t1")).toEqual(["a.txt"]);
+  });
+
+  it("omits the turn when the start's uncommitted changes conflict with where HEAD landed", async () => {
+    git(repo, "checkout", "-q", "-b", "other");
+    writeFileSync(path.join(repo, "a.txt"), "other\n");
+    git(repo, "commit", "-q", "-am", "other");
+    git(repo, "checkout", "-q", "main");
+    writeFileSync(path.join(repo, "a.txt"), "dirty\n");
+
+    await runTurn("t1", () => {
+      git(repo, "checkout", "-q", "-f", "other");
+      writeFileSync(path.join(repo, "b.txt"), "new\n");
+    });
+
+    expect(await store.list(AGENT_ID)).toEqual([]);
+    expect(await store.resolveRange(AGENT_ID, { kind: "last_turn" })).toBeNull();
   });
 
   it("keeps snapshot trees alive with hidden refs and removes them on delete", async () => {
