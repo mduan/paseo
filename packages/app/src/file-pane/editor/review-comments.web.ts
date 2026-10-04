@@ -218,6 +218,15 @@ class ReviewThreadWidget extends WidgetType {
     return wrapper;
   }
 
+  // A growing comment editor changes the height on every new line. Moving the host into a new
+  // wrapper would blur its textarea, so the same thread keeps its wrapper.
+  updateDOM(dom: HTMLElement, _view: EditorView, from: ReviewThreadWidget): boolean {
+    if (from.key !== this.key || from.host !== this.host) return false;
+    dom.style.left = `${this.stickyLeft}px`;
+    dom.style.minHeight = `${this.height}px`;
+    return true;
+  }
+
   get estimatedHeight(): number {
     return this.height;
   }
