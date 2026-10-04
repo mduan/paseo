@@ -17,6 +17,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { titlebarDragSurfaceStyle } from "@/components/desktop/titlebar-drag-region";
 import { WORKSPACE_SECONDARY_HEADER_HEIGHT } from "@/constants/layout";
@@ -101,6 +102,8 @@ function ExplorerSidebarTab({
   const handleHoverIn = useCallback(() => setHovered(true), []);
   const handleHoverOut = useCallback(() => setHovered(false), []);
   const showCloseControl = hovered || isNative;
+  const chipBackdrop: SurfaceBackdrop =
+    hovered || item.isActive ? "surfaceSidebarHover" : "surfaceSidebar";
   const handleClose = useCallback(() => {
     void onCloseTab(item.tab.tabId);
   }, [item.tab.tabId, onCloseTab]);
@@ -174,21 +177,26 @@ function ExplorerSidebarTab({
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
-        <Pressable
-          testID={`explorer-sidebar-tab-close-${item.tab.tabId}`}
-          accessibilityRole="button"
-          accessibilityLabel={t("workspace.tabs.menu.close")}
-          pointerEvents={showCloseControl ? "auto" : "none"}
-          onPress={handleClose}
-          style={[styles.tabCloseButton, showCloseControl ? null : styles.tabCloseButtonHidden]}
+        <View
+          pointerEvents={showCloseControl ? "box-none" : "none"}
+          style={[styles.tabTrailingOverlay, showCloseControl ? null : styles.tabCloseHidden]}
         >
-          {({ hovered: closeHovered, pressed }) => (
-            <ThemedX
-              size={12}
-              uniProps={closeHovered || pressed ? foregroundColorMapping : mutedColorMapping}
-            />
-          )}
-        </Pressable>
+          <TrailingActionScrim backdrop={chipBackdrop} />
+          <Pressable
+            testID={`explorer-sidebar-tab-close-${item.tab.tabId}`}
+            accessibilityRole="button"
+            accessibilityLabel={t("workspace.tabs.menu.close")}
+            onPress={handleClose}
+            style={styles.tabCloseButton}
+          >
+            {({ hovered: closeHovered, pressed }) => (
+              <ThemedX
+                size={12}
+                uniProps={closeHovered || pressed ? foregroundColorMapping : mutedColorMapping}
+              />
+            )}
+          </Pressable>
+        </View>
       </View>
     ),
     [
@@ -204,6 +212,7 @@ function ExplorerSidebarTab({
       showCloseControl,
       item,
       canMoveToMain,
+      chipBackdrop,
       closeLeading,
       moveToMainLeading,
       t,
@@ -441,7 +450,7 @@ const styles = StyleSheet.create((theme) => ({
   tab: {
     height: HEADER_CONTROL_HEIGHT,
     maxWidth: 180,
-    paddingRight: theme.spacing[1],
+    position: "relative",
     borderRadius: theme.borderRadius.md,
     flexDirection: "row",
     alignItems: "center",
@@ -451,28 +460,42 @@ const styles = StyleSheet.create((theme) => ({
     alignSelf: "stretch",
     minWidth: 0,
     flexShrink: 1,
-    paddingLeft: theme.spacing[2],
-    paddingRight: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
     userSelect: "none",
   },
+  tabTrailingOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 48,
+    borderTopRightRadius: theme.borderRadius.md,
+    borderBottomRightRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
   tabCloseButton: {
+    position: "absolute",
+    right: 4,
     width: 18,
     height: 18,
     borderRadius: theme.borderRadius.sm,
     alignItems: "center",
     justifyContent: "center",
   },
-  tabCloseButtonHidden: {
+  tabCloseHidden: {
     opacity: 0,
   },
+  // Opaque fills so the close button's scrim can match them exactly.
   tabHovered: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   tabActive: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   tabLabel: {
     minWidth: 0,
