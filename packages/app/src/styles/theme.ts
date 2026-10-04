@@ -269,6 +269,9 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surface1,
     surfaceSidebarSelected: tint.surface3,
+    // Behind the focused workspace and its nested session rows; quieter than a hover or selection.
+    // Opaque so trailing-action scrims can fade into it.
+    surfaceSidebarGroupSelected: "#ededee",
     surfaceWorkspace: tint.surface0,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
 
@@ -400,6 +403,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surface1,
     surfaceSidebarSelected: tint.surface2,
+    surfaceSidebarGroupSelected: tint.surface0,
     surfaceWorkspace: tint.surface1,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
 

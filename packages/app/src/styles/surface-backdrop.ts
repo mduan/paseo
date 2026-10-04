@@ -17,9 +17,14 @@ export type SurfaceBackdrop =
   | "surface2"
   | "surfaceSidebar"
   | "surfaceSidebarHover"
-  | "surfaceSidebarSelected";
+  | "surfaceSidebarSelected"
+  | "surfaceSidebarGroupSelected";
 
 export type SidebarSurfaceBackdrop = Extract<
   SurfaceBackdrop,
-  "surfaceSidebar" | "surfaceSidebarHover" | "surfaceSidebarSelected" | "surface2"
+  | "surfaceSidebar"
+  | "surfaceSidebarHover"
+  | "surfaceSidebarSelected"
+  | "surfaceSidebarGroupSelected"
+  | "surface2"
 >;

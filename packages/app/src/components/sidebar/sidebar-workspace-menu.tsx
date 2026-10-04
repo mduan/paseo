@@ -70,7 +70,7 @@ const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedCol
 const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 
-function renderTriggerIcon({ hovered }: { hovered?: boolean }) {
+export function renderSidebarKebabTriggerIcon({ hovered }: { hovered?: boolean }) {
   return (
     <ThemedMoreVertical
       size={14}
@@ -281,12 +281,12 @@ export function SidebarWorkspaceMenu({
     <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
         hitSlop={8}
-        style={triggerStyle}
+        style={sidebarKebabTriggerStyle}
         accessibilityRole={isWeb ? undefined : "button"}
         accessibilityLabel={t("sidebar.workspace.actions.menu")}
         testID={`sidebar-workspace-kebab-${workspaceKey}`}
       >
-        {renderTriggerIcon}
+        {renderSidebarKebabTriggerIcon}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -432,7 +432,9 @@ export function SidebarWorkspaceContextMenu({
   );
 }
 
-function triggerStyle({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) {
+export function sidebarKebabTriggerStyle({
+  hovered = false,
+}: PressableStateCallbackType & { hovered?: boolean }) {
   return [styles.trigger, hovered && styles.triggerHovered];
 }
 

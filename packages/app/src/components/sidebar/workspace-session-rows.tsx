@@ -1,8 +1,25 @@
-import { createContext, memo, useCallback, useContext, useMemo } from "react";
+import { createContext, memo, useCallback, useContext, useMemo, useState } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { isNative, isWeb } from "@/constants/platform";
+import {
+  renderSidebarKebabTriggerIcon,
+  sidebarKebabTriggerStyle,
+} from "@/components/sidebar/sidebar-workspace-menu";
+import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
+import type { WorkspaceTabMenuEntry } from "@/screens/workspace/workspace-tab-menu";
+import { useWorkspaceTabMenuItemAdornments } from "@/screens/workspace/workspace-tab-menu-item";
+import { useWorkspaceTabMenuRegistry } from "@/stores/workspace-tab-menu-registry";
 import { workspaceTerminalsPushRoute } from "@/data/push-router";
 import { useReplicaQuery } from "@/data/query";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -236,44 +253,133 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   );
 
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const [isHovered, setIsHovered] = useState(false);
+  // Hover is tracked on a plain wrapping View (docs/hover.md): on the Pressable, entering the
+  // nested kebab trigger fires hoverOut and swaps the kebab back to the activity age.
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const isCompact = useIsCompactFormFactor();
+  const layoutKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId }) ?? "";
+  // Only a mounted workspace screen can run the tab actions, so unvisited workspaces get no menu.
+  const hasMenu = useWorkspaceTabMenuRegistry((state) =>
+    Boolean(row.tabId && state.builders[layoutKey]),
+  );
+  const kebab = useOpenKebabMenuVisibility(hasMenu && (isHovered || isNative || isCompact));
 
   return (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
       {(presentation) => (
-        <Pressable
-          onPress={handlePress}
-          style={pressableStyle}
-          accessibilityRole="button"
-          accessibilityState={accessibilityState}
-          testID={`sidebar-workspace-session-${row.key}`}
+        <View
+          style={styles.hoverTarget}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
         >
-          {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
-            <>
-              <View style={styles.titleLine}>
-                <WorkspaceTabIcon
-                  presentation={presentation}
-                  active={selected}
-                  backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
-                />
-                <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
-                  {presentation.titleState === "loading"
-                    ? t("workspace.tabs.loading")
-                    : presentation.label}
-                </Text>
+          <Pressable
+            onPress={handlePress}
+            style={pressableStyle}
+            accessibilityRole="button"
+            accessibilityState={accessibilityState}
+            testID={`sidebar-workspace-session-${row.key}`}
+          >
+            {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
+              <>
+                <View style={styles.titleLine}>
+                  <View style={selected ? undefined : styles.iconUnfocused}>
+                    <WorkspaceTabIcon
+                      presentation={presentation}
+                      active={selected}
+                      backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                    />
+                  </View>
+                  <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
+                    {presentation.titleState === "loading"
+                      ? t("workspace.tabs.loading")
+                      : presentation.label}
+                  </Text>
+                  {kebab.showKebab && row.tabId ? (
+                    <WorkspaceSessionKebab
+                      {...kebab.menuProps}
+                      layoutKey={layoutKey}
+                      tabId={row.tabId}
+                      label={presentation.label}
+                    />
+                  ) : null}
+                  {!kebab.showKebab && row.target.kind === "agent" ? (
+                    <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
+                  ) : null}
+                </View>
                 {row.target.kind === "agent" ? (
-                  <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
+                  <AgentPreview serverId={serverId} agentId={row.target.agentId} />
                 ) : null}
-              </View>
-              {row.target.kind === "agent" ? (
-                <AgentPreview serverId={serverId} agentId={row.target.agentId} />
-              ) : null}
-            </>
-          )}
-        </Pressable>
+              </>
+            )}
+          </Pressable>
+        </View>
       )}
     </WorkspaceTabPresentationResolver>
   );
 });
+
+function WorkspaceSessionKebab({
+  layoutKey,
+  tabId,
+  label,
+  open,
+  onOpenChange,
+}: {
+  layoutKey: string;
+  tabId: string;
+  label: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
+  // Built on open so the entries reflect the pane's tabs at that moment.
+  const entries = useMemo(() => (open ? (builder?.(tabId) ?? []) : []), [builder, open, tabId]);
+  return (
+    <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger
+        hitSlop={8}
+        style={sidebarKebabTriggerStyle}
+        accessibilityRole={isWeb ? undefined : "button"}
+        accessibilityLabel={label}
+        testID={`sidebar-workspace-session-kebab-${tabId}`}
+      >
+        {renderSidebarKebabTriggerIcon}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" width={260} sheetTitle={label}>
+        {entries.map((entry) =>
+          entry.kind === "separator" ? (
+            <DropdownMenuSeparator key={entry.key} />
+          ) : (
+            <WorkspaceSessionMenuItem key={entry.key} entry={entry} />
+          ),
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function WorkspaceSessionMenuItem({
+  entry,
+}: {
+  entry: Extract<WorkspaceTabMenuEntry, { kind: "item" }>;
+}) {
+  const { leading, trailing } = useWorkspaceTabMenuItemAdornments(entry);
+  return (
+    <DropdownMenuItem
+      testID={entry.testID}
+      disabled={entry.disabled}
+      destructive={entry.destructive}
+      onSelect={entry.onSelect}
+      tooltip={entry.tooltip}
+      leading={leading}
+      trailing={trailing}
+    >
+      {entry.label}
+    </DropdownMenuItem>
+  );
+}
 
 function resolveBackdrop(input: {
   hovered: boolean;
@@ -312,23 +418,32 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
   return label ? <Text style={styles.age}>{label}</Text> : null;
 }
 
-// The icon lines up under the workspace title: row padding, chevron, status slot and their gaps.
-const SESSION_ROW_INSET = 8 + 12 + 8 + 16 + 8 - 4;
+// Inner padding before the icon. With the list's 4px left gutter, the icon sits 4px right of the
+// workspace status dot.
+const SESSION_ROW_INSET = 8 + 1 - 4;
 
 const styles = StyleSheet.create((theme) => ({
+  // The gutter leaves a strip of the hovered workspace group's background around each row.
   list: {
-    marginBottom: theme.spacing[0.5],
+    // Tuck under the workspace row's bottom padding; the bottom gutter matches the side gutters.
+    marginTop: -theme.spacing[1],
+    paddingBottom: theme.spacing[1],
+    paddingLeft: theme.spacing[1],
+    paddingRight: theme.spacing[1],
   },
   listIndented: {
-    marginBottom: theme.spacing[0.5],
-    paddingLeft: theme.spacing[2],
+    // Tuck under the workspace row's bottom padding; the bottom gutter matches the side gutters.
+    marginTop: -theme.spacing[1],
+    paddingBottom: theme.spacing[1],
+    paddingLeft: theme.spacing[1] + theme.spacing[2],
+    paddingRight: theme.spacing[1],
   },
   row: {
     justifyContent: "center",
     minHeight: 28,
     paddingVertical: theme.spacing[1],
     paddingLeft: SESSION_ROW_INSET,
-    paddingRight: theme.spacing[3],
+    paddingRight: theme.spacing[3] - theme.spacing[1],
     borderRadius: theme.borderRadius.lg,
     userSelect: "none",
   },
@@ -344,8 +459,15 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
   },
+  // The workspace group already paints surfaceSidebarHover while hovered.
+  hoverTarget: {
+    position: "relative",
+  },
+  iconUnfocused: {
+    opacity: 0.5,
+  },
   rowHovered: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
+    backgroundColor: theme.colors.surface2,
   },
   rowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
