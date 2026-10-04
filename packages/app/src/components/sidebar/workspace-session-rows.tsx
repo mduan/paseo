@@ -312,8 +312,8 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
   return label ? <Text style={styles.age}>{label}</Text> : null;
 }
 
-// The icon lines up under the workspace title: row padding, chevron, status slot and their gaps.
-const SESSION_ROW_INSET = 8 + 12 + 8 + 16 + 8 - 4;
+// The icon lines up under the workspace status slot: row padding plus centering 14px in 16px.
+const SESSION_ROW_INSET = 8 + 1 - 4;
 
 const styles = StyleSheet.create((theme) => ({
   list: {

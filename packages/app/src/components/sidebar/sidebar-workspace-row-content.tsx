@@ -152,25 +152,26 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   return (
     <View style={styles.workspaceRowContent}>
       <View style={styles.workspaceRowMain}>
-        {expandToggle ? <WorkspaceExpandChevron toggle={expandToggle} /> : null}
-        {leadingProjectName ? (
-          <ProjectStatusIndicator
-            iconDataUri={leadingProjectIconDataUri}
-            displayName={leadingProjectName}
-            projectViewKey={workspace.projectViewKey}
-            statusBucket={workspace.statusBucket}
-            backdrop={backdrop}
-            loading={isLoading}
-            testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
-          />
-        ) : (
-          <WorkspaceStatusIndicator
-            bucket={workspace.statusBucket}
-            workspaceKind={workspace.workspaceKind}
-            loading={isLoading}
-            reserveIdleSpace={reserveIdleStatusIndicatorSpace}
-          />
-        )}
+        <WorkspaceLeadingSlot toggle={expandToggle} showChevron={isHovered}>
+          {leadingProjectName ? (
+            <ProjectStatusIndicator
+              iconDataUri={leadingProjectIconDataUri}
+              displayName={leadingProjectName}
+              projectViewKey={workspace.projectViewKey}
+              statusBucket={workspace.statusBucket}
+              backdrop={backdrop}
+              loading={isLoading}
+              testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
+            />
+          ) : (
+            <WorkspaceStatusIndicator
+              bucket={workspace.statusBucket}
+              workspaceKind={workspace.workspaceKind}
+              loading={isLoading}
+              reserveIdleSpace={reserveIdleStatusIndicatorSpace}
+            />
+          )}
+        </WorkspaceLeadingSlot>
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
             <Text style={workspaceBranchTextStyle} numberOfLines={1}>
@@ -198,15 +199,21 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   );
 });
 
-function WorkspaceExpandChevron({
+// The chevron takes the status slot on hover rather than adding a column. Touch has no hover, so
+// tapping the status visual toggles there.
+function WorkspaceLeadingSlot({
   toggle,
+  showChevron,
+  children,
 }: {
-  toggle: NonNullable<WorkspaceSessionRows["expandToggle"]>;
+  toggle?: WorkspaceSessionRows["expandToggle"];
+  showChevron: boolean;
+  children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const accessibilityState = useMemo(() => ({ expanded: toggle.expanded }), [toggle.expanded]);
-  // A workspace without sessions keeps the slot so every title stays on the same rail.
-  if (!toggle.visible) return <View style={styles.expandChevron} />;
+  const expanded = toggle?.expanded;
+  const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
+  if (!toggle?.visible) return children;
   const Chevron = toggle.expanded ? ThemedChevronDown : ThemedChevronRight;
   return (
     <Pressable
@@ -222,7 +229,7 @@ function WorkspaceExpandChevron({
       accessibilityState={accessibilityState}
       testID="sidebar-workspace-expand-chevron"
     >
-      <Chevron size={12} uniProps={foregroundMutedColorMapping} />
+      {showChevron ? <Chevron size={12} uniProps={foregroundMutedColorMapping} /> : children}
     </Pressable>
   );
 }
@@ -526,7 +533,7 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
   },
   expandChevron: {
-    width: 12,
+    minWidth: theme.iconSize.md,
     height: 20,
     flexShrink: 0,
     alignItems: "center",
