@@ -515,7 +515,7 @@ function sanitizeRuntimeInfo(
   return sanitized;
 }
 
-const ASSISTANT_PREVIEW_MAX_LENGTH = 200;
+const ASSISTANT_PREVIEW_MAX_LENGTH = 300;
 
 // ponytail: drops only inline markdown markers; a preview of a table or code block still reads raw.
 export function toAssistantPreview(text: string): string | undefined {

@@ -1,4 +1,12 @@
-import { createContext, memo, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactElement,
+} from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -10,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
@@ -28,7 +37,12 @@ import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import {
   WorkspaceTabIcon,
   WorkspaceTabPresentationResolver,
+  type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
+import { formatSessionCost } from "@/components/context-window-meter";
+import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
+import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
+import { filterSelectableModels } from "@/provider-selection/model-catalog";
 import {
   buildTerminalsQueryKey,
   collectScriptTerminalIds,
@@ -269,8 +283,10 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   return (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
       {(presentation) => (
-        <View
-          style={styles.hoverTarget}
+        <SessionRowHoverTarget
+          row={row}
+          serverId={serverId}
+          presentation={presentation}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
@@ -288,7 +304,11 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                     <WorkspaceTabIcon
                       presentation={presentation}
                       active={selected}
-                      backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                      backdrop={resolveBackdrop({
+                        hovered: Boolean(hovered),
+                        pressed,
+                        selected,
+                      })}
                     />
                   </View>
                   <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
@@ -314,11 +334,64 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
               </>
             )}
           </Pressable>
-        </View>
+        </SessionRowHoverTarget>
       )}
     </WorkspaceTabPresentationResolver>
   );
 });
+
+/**
+ * Carries the row's hover View. The tooltip shows the full tab name
+ * and, for agents, the last response the row truncates to one line.
+ */
+function SessionRowHoverTarget({
+  row,
+  serverId,
+  presentation,
+  onPointerEnter,
+  onPointerLeave,
+  children,
+}: {
+  row: WorkspaceSessionRow;
+  serverId: string;
+  presentation: WorkspaceTabPresentation;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+  children: ReactElement;
+}) {
+  return (
+    <View
+      style={styles.hoverTarget}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent
+          side="right"
+          align="start"
+          offset={8}
+          maxWidth={360}
+          style={styles.tooltipCard}
+        >
+          {/* The icon sits inline in the title so a wrapping name continues under it. */}
+          <Text style={styles.tooltipTitle}>
+            <View style={styles.tooltipIconSlot}>
+              <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
+            </View>
+            {presentation.label}
+          </Text>
+          {row.target.kind === "agent" ? (
+            <>
+              <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
+              <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+            </>
+          ) : null}
+        </TooltipContent>
+      </Tooltip>
+    </View>
+  );
+}
 
 function WorkspaceSessionKebab({
   layoutKey,
@@ -392,15 +465,54 @@ function resolveBackdrop(input: {
   return "surfaceSidebar";
 }
 
-function AgentPreview({ serverId, agentId }: { serverId: string; agentId: string }) {
+function AgentPreview({
+  serverId,
+  agentId,
+  full = false,
+}: {
+  serverId: string;
+  agentId: string;
+  /** The tooltip shows the whole preview instead of the row's single line. */
+  full?: boolean;
+}) {
   const preview = useSessionStore(
     (state) => state.sessions[serverId]?.agents?.get(agentId)?.lastAssistantPreview,
   );
-  return preview ? (
+  if (!preview) return null;
+  return full ? (
+    // Persisted previews from before the 300-character cap still run longer.
+    <Text style={styles.tooltipPreview} numberOfLines={6}>
+      {preview}
+    </Text>
+  ) : (
     <Text style={styles.preview} numberOfLines={1}>
       {preview}
     </Text>
-  ) : null;
+  );
+}
+
+/** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
+function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: string }) {
+  const { t } = useTranslation();
+  const agent = useSessionStore((state) => state.sessions[serverId]?.agents?.get(agentId));
+  const { entries } = useProvidersSnapshot(serverId, { cwd: agent?.cwd });
+  const models = entries?.find((entry) => entry.provider === agent?.provider)?.models ?? null;
+  const selection = resolveAgentModelSelection({
+    models: filterSelectableModels(models),
+    runtimeModelId: agent?.runtimeInfo?.model,
+    configuredModelId: agent?.model,
+    runtimeThinkingOptionId: agent?.runtimeInfo?.thinkingOptionId,
+    explicitThinkingOptionId: agent?.thinkingOptionId,
+  });
+  const totalCostUsd = agent?.lastUsage?.totalCostUsd;
+  const parts = [
+    selection.activeModelId ? selection.displayModel : null,
+    selection.selectedThinkingId
+      ? t("workspace.tabs.effort", { effort: selection.displayThinking })
+      : null,
+    typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
 }
 
 function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: string }) {
@@ -421,6 +533,8 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
 // Inner padding before the icon. With the list's 4px left gutter, the icon sits 4px right of the
 // workspace status dot.
 const SESSION_ROW_INSET = 8 + 1 - 4;
+
+const TOOLTIP_TITLE_LINE_HEIGHT = 20;
 
 const styles = StyleSheet.create((theme) => ({
   // The gutter leaves a strip of the hovered workspace group's background around each row.
@@ -455,6 +569,36 @@ const styles = StyleSheet.create((theme) => ({
   // Starts under the title, past the 14px tab icon and its gap.
   preview: {
     paddingLeft: 14 + theme.spacing[2],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
+  },
+  // Matches the workspace hover card's surface and padding.
+  tooltipCard: {
+    backgroundColor: theme.colors.surface1,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
+  },
+  tooltipIconSlot: {
+    marginRight: theme.spacing[1],
+    verticalAlign: "middle",
+  },
+  // Matches the workspace hover card's title.
+  tooltipTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    lineHeight: TOOLTIP_TITLE_LINE_HEIGHT,
+    fontWeight: theme.fontWeight.normal,
+  },
+  tooltipMeta: {
+    marginTop: theme.spacing[1],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
+  },
+  tooltipPreview: {
+    marginTop: theme.spacing[2],
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,

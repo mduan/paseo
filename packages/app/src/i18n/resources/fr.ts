@@ -627,6 +627,7 @@ export const fr: TranslationResources = {
     },
     tabs: {
       loading: "Chargement...",
+      effort: "Effort {{effort}}",
       modified: "Modifications non enregistrées",
       loadingAgentTitle: "Titre d'agent de chargement",
       fallback: {

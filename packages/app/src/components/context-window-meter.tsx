@@ -47,7 +47,7 @@ function clampPercentage(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-function formatSessionCost(value: number): string | null {
+export function formatSessionCost(value: number): string | null {
   if (!Number.isFinite(value) || value <= 0) {
     return null;
   }

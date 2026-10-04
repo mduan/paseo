@@ -621,6 +621,7 @@ export const zhCN: TranslationResources = {
     },
     tabs: {
       loading: "正在加载...",
+      effort: "推理强度 {{effort}}",
       modified: "未保存的更改",
       loadingAgentTitle: "正在加载 Agent 标题",
       fallback: {
