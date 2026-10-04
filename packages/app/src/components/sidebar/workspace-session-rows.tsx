@@ -279,11 +279,13 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
           {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <>
               <View style={styles.titleLine}>
-                <WorkspaceTabIcon
-                  presentation={presentation}
-                  active={selected}
-                  backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
-                />
+                <View style={selected ? undefined : styles.iconUnfocused}>
+                  <WorkspaceTabIcon
+                    presentation={presentation}
+                    active={selected}
+                    backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                  />
+                </View>
                 <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
                   {presentation.titleState === "loading"
                     ? t("workspace.tabs.loading")
@@ -452,6 +454,9 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
   },
   // The workspace group already paints surfaceSidebarHover while hovered.
+  iconUnfocused: {
+    opacity: 0.5,
+  },
   rowHovered: {
     backgroundColor: theme.colors.surface2,
   },
