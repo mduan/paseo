@@ -62,8 +62,8 @@ function getWebTextInputElement(input: EditingTextInputHandle | null): HTMLEleme
 }
 
 export const SMALL_ACTION_HIT_SLOP = 8;
-const EDITOR_MAX_LINES = 15;
-const COMMENT_MAX_LINES = 30;
+// The comment input and saved comment cards show up to this many lines.
+const MAX_TEXT_LINES = 15;
 const foregroundMutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const destructiveIconColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
 const accentForegroundIconColorMapping = (theme: Theme) => ({
@@ -507,7 +507,7 @@ function CommentRow({
 
   return (
     <View style={styles.commentBlock} onLayout={handleLayout}>
-      <Text style={styles.commentBody} numberOfLines={COMMENT_MAX_LINES}>
+      <Text style={styles.commentBody} numberOfLines={MAX_TEXT_LINES}>
         {comment.body}
       </Text>
       <View style={styles.commentActions}>
@@ -840,7 +840,7 @@ const styles = StyleSheet.create((theme) => ({
     // One line to the max, plus padding and border.
     minHeight: theme.fontSize.content * 1.4 + theme.spacing[2] * 2 + theme.borderWidth[1] * 2,
     maxHeight:
-      theme.fontSize.content * 1.4 * EDITOR_MAX_LINES +
+      theme.fontSize.content * 1.4 * MAX_TEXT_LINES +
       theme.spacing[2] * 2 +
       theme.borderWidth[1] * 2,
     color: theme.colors.foreground,
