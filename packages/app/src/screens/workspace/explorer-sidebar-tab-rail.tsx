@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { ArrowLeftToLine, Plus, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -17,11 +17,12 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { titlebarDragSurfaceStyle } from "@/components/desktop/titlebar-drag-region";
 import { WORKSPACE_SECONDARY_HEADER_HEIGHT } from "@/constants/layout";
 import { iconButtonChromeGlyphSize } from "@/components/ui/icon-button-chrome";
 import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
+import { isNative } from "@/constants/platform";
 import {
   WorkspaceTabIcon,
   WorkspaceTabPresentationResolver,
@@ -47,6 +48,7 @@ const TAB_GAP = 4;
 const TAB_DROP_INDICATOR_WIDTH = 4;
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 
 interface ExplorerSidebarTabRailProps {
   paneId: string;
@@ -98,6 +100,9 @@ function ExplorerSidebarTab({
   );
   const handleHoverIn = useCallback(() => setHovered(true), []);
   const handleHoverOut = useCallback(() => setHovered(false), []);
+  const showCloseControl = hovered || isNative;
+  const chipBackdrop: SurfaceBackdrop =
+    hovered || item.isActive ? "surfaceSidebarHover" : "surfaceSidebar";
   const handleClose = useCallback(() => {
     void onCloseTab(item.tab.tabId);
   }, [item.tab.tabId, onCloseTab]);
@@ -114,60 +119,84 @@ function ExplorerSidebarTab({
   const accessibilityState = useMemo(() => ({ selected: item.isActive }), [item.isActive]);
   const renderPresentation = useCallback(
     (presentation: WorkspaceTabPresentation) => (
-      <ContextMenu>
-        <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
-          <TooltipTrigger asChild triggerRefProp="triggerRef">
-            <ContextMenuTrigger
-              {...(dragHandleProps?.attributes as object | undefined)}
-              {...(dragHandleProps?.listeners as object | undefined)}
-              triggerRef={dragHandleProps?.setActivatorNodeRef as never}
-              testID={`explorer-sidebar-tab-${item.tab.tabId}`}
-              accessibilityRole="button"
-              accessibilityLabel={presentation.tooltip}
-              accessibilityState={accessibilityState}
-              onPress={handlePress}
-              onHoverIn={handleHoverIn}
-              onHoverOut={handleHoverOut}
-              style={[
-                styles.tab,
-                hovered ? styles.tabHovered : null,
-                item.isActive ? styles.tabActive : null,
-                isDragging ? styles.tabDragging : null,
-              ]}
-            >
-              <WorkspaceTabIcon
-                presentation={presentation}
-                active={item.isActive}
-                size={iconButtonChromeGlyphSize("small")}
-                strokeWidth={1.5}
-                backdrop={resolveExplorerSidebarTabBackdrop()}
-              />
-              <Text
-                selectable={false}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={[styles.tabLabel, item.isActive ? styles.tabLabelActive : null]}
+      <View
+        style={styles.tabHoverFrame}
+        onPointerEnter={handleHoverIn}
+        onPointerLeave={handleHoverOut}
+      >
+        <ContextMenu>
+          <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
+            <TooltipTrigger asChild triggerRefProp="triggerRef">
+              <ContextMenuTrigger
+                {...(dragHandleProps?.attributes as object | undefined)}
+                {...(dragHandleProps?.listeners as object | undefined)}
+                triggerRef={dragHandleProps?.setActivatorNodeRef as never}
+                testID={`explorer-sidebar-tab-${item.tab.tabId}`}
+                accessibilityRole="button"
+                accessibilityLabel={presentation.tooltip}
+                accessibilityState={accessibilityState}
+                onPress={handlePress}
+                style={[
+                  styles.tab,
+                  hovered ? styles.tabHovered : null,
+                  item.isActive ? styles.tabActive : null,
+                  isDragging ? styles.tabDragging : null,
+                ]}
               >
-                {presentation.label}
-              </Text>
-            </ContextMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="center" offset={8}>
-            <Text style={styles.tooltipText}>{presentation.tooltip}</Text>
-          </TooltipContent>
-        </Tooltip>
-        <ContextMenuContent align="start" minWidth={180}>
-          {canMoveToMain ? (
-            <ContextMenuItem leading={moveToMainLeading} onSelect={handleMoveToMain}>
-              {t("workspace.tabs.menu.moveToMain")}
+                <WorkspaceTabIcon
+                  presentation={presentation}
+                  active={item.isActive}
+                  size={iconButtonChromeGlyphSize("small")}
+                  strokeWidth={1.5}
+                  backdrop={resolveExplorerSidebarTabBackdrop()}
+                />
+                <Text
+                  selectable={false}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[styles.tabLabel, item.isActive ? styles.tabLabelActive : null]}
+                >
+                  {presentation.label}
+                </Text>
+              </ContextMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center" offset={8}>
+              <Text style={styles.tooltipText}>{presentation.tooltip}</Text>
+            </TooltipContent>
+          </Tooltip>
+          <View
+            pointerEvents={showCloseControl ? "box-none" : "none"}
+            style={[styles.tabTrailingOverlay, showCloseControl ? null : styles.tabCloseHidden]}
+          >
+            <TrailingActionScrim backdrop={chipBackdrop} />
+            <Pressable
+              testID={`explorer-sidebar-tab-close-${item.tab.tabId}`}
+              accessibilityRole="button"
+              accessibilityLabel={t("workspace.tabs.menu.close")}
+              onPress={handleClose}
+              style={styles.tabCloseButton}
+            >
+              {({ hovered: closeHovered, pressed }) => (
+                <ThemedX
+                  size={12}
+                  uniProps={closeHovered || pressed ? foregroundColorMapping : mutedColorMapping}
+                />
+              )}
+            </Pressable>
+          </View>
+          <ContextMenuContent align="start" minWidth={180}>
+            {canMoveToMain ? (
+              <ContextMenuItem leading={moveToMainLeading} onSelect={handleMoveToMain}>
+                {t("workspace.tabs.menu.moveToMain")}
+              </ContextMenuItem>
+            ) : null}
+            {canMoveToMain ? <ContextMenuSeparator /> : null}
+            <ContextMenuItem leading={closeLeading} onSelect={handleClose}>
+              {t("workspace.tabs.menu.close")}
             </ContextMenuItem>
-          ) : null}
-          {canMoveToMain ? <ContextMenuSeparator /> : null}
-          <ContextMenuItem leading={closeLeading} onSelect={handleClose}>
-            {t("workspace.tabs.menu.close")}
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenuContent>
+        </ContextMenu>
+      </View>
     ),
     [
       accessibilityState,
@@ -179,8 +208,10 @@ function ExplorerSidebarTab({
       handlePress,
       hovered,
       isDragging,
+      showCloseControl,
       item,
       canMoveToMain,
+      chipBackdrop,
       closeLeading,
       moveToMainLeading,
       t,
@@ -333,11 +364,7 @@ export function ExplorerSidebarTabRail({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger
-        contextOnly
-        style={[styles.track, titlebarDragSurfaceStyle as never]}
-        testID="explorer-sidebar-tab-rail"
-      >
+      <ContextMenuTrigger contextOnly style={styles.track} testID="explorer-sidebar-tab-rail">
         <View style={styles.scrollContainer}>
           <Animated.ScrollView
             horizontal
@@ -425,11 +452,40 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
     userSelect: "none",
   },
+  tabHoverFrame: {
+    position: "relative",
+  },
+  tabTrailingOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 48,
+    borderTopRightRadius: theme.borderRadius.md,
+    borderBottomRightRadius: theme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+    overflow: "hidden",
+  },
+  tabCloseButton: {
+    position: "absolute",
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: theme.borderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabCloseHidden: {
+    opacity: 0,
+  },
+  // Opaque fills so the close button's scrim can match them exactly.
   tabHovered: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   tabActive: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   tabLabel: {
     minWidth: 0,
