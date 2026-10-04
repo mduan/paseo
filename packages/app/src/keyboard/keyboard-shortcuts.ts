@@ -389,10 +389,12 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   },
 
   // --- Rename ---
+  // Rename workspace moved from Alt+R to Alt+E and Rename tab from Alt+E to Alt+R. The binding ids
+  // keep their original key names because user shortcut overrides are keyed by binding id.
   {
     id: "workspace-rename-cmd-alt-r-mac",
     action: "workspace.rename",
-    combo: "Cmd+Alt+R",
+    combo: "Cmd+Alt+E",
     when: { mac: true, commandCenter: false },
     help: {
       id: "rename-workspace",
@@ -403,7 +405,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-rename-ctrl-alt-r-non-mac",
     action: "workspace.rename",
-    combo: "Ctrl+Alt+R",
+    combo: "Ctrl+Alt+E",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "rename-workspace",
@@ -414,7 +416,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-cmd-alt-e-mac",
     action: "workspace.tab.rename",
-    combo: "Cmd+Alt+T",
+    combo: "Cmd+Alt+R",
     when: { mac: true, commandCenter: false },
     help: {
       id: "workspace-tab-rename",
@@ -425,7 +427,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-ctrl-alt-e-non-mac",
     action: "workspace.tab.rename",
-    combo: "Ctrl+Alt+T",
+    combo: "Ctrl+Alt+R",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "workspace-tab-rename",
@@ -1077,7 +1079,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "theme-cycle-cmd-shift-t-mac",
     action: "theme.cycle",
-    combo: "",
+    combo: "Cmd+Alt+T",
     when: { mac: true, commandCenter: false },
     help: {
       id: "cycle-theme",
@@ -1088,7 +1090,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "theme-cycle-ctrl-alt-t-non-mac",
     action: "theme.cycle",
-    combo: "",
+    combo: "Ctrl+Alt+T",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "cycle-theme",
