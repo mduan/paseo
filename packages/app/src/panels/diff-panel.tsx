@@ -10,7 +10,13 @@ import { PaneContentToolbar, ToolbarButton } from "@/components/ui/pane-content-
 import { isWeb } from "@/constants/platform";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { DiffDocument } from "@/git/diff-document";
-import { ChangesSurface, DiffLayoutToggle, resolveDiffLayout } from "@/git/diff-pane";
+import {
+  ChangesDiffToolbar,
+  ChangesSurface,
+  DiffLayoutToggle,
+  resolveDiffLayout,
+  type ChangesToolbarDiffOptions,
+} from "@/git/diff-pane";
 import { useCommitDiffFiles } from "@/git/use-diff-files";
 import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -281,11 +287,35 @@ function TurnDiffPanel() {
   );
 
   const payload = query.data;
+  const files = payload?.files ?? EMPTY_FILES;
+  const diffOptions = useMemo<ChangesToolbarDiffOptions>(
+    () => ({
+      collapse:
+        files.length > 0
+          ? {
+              allFilesCollapsed: files.every((file) => collapsedFilePaths.includes(file.path)),
+              onCollapseAll: () => setCollapsedFilePaths(files.map((file) => file.path)),
+              onExpandAll: () => setCollapsedFilePaths([]),
+            }
+          : null,
+      layout: panelPreferences.canUseSplitLayout
+        ? {
+            value: panelPreferences.preferences.layout,
+            onToggle: panelPreferences.toggleLayout,
+          }
+        : null,
+      hideWhitespace: panelPreferences.preferences.hideWhitespace,
+      wrapLines: panelPreferences.preferences.wrapLines,
+      onToggleHideWhitespace: panelPreferences.toggleHideWhitespace,
+      onToggleWrapLines: panelPreferences.toggleWrapLines,
+    }),
+    [collapsedFilePaths, files, panelPreferences],
+  );
   const expansion = useDiffContextExpansion({
     serverId,
     cwd: payload?.cwd ?? "",
     scopeKey: `turn:${serverId}:${target.agentId}:${target.turnId}:${panelPreferences.preferences.hideWhitespace}`,
-    files: payload?.files ?? EMPTY_FILES,
+    files,
   });
   let body: ReactNode;
   if (query.error) {
@@ -312,29 +342,20 @@ function TurnDiffPanel() {
 
   return (
     <View style={styles.container} testID="turn-diff-panel">
-      {panelPreferences.canUseSplitLayout || canOpenInMainPanel ? (
-        <PaneContentToolbar style={styles.toolbar}>
-          <View style={styles.toolbarActions}>
-            {panelPreferences.canUseSplitLayout ? (
-              <DiffLayoutToggle
-                layout={panelPreferences.preferences.layout}
-                isMobile={panelPreferences.isCompact}
-                testID="turn-diff-toggle-layout"
-                onToggle={panelPreferences.toggleLayout}
-              />
-            ) : null}
-            {canOpenInMainPanel ? (
-              <ToolbarButton
-                label={t("workspace.tabs.menu.moveToMain")}
-                onPress={handleOpenInMainPanel}
-                testID="turn-diff-open-in-main"
-              >
-                <ThemedMaximize size={14} uniProps={mutedIconColorMapping} />
-              </ToolbarButton>
-            ) : null}
-          </View>
-        </PaneContentToolbar>
-      ) : null}
+      <PaneContentToolbar style={styles.toolbar}>
+        <View style={styles.toolbarActions}>
+          <ChangesDiffToolbar options={diffOptions} compact={panelPreferences.isCompact} />
+          {canOpenInMainPanel ? (
+            <ToolbarButton
+              label={t("workspace.tabs.menu.moveToMain")}
+              onPress={handleOpenInMainPanel}
+              testID="turn-diff-open-in-main"
+            >
+              <ThemedMaximize size={14} uniProps={mutedIconColorMapping} />
+            </ToolbarButton>
+          ) : null}
+        </View>
+      </PaneContentToolbar>
       <View style={styles.body}>{body}</View>
     </View>
   );

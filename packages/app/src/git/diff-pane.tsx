@@ -384,7 +384,7 @@ interface ChangesToolbarInlineDiffToggle {
   onToggle: () => void;
 }
 
-interface ChangesToolbarDiffOptions {
+export interface ChangesToolbarDiffOptions {
   collapse: {
     allFilesCollapsed: boolean;
     onCollapseAll: () => void;
@@ -836,7 +836,7 @@ function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; co
   );
 }
 
-function ChangesDiffToolbar({
+export function ChangesDiffToolbar({
   options,
   compact,
 }: {
