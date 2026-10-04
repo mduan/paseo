@@ -76,6 +76,7 @@ import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
 import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-default-environment";
 import { setAssistantMarkdownBlockHeight } from "@/utils/assistant-message-height-estimate";
+import { getAssistantImageMetadata } from "@/utils/assistant-image-metadata";
 import { isRenderProfileEnabled } from "@/utils/render-profiler";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import { PlanCard } from "./plan-card";
@@ -739,7 +740,6 @@ export const assistantMessageStylesheet = StyleSheet.create((theme) => ({
   },
   imageFrame: {
     width: "100%",
-    minHeight: 160,
     marginHorizontal: -theme.spacing[1],
   },
   imageSurface: {
@@ -823,10 +823,16 @@ function AssistantMarkdownImage({
   );
   const imageSizeStyle = useMemo<ViewStyle>(() => {
     if (aspectRatio) {
-      return { aspectRatio, maxWidth: ASSISTANT_IMAGE_MAX_HEIGHT * aspectRatio };
+      // Never scale up past the image's own pixel size.
+      const naturalWidth =
+        getAssistantImageMetadata({ source, workspaceRoot, serverId })?.width ?? Infinity;
+      return {
+        aspectRatio,
+        maxWidth: Math.min(ASSISTANT_IMAGE_MAX_HEIGHT * aspectRatio, naturalWidth),
+      };
     }
     return { height: ASSISTANT_IMAGE_MIN_HEIGHT };
-  }, [aspectRatio]);
+  }, [aspectRatio, serverId, source, workspaceRoot]);
   const surfaceStyle = useMemo<StyleProp<ViewStyle>>(
     () => [assistantMessageStylesheet.imageSurface, imageSizeStyle],
     [imageSizeStyle],
