@@ -410,19 +410,20 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
   return label ? <Text style={styles.age}>{label}</Text> : null;
 }
 
-// The icon sits just right of the workspace status dot: row padding, centering 14px in 16px, and a
-// 4px indent, less the list's 4px gutter.
-const SESSION_ROW_INSET = 8 + 1 - 4 + 4 - 4;
+// Inner padding before the icon. With the list's 8px left gutter, the icon sits just right of the
+// workspace status dot.
+const SESSION_ROW_INSET = 8 + 1 - 4;
 
 const styles = StyleSheet.create((theme) => ({
   // The gutter leaves a strip of the hovered workspace group's background around each row.
   list: {
     marginBottom: theme.spacing[0.5],
-    paddingHorizontal: theme.spacing[1],
+    paddingLeft: theme.spacing[2],
+    paddingRight: theme.spacing[1],
   },
   listIndented: {
     marginBottom: theme.spacing[0.5],
-    paddingLeft: theme.spacing[1] + theme.spacing[2],
+    paddingLeft: theme.spacing[2] + theme.spacing[2],
     paddingRight: theme.spacing[1],
   },
   row: {
