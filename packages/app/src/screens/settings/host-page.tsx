@@ -52,6 +52,7 @@ import {
   isHostRuntimeConnected,
   useHostMutations,
   useHostRuntimeClient,
+  useHostRuntimeConnectionStatus,
   useHostRuntimeIsConnected,
   useHostRuntimeSnapshot,
   useHosts,
@@ -572,6 +573,7 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
   const { t } = useTranslation();
   const daemonClient = useHostRuntimeClient(host.serverId);
   const isConnected = useHostRuntimeIsConnected(host.serverId);
+  const connectionStatus = useHostRuntimeConnectionStatus(host.serverId);
   const runtime = getHostRuntimeStore();
   const [isRestarting, setIsRestarting] = useState(false);
   const isMountedRef = useRef(true);
@@ -581,7 +583,7 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
   );
   const sshOperation = resolveRemoteSshRestartOperation({
     hasRemoteSshTarget: remoteSshTarget !== undefined,
-    isConnected,
+    connectionStatus,
   });
 
   useEffect(() => {
@@ -753,6 +755,7 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
   const { t } = useTranslation();
   const daemonClient = useHostRuntimeClient(host.serverId);
   const isConnected = useHostRuntimeIsConnected(host.serverId);
+  const connectionStatus = useHostRuntimeConnectionStatus(host.serverId);
   const runtime = getHostRuntimeStore();
   const [updateState, setUpdateState] = useState<DaemonUpdateState>({ status: "idle" });
   const isMountedRef = useRef(true);
@@ -776,7 +779,7 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
   );
   const sshOperation = resolveRemoteSshUpdateOperation({
     hasRemoteSshTarget: remoteSshTarget !== undefined,
-    isConnected,
+    connectionStatus,
     daemonVersion,
   });
 

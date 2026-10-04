@@ -48,37 +48,62 @@ describe("daemon card actions", () => {
   it.each([
     {
       state: "fork daemon online",
-      isConnected: true,
+      connectionStatus: "online" as const,
       daemonVersion: "0.11.0-fork.1",
       update: undefined,
       restart: undefined,
     },
     {
       state: "upstream daemon online",
-      isConnected: true,
+      connectionStatus: "online" as const,
       daemonVersion: "0.10.3",
       update: RemoteSshDaemonOperation.InstallForkDaemon,
       restart: undefined,
     },
     {
       state: "online before server info arrives",
-      isConnected: true,
+      connectionStatus: "online" as const,
       daemonVersion: null,
       update: undefined,
       restart: undefined,
     },
     {
       state: "offline or no daemon",
-      isConnected: false,
+      connectionStatus: "offline" as const,
       daemonVersion: null,
       update: RemoteSshDaemonOperation.InstallForkDaemon,
       restart: RemoteSshDaemonOperation.StartDaemon,
     },
-  ])("$state over Remote SSH", ({ isConnected, daemonVersion, update, restart }) => {
+    {
+      state: "connection error",
+      connectionStatus: "error" as const,
+      daemonVersion: null,
+      update: RemoteSshDaemonOperation.InstallForkDaemon,
+      restart: RemoteSshDaemonOperation.StartDaemon,
+    },
+    {
+      state: "still connecting",
+      connectionStatus: "connecting" as const,
+      daemonVersion: null,
+      update: undefined,
+      restart: undefined,
+    },
+    {
+      state: "idle",
+      connectionStatus: "idle" as const,
+      daemonVersion: null,
+      update: undefined,
+      restart: undefined,
+    },
+  ])("$state over Remote SSH", ({ connectionStatus, daemonVersion, update, restart }) => {
     expect(
-      resolveRemoteSshUpdateOperation({ hasRemoteSshTarget: true, isConnected, daemonVersion }),
+      resolveRemoteSshUpdateOperation({
+        hasRemoteSshTarget: true,
+        connectionStatus,
+        daemonVersion,
+      }),
     ).toBe(update);
-    expect(resolveRemoteSshRestartOperation({ hasRemoteSshTarget: true, isConnected })).toBe(
+    expect(resolveRemoteSshRestartOperation({ hasRemoteSshTarget: true, connectionStatus })).toBe(
       restart,
     );
   });
@@ -87,12 +112,12 @@ describe("daemon card actions", () => {
     expect(
       resolveRemoteSshUpdateOperation({
         hasRemoteSshTarget: false,
-        isConnected: false,
+        connectionStatus: "offline",
         daemonVersion: "0.10.3",
       }),
     ).toBeUndefined();
     expect(
-      resolveRemoteSshRestartOperation({ hasRemoteSshTarget: false, isConnected: false }),
+      resolveRemoteSshRestartOperation({ hasRemoteSshTarget: false, connectionStatus: "offline" }),
     ).toBeUndefined();
   });
 
