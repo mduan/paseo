@@ -77,39 +77,13 @@ function createMemoryStorage(): StateStorage & { values: Map<string, string> } {
 }
 
 describe("buildReviewDraftKey", () => {
-  it("scopes by server, workspace-or-cwd, diff mode, base ref, and whitespace mode", () => {
-    const base = buildReviewDraftKey({
-      serverId: " local ",
-      workspaceId: " workspace-1 ",
-      cwd: "/repo",
-      mode: "base",
-      baseRef: " main ",
-      ignoreWhitespace: false,
-    });
-
-    expect(base).toBe(
-      "review:server=local:workspace=workspace-1:mode=base:base=main:ignoreWhitespace=false",
+  it("scopes by server and workspace-or-cwd only, so edits keep the same comments", () => {
+    expect(
+      buildReviewDraftKey({ serverId: " local ", workspaceId: " workspace-1 ", cwd: "/repo" }),
+    ).toBe("review:server=local:workspace=workspace-1");
+    expect(buildReviewDraftKey({ serverId: "local", workspaceId: null, cwd: "/repo/" })).toBe(
+      "review:server=local:cwd=%2Frepo",
     );
-    expect(
-      buildReviewDraftKey({
-        serverId: "local",
-        workspaceId: "workspace-1",
-        cwd: "/repo",
-        mode: "base",
-        baseRef: "main",
-        ignoreWhitespace: true,
-      }),
-    ).not.toBe(base);
-    expect(
-      buildReviewDraftKey({
-        serverId: "local",
-        workspaceId: null,
-        cwd: "/repo/",
-        mode: "base",
-        baseRef: "main",
-        ignoreWhitespace: false,
-      }),
-    ).toBe("review:server=local:cwd=%2Frepo:mode=base:base=main:ignoreWhitespace=false");
   });
 });
 
@@ -131,6 +105,42 @@ describe("normalizePersistedState", () => {
 
     expect(normalized.drafts["review:key"]).toEqual([makeComment()]);
     expect(backing.values.has("@paseo:review-draft-store")).toBe(true);
+  });
+
+  it("merges drafts saved per diff mode into one set per workspace", () => {
+    const normalized = normalizePersistedState({
+      drafts: {
+        "review:server=local:workspace=w1:mode=base:base=main:ignoreWhitespace=false": [
+          makeComment({ id: "a" }),
+        ],
+        "review:server=local:workspace=w1:mode=uncommitted:base=main:ignoreWhitespace=true": [
+          makeComment({ id: "b" }),
+          makeComment({ id: "a" }),
+        ],
+      },
+    });
+
+    expect(normalized.drafts).toEqual({
+      "review:server=local:workspace=w1": [makeComment({ id: "a" }), makeComment({ id: "b" })],
+    });
+  });
+
+  it("merges drafts saved per diff mode into one set per workspace", () => {
+    const normalized = normalizePersistedState({
+      drafts: {
+        "review:server=local:workspace=w1:mode=base:base=main:ignoreWhitespace=false": [
+          makeComment({ id: "a" }),
+        ],
+        "review:server=local:workspace=w1:mode=uncommitted:base=main:ignoreWhitespace=true": [
+          makeComment({ id: "b" }),
+          makeComment({ id: "a" }),
+        ],
+      },
+    });
+
+    expect(normalized.drafts).toEqual({
+      "review:server=local:workspace=w1": [makeComment({ id: "a" }), makeComment({ id: "b" })],
+    });
   });
 
   it("rejects the complete payload when any draft comment or field is invalid", () => {

@@ -11,7 +11,6 @@ import {
 } from "@/review";
 import { buildDiffReviewContext } from "@/review/context";
 import type { ReviewLineRange } from "@/review/range";
-import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
 import { useCheckoutDiffQuery } from "@/git/use-diff-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -88,6 +87,8 @@ export function useWorkingDiff({
     cwd,
     ignoreWhitespace,
     reviewDraftKey,
+    checkoutMode,
+    baseRef,
     turnComparison,
     turnDiff,
     checkoutFiles: checkoutDiff.files,
@@ -174,6 +175,8 @@ function useWorkingDiffExpansion(input: {
   cwd: string;
   ignoreWhitespace: boolean;
   reviewDraftKey: string;
+  checkoutMode: CheckoutDiffComparison;
+  baseRef?: string;
   turnComparison: TurnDiffComparison | null;
   turnDiff: { cwd: string; agentId: string | null; files: ParsedDiffFile[] };
   checkoutFiles: ParsedDiffFile[];
@@ -187,7 +190,12 @@ function useWorkingDiffExpansion(input: {
           scopeKey: `turn:${serverId}:${turnDiff.agentId}:${turnComparison}:${input.ignoreWhitespace}`,
           files: turnDiff.files,
         }
-      : { cwd: input.cwd, scopeKey: input.reviewDraftKey, files: input.checkoutFiles }),
+      : {
+          cwd: input.cwd,
+          // Expanded gaps belong to one checkout comparison.
+          scopeKey: `${input.reviewDraftKey}:mode=${input.checkoutMode}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
+          files: input.checkoutFiles,
+        }),
   });
 }
 
@@ -230,8 +238,8 @@ export interface ReviewDraftScope {
 }
 
 /**
- * The review draft key for a checkout, as the diff pane resolves it: the selected checkout
- * comparison, its base ref, and the hide-whitespace preference.
+ * The workspace's review draft key, plus the checkout comparison the diff pane resolves, which
+ * the review attachment reports.
  */
 export function useReviewDraftScope({
   serverId,
@@ -251,18 +259,9 @@ export function useReviewDraftScope({
     cwd,
     isDirty: Boolean(gitStatus?.isDirty),
   });
-  const ignoreWhitespace = useChangesPreferences().preferences.hideWhitespace;
   const reviewDraftKey = useMemo(
-    () =>
-      buildReviewDraftKey({
-        serverId,
-        workspaceId,
-        cwd,
-        mode: checkoutMode,
-        baseRef,
-        ignoreWhitespace,
-      }),
-    [baseRef, checkoutMode, cwd, ignoreWhitespace, serverId, workspaceId],
+    () => buildReviewDraftKey({ serverId, workspaceId, cwd }),
+    [cwd, serverId, workspaceId],
   );
   return { reviewDraftKey, isGit: Boolean(gitStatus), mode: checkoutMode, baseRef };
 }

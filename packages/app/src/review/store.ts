@@ -23,8 +23,8 @@ import { createValidatedPersistStorage } from "@/storage/validated-persist-stora
 
 export type { ReviewDraftComment, ReviewDraftMode, ReviewDraftSide } from "@/review/state";
 
-// v2 dropped the legacy persisted activeModesByScope field.
-const STORE_VERSION = 2;
+// v2 dropped the legacy persisted activeModesByScope field. v3 keys drafts by workspace only.
+const STORE_VERSION = 3;
 const EMPTY_REVIEW_DRAFT_COMMENTS: ReviewDraftComment[] = [];
 
 type ReviewAttachment = Extract<AgentAttachment, { type: "review" }>;
@@ -34,12 +34,7 @@ export interface BuildReviewDraftKeyInput {
   serverId: string;
   workspaceId?: string | null;
   cwd: string;
-  mode: ReviewDraftMode;
-  baseRef?: string | null;
-  ignoreWhitespace: boolean;
 }
-
-type BuildReviewDraftScopeKeyInput = Omit<BuildReviewDraftKeyInput, "mode">;
 
 export interface BuildReviewAttachmentSnapshotInput {
   reviewDraftKey: string;
@@ -82,28 +77,17 @@ function normalizeBaseRef(baseRef: string | null | undefined): string {
   return baseRef?.trim() ?? "";
 }
 
-function buildReviewDraftScopeParts(input: BuildReviewDraftScopeKeyInput): string[] {
+/**
+ * One comment set per workspace. The diff comparison is left out because its default follows
+ * whether the checkout is dirty, and an edit would otherwise switch to another set of comments.
+ */
+export function buildReviewDraftKey(input: BuildReviewDraftKeyInput): string {
   const workspaceId = input.workspaceId?.trim();
   // workspaceId is opaque; do not parse this key back into a path.
   const workspacePart = workspaceId
     ? `workspace=${encodeKeyPart(workspaceId)}`
     : `cwd=${encodeKeyPart(normalizeCwd(input.cwd))}`;
-
-  return [
-    "review",
-    `server=${encodeKeyPart(input.serverId)}`,
-    workspacePart,
-    `base=${encodeKeyPart(normalizeBaseRef(input.baseRef))}`,
-    `ignoreWhitespace=${input.ignoreWhitespace ? "true" : "false"}`,
-  ];
-}
-
-export function buildReviewDraftKey(input: BuildReviewDraftKeyInput): string {
-  const [prefix, serverPart, workspacePart, basePart, whitespacePart] =
-    buildReviewDraftScopeParts(input);
-  return [prefix, serverPart, workspacePart, `mode=${input.mode}`, basePart, whitespacePart].join(
-    ":",
-  );
+  return ["review", `server=${encodeKeyPart(input.serverId)}`, workspacePart].join(":");
 }
 
 function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment {

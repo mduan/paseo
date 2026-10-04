@@ -138,8 +138,28 @@ export function serializeReviewDraftState(
 export function normalizePersistedState(state: unknown): ReviewDraftStoreState {
   const result = SerializedReviewDraftStateSchema.safeParse(state);
   return {
-    drafts: result.success ? result.data.drafts : {},
+    drafts: result.success ? mergeDraftsByWorkspace(result.data.drafts) : {},
   };
+}
+
+// COMPAT(reviewDraftWorkspaceKey): added in v0.11, remove after 2027-04-03.
+// Keys before v3 also held the diff mode, base ref, and whitespace setting.
+const LEGACY_KEY_PART = /^(mode|base|ignoreWhitespace)=/;
+
+function mergeDraftsByWorkspace(
+  drafts: Record<string, ReviewDraftComment[]>,
+): Record<string, ReviewDraftComment[]> {
+  const merged: Record<string, ReviewDraftComment[]> = {};
+  for (const [key, comments] of Object.entries(drafts)) {
+    const workspaceKey = key
+      .split(":")
+      .filter((part) => !LEGACY_KEY_PART.test(part))
+      .join(":");
+    const existing = merged[workspaceKey] ?? [];
+    const ids = new Set(existing.map((comment) => comment.id));
+    merged[workspaceKey] = [...existing, ...comments.filter((comment) => !ids.has(comment.id))];
+  }
+  return merged;
 }
 
 function applyCommentUpdates(
