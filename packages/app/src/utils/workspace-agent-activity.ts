@@ -8,6 +8,11 @@ export interface WorkspaceAgentActivity {
   enteredAt: Date | null;
 }
 
+/** The attention time while the agent needs the user, otherwise its last update. */
+export function getAgentActivityAt(agent: Agent): Date {
+  return agent.attentionTimestamp ?? agent.updatedAt;
+}
+
 function workspaceAgentStatus(agent: Agent): Agent["status"] {
   if (agent.turn.phase === "open") return "running";
   return agent.status === "running" ? "idle" : agent.status;
@@ -26,7 +31,7 @@ export function buildWorkspaceAgentActivityIndex(
       continue;
     }
 
-    const enteredAt = agent.attentionTimestamp ?? agent.updatedAt;
+    const enteredAt = getAgentActivityAt(agent);
     const latestActivityAt = latestActivityAtByWorkspaceId.get(agent.workspaceId);
     if (latestActivityAt && enteredAt <= latestActivityAt) {
       continue;

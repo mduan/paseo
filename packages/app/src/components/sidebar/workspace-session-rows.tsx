@@ -56,6 +56,7 @@ import { collectAllTabs, findPaneById } from "@/stores/workspace-layout-actions"
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { isWorkspaceRootAgent } from "@/subagents/policies";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
+import { getAgentActivityAt } from "@/utils/workspace-agent-activity";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { buildWorkspaceTabPersistenceKey, type WorkspaceTab } from "@/workspace-tabs/model";
 import {
@@ -517,10 +518,8 @@ function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: st
 
 function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: string }) {
   const lastActivityTime = useSessionStore((state) => {
-    const lastActivityAt =
-      state.agentLastActivity.get(agentId) ??
-      state.sessions[serverId]?.agents?.get(agentId)?.lastActivityAt;
-    return lastActivityAt ? lastActivityAt.getTime() : null;
+    const agent = state.sessions[serverId]?.agents?.get(agentId);
+    return agent ? getAgentActivityAt(agent).getTime() : null;
   });
   const date = useMemo(
     () => (lastActivityTime === null ? null : new Date(lastActivityTime)),
