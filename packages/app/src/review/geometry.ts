@@ -3,10 +3,11 @@ import { buildReviewableDiffTargetKey } from "@/utils/diff-layout";
 import type { ReviewLineRange } from "./range";
 import type { ReviewDraftComment } from "./store";
 
-export const INLINE_REVIEW_COMMENT_HEIGHT = 72;
+// Two body lines (15px font, 1.4 line height) plus the card's border.
+export const INLINE_REVIEW_COMMENT_HEIGHT = 44;
 export const INLINE_REVIEW_EDITOR_HEIGHT = 132;
 export const INLINE_REVIEW_GAP = 6;
-export const INLINE_REVIEW_VERTICAL_PADDING = 8;
+export const INLINE_REVIEW_VERTICAL_PADDING = 4;
 
 export interface InlineReviewEditorState {
   target: ReviewableDiffTarget;

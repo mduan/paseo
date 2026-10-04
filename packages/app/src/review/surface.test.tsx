@@ -424,7 +424,7 @@ describe("git diff inline review helpers", () => {
 
     expect(rowState?.left).toBeNull();
     expect(rowState?.right?.comments).toEqual([rightComment]);
-    expect(rowState?.height).toBe(226);
+    expect(rowState?.height).toBe(190);
   });
 
   it("includes thread padding in the inline editor height", () => {
@@ -433,7 +433,7 @@ describe("git diff inline review helpers", () => {
       editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0 },
     });
 
-    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(148);
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(140);
   });
 
   it("pins no-wrap review threads to the visible diff viewport", () => {
@@ -666,7 +666,7 @@ describe("InlineReviewThread", () => {
       commentsByTarget: groupInlineReviewCommentsByTarget([comment()]),
     });
     const { getByText } = render(
-      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={88} />,
+      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={52} />,
     );
 
     const card = getByText("Please simplify this.").parentElement!;

@@ -742,7 +742,6 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.borderAccent,
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
