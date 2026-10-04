@@ -254,8 +254,10 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
 
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const [isHovered, setIsHovered] = useState(false);
-  const handleHoverIn = useCallback(() => setIsHovered(true), []);
-  const handleHoverOut = useCallback(() => setIsHovered(false), []);
+  // Hover is tracked on a plain wrapping View (docs/hover.md): on the Pressable, entering the
+  // nested kebab trigger fires hoverOut and swaps the kebab back to the activity age.
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
   const isCompact = useIsCompactFormFactor();
   const layoutKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId }) ?? "";
   // Only a mounted workspace screen can run the tab actions, so unvisited workspaces get no menu.
@@ -267,48 +269,52 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   return (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
       {(presentation) => (
-        <Pressable
-          onPress={handlePress}
-          onHoverIn={handleHoverIn}
-          onHoverOut={handleHoverOut}
-          style={pressableStyle}
-          accessibilityRole="button"
-          accessibilityState={accessibilityState}
-          testID={`sidebar-workspace-session-${row.key}`}
+        <View
+          style={styles.hoverTarget}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
         >
-          {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
-            <>
-              <View style={styles.titleLine}>
-                <View style={selected ? undefined : styles.iconUnfocused}>
-                  <WorkspaceTabIcon
-                    presentation={presentation}
-                    active={selected}
-                    backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
-                  />
+          <Pressable
+            onPress={handlePress}
+            style={pressableStyle}
+            accessibilityRole="button"
+            accessibilityState={accessibilityState}
+            testID={`sidebar-workspace-session-${row.key}`}
+          >
+            {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
+              <>
+                <View style={styles.titleLine}>
+                  <View style={selected ? undefined : styles.iconUnfocused}>
+                    <WorkspaceTabIcon
+                      presentation={presentation}
+                      active={selected}
+                      backdrop={resolveBackdrop({ hovered: Boolean(hovered), pressed, selected })}
+                    />
+                  </View>
+                  <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
+                    {presentation.titleState === "loading"
+                      ? t("workspace.tabs.loading")
+                      : presentation.label}
+                  </Text>
+                  {kebab.showKebab && row.tabId ? (
+                    <WorkspaceSessionKebab
+                      {...kebab.menuProps}
+                      layoutKey={layoutKey}
+                      tabId={row.tabId}
+                      label={presentation.label}
+                    />
+                  ) : null}
+                  {!kebab.showKebab && row.target.kind === "agent" ? (
+                    <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
+                  ) : null}
                 </View>
-                <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
-                  {presentation.titleState === "loading"
-                    ? t("workspace.tabs.loading")
-                    : presentation.label}
-                </Text>
-                {kebab.showKebab && row.tabId ? (
-                  <WorkspaceSessionKebab
-                    {...kebab.menuProps}
-                    layoutKey={layoutKey}
-                    tabId={row.tabId}
-                    label={presentation.label}
-                  />
+                {row.target.kind === "agent" ? (
+                  <AgentPreview serverId={serverId} agentId={row.target.agentId} />
                 ) : null}
-                {!kebab.showKebab && row.target.kind === "agent" ? (
-                  <AgentActivityAge serverId={serverId} agentId={row.target.agentId} />
-                ) : null}
-              </View>
-              {row.target.kind === "agent" ? (
-                <AgentPreview serverId={serverId} agentId={row.target.agentId} />
-              ) : null}
-            </>
-          )}
-        </Pressable>
+              </>
+            )}
+          </Pressable>
+        </View>
       )}
     </WorkspaceTabPresentationResolver>
   );
@@ -454,6 +460,9 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
   },
   // The workspace group already paints surfaceSidebarHover while hovered.
+  hoverTarget: {
+    position: "relative",
+  },
   iconUnfocused: {
     opacity: 0.5,
   },
