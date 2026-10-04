@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { createExternalProcessEnv } from "../server/paseo-env.js";
 import { writePrivateFileAtomicSync } from "../server/private-files.js";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
+import { PASEO_CLI_PACKAGE } from "../server/session/daemon/npm-global-cli.js";
 import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
 import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
 import { TerminalActivityTracker } from "./activity/terminal-activity-tracker.js";
@@ -16,7 +17,10 @@ import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol
 
 const { Terminal } = xterm;
 const require = createRequire(import.meta.url);
-const PASEO_CLI_BIN_ENTRY = "@getpaseo/cli/bin/paseo";
+// The fork publishes the CLI as `@mduan/paseo-cli` with this server bundled
+// inside it; local dev and the desktop app resolve the `@getpaseo/cli` workspace.
+// The fork name goes first so a leftover global `@getpaseo/cli` never wins.
+const PASEO_CLI_BIN_ENTRIES = [`${PASEO_CLI_PACKAGE}/bin/paseo`, "@getpaseo/cli/bin/paseo"];
 let nodePtySpawnHelperChecked = false;
 const TERMINAL_TITLE_DEBOUNCE_MS = 150;
 const TERMINAL_EXIT_OUTPUT_LINE_LIMIT = 12;
@@ -422,11 +426,14 @@ export function resolvePaseoCliExecutablePath(): string | null {
 }
 
 function resolvePaseoCliBinEntrypoint(): string | null {
-  try {
-    return require.resolve(PASEO_CLI_BIN_ENTRY);
-  } catch {
-    return null;
+  for (const entry of PASEO_CLI_BIN_ENTRIES) {
+    try {
+      return require.resolve(entry);
+    } catch {
+      // Try the next package name.
+    }
   }
+  return null;
 }
 
 function findNpmBinDir(startPath: string): string | null {
