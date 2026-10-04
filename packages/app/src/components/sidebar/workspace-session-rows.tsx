@@ -411,23 +411,26 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
 }
 
 // The icon sits just right of the workspace status dot: row padding, centering 14px in 16px, and a
-// 4px indent.
-const SESSION_ROW_INSET = 8 + 1 - 4 + 4;
+// 4px indent, less the list's 4px gutter.
+const SESSION_ROW_INSET = 8 + 1 - 4 + 4 - 4;
 
 const styles = StyleSheet.create((theme) => ({
+  // The gutter leaves a strip of the hovered workspace group's background around each row.
   list: {
     marginBottom: theme.spacing[0.5],
+    paddingHorizontal: theme.spacing[1],
   },
   listIndented: {
     marginBottom: theme.spacing[0.5],
-    paddingLeft: theme.spacing[2],
+    paddingLeft: theme.spacing[1] + theme.spacing[2],
+    paddingRight: theme.spacing[1],
   },
   row: {
     justifyContent: "center",
     minHeight: 28,
     paddingVertical: theme.spacing[1],
     paddingLeft: SESSION_ROW_INSET,
-    paddingRight: theme.spacing[3],
+    paddingRight: theme.spacing[3] - theme.spacing[1],
     borderRadius: theme.borderRadius.lg,
     userSelect: "none",
   },
