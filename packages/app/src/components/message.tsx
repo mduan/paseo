@@ -593,6 +593,7 @@ interface AssistantTurnFooterProps {
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
   hoverTarget: {
     position: "relative",
+    flex: 1,
   },
   actions: {
     flexDirection: "row",

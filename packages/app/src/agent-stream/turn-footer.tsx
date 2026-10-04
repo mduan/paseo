@@ -205,7 +205,7 @@ function CompletedTurnFooter({
     (state) => messageId !== undefined && state.messageId === messageId,
   );
   return (
-    <View style={stylesheet.turnFooterSlot}>
+    <View style={[stylesheet.turnFooterSlot, stylesheet.completedTurnFooterSlot]}>
       <AssistantTurnFooter
         getContent={getContent}
         completedAt={timing?.completedAt}
@@ -229,6 +229,10 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   turnFooterRow: {
     marginTop: theme.spacing[1],
+  },
+  // Full width, so the footer's hover target spans the whole row, not just its actions.
+  completedTurnFooterSlot: {
+    alignSelf: "stretch",
   },
   turnFooterSlot: {
     flexDirection: "row",
