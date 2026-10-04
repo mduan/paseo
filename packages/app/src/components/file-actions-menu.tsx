@@ -2,6 +2,8 @@ import { Fragment, useMemo, type ReactElement } from "react";
 import { withUnistyles } from "react-native-unistyles";
 import {
   ArrowRightToLine,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Copy,
   CopyPlus,
   Download,
@@ -64,6 +66,8 @@ interface FileActionsContextMenuContentProps {
   onNewFile?: () => void;
   onNewFolder?: () => void;
   onCollapseFolder?: () => void;
+  onExpandAllSubfolders?: () => void;
+  onCollapseAllSubfolders?: () => void;
   onRename?: () => void;
   onDuplicate?: () => void;
   onRevert?: () => void;
@@ -91,6 +95,8 @@ export function FileActionsContextMenuContent({
   onNewFile,
   onNewFolder,
   onCollapseFolder,
+  onExpandAllSubfolders,
+  onCollapseAllSubfolders,
   onRename,
   onDuplicate,
   onRevert,
@@ -103,7 +109,7 @@ export function FileActionsContextMenuContent({
       fileKind === "directory" && onOpenInEditor && editorTargetName
         ? {
             key: "open-in-editor",
-            group: "open",
+            group: "reference",
             label: t("workspace.fileActions.openIn", { target: editorTargetName }),
             icon: ExternalLink,
             onSelect: onOpenInEditor,
@@ -141,6 +147,18 @@ export function FileActionsContextMenuContent({
             onSelect: onCollapseFolder,
           }
         : null,
+      optionalFileAction(fileKind === "directory", onExpandAllSubfolders, {
+        key: "expand-all-subfolders",
+        group: "open",
+        label: t("workspace.fileActions.expandAllSubfolders"),
+        icon: ChevronsUpDown,
+      }),
+      optionalFileAction(fileKind === "directory", onCollapseAllSubfolders, {
+        key: "collapse-all-subfolders",
+        group: "open",
+        label: t("workspace.fileActions.collapseAllSubfolders"),
+        icon: ChevronsDownUp,
+      }),
       availableFile && onOpenFile
         ? {
             key: "open-file",
@@ -150,7 +168,6 @@ export function FileActionsContextMenuContent({
             onSelect: onOpenFile,
           }
         : null,
-      openInEditorAction,
       optionalFileAction(availableFile, onOpenToSide, {
         key: "open-to-side",
         group: "open",
@@ -184,6 +201,7 @@ export function FileActionsContextMenuContent({
             onSelect: onReveal,
           }
         : null,
+      openInEditorAction,
       availableFile && onDownload
         ? {
             key: "download",
@@ -252,12 +270,14 @@ export function FileActionsContextMenuContent({
     fileExists,
     fileKind,
     onAddToChat,
+    onCollapseAllSubfolders,
     onCollapseFolder,
     onCopyPath,
     onCopyRelativePath,
     onDelete,
     onDownload,
     onDuplicate,
+    onExpandAllSubfolders,
     onNewFile,
     onNewFolder,
     onOpenFile,

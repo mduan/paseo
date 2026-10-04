@@ -63,9 +63,9 @@ import {
   buildSuggestedParentDirectories,
   filterAddProjectHosts,
   joinDirectoryPath,
-  pathBaseName,
   type AddProjectMethodId,
 } from "@/add-project-flow/options";
+import { pathBaseName } from "@/utils/path";
 import {
   buildProjectPickerOptions,
   type ProjectPickerOption,

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ExplorerEntry } from "@/stores/session-store";
 import {
   MAX_AUTO_EXPANDED_DIRECTORY_DEPTH,
+  expandDirectoryTree,
+  explorerAncestorPaths,
   flattenExplorerTree,
   reconcileRestoredExpandedPaths,
   restoreExpandedDirectories,
@@ -110,7 +112,7 @@ describe("file explorer tree", () => {
     const requestedPaths: string[] = [];
     const expandedPaths = await restoreExpandedDirectories({
       rootDirectory,
-      persistedExpandedPaths: new Set(paths),
+      persistedExpandedPaths: new Set([".", ...paths]),
       showHiddenFiles: true,
       requestDirectoryListing: async (path) => {
         requestedPaths.push(path);
@@ -132,7 +134,7 @@ describe("file explorer tree", () => {
 
     const expandedPaths = await restoreExpandedDirectories({
       rootDirectory,
-      persistedExpandedPaths: new Set(["parent/child", "parent/child/grandchild"]),
+      persistedExpandedPaths: new Set([".", "parent/child", "parent/child/grandchild"]),
       showHiddenFiles: true,
       requestDirectoryListing: async (path) => {
         requestedPaths.push(path);
@@ -142,6 +144,46 @@ describe("file explorer tree", () => {
 
     expect(requestedPaths).toEqual([]);
     expect(expandedPaths).toEqual(["."]);
+  });
+
+  it("keeps a collapsed root collapsed when restoring", async () => {
+    const expandedPaths = await restoreExpandedDirectories({
+      rootDirectory: { path: ".", entries: [makeDirectoryEntry("parent", "parent")] },
+      persistedExpandedPaths: new Set(["parent"]),
+      showHiddenFiles: true,
+      requestDirectoryListing: async (path) => ({ path, entries: [] }),
+    });
+
+    expect(expandedPaths).toEqual(["parent"]);
+  });
+
+  it("lists the ancestors a revealed path needs expanded", () => {
+    expect(explorerAncestorPaths("a/b/c.ts")).toEqual([".", "a", "a/b"]);
+    expect(explorerAncestorPaths("c.ts")).toEqual(["."]);
+  });
+
+  it("expands a directory tree level by level, skipping hidden directories", async () => {
+    const directories = new Map<string, { path: string; entries: ExplorerEntry[] }>([
+      [
+        "src",
+        {
+          path: "src",
+          entries: [makeDirectoryEntry("a", "src/a"), makeDirectoryEntry(".cache", "src/.cache")],
+        },
+      ],
+      ["src/a", { path: "src/a", entries: [makeDirectoryEntry("b", "src/a/b")] }],
+      ["src/a/b", { path: "src/a/b", entries: [] }],
+    ]);
+    const levels: string[][] = [];
+
+    await expandDirectoryTree({
+      rootPath: "src",
+      showHiddenFiles: false,
+      requestDirectoryListing: async (path) => directories.get(path) ?? null,
+      onLevelListed: (paths) => levels.push(paths),
+    });
+
+    expect(levels).toEqual([["src"], ["src/a"], ["src/a/b"]]);
   });
 
   it("preserves expansion changes made while persisted directories are restoring", () => {
@@ -183,7 +225,7 @@ describe("file explorer tree", () => {
 
     const restoration = showHiddenFilesAndRestoreExpandedDirectories({
       rootDirectory,
-      persistedExpandedPaths: new Set([".hidden"]),
+      persistedExpandedPaths: new Set([".", ".hidden"]),
       showHiddenFiles: () => {
         hiddenFilesAreShown = true;
       },
