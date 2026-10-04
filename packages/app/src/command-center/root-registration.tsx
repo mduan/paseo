@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   CalendarClock,
   CircleDashed,
+  Columns3,
   Folder,
   FolderPlus,
   History,
@@ -13,11 +14,13 @@ import {
   PanelLeft,
   Plus,
   Settings,
+  SunMoon,
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
 import { getIsElectronRuntime, useIsCompactFormFactor } from "@/constants/layout";
 import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-overrides";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
+import { useAppSettings } from "@/hooks/use-settings";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
@@ -25,6 +28,7 @@ import { resolveShortcutKeysForAction } from "@/keyboard/keyboard-shortcuts";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { usePanelStore } from "@/stores/panel-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { getNextThemePreference } from "@/styles/theme";
 import { clearCommandCenterFocusRestoreElement } from "@/utils/command-center-focus-restore";
 import {
   buildOpenProjectRoute,
@@ -60,6 +64,12 @@ const ThemedCircleDashed = withUnistyles(CircleDashed, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 const ThemedPanelLeft = withUnistyles(PanelLeft, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+const ThemedColumns3 = withUnistyles(Columns3, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+const ThemedSunMoon = withUnistyles(SunMoon, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
@@ -107,6 +117,14 @@ function PanelLeftIcon({ size }: CommandCenterIconProps) {
   return <ThemedPanelLeft size={size} strokeWidth={2.2} />;
 }
 
+function BothSidebarsIcon({ size }: CommandCenterIconProps) {
+  return <ThemedColumns3 size={size} strokeWidth={2.2} />;
+}
+
+function ThemeIcon({ size }: CommandCenterIconProps) {
+  return <ThemedSunMoon size={size} strokeWidth={2.2} />;
+}
+
 export function CommandCenterRootActions() {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const { t } = useTranslation();
@@ -127,6 +145,8 @@ export function CommandCenterRootActions() {
   const toggleMobileAgentList = usePanelStore((state) => state.toggleMobileAgentList);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
   const toggleAgentList = isCompact ? toggleMobileAgentList : toggleDesktopAgentList;
+  const { settings, updateSettings } = useAppSettings();
+  const theme = settings.theme;
   const shortcutPlatform = useMemo(
     () => ({ isMac: getShortcutOs() === "mac", isDesktop: getIsElectronRuntime() }),
     [],
@@ -293,6 +313,49 @@ export function CommandCenterRootActions() {
             undefined,
         },
       },
+      {
+        id: "toggle-both-sidebars",
+        group: "actions",
+        groupRank: 0,
+        rank: 9,
+        keywords: ["toggle", "sidebars", "both", "panels", "explorer"],
+        visibility: "query",
+        run: () => {
+          clearCommandCenterFocusRestoreElement();
+          // Same fallback as the shortcut: off a workspace route there is only the agent list.
+          if (!keyboardActionDispatcher.dispatch({ id: "sidebar.toggle.both", scope: "sidebar" })) {
+            toggleAgentList();
+          }
+        },
+        presentation: {
+          kind: "action",
+          title: t("settings.shortcuts.help.toggleBothSidebars"),
+          sectionTitle: t("shell.commandCenter.actions"),
+          icon: BothSidebarsIcon,
+          shortcutKeys:
+            resolveShortcutKeysForAction("toggle-both-sidebars", overrides, shortcutPlatform) ??
+            undefined,
+        },
+      },
+      {
+        id: "cycle-theme",
+        group: "actions",
+        groupRank: 0,
+        rank: 10,
+        keywords: ["theme", "cycle", "appearance", "dark", "light"],
+        visibility: "query",
+        run: () => {
+          void updateSettings({ theme: getNextThemePreference(theme) });
+        },
+        presentation: {
+          kind: "action",
+          title: t("settings.shortcuts.help.cycleTheme"),
+          sectionTitle: t("shell.commandCenter.actions"),
+          icon: ThemeIcon,
+          shortcutKeys:
+            resolveShortcutKeysForAction("cycle-theme", overrides, shortcutPlatform) ?? undefined,
+        },
+      },
     ];
 
     if (shortcutsAvailable) {
@@ -345,7 +408,9 @@ export function CommandCenterRootActions() {
     shortcutPlatform,
     shortcutsAvailable,
     t,
+    theme,
     toggleAgentList,
+    updateSettings,
   ]);
 
   useCommandCenterActions({ sourceId: "root", enabled: true, actions });

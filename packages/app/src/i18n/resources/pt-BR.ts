@@ -2350,6 +2350,7 @@ export const ptBR: TranslationResources = {
         archiveWorkspace: "Arquivar workspace",
         newTab: "Nova aba",
         closeCurrentTab: "Fechar aba atual",
+        renameTab: "Renomear aba",
         jumpToWorkspace: "Ir para workspace",
         jumpToTab: "Ir para aba",
         previousWorkspace: "Workspace anterior",

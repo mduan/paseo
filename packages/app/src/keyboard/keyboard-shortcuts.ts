@@ -217,6 +217,7 @@ const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
   "workspace-tab-target-changes": "workspace.tabs.actions.changes",
   "workspace-tab-target-files": "workspace.tabs.actions.files",
   "workspace-tab-close-current": "settings.shortcuts.help.closeCurrentTab",
+  "workspace-tab-rename": "settings.shortcuts.help.renameTab",
   "workspace-jump-index": "settings.shortcuts.help.jumpToWorkspace",
   "workspace-tab-jump-index": "settings.shortcuts.help.jumpToTab",
   "workspace-prev": "settings.shortcuts.help.previousWorkspace",
@@ -388,10 +389,12 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   },
 
   // --- Rename ---
+  // Rename workspace moved from Alt+R to Alt+E and Rename tab from Alt+E to Alt+R. The binding ids
+  // keep their original key names because user shortcut overrides are keyed by binding id.
   {
     id: "workspace-rename-cmd-alt-r-mac",
     action: "workspace.rename",
-    combo: "Cmd+Alt+R",
+    combo: "Cmd+Alt+E",
     when: { mac: true, commandCenter: false },
     help: {
       id: "rename-workspace",
@@ -402,7 +405,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-rename-ctrl-alt-r-non-mac",
     action: "workspace.rename",
-    combo: "Ctrl+Alt+R",
+    combo: "Ctrl+Alt+E",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "rename-workspace",
@@ -413,7 +416,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-cmd-alt-e-mac",
     action: "workspace.tab.rename",
-    combo: "Cmd+Alt+E",
+    combo: "Cmd+Alt+R",
     when: { mac: true, commandCenter: false },
     help: {
       id: "workspace-tab-rename",
@@ -424,7 +427,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-ctrl-alt-e-non-mac",
     action: "workspace.tab.rename",
-    combo: "Ctrl+Alt+E",
+    combo: "Ctrl+Alt+R",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "workspace-tab-rename",

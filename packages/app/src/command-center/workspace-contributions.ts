@@ -57,6 +57,16 @@ export interface WorkspaceCommandCenterLabels {
   unpin: string;
   showSetup: string;
   labelsGroup: string;
+  newTab: string;
+  searchFiles: string;
+  previousWorkspace: string;
+  nextWorkspace: string;
+  focusMessageInput: string;
+  cycleAgentMode: string;
+  toggleVoiceMode: string;
+  toggleDictation: string;
+  interruptAgent: string;
+  toggleVoiceMute: string;
 }
 
 export interface WorkspaceCommandCenterIcons {
@@ -86,6 +96,16 @@ export interface WorkspaceCommandCenterIcons {
   showSetup?: CommandCenterIcon;
   toggleFocusMode?: CommandCenterIcon;
   label?: CommandCenterIcon;
+  newTab?: CommandCenterIcon;
+  searchFiles?: CommandCenterIcon;
+  previousWorkspace?: CommandCenterIcon;
+  nextWorkspace?: CommandCenterIcon;
+  messageInput?: CommandCenterIcon;
+  agentMode?: CommandCenterIcon;
+  voice?: CommandCenterIcon;
+  dictation?: CommandCenterIcon;
+  interrupt?: CommandCenterIcon;
+  voiceMute?: CommandCenterIcon;
   git?(action: GitAction): CommandCenterIcon | undefined;
 }
 
@@ -104,6 +124,27 @@ export interface WorkspaceCommandCenterShortcuts {
   pinWorkspace?: ShortcutKey[][];
   renameWorkspace?: ShortcutKey[][];
   renameTab?: ShortcutKey[][];
+  newTab?: ShortcutKey[][];
+  newBrowser?: ShortcutKey[][];
+  changes?: ShortcutKey[][];
+  files?: ShortcutKey[][];
+  searchFiles?: ShortcutKey[][];
+  previousWorkspace?: ShortcutKey[][];
+  nextWorkspace?: ShortcutKey[][];
+  focusPaneLeft?: ShortcutKey[][];
+  focusPaneRight?: ShortcutKey[][];
+  focusPaneUp?: ShortcutKey[][];
+  focusPaneDown?: ShortcutKey[][];
+  moveTabLeft?: ShortcutKey[][];
+  moveTabRight?: ShortcutKey[][];
+  moveTabUp?: ShortcutKey[][];
+  moveTabDown?: ShortcutKey[][];
+  focusMessageInput?: ShortcutKey[][];
+  cycleAgentMode?: ShortcutKey[][];
+  toggleVoiceMode?: ShortcutKey[][];
+  toggleDictation?: ShortcutKey[][];
+  interruptAgent?: ShortcutKey[][];
+  toggleVoiceMute?: ShortcutKey[][];
 }
 
 export interface WorkspaceCommandCenterSource {
@@ -136,6 +177,8 @@ export interface WorkspaceCommandCenterSource {
   copyPath(): void;
   copyBranchName(): void;
   toggleLabel(name: string, assigned: boolean): void | Promise<void>;
+  searchFiles(): void;
+  navigateWorkspace(delta: 1 | -1): void;
 }
 
 function buildGitContribution(
@@ -209,9 +252,20 @@ function buildPanelContributions(
     target: WorkspacePanelTarget;
     name: string;
     icon?: CommandCenterIcon;
+    shortcutKeys?: ShortcutKey[][];
   }> = [
-    { target: "changes", name: source.labels.changes, icon: source.icons.changes },
-    { target: "files", name: source.labels.files, icon: source.icons.files },
+    {
+      target: "changes",
+      name: source.labels.changes,
+      icon: source.icons.changes,
+      shortcutKeys: source.shortcuts.changes,
+    },
+    {
+      target: "files",
+      name: source.labels.files,
+      icon: source.icons.files,
+      shortcutKeys: source.shortcuts.files,
+    },
     {
       target: "pull-request",
       name: source.labels.pullRequest,
@@ -227,6 +281,7 @@ function buildPanelContributions(
         title: source.labels.openPanel(panel.name, "supporting"),
         keywords: ["open", panel.target, "tab", "supporting"],
         icon: panel.icon,
+        shortcutKeys: panel.shortcutKeys,
         action: {
           id: "workspace.tab.open",
           scope: "workspace",
@@ -421,6 +476,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.focusPaneLeft,
       keywords: ["pane", "focus", "left"],
       icon: source.icons.focusPane,
+      shortcutKeys: source.shortcuts.focusPaneLeft,
       action: { id: "workspace.pane.focus.left", scope: "workspace" },
     },
     {
@@ -429,6 +485,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.focusPaneRight,
       keywords: ["pane", "focus", "right"],
       icon: source.icons.focusPane,
+      shortcutKeys: source.shortcuts.focusPaneRight,
       action: { id: "workspace.pane.focus.right", scope: "workspace" },
     },
     {
@@ -437,6 +494,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.focusPaneUp,
       keywords: ["pane", "focus", "up"],
       icon: source.icons.focusPane,
+      shortcutKeys: source.shortcuts.focusPaneUp,
       action: { id: "workspace.pane.focus.up", scope: "workspace" },
     },
     {
@@ -445,6 +503,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.focusPaneDown,
       keywords: ["pane", "focus", "down"],
       icon: source.icons.focusPane,
+      shortcutKeys: source.shortcuts.focusPaneDown,
       action: { id: "workspace.pane.focus.down", scope: "workspace" },
     },
     {
@@ -453,6 +512,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.moveTabLeft,
       keywords: ["pane", "tab", "move", "left"],
       icon: source.icons.moveTab,
+      shortcutKeys: source.shortcuts.moveTabLeft,
       action: { id: "workspace.pane.move-tab.left", scope: "workspace" },
     },
     {
@@ -461,6 +521,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.moveTabRight,
       keywords: ["pane", "tab", "move", "right"],
       icon: source.icons.moveTab,
+      shortcutKeys: source.shortcuts.moveTabRight,
       action: { id: "workspace.pane.move-tab.right", scope: "workspace" },
     },
     {
@@ -469,6 +530,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.moveTabUp,
       keywords: ["pane", "tab", "move", "up"],
       icon: source.icons.moveTab,
+      shortcutKeys: source.shortcuts.moveTabUp,
       action: { id: "workspace.pane.move-tab.up", scope: "workspace" },
     },
     {
@@ -477,6 +539,7 @@ function buildPaneContributions(source: WorkspaceCommandCenterSource): CommandCe
       title: source.labels.moveTabDown,
       keywords: ["pane", "tab", "move", "down"],
       icon: source.icons.moveTab,
+      shortcutKeys: source.shortcuts.moveTabDown,
       action: { id: "workspace.pane.move-tab.down", scope: "workspace" },
     },
     {
@@ -567,6 +630,7 @@ function buildCreationContributions(
         title: source.labels.newBrowser,
         keywords: ["browser", "web", "preview"],
         icon: source.icons.newBrowser,
+        shortcutKeys: source.shortcuts.newBrowser,
         action: { id: "workspace.browser.new", scope: "workspace" },
       }),
     );
@@ -699,9 +763,126 @@ export function buildWorkspaceCommandCenterContributions(
     );
   }
 
-  contributions.push(...buildLabelContributions(source));
+  contributions.push(
+    ...buildNavigationContributions(source),
+    ...buildAgentInputContributions(source),
+    ...buildLabelContributions(source),
+  );
 
   return contributions;
+}
+
+function buildNavigationContributions(
+  source: WorkspaceCommandCenterSource,
+): CommandCenterContribution[] {
+  return [
+    buildQueryAction(source, {
+      id: "tab:new",
+      rank: 70,
+      title: source.labels.newTab,
+      keywords: ["tab", "new", "open", "launcher"],
+      icon: source.icons.newTab,
+      shortcutKeys: source.shortcuts.newTab,
+      action: { id: "workspace.tab.menu.open", scope: "workspace" },
+    }),
+    buildWorkspaceCallback({
+      source,
+      id: "workspace:search-files",
+      rank: 71,
+      title: source.labels.searchFiles,
+      keywords: ["search", "files", "find", "open", "file"],
+      icon: source.icons.searchFiles,
+      shortcutKeys: source.shortcuts.searchFiles,
+      run: source.searchFiles,
+      visibility: "query",
+    }),
+    buildWorkspaceCallback({
+      source,
+      id: "workspace:previous",
+      rank: 72,
+      title: source.labels.previousWorkspace,
+      keywords: ["workspace", "previous", "switch", "navigate"],
+      icon: source.icons.previousWorkspace,
+      shortcutKeys: source.shortcuts.previousWorkspace,
+      run: () => source.navigateWorkspace(-1),
+      visibility: "query",
+    }),
+    buildWorkspaceCallback({
+      source,
+      id: "workspace:next",
+      rank: 73,
+      title: source.labels.nextWorkspace,
+      keywords: ["workspace", "next", "switch", "navigate"],
+      icon: source.icons.nextWorkspace,
+      shortcutKeys: source.shortcuts.nextWorkspace,
+      run: () => source.navigateWorkspace(1),
+      visibility: "query",
+    }),
+  ];
+}
+
+// The composer of the focused agent tab handles these, so they only make sense on an agent tab.
+function buildAgentInputContributions(
+  source: WorkspaceCommandCenterSource,
+): CommandCenterContribution[] {
+  if (source.activeTabKind !== "agent") return [];
+  const agentInputActions: QueryActionInput[] = [
+    {
+      id: "agent-input:focus",
+      rank: 74,
+      title: source.labels.focusMessageInput,
+      keywords: ["focus", "message", "input", "composer", "prompt"],
+      icon: source.icons.messageInput,
+      shortcutKeys: source.shortcuts.focusMessageInput,
+      action: { id: "message-input.focus", scope: "message-input" },
+    },
+    {
+      id: "agent-input:mode-cycle",
+      rank: 75,
+      title: source.labels.cycleAgentMode,
+      keywords: ["agent", "mode", "cycle", "switch"],
+      icon: source.icons.agentMode,
+      shortcutKeys: source.shortcuts.cycleAgentMode,
+      action: { id: "message-input.mode-cycle", scope: "message-input" },
+    },
+    {
+      id: "agent-input:voice-toggle",
+      rank: 76,
+      title: source.labels.toggleVoiceMode,
+      keywords: ["voice", "mode", "toggle", "talk"],
+      icon: source.icons.voice,
+      shortcutKeys: source.shortcuts.toggleVoiceMode,
+      action: { id: "message-input.voice-toggle", scope: "message-input" },
+    },
+    {
+      id: "agent-input:dictation-toggle",
+      rank: 77,
+      title: source.labels.toggleDictation,
+      keywords: ["dictation", "dictate", "speech", "microphone"],
+      icon: source.icons.dictation,
+      shortcutKeys: source.shortcuts.toggleDictation,
+      action: { id: "message-input.dictation-toggle", scope: "message-input" },
+    },
+    {
+      id: "agent-input:interrupt",
+      rank: 78,
+      title: source.labels.interruptAgent,
+      keywords: ["interrupt", "stop", "cancel", "agent"],
+      icon: source.icons.interrupt,
+      shortcutKeys: source.shortcuts.interruptAgent,
+      action: { id: "agent.interrupt", scope: "global" },
+    },
+    {
+      id: "agent-input:voice-mute-toggle",
+      rank: 79,
+      title: source.labels.toggleVoiceMute,
+      keywords: ["voice", "mute", "unmute", "microphone"],
+      icon: source.icons.voiceMute,
+      shortcutKeys: source.shortcuts.toggleVoiceMute,
+      action: { id: "message-input.voice-mute-toggle", scope: "message-input" },
+    },
+  ];
+  return agentInputActions.map((action) => buildQueryAction(source, action));
 }
 
 /**

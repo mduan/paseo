@@ -1,9 +1,12 @@
 import { useCallback, useMemo, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ArrowDown,
   ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  AudioLines,
   Columns2,
   Copy,
   Files,
@@ -13,13 +16,20 @@ import {
   GitPullRequest,
   Globe,
   ListChecks,
+  MessageSquare,
+  Mic,
+  MicOff,
   Move,
   PanelRight,
   Pencil,
   Pin,
   PinOff,
+  Plus,
+  Repeat,
   RotateCw,
   Rows2,
+  Search,
+  Square,
   SquarePen,
   SquareTerminal,
   X,
@@ -34,7 +44,11 @@ import { useToast } from "@/contexts/toast-context";
 import { type ShortcutOverrides } from "@/keyboard/keyboard-shortcuts";
 import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import { useHostFeature } from "@/runtime/host-features";
-import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
+import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
+import {
+  navigateToWorkspace,
+  useActiveWorkspaceSelection,
+} from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceDirectory, useWorkspaceFields } from "@/stores/session-store-hooks";
 import {
   collectAllTabs,
@@ -44,6 +58,7 @@ import {
 import { shouldShowWorkspaceSetup, useWorkspaceSetupStore } from "@/stores/workspace-setup-store";
 import { clearCommandCenterFocusRestoreElement } from "@/utils/command-center-focus-restore";
 import { getShortcutOs } from "@/utils/shortcut-platform";
+import { getRelativeSidebarShortcutTarget } from "@/utils/sidebar-shortcuts";
 import {
   buildWorkspaceLabelPickerRows,
   useWorkspaceLabelProjection,
@@ -88,6 +103,16 @@ const WORKSPACE_COMMAND_CENTER_ICONS = {
   unpin: getCommandCenterIcon(PinOff),
   showSetup: getCommandCenterIcon(ListChecks),
   toggleFocusMode: getCommandCenterIcon(Focus),
+  newTab: getCommandCenterIcon(Plus),
+  searchFiles: getCommandCenterIcon(Search),
+  previousWorkspace: getCommandCenterIcon(ArrowUp),
+  nextWorkspace: getCommandCenterIcon(ArrowDown),
+  messageInput: getCommandCenterIcon(MessageSquare),
+  agentMode: getCommandCenterIcon(Repeat),
+  voice: getCommandCenterIcon(AudioLines),
+  dictation: getCommandCenterIcon(Mic),
+  interrupt: getCommandCenterIcon(Square),
+  voiceMute: getCommandCenterIcon(MicOff),
 };
 
 const OPEN_PANEL_LABEL_KEYS = {
@@ -102,6 +127,12 @@ function staticIcon(element: ReactElement | undefined): CommandCenterIcon | unde
     return element;
   }
   return StaticIcon;
+}
+
+// The palette closes before it runs a result. Reopen it on the next tick, so it opens again with
+// an empty query in the files scope instead of keeping the query that found this entry.
+function searchFiles() {
+  setTimeout(() => useKeyboardShortcutsStore.getState().setCommandCenterOpen(true, "files"), 0);
 }
 
 function resolveWorkspaceShortcuts(overrides: ShortcutOverrides): WorkspaceCommandCenterShortcuts {
@@ -231,6 +262,20 @@ export function useWorkspaceCommandCenterActions(): void {
 
   const { labelCatalog, toggleLabel } = useWorkspaceLabelCatalog(serverId, fields);
 
+  const navigateWorkspace = useCallback(
+    (delta: 1 | -1) => {
+      const target = getRelativeSidebarShortcutTarget({
+        targets: useKeyboardShortcutsStore.getState().sidebarShortcutWorkspaceTargets,
+        currentTarget: serverId && workspaceId ? { serverId, workspaceId } : null,
+        delta,
+      });
+      if (target) {
+        navigateToWorkspace({ serverId: target.serverId, workspaceId: target.workspaceId });
+      }
+    },
+    [serverId, workspaceId],
+  );
+
   const actions = useMemo(
     () =>
       buildWorkspaceCommandCenterContributions({
@@ -249,7 +294,7 @@ export function useWorkspaceCommandCenterActions(): void {
           previousTab: t("settings.shortcuts.help.previousTab"),
           nextTab: t("settings.shortcuts.help.nextTab"),
           closeCurrentTab: t("settings.shortcuts.help.closeCurrentTab"),
-          renameTab: t("workspace.tabs.menu.rename"),
+          renameTab: t("settings.shortcuts.help.renameTab"),
           reloadAgent: t("workspace.tabs.menu.reloadAgent"),
           copyResumeCommand: t("workspace.tabs.menu.copyResumeCommand"),
           copyAgentId: t("workspace.tabs.menu.copyAgentId"),
@@ -277,6 +322,16 @@ export function useWorkspaceCommandCenterActions(): void {
           unpin: t("sidebar.workspace.actions.unpin"),
           showSetup: t("workspace.header.actions.showSetup"),
           labelsGroup: t("workspaceLabels.title"),
+          newTab: t("settings.shortcuts.help.newTab"),
+          searchFiles: t("settings.shortcuts.help.searchFiles"),
+          previousWorkspace: t("settings.shortcuts.help.previousWorkspace"),
+          nextWorkspace: t("settings.shortcuts.help.nextWorkspace"),
+          focusMessageInput: t("settings.shortcuts.help.focusMessageInput"),
+          cycleAgentMode: t("settings.shortcuts.help.cycleAgentMode"),
+          toggleVoiceMode: t("settings.shortcuts.help.toggleVoiceMode"),
+          toggleDictation: t("settings.shortcuts.help.startStopDictation"),
+          interruptAgent: t("settings.shortcuts.help.interruptAgent"),
+          toggleVoiceMute: t("settings.shortcuts.help.muteUnmuteVoiceMode"),
         },
         icons: {
           ...WORKSPACE_COMMAND_CENTER_ICONS,
@@ -304,6 +359,8 @@ export function useWorkspaceCommandCenterActions(): void {
         copyPath,
         copyBranchName,
         toggleLabel,
+        searchFiles,
+        navigateWorkspace,
       }),
     [
       activeTabIndex,
@@ -320,6 +377,7 @@ export function useWorkspaceCommandCenterActions(): void {
       isPinned,
       keyboardActionDispatcher,
       labelCatalog,
+      navigateWorkspace,
       overrides,
       runGitAction,
       t,
