@@ -2,6 +2,25 @@
 
 All workspaces share one version and release together.
 
+## Fork CLI release
+
+This fork publishes one npm package, `@mduan/paseo-cli`, and none of the `@getpaseo/*` packages. Remote hosts install it with `npm install -g`. The daemon self-update and the Remote SSH Update action in Host settings both install `@mduan/paseo-cli@latest`. The workspace packages keep their `@getpaseo/*` names and ship inside the tarball as bundled dependencies. `scripts/pack-fork-cli.mjs` explains the npm behaviors that shape the tarball.
+
+Fork versions use the form `X.Y.Z-fork.N`. The app treats a daemon whose version contains `-fork` as a fork daemon. Any other version on a Remote SSH host gets the SSH install path.
+
+```bash
+# Set the next fork version in every workspace and the lockfile.
+npm pkg set version=0.11.0-fork.2 && npm run version:sync-internal && npm install
+# Build the server stack and daemon web UI, then pack dist/fork-cli/mduan-paseo-cli-<version>.tgz.
+npm run release:fork:cli
+# Publish the printed tarball. npm requires the explicit tag for prerelease versions.
+npm publish dist/fork-cli/mduan-paseo-cli-0.11.0-fork.2.tgz --access public --tag latest
+```
+
+`npm run release:fork:cli -- --publish` packs and publishes in one step. `--skip-build` repacks the current build output.
+
+The rest of this document covers upstream `@getpaseo/*` releases.
+
 ## Two steps
 
 A release has exactly two steps. The agent does the first, the user authorizes the second.
