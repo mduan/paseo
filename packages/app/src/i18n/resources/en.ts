@@ -2075,6 +2075,17 @@ export const en = {
         description:
           "Show the files each turn changed, and add Last Turn and Chat Session to Changes",
       },
+      usageAutoRefresh: {
+        title: "Usage auto-refresh",
+        description: "How often the sidebar's usage summary fetches fresh numbers",
+        options: {
+          manual: "Manual only",
+          "5m": "Every 5 minutes",
+          "15m": "Every 15 minutes",
+          "30m": "Every 30 minutes",
+          "1h": "Every hour",
+        },
+      },
       showWork: "Show work",
       hideWork: "Hide work",
       gitWorktree: "Git worktree",
