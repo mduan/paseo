@@ -16,18 +16,20 @@
 // Usage: node scripts/pack-fork-cli.mjs [--skip-build] [--skip-web-ui] [--publish]
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import semver from "semver";
 import { isMainModule } from "./is-main-module.mjs";
 
-export const FORK_CLI_PACKAGE = "@mduan/paseo-cli";
+const FORK_CLI_PACKAGE = "@mduan/paseo-cli";
 const WORKSPACE_CLI_PACKAGE = "@getpaseo/cli";
 const FORK_VERSION_PATTERN = /^\d+\.\d+\.\d+-fork\.\d+$/;
 const USAGE = "Usage: node scripts/pack-fork-cli.mjs [--skip-build] [--skip-web-ui] [--publish]\n";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
+// The repo root declares no semver dependency; the server does.
+const semver = createRequire(path.join(rootDir, "packages", "server", "package.json"))("semver");
 const outDir = path.join(rootDir, "dist", "fork-cli");
 const stageDir = path.join(outDir, "stage");
 const tarballDir = path.join(outDir, "workspace-tarballs");
