@@ -3,9 +3,10 @@ import { buildReviewableDiffTargetKey } from "@/utils/diff-layout";
 import type { ReviewLineRange } from "./range";
 import type { ReviewDraftComment } from "./store";
 
-// Two body lines (15px font, 1.4 line height) plus the card's border.
-export const INLINE_REVIEW_COMMENT_HEIGHT = 44;
-export const INLINE_REVIEW_EDITOR_HEIGHT = 132;
+// One body line (15px font, 1.4 line height), the card's border, and 6px above and below.
+export const INLINE_REVIEW_COMMENT_HEIGHT = 36;
+/** The editor's height with a one-line input, reserved until it reports its laid-out height. */
+export const INLINE_REVIEW_EDITOR_HEIGHT = 105;
 export const INLINE_REVIEW_GAP = 6;
 export const INLINE_REVIEW_VERTICAL_PADDING = 4;
 
@@ -17,6 +18,8 @@ export interface InlineReviewEditorState {
   body: string;
   /** Bumped to move focus back into the open editor. */
   focusRequestId: number;
+  /** The editor's laid-out height; it grows with its text. */
+  height?: number;
 }
 
 export interface InlineReviewActions {
@@ -31,6 +34,7 @@ export interface InlineReviewActions {
   onStartHighlightComment: () => void;
   onEditComment: (target: ReviewableDiffTarget, comment: ReviewDraftComment) => void;
   onEditorBodyChange: (body: string) => void;
+  onEditorHeightChange: (height: number) => void;
   onCancelEditor: () => void;
   onSaveEditor: (body: string) => void;
   onDeleteComment: (id: string) => void;
@@ -81,7 +85,7 @@ export function getInlineReviewThreadState(input: {
 
   const height =
     visibleCommentCount * INLINE_REVIEW_COMMENT_HEIGHT +
-    editorCount * INLINE_REVIEW_EDITOR_HEIGHT +
+    editorCount * (editorForTarget?.height ?? INLINE_REVIEW_EDITOR_HEIGHT) +
     Math.max(0, visibleBlockCount - 1) * INLINE_REVIEW_GAP +
     INLINE_REVIEW_VERTICAL_PADDING * 2;
   return { comments, hasEditor, editingCommentId, height };

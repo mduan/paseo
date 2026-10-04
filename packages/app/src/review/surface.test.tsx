@@ -156,6 +156,7 @@ function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): Inlin
     onStartHighlightComment: vi.fn(),
     onEditComment: vi.fn(),
     onEditorBodyChange: vi.fn(),
+    onEditorHeightChange: vi.fn(),
     onCancelEditor: vi.fn(),
     onSaveEditor: vi.fn(),
     onDeleteComment: vi.fn(),
@@ -424,7 +425,16 @@ describe("git diff inline review helpers", () => {
 
     expect(rowState?.left).toBeNull();
     expect(rowState?.right?.comments).toEqual([rightComment]);
-    expect(rowState?.height).toBe(190);
+    expect(rowState?.height).toBe(155);
+  });
+
+  it("reserves the editor's laid-out height once it reports one", () => {
+    const reviewTarget = target();
+    const actions = buildReviewActions({
+      editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0, height: 300 },
+    });
+
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(308);
   });
 
   it("includes thread padding in the inline editor height", () => {
@@ -433,7 +443,7 @@ describe("git diff inline review helpers", () => {
       editor: { target: reviewTarget, commentId: null, body: "", focusRequestId: 0 },
     });
 
-    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(140);
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(113);
   });
 
   it("pins no-wrap review threads to the visible diff viewport", () => {
@@ -543,6 +553,7 @@ describe("InlineReviewEditor", () => {
         initialBody=" initial "
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -566,6 +577,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={onCancel}
         onSave={onSave}
         testID="editor"
@@ -588,6 +600,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={vi.fn()}
         onSave={vi.fn()}
         testID="editor"
@@ -618,6 +631,7 @@ describe("InlineReviewEditor", () => {
         initialBody="ready"
         focusRequestId={0}
         onChangeBody={vi.fn()}
+        onHeightChange={vi.fn()}
         onCancel={vi.fn()}
         onSave={vi.fn()}
         testID="editor"
@@ -666,7 +680,7 @@ describe("InlineReviewThread", () => {
       commentsByTarget: groupInlineReviewCommentsByTarget([comment()]),
     });
     const { getByText } = render(
-      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={52} />,
+      <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={44} />,
     );
 
     const card = getByText("Please simplify this.").parentElement!;

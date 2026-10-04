@@ -6,6 +6,7 @@ import {
   Pressable,
   type PressableStateCallbackType,
   Text,
+  type LayoutChangeEvent,
   type TextStyle,
   View,
   type StyleProp,
@@ -27,7 +28,6 @@ import { getShortcutOs } from "@/utils/shortcut-platform";
 import {
   editorLineRange,
   INLINE_REVIEW_COMMENT_HEIGHT,
-  INLINE_REVIEW_EDITOR_HEIGHT,
   INLINE_REVIEW_GAP,
   INLINE_REVIEW_VERTICAL_PADDING,
   isInlineReviewEditorForTarget,
@@ -62,6 +62,7 @@ function getWebTextInputElement(input: EditingTextInputHandle | null): HTMLEleme
 }
 
 export const SMALL_ACTION_HIT_SLOP = 8;
+const EDITOR_MAX_LINES = 30;
 const foregroundMutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const destructiveIconColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
 const accentForegroundIconColorMapping = (theme: Theme) => ({
@@ -226,6 +227,12 @@ export function useInlineReviewController(input: {
     editorBodyRef.current = body;
   }, []);
 
+  const handleEditorHeightChange = useCallback((height: number) => {
+    setEditor((current) =>
+      current && current.height !== height ? { ...current, height } : current,
+    );
+  }, []);
+
   const handleSaveEditor = useCallback(
     (body: string) => {
       if (editor && saveEditorBody(editor, body)) {
@@ -256,6 +263,7 @@ export function useInlineReviewController(input: {
       onStartHighlightComment: handleStartHighlightComment,
       onEditComment: handleEditComment,
       onEditorBodyChange: handleEditorBodyChange,
+      onEditorHeightChange: handleEditorHeightChange,
       onCancelEditor: closeEditor,
       onSaveEditor: handleSaveEditor,
       onDeleteComment: handleDeleteComment,
@@ -266,6 +274,7 @@ export function useInlineReviewController(input: {
       editor,
       handleDeleteComment,
       handleEditComment,
+      handleEditorHeightChange,
       handleEditorBodyChange,
       handleSaveEditor,
       handleStartComment,
@@ -414,6 +423,7 @@ export function InlineReviewThread({
       initialBody={editor.body}
       focusRequestId={editor.focusRequestId}
       onChangeBody={reviewActions.onEditorBodyChange}
+      onHeightChange={reviewActions.onEditorHeightChange}
       onCancel={reviewActions.onCancelEditor}
       onSave={reviewActions.onSaveEditor}
       testID="inline-review-editor"
@@ -475,7 +485,7 @@ function CommentRow({
 
   return (
     <View style={styles.commentBlock}>
-      <Text style={styles.commentBody} numberOfLines={2}>
+      <Text style={styles.commentBody} numberOfLines={1}>
         {comment.body}
       </Text>
       <View style={styles.commentActions}>
@@ -555,6 +565,7 @@ export function InlineReviewEditor({
   initialBody,
   focusRequestId,
   onChangeBody,
+  onHeightChange,
   onCancel,
   onSave,
   testID,
@@ -563,6 +574,8 @@ export function InlineReviewEditor({
   initialBody: string;
   focusRequestId: number;
   onChangeBody: (body: string) => void;
+  /** The thread reserves this height, so the input can grow with its text. */
+  onHeightChange: (height: number) => void;
   onCancel: () => void;
   onSave: (body: string) => void;
   testID?: string;
@@ -599,6 +612,9 @@ export function InlineReviewEditor({
     if (!element) {
       return;
     }
+    // Native multiline inputs grow with their text; a web textarea needs field-sizing.
+    // ponytail: Firefox lacks field-sizing, so there it stays one line and scrolls.
+    element.style.setProperty("field-sizing", "content");
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const hasModifier = event.shiftKey || event.altKey || event.metaKey || event.ctrlKey;
@@ -644,8 +660,13 @@ export function InlineReviewEditor({
     [isFocused],
   );
 
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => onHeightChange(event.nativeEvent.layout.height),
+    [onHeightChange],
+  );
+
   return (
-    <View style={styles.editorBlock} testID={testID}>
+    <View style={styles.editorBlock} onLayout={handleLayout} testID={testID}>
       <TextInput
         ref={inputRef}
         accessibilityLabel={t("review.comment.label")}
@@ -785,7 +806,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface3,
   },
   editorBlock: {
-    minHeight: INLINE_REVIEW_EDITOR_HEIGHT,
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
@@ -795,8 +815,12 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
   },
   editorInput: {
-    flex: 1,
-    minHeight: 0,
+    // One line to the max, plus padding and border.
+    minHeight: theme.fontSize.content * 1.4 + theme.spacing[2] * 2 + theme.borderWidth[1] * 2,
+    maxHeight:
+      theme.fontSize.content * 1.4 * EDITOR_MAX_LINES +
+      theme.spacing[2] * 2 +
+      theme.borderWidth[1] * 2,
     color: theme.colors.foreground,
     backgroundColor: theme.colors.surface1,
     borderWidth: theme.borderWidth[1],
