@@ -476,6 +476,7 @@ const styles = StyleSheet.create((theme) => ({
     borderBottomRightRadius: theme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 2,
     overflow: "hidden",
   },
   tabCloseButton: {
