@@ -2007,6 +2007,8 @@ export const en = {
     sessionCostEstimate: "Estimated at API list prices",
     sessionCostUnavailable: "Unavailable",
     sessionCostBeforeTurn: "(before this turn)",
+    sessionCostEstimated: "(est.)",
+    sessionCostEstimatedBeforeTurn: "(est., before this turn)",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

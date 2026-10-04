@@ -1095,16 +1095,31 @@ function isSameCostEstimate(left: CodexCostEstimate, right: CodexCostEstimate): 
   return left.status === right.status;
 }
 
-// Both cost fields are always written, undefined included, so the agent manager's usage merge on
+// All cost fields are always written, undefined included, so the agent manager's usage merge on
 // turn completion cannot keep a stale value from the previous state.
 function withCostEstimate(usage: AgentUsage, estimate: CodexCostEstimate): AgentUsage {
   switch (estimate.status) {
     case CodexCostStatus.Estimated:
-      return { ...usage, totalCostUsd: estimate.costUsd, totalCostUnavailable: false };
+      return {
+        ...usage,
+        totalCostUsd: estimate.costUsd,
+        totalCostUnavailable: false,
+        totalCostEstimated: true,
+      };
     case CodexCostStatus.Unavailable:
-      return { ...usage, totalCostUsd: undefined, totalCostUnavailable: true };
+      return {
+        ...usage,
+        totalCostUsd: undefined,
+        totalCostUnavailable: true,
+        totalCostEstimated: undefined,
+      };
     case CodexCostStatus.Pending:
-      return { ...usage, totalCostUsd: undefined, totalCostUnavailable: undefined };
+      return {
+        ...usage,
+        totalCostUsd: undefined,
+        totalCostUnavailable: undefined,
+        totalCostEstimated: undefined,
+      };
   }
 }
 

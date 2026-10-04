@@ -196,6 +196,8 @@ export interface AgentUsage {
   totalCostUsd?: number;
   /** The provider can estimate cost, but its price list could not be loaded. */
   totalCostUnavailable?: boolean;
+  /** Paseo priced the provider's token counts itself; the provider reports no cost. */
+  totalCostEstimated?: boolean;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
 }

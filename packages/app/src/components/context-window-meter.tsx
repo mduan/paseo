@@ -11,6 +11,8 @@ interface ContextWindowMeterProps {
   totalCostUsd?: number | null;
   /** The provider estimates cost but could not load its price list. */
   totalCostUnavailable?: boolean;
+  /** Paseo estimated the cost from token counts; the provider reports none. */
+  totalCostEstimated?: boolean;
   /** A turn is running, so the cost is the total before it. */
   costExcludesCurrentTurn?: boolean;
   showPercentage?: boolean;
@@ -94,11 +96,25 @@ function getMeterGeometry(showPercentage: boolean, glyphSize?: number) {
   };
 }
 
+function getSessionCostSuffix({
+  estimated,
+  excludesCurrentTurn,
+}: {
+  estimated: boolean;
+  excludesCurrentTurn: boolean;
+}) {
+  if (estimated && excludesCurrentTurn) return "contextWindow.sessionCostEstimatedBeforeTurn";
+  if (estimated) return "contextWindow.sessionCostEstimated";
+  if (excludesCurrentTurn) return "contextWindow.sessionCostBeforeTurn";
+  return undefined;
+}
+
 export function ContextWindowMeter({
   maxTokens,
   usedTokens,
   totalCostUsd,
   totalCostUnavailable = false,
+  totalCostEstimated = false,
   costExcludesCurrentTurn = false,
   showPercentage = false,
   pending = false,
@@ -147,6 +163,10 @@ export function ContextWindowMeter({
   const colors = getMeterColors(clampedPercentage, theme);
   const formattedSessionCost =
     typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null;
+  const sessionCostSuffix = getSessionCostSuffix({
+    estimated: totalCostEstimated,
+    excludesCurrentTurn: costExcludesCurrentTurn,
+  });
 
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile>
@@ -209,8 +229,8 @@ export function ContextWindowMeter({
             <>
               <Text style={styles.tooltipDetail}>
                 {t("contextWindow.sessionCost", {
-                  cost: costExcludesCurrentTurn
-                    ? `${formattedSessionCost} ${t("contextWindow.sessionCostBeforeTurn")}`
+                  cost: sessionCostSuffix
+                    ? `${formattedSessionCost} ${t(sessionCostSuffix)}`
                     : formattedSessionCost,
                 })}
               </Text>

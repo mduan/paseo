@@ -268,12 +268,14 @@ function buildRealtimeVoiceButtonStyle(
 function buildAgentStateSelector(serverId: string, agentId: string) {
   return (state: ReturnType<typeof useSessionStore.getState>) => {
     const agent = state.sessions[serverId]?.agents?.get(agentId) ?? null;
+    const usage = agent?.lastUsage ?? {};
     return {
       status: agent?.status ?? null,
-      contextWindowMaxTokens: agent?.lastUsage?.contextWindowMaxTokens ?? null,
-      contextWindowUsedTokens: agent?.lastUsage?.contextWindowUsedTokens ?? null,
-      totalCostUsd: agent?.lastUsage?.totalCostUsd ?? null,
-      totalCostUnavailable: agent?.lastUsage?.totalCostUnavailable ?? false,
+      contextWindowMaxTokens: usage.contextWindowMaxTokens ?? null,
+      contextWindowUsedTokens: usage.contextWindowUsedTokens ?? null,
+      totalCostUsd: usage.totalCostUsd ?? null,
+      totalCostUnavailable: usage.totalCostUnavailable ?? false,
+      totalCostEstimated: usage.totalCostEstimated ?? false,
       model: agent?.model ?? null,
     };
   };
@@ -284,6 +286,7 @@ function renderContextWindowMeter({
   contextWindowUsedTokens,
   totalCostUsd,
   totalCostUnavailable,
+  totalCostEstimated,
   costExcludesCurrentTurn,
   showPercentage,
   pending,
@@ -293,6 +296,7 @@ function renderContextWindowMeter({
   contextWindowUsedTokens: number | null;
   totalCostUsd: number | null;
   totalCostUnavailable: boolean;
+  totalCostEstimated: boolean;
   costExcludesCurrentTurn: boolean;
   showPercentage: boolean;
   pending: boolean;
@@ -308,6 +312,7 @@ function renderContextWindowMeter({
       usedTokens={contextWindowUsedTokens}
       totalCostUsd={totalCostUsd}
       totalCostUnavailable={totalCostUnavailable}
+      totalCostEstimated={totalCostEstimated}
       costExcludesCurrentTurn={costExcludesCurrentTurn}
       showPercentage={showPercentage}
       pending={pending}
@@ -2094,6 +2099,7 @@ function ComposerContentImpl({
         contextWindowUsedTokens,
         totalCostUsd: agentState.totalCostUsd,
         totalCostUnavailable: agentState.totalCostUnavailable,
+        totalCostEstimated: agentState.totalCostEstimated,
         // Providers report cost when a turn ends, so mid-turn it is the previous total.
         costExcludesCurrentTurn: isAgentRunning,
         showPercentage: false,
@@ -2105,6 +2111,7 @@ function ComposerContentImpl({
       contextWindowUsedTokens,
       agentState.totalCostUsd,
       agentState.totalCostUnavailable,
+      agentState.totalCostEstimated,
       isAgentRunning,
       contextWindowPending,
       contextWindowMeterGlyphSize,

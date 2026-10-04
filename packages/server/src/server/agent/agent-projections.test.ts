@@ -297,14 +297,15 @@ describe("toAgentPayload", () => {
     expect(permissionA.title).toBe("Run command");
   });
 
-  it("keeps the cost-unavailable flag in the usage payload", () => {
+  it("keeps the cost flags in the usage payload", () => {
     const agent = createManagedAgent({
-      lastUsage: { inputTokens: 10, totalCostUnavailable: true },
+      lastUsage: { inputTokens: 10, totalCostUnavailable: true, totalCostEstimated: false },
     });
 
     expect(toAgentPayload(agent).lastUsage).toEqual({
       inputTokens: 10,
       totalCostUnavailable: true,
+      totalCostEstimated: false,
     });
   });
 
