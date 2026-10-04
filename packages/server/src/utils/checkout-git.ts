@@ -2160,11 +2160,7 @@ export async function getCheckoutSnapshotFacts(
     context,
   ).catch(() => null);
   let comparisonBaseRef: string | null = null;
-  if (
-    resolvedBaseRef &&
-    inspected.currentBranch &&
-    branchNameFromRef(resolvedBaseRef) !== inspected.currentBranch
-  ) {
+  if (resolvedBaseRef && branchNameFromRef(resolvedBaseRef) !== inspected.currentBranch) {
     comparisonBaseRef = await resolveBestComparisonBaseRef(cwd, resolvedBaseRef, context).catch(
       () => null,
     );
@@ -2387,10 +2383,9 @@ export async function getCheckoutStatus(
   const baseRef = facts.resolvedBaseRef;
   const mainRepoRoot = facts.mainRepoRoot;
   const factsContext = { ...context, facts };
-  const aheadBehind =
-    baseRef && currentBranch
-      ? await getAheadBehind(cwd, baseRef, currentBranch, factsContext)
-      : null;
+  const aheadBehind = baseRef
+    ? await getAheadBehind(cwd, baseRef, currentBranch ?? "HEAD", factsContext)
+    : null;
   const upstreamStatus = facts.upstreamStatus;
   // The wire carries the display name: clients label the base with it and send it back to
   // request diffs and merges. The exact ref stays in worktree.json and in facts, where the
@@ -2666,10 +2661,8 @@ export async function listCheckoutCommits({
   cwd: string;
   context?: CheckoutContext;
 }): Promise<CheckoutCommitsResult> {
-  const currentBranch = await getCurrentBranch(cwd);
-  if (!currentBranch) {
-    return { baseRef: null, commits: [] };
-  }
+  // A detached HEAD still has commits ahead of its base; compare from HEAD itself.
+  const currentBranch = (await getCurrentBranch(cwd)) ?? "HEAD";
 
   const { resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
   const normalizedBaseRef = resolvedBaseRef ? branchNameFromRef(resolvedBaseRef) : null;
@@ -3090,8 +3083,8 @@ export async function getCheckoutRefDerivedState(
 
   let aheadBehind = current.aheadBehind;
   let diffStat = current.diffStat;
-  if (baseMoved && currentBranch && facts.resolvedBaseRef) {
-    aheadBehind = await getAheadBehind(cwd, facts.resolvedBaseRef, currentBranch, {
+  if (baseMoved && facts.resolvedBaseRef) {
+    aheadBehind = await getAheadBehind(cwd, facts.resolvedBaseRef, currentBranch ?? "HEAD", {
       ...context,
       facts,
     });
