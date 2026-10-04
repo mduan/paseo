@@ -581,7 +581,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[3],
   },
   tooltipIconSlot: {
-    marginRight: theme.spacing[2],
+    marginRight: theme.spacing[1],
     verticalAlign: "middle",
   },
   // Matches the workspace hover card's title.
