@@ -374,12 +374,13 @@ function SessionRowHoverTarget({
           maxWidth={360}
           style={styles.tooltipCard}
         >
-          <View style={styles.tooltipHeader}>
+          {/* The icon sits inline in the title so a wrapping name continues under it. */}
+          <Text style={styles.tooltipTitle}>
             <View style={styles.tooltipIconSlot}>
               <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
             </View>
-            <Text style={styles.tooltipTitle}>{presentation.label}</Text>
-          </View>
+            {presentation.label}
+          </Text>
           {row.target.kind === "agent" ? (
             <>
               <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
@@ -579,20 +580,12 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
   },
-  tooltipHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: theme.spacing[2],
-  },
-  // One title line tall, so the icon centers on the first line of a wrapping name.
   tooltipIconSlot: {
-    height: TOOLTIP_TITLE_LINE_HEIGHT,
-    justifyContent: "center",
+    marginRight: theme.spacing[2],
+    verticalAlign: "middle",
   },
   // Matches the workspace hover card's title.
   tooltipTitle: {
-    flex: 1,
-    minWidth: 0,
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     lineHeight: TOOLTIP_TITLE_LINE_HEIGHT,
