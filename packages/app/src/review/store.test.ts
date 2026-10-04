@@ -302,6 +302,21 @@ describe("buildReviewAttachmentSnapshot", () => {
     });
   });
 
+  it("forwards a file-view comment's source and stores it through the schema", () => {
+    const fileComment = makeComment({ context: storedContext, source: "file" });
+    expect(
+      SerializedReviewDraftStateSchema.safeParse({ drafts: { k: [fileComment] } }).success,
+    ).toBe(true);
+    const snapshot = buildReviewAttachmentSnapshot({
+      reviewDraftKey: "review:key",
+      cwd: "/repo",
+      mode: "base",
+      comments: [fileComment, makeComment({ id: "diff", context: storedContext })],
+    });
+    expect(snapshot?.attachment.comments[0]?.source).toBe("file");
+    expect(snapshot?.attachment.comments[1]).not.toHaveProperty("source");
+  });
+
   it("falls back to the stored line for a comment saved without context", () => {
     const snapshot = buildReviewAttachmentSnapshot({
       reviewDraftKey: "review:key",

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { ReviewAttachmentCommentSchema } from "@getpaseo/protocol/messages";
+import {
+  ReviewAttachmentCommentSchema,
+  ReviewCommentSourceSchema,
+} from "@getpaseo/protocol/messages";
 
 export type ReviewDraftMode = "uncommitted" | "base";
 export type ReviewDraftSide = "old" | "new";
@@ -19,6 +22,8 @@ export interface ReviewDraftComment {
   content?: string;
   /** Lines around the range, captured by the viewer the comment was made in. */
   context?: ReviewDraftCommentContext;
+  /** Absent for diff comments; "file" when made in the file viewer. */
+  source?: z.infer<typeof ReviewCommentSourceSchema>;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +48,7 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   startLineNumber: z.number().int().positive().optional(),
   content: z.string().optional(),
   context: ReviewDraftCommentContextSchema.optional(),
+  source: ReviewCommentSourceSchema.optional(),
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,

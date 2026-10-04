@@ -117,6 +117,7 @@ function createDraftComment(input: ReviewDraftCommentInput): ReviewDraftComment 
     startLineNumber: input.startLineNumber,
     ...(input.content !== undefined ? { content: input.content } : {}),
     ...(input.context ? { context: input.context } : {}),
+    ...(input.source ? { source: input.source } : {}),
     body: input.body,
     createdAt: input.createdAt ?? now,
     updatedAt: input.updatedAt ?? input.createdAt ?? now,
@@ -188,6 +189,7 @@ export function buildReviewAttachmentSnapshot(
       startSide: draftComment.startSide,
       startLineNumber: draftComment.startLineNumber,
       body: draftComment.body,
+      ...(draftComment.source ? { source: draftComment.source } : {}),
       context,
     });
   }

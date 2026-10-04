@@ -100,8 +100,10 @@ export function useInlineReviewController(input: {
   reviewDraftKey: string;
   /** Surrounding lines for a new comment, read from the viewer it is made in. */
   buildContext: (range: ReviewLineRange) => ReviewDraftCommentContext | undefined;
+  /** Set on new comments; absent means the diff viewer. */
+  source?: ReviewDraftComment["source"];
 }): InlineReviewActions {
-  const { buildContext } = input;
+  const { buildContext, source } = input;
   const reviewComments = useReviewDraftComments(input.reviewDraftKey);
   const commentsByTarget = useMemo(
     () => groupInlineReviewCommentsByTarget(reviewComments),
@@ -144,13 +146,14 @@ export function useInlineReviewController(input: {
             startLineNumber: current.start?.lineNumber,
             content: current.target.content,
             context: buildContext(editorLineRange(current)),
+            source,
             body: trimmedBody,
           },
         });
       }
       return true;
     },
-    [addComment, buildContext, input.reviewDraftKey, updateComment],
+    [addComment, buildContext, input.reviewDraftKey, source, updateComment],
   );
 
   const openEditor = useCallback(

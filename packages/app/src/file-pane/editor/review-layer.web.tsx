@@ -64,6 +64,7 @@ export function FileReviewLayer({ view, review }: { view: EditorView; review: Fi
   const actions = useInlineReviewController({
     reviewDraftKey: review.reviewDraftKey,
     buildContext,
+    source: "file",
   });
   const actionsRef = useRef(actions);
   actionsRef.current = actions;

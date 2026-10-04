@@ -1139,6 +1139,8 @@ export const ReviewAttachmentContextLineSchema = z.object({
   content: z.string(),
 });
 
+export const ReviewCommentSourceSchema = z.enum(["diff", "file"]);
+
 export const ReviewAttachmentCommentSchema = z.object({
   filePath: z.string(),
   side: z.enum(["old", "new"]),
@@ -1147,6 +1149,8 @@ export const ReviewAttachmentCommentSchema = z.object({
   startSide: z.enum(["old", "new"]).optional(),
   startLineNumber: z.number().int().positive().optional(),
   body: z.string(),
+  // Where the comment was made; absent means "diff". "file" context lines are whole-file excerpts.
+  source: ReviewCommentSourceSchema.optional(),
   context: z.object({
     hunkHeader: z.string(),
     targetLine: ReviewAttachmentContextLineSchema,
