@@ -63,6 +63,7 @@ function getWebTextInputElement(input: EditingTextInputHandle | null): HTMLEleme
 
 export const SMALL_ACTION_HIT_SLOP = 8;
 const EDITOR_MAX_LINES = 30;
+const COMMENT_MAX_LINES = 30;
 const foregroundMutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const destructiveIconColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
 const accentForegroundIconColorMapping = (theme: Theme) => ({
@@ -112,6 +113,9 @@ export function useInlineReviewController(input: {
   );
   const [editor, setEditor] = useState<InlineReviewEditorState | null>(null);
   const [highlight, setHighlight] = useState<ReviewLineRange>();
+  const [commentHeights, setCommentHeights] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
   // The editor owns its text; this mirror lets opening another editor save it first.
   const editorBodyRef = useRef("");
   const addComment = useReviewDraftStore((state) => state.addComment);
@@ -227,6 +231,13 @@ export function useInlineReviewController(input: {
     editorBodyRef.current = body;
   }, []);
 
+  // ponytail: heights of deleted comments stay in the map; they are a few numbers per session.
+  const handleCommentHeightChange = useCallback((id: string, height: number) => {
+    setCommentHeights((current) =>
+      current.get(id) === height ? current : new Map(current).set(id, height),
+    );
+  }, []);
+
   const handleEditorHeightChange = useCallback((height: number) => {
     setEditor((current) =>
       current && current.height !== height ? { ...current, height } : current,
@@ -255,6 +266,7 @@ export function useInlineReviewController(input: {
   return useMemo<InlineReviewActions>(
     () => ({
       commentsByTarget,
+      commentHeights,
       editor,
       highlight,
       onHighlight: setHighlight,
@@ -264,17 +276,20 @@ export function useInlineReviewController(input: {
       onEditComment: handleEditComment,
       onEditorBodyChange: handleEditorBodyChange,
       onEditorHeightChange: handleEditorHeightChange,
+      onCommentHeightChange: handleCommentHeightChange,
       onCancelEditor: closeEditor,
       onSaveEditor: handleSaveEditor,
       onDeleteComment: handleDeleteComment,
     }),
     [
       closeEditor,
+      commentHeights,
       commentsByTarget,
       editor,
       handleDeleteComment,
       handleEditComment,
       handleEditorHeightChange,
+      handleCommentHeightChange,
       handleEditorBodyChange,
       handleSaveEditor,
       handleStartComment,
@@ -452,6 +467,7 @@ export function InlineReviewThread({
             reviewTarget={reviewTarget}
             onEditComment={reviewActions.onEditComment}
             onDeleteComment={reviewActions.onDeleteComment}
+            onHeightChange={reviewActions.onCommentHeightChange}
           />
         );
       })}
@@ -465,13 +481,19 @@ function CommentRow({
   reviewTarget,
   onEditComment,
   onDeleteComment,
+  onHeightChange,
 }: {
   comment: ReviewDraftComment;
   reviewTarget: ReviewableDiffTarget;
   onEditComment: (target: ReviewableDiffTarget, comment: ReviewDraftComment) => void;
   onDeleteComment: (id: string) => void;
+  onHeightChange: (id: string, height: number) => void;
 }) {
   const { t } = useTranslation();
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => onHeightChange(comment.id, event.nativeEvent.layout.height),
+    [onHeightChange, comment.id],
+  );
   const handleEdit = useCallback(
     () => onEditComment(reviewTarget, comment),
     [onEditComment, reviewTarget, comment],
@@ -484,8 +506,8 @@ function CommentRow({
   );
 
   return (
-    <View style={styles.commentBlock}>
-      <Text style={styles.commentBody} numberOfLines={1}>
+    <View style={styles.commentBlock} onLayout={handleLayout}>
+      <Text style={styles.commentBody} numberOfLines={COMMENT_MAX_LINES}>
         {comment.body}
       </Text>
       <View style={styles.commentActions}>
@@ -756,8 +778,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Fixed to the reserved row height so the diff layout and the card agree.
   commentBlock: {
-    height: INLINE_REVIEW_COMMENT_HEIGHT,
-    overflow: "hidden",
+    minHeight: INLINE_REVIEW_COMMENT_HEIGHT,
+    paddingVertical: theme.spacing[1.5],
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,

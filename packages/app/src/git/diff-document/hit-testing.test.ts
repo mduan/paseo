@@ -313,6 +313,7 @@ function reviewActionsForFirstAddition(): NonNullable<
   };
   return {
     commentsByTarget: new Map(),
+    commentHeights: new Map(),
     editor: { target, commentId: null, body: "", focusRequestId: 0 },
   };
 }

@@ -3,7 +3,7 @@ import { buildReviewableDiffTargetKey } from "@/utils/diff-layout";
 import type { ReviewLineRange } from "./range";
 import type { ReviewDraftComment } from "./store";
 
-// One body line (15px font, 1.4 line height), the card's border, and 6px above and below.
+/** A one-line comment card, reserved until the card reports its laid-out height. */
 export const INLINE_REVIEW_COMMENT_HEIGHT = 36;
 /** The editor's height with a one-line input, reserved until it reports its laid-out height. */
 export const INLINE_REVIEW_EDITOR_HEIGHT = 105;
@@ -24,6 +24,8 @@ export interface InlineReviewEditorState {
 
 export interface InlineReviewActions {
   commentsByTarget: ReadonlyMap<string, ReviewDraftComment[]>;
+  /** Laid-out comment card heights by comment id; cards grow with their text. */
+  commentHeights: ReadonlyMap<string, number>;
   editor: InlineReviewEditorState | null;
   /** Highlighted diff lines; the open editor's range or a gutter selection. */
   highlight?: ReviewLineRange;
@@ -35,13 +37,17 @@ export interface InlineReviewActions {
   onEditComment: (target: ReviewableDiffTarget, comment: ReviewDraftComment) => void;
   onEditorBodyChange: (body: string) => void;
   onEditorHeightChange: (height: number) => void;
+  onCommentHeightChange: (id: string, height: number) => void;
   onCancelEditor: () => void;
   onSaveEditor: (body: string) => void;
   onDeleteComment: (id: string) => void;
 }
 
 /** The review state that shapes diff layout; the highlight and callbacks only repaint. */
-export type InlineReviewGeometry = Pick<InlineReviewActions, "commentsByTarget" | "editor">;
+export type InlineReviewGeometry = Pick<
+  InlineReviewActions,
+  "commentsByTarget" | "commentHeights" | "editor"
+>;
 
 export function editorLineRange(editor: InlineReviewEditorState): ReviewLineRange {
   return { start: editor.start ?? editor.target, end: editor.target };
@@ -76,15 +82,18 @@ export function getInlineReviewThreadState(input: {
     : null;
   const hasEditor = editorForTarget !== null;
   const editingCommentId = editorForTarget?.commentId ?? null;
-  const editingExisting =
-    editingCommentId !== null && comments.some((comment) => comment.id === editingCommentId);
-  const visibleCommentCount = editingExisting ? comments.length - 1 : comments.length;
+  const visibleComments = comments.filter((comment) => comment.id !== editingCommentId);
+  const visibleCommentCount = visibleComments.length;
   const editorCount = hasEditor ? 1 : 0;
   const visibleBlockCount = visibleCommentCount + editorCount;
   if (visibleBlockCount === 0) return null;
 
   const height =
-    visibleCommentCount * INLINE_REVIEW_COMMENT_HEIGHT +
+    visibleComments.reduce(
+      (total, comment) =>
+        total + (reviewActions.commentHeights.get(comment.id) ?? INLINE_REVIEW_COMMENT_HEIGHT),
+      0,
+    ) +
     editorCount * (editorForTarget?.height ?? INLINE_REVIEW_EDITOR_HEIGHT) +
     Math.max(0, visibleBlockCount - 1) * INLINE_REVIEW_GAP +
     INLINE_REVIEW_VERTICAL_PADDING * 2;

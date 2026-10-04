@@ -118,7 +118,7 @@ export function fileReviewHighlightLines(input: {
  */
 export function fileReviewThreads(input: {
   filePath: string;
-  actions: Pick<InlineReviewActions, "commentsByTarget" | "editor">;
+  actions: Pick<InlineReviewActions, "commentsByTarget" | "commentHeights" | "editor">;
   doc: Text;
 }): FileReviewThread[] {
   const lineNumbers = new Set<number>();

@@ -116,7 +116,7 @@ describe("fileReviewThreads", () => {
     ]);
     const threads = fileReviewThreads({
       filePath: FILE,
-      actions: { commentsByTarget, editor: editorAt(1) },
+      actions: { commentsByTarget, commentHeights: new Map(), editor: editorAt(1) },
       doc,
     });
     expect(threads.map((thread) => thread.target.lineNumber)).toEqual([1, 4]);

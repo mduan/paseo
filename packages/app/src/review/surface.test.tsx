@@ -149,6 +149,7 @@ const COMMENT_LIST: ReviewDraftComment[] = [comment()];
 function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): InlineReviewActions {
   return {
     commentsByTarget: new Map(),
+    commentHeights: new Map(),
     editor: null,
     onHighlight: vi.fn(),
     onToggleHighlight: vi.fn(),
@@ -157,6 +158,7 @@ function buildReviewActions(overrides: Partial<InlineReviewActions> = {}): Inlin
     onEditComment: vi.fn(),
     onEditorBodyChange: vi.fn(),
     onEditorHeightChange: vi.fn(),
+    onCommentHeightChange: vi.fn(),
     onCancelEditor: vi.fn(),
     onSaveEditor: vi.fn(),
     onDeleteComment: vi.fn(),
@@ -437,6 +439,17 @@ describe("git diff inline review helpers", () => {
     expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(308);
   });
 
+  it("reserves a comment card's laid-out height once it reports one", () => {
+    const reviewTarget = target();
+    const saved = comment();
+    const actions = buildReviewActions({
+      commentsByTarget: groupInlineReviewCommentsByTarget([saved]),
+      commentHeights: new Map([[saved.id, 120]]),
+    });
+
+    expect(getInlineReviewThreadState({ reviewTarget, reviewActions: actions })?.height).toBe(128);
+  });
+
   it("includes thread padding in the inline editor height", () => {
     const reviewTarget = target();
     const actions = buildReviewActions({
@@ -674,17 +687,21 @@ describe("InlineReviewThread", () => {
     expect(actions.onDeleteComment).toHaveBeenCalledWith("comment-1");
   });
 
-  it("renders each saved comment card at the height the diff layout reserves for it", () => {
+  it("keeps multiline comment text and starts each card at the one-line reservation", () => {
     const reviewTarget = target();
     const actions = buildReviewActions({
-      commentsByTarget: groupInlineReviewCommentsByTarget([comment()]),
+      commentsByTarget: groupInlineReviewCommentsByTarget([comment({ body: "line 1\nline 2" })]),
     });
     const { getByText } = render(
       <InlineReviewThread reviewTarget={reviewTarget} reviewActions={actions} height={44} />,
     );
 
-    const card = getByText("Please simplify this.").parentElement!;
-    expect(getComputedStyle(card).height).toBe(`${INLINE_REVIEW_COMMENT_HEIGHT}px`);
+    const body = getByText(/line 1/);
+    expect(body.textContent).toBe("line 1\nline 2");
+    expect(getComputedStyle(body).whiteSpace).not.toBe("nowrap");
+    expect(getComputedStyle(body.parentElement!).minHeight).toBe(
+      `${INLINE_REVIEW_COMMENT_HEIGHT}px`,
+    );
   });
 
   it("labels single-line and range comments and the editor by side and line", () => {

@@ -360,10 +360,20 @@ export function reviewGeometryKey(
 ): string {
   if (!reviewActions) return "";
   const comments = [...reviewActions.commentsByTarget.entries()]
-    .map(([target, targetComments]) => [target, targetComments.map((comment) => comment.id).sort()])
+    .map(([target, targetComments]) => [
+      target,
+      targetComments
+        .map((comment) => [comment.id, reviewActions.commentHeights.get(comment.id) ?? null])
+        .sort(),
+    ])
     .sort(([left], [right]) => String(left).localeCompare(String(right)));
+  // Cards and the editor grow with their text, so their heights shape layout too.
   const editor = reviewActions.editor
-    ? [reviewActions.editor.target.key, reviewActions.editor.commentId]
+    ? [
+        reviewActions.editor.target.key,
+        reviewActions.editor.commentId,
+        reviewActions.editor.height ?? null,
+      ]
     : null;
   return JSON.stringify([comments, editor]);
 }

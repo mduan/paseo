@@ -101,11 +101,15 @@ export function FileReviewLayer({ view, review }: { view: EditorView; review: Fi
     return () => view.dispatch({ effects: fileReviewCompartment.reconfigure([]) });
   }, [view]);
 
-  const { commentsByTarget, editor, highlight } = actions;
+  const { commentsByTarget, commentHeights, editor, highlight } = actions;
   const threads = useMemo(
     () =>
-      fileReviewThreads({ filePath, actions: { commentsByTarget, editor }, doc: view.state.doc }),
-    [commentsByTarget, editor, filePath, view],
+      fileReviewThreads({
+        filePath,
+        actions: { commentsByTarget, commentHeights, editor },
+        doc: view.state.doc,
+      }),
+    [commentHeights, commentsByTarget, editor, filePath, view],
   );
   // One host per thread for as long as the thread exists, whether or not CodeMirror shows it.
   const [hostCache] = useState(() => new Map<string, HTMLElement>());

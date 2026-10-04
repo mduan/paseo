@@ -8,10 +8,12 @@ import {
   measureFragments,
   resolveScrollAnchor,
   resolveRelayoutScrollTop,
+  reviewGeometryKey,
   shouldApplyRelayoutScroll,
 } from "./model";
 import type { BuildDiffDocumentModelInput, TextMeasurer } from "./types";
 import { DiffGapDirection } from "@/git/diff-gaps";
+import type { ReviewableDiffTarget } from "@/utils/diff-layout";
 
 const measurer: TextMeasurer = { measure: (text) => Array.from(text).length * 10 };
 
@@ -72,6 +74,41 @@ function input(overrides: Partial<BuildDiffDocumentModelInput> = {}): BuildDiffD
 }
 
 describe("diff document model", () => {
+  it("keys review geometry on the editor's and comment cards' laid-out heights", () => {
+    const target: ReviewableDiffTarget = {
+      key: "src/a.ts:new:1",
+      filePath: "src/a.ts",
+      hunkHeader: "@@ -1 +1 @@",
+      hunkIndex: 0,
+      lineIndex: 0,
+      oldLineNumber: null,
+      newLineNumber: 1,
+      side: "new",
+      lineNumber: 1,
+      lineType: "add",
+      content: "a",
+    };
+    const actions = reviewActionsWithEditor(target);
+    const key = reviewGeometryKey(actions);
+
+    expect(reviewGeometryKey({ ...actions, editor: { ...actions.editor!, height: 200 } })).not.toBe(
+      key,
+    );
+    const comment = {
+      id: "c1",
+      filePath: target.filePath,
+      side: target.side,
+      lineNumber: target.lineNumber,
+      body: "a\nb",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const withComment = { ...actions, commentsByTarget: new Map([[target.key, [comment]]]) };
+    expect(reviewGeometryKey({ ...withComment, commentHeights: new Map([["c1", 57]]) })).not.toBe(
+      reviewGeometryKey(withComment),
+    );
+  });
+
   it("replaces hunk headers with expandable gap separators", () => {
     const expandable: ParsedDiffFile = {
       ...file(),
@@ -411,6 +448,7 @@ describe("diff document model", () => {
       input({
         reviewActions: {
           commentsByTarget: new Map(),
+          commentHeights: new Map(),
           editor: {
             target: {
               key: "src/a.ts:old:1",
@@ -824,6 +862,7 @@ function reviewActionsWithEditor(
 ): NonNullable<BuildDiffDocumentModelInput["reviewActions"]> {
   return {
     commentsByTarget: new Map(),
+    commentHeights: new Map(),
     editor: target ? { target, body: "", commentId: null, focusRequestId: 0 } : null,
   };
 }
