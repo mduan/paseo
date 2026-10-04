@@ -227,7 +227,15 @@ function CommitDiffPanel() {
   return (
     <View style={styles.container} testID="commit-diff-panel">
       {panelPreferences.canUseSplitLayout ? (
-        <PaneContentToolbar style={styles.toolbar} testID="commit-diff-header">
+        <PaneContentToolbar
+          style={[
+            styles.toolbar,
+            {
+              paddingRight: paneContentToolbarTrailingPadding(panelPreferences.isCompact, "glyph"),
+            },
+          ]}
+          testID="commit-diff-header"
+        >
           <View style={styles.toolbarActions} testID="commit-diff-toolbar">
             <DiffLayoutToggle
               layout={panelPreferences.preferences.layout}
