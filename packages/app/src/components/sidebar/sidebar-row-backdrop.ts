@@ -15,14 +15,18 @@ export function getSidebarRowBackdrop({
   isPressed = false,
   selected = false,
   isHovered = false,
+  groupSelected = false,
 }: {
   isDragging?: boolean;
   isPressed?: boolean;
   selected?: boolean;
   isHovered?: boolean;
+  /** The row heads the focused workspace group, which paints its own background. */
+  groupSelected?: boolean;
 }): SidebarSurfaceBackdrop {
   if (isDragging || isPressed) return "surface2";
   if (selected) return "surfaceSidebarSelected";
+  if (groupSelected) return "surfaceSidebarGroupSelected";
   if (isHovered) return "surfaceSidebarHover";
   return "surfaceSidebar";
 }

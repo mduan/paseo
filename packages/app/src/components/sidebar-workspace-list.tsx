@@ -1138,6 +1138,7 @@ function WorkspaceRowInner({
           isPressed,
           selected: rowSelected,
           isHovered: isRowHovered,
+          groupSelected,
         });
         return (
           <View

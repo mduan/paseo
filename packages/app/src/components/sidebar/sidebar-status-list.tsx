@@ -864,6 +864,7 @@ function StatusWorkspaceRowInnerContent({
           isPressed,
           selected: rowSelected,
           isHovered: isRowHovered,
+          groupSelected,
         });
         return (
           <View
