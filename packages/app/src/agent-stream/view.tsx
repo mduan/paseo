@@ -1901,7 +1901,10 @@ function StreamItemWrapper({
   // The toggle moves between the final message and the first work row, which take different
   // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
   const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
-  const marginBottom = isAboveWorkToggle ? 0 : gapBelow;
+  const gap = isAboveWorkToggle ? 0 : gapBelow;
+  // Response rows take the gap as padding inside their hover target, so the pointer stays over
+  // the response between paragraphs.
+  const marginBottom = responseMessageId ? 0 : gap;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],
@@ -1910,7 +1913,9 @@ function StreamItemWrapper({
     <View style={wrapperStyle}>
       <WorkToggleButton itemId={itemId} />
       {responseMessageId ? (
-        <ResponseHoverTarget messageId={responseMessageId}>{children}</ResponseHoverTarget>
+        <ResponseHoverTarget messageId={responseMessageId} paddingBottom={gap}>
+          {children}
+        </ResponseHoverTarget>
       ) : (
         children
       )}
@@ -1919,7 +1924,15 @@ function StreamItemWrapper({
 }
 
 // Wraps only the row's content, so hovering the "Worked for" toggle above it does not count.
-function ResponseHoverTarget({ messageId, children }: { messageId: string; children: ReactNode }) {
+function ResponseHoverTarget({
+  messageId,
+  paddingBottom,
+  children,
+}: {
+  messageId: string;
+  paddingBottom: number;
+  children: ReactNode;
+}) {
   const handlePointerEnter = useCallback(
     () => useHoveredResponseStore.setState({ messageId }),
     [messageId],
@@ -1929,12 +1942,9 @@ function ResponseHoverTarget({ messageId, children }: { messageId: string; child
       useHoveredResponseStore.setState({ messageId: undefined });
     }
   }, [messageId]);
+  const style = useMemo(() => [stylesheet.responseHoverTarget, { paddingBottom }], [paddingBottom]);
   return (
-    <View
-      style={stylesheet.responseHoverTarget}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-    >
+    <View style={style} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       {children}
     </View>
   );

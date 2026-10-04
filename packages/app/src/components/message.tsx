@@ -591,9 +591,13 @@ interface AssistantTurnFooterProps {
 }
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
+  // Reaches up over the turn footer row's top margin, so no dead gap sits between the
+  // response and its footer.
   hoverTarget: {
     position: "relative",
     flex: 1,
+    marginTop: -theme.spacing[1],
+    paddingTop: theme.spacing[1],
   },
   actions: {
     flexDirection: "row",
