@@ -522,6 +522,11 @@ export const ru: TranslationResources = {
         noFiles: "Нет файлов",
         noVisibleFiles: "Нет видимых файлов",
       },
+      search: {
+        placeholder: "Поиск файлов",
+        clear: "Очистить поиск",
+        noResults: "Нет подходящих файлов",
+      },
       states: {
         unavailable: "Рабочее пространство недоступно",
         loading: "Загрузка файлов...",

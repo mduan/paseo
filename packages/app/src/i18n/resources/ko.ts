@@ -518,6 +518,11 @@ export const ko: TranslationResources = {
         noFiles: "파일 없음",
         noVisibleFiles: "표시되는 파일이 없습니다.",
       },
+      search: {
+        placeholder: "파일 검색",
+        clear: "검색 지우기",
+        noResults: "일치하는 파일이 없습니다.",
+      },
       states: {
         unavailable: "워크스페이스를 사용할 수 없습니다",
         loading: "파일 불러오는 중...",

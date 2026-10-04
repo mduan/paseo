@@ -47,15 +47,17 @@ function describeFileEntries(
   return entries.map(({ path }) => describeWorkspaceFilePath(path));
 }
 
-export function useWorkspaceFileSearch(input: { enabled: boolean; query: string }): {
+export function useWorkspaceFileSearch(input: {
+  serverId: string | null;
+  workspaceId: string | null;
+  enabled: boolean;
+  query: string;
+}): {
   entries: readonly WorkspaceFileSearchEntry[];
   loading: boolean;
   error: string | null;
-  openFile(path: string): void;
 } {
-  const selection = useActiveWorkspaceSelection();
-  const serverId = selection?.serverId ?? null;
-  const workspaceId = selection?.workspaceId ?? null;
+  const { serverId, workspaceId } = input;
   const cwd = useWorkspaceDirectory(serverId, workspaceId);
   const client = useSessionStore((state) =>
     serverId ? (state.sessions[serverId]?.client ?? null) : null,
@@ -124,6 +126,24 @@ export function useWorkspaceFileSearch(input: { enabled: boolean; query: string 
     };
   }, [client, cwd, input.query, requestKey, sourceKey]);
 
+  return {
+    entries: requestKey && state.sourceKey === sourceKey ? state.entries : [],
+    loading: Boolean(requestKey) && (state.requestKey !== requestKey || state.loading),
+    error: state.requestKey === requestKey ? state.error : null,
+  };
+}
+
+export function useActiveWorkspaceFileSearch(input: { enabled: boolean; query: string }): {
+  entries: readonly WorkspaceFileSearchEntry[];
+  loading: boolean;
+  error: string | null;
+  openFile(path: string): void;
+} {
+  const selection = useActiveWorkspaceSelection();
+  const serverId = selection?.serverId ?? null;
+  const workspaceId = selection?.workspaceId ?? null;
+  const search = useWorkspaceFileSearch({ serverId, workspaceId, ...input });
+
   const openFile = useCallback(
     (path: string) => {
       if (!serverId || !workspaceId) return;
@@ -146,10 +166,5 @@ export function useWorkspaceFileSearch(input: { enabled: boolean; query: string 
     [serverId, workspaceId],
   );
 
-  return {
-    entries: requestKey && state.sourceKey === sourceKey ? state.entries : [],
-    loading: Boolean(requestKey) && (state.requestKey !== requestKey || state.loading),
-    error: state.requestKey === requestKey ? state.error : null,
-    openFile,
-  };
+  return { ...search, openFile };
 }

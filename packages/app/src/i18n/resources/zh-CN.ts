@@ -517,6 +517,11 @@ export const zhCN: TranslationResources = {
         noFiles: "没有文件",
         noVisibleFiles: "没有可见文件",
       },
+      search: {
+        placeholder: "搜索文件",
+        clear: "清除搜索",
+        noResults: "没有匹配的文件",
+      },
       states: {
         unavailable: "Workspace 不可用",
         loading: "正在加载文件...",

@@ -69,7 +69,7 @@ import {
   type CommandCenterSearchFields,
   type CommandCenterWorkspaceResult,
 } from "./results";
-import { useWorkspaceFileSearch } from "./workspace-file-search";
+import { useActiveWorkspaceFileSearch } from "./workspace-file-search";
 
 const ThemedBottomSheetTextInput = withUnistyles(TextInput, (theme) => ({
   placeholderTextColor: theme.colors.foregroundMuted,
@@ -254,7 +254,7 @@ function useCommandCenterState(): CommandCenterState {
     loading: fileSearchLoading,
     error: fileSearchError,
     openFile,
-  } = useWorkspaceFileSearch({
+  } = useActiveWorkspaceFileSearch({
     enabled: open && (scope === "files" || Boolean(query.trim())),
     query,
   });

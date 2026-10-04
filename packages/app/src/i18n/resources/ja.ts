@@ -523,6 +523,11 @@ export const ja: TranslationResources = {
         noFiles: "ファイルなし",
         noVisibleFiles: "表示可能なファイルなし",
       },
+      search: {
+        placeholder: "ファイルを検索",
+        clear: "検索をクリア",
+        noResults: "一致するファイルなし",
+      },
       states: {
         unavailable: "ワークスペースが利用できません",
         loading: "ファイルを読み込み中...",

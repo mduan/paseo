@@ -514,6 +514,11 @@ export const en = {
         noFiles: "No files",
         noVisibleFiles: "No visible files",
       },
+      search: {
+        placeholder: "Search files",
+        clear: "Clear search",
+        noResults: "No matching files",
+      },
       states: {
         unavailable: "Workspace is unavailable",
         loading: "Loading files...",
