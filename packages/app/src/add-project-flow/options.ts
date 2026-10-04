@@ -3,6 +3,7 @@ import {
   parseGitHubRemoteUrl,
   parseGitRemoteLocation,
 } from "@getpaseo/protocol/git-remote";
+import { pathBaseName } from "@/utils/path";
 import { shortenPath } from "@/utils/shorten-path";
 import type { AddProjectHost, GithubRepositoryChoice } from "./model";
 
@@ -79,12 +80,6 @@ function githubMethodDescription(host: AddProjectHost): string {
     return "Search projects available to your GitHub account";
   }
   return "Enter a GitHub URL or owner/repo";
-}
-
-export function pathBaseName(path: string): string {
-  const trimmed = path.replace(/[\\/]+$/, "");
-  const parts = trimmed.split(/[\\/]/);
-  return parts[parts.length - 1] ?? trimmed;
 }
 
 export function buildManualGithubRepositoryChoices(query: string): GithubRepositoryChoice[] {

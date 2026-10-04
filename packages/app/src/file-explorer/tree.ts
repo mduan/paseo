@@ -86,8 +86,9 @@ export async function restoreExpandedDirectories({
   showHiddenFiles,
   requestDirectoryListing,
 }: RestoreExpandedDirectoriesInput): Promise<string[]> {
-  const restoredPaths = ["."];
-  const restoredPathSet = new Set(restoredPaths);
+  // The root row is collapsible, so "." restores only when it was persisted as expanded.
+  const restoredPaths = persistedExpandedPaths.has(".") ? ["."] : [];
+  const restoredPathSet = new Set(["."]);
   let parentDirectories = [rootDirectory];
 
   for (let depth = 1; depth <= MAX_AUTO_EXPANDED_DIRECTORY_DEPTH; depth += 1) {
@@ -171,6 +172,47 @@ export function setExpandedDirectoryPath({
     nextPaths.delete(directoryPath);
   }
   return Array.from(nextPaths);
+}
+
+/** The directories that must be expanded for `path` to show in the tree, root first. */
+export function explorerAncestorPaths(path: string): string[] {
+  const segments = path.split("/");
+  return [".", ...segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join("/"))];
+}
+
+// ponytail: hard cap so "Expand all" on a node_modules-heavy root can't fire thousands of listings.
+export const MAX_EXPAND_ALL_DIRECTORIES = 500;
+
+/**
+ * Lists `rootPath` and every visible directory below it, one level per batch, and reports
+ * each listed level so the tree grows while deeper levels load.
+ */
+export async function expandDirectoryTree({
+  rootPath,
+  showHiddenFiles,
+  requestDirectoryListing,
+  onLevelListed,
+}: {
+  rootPath: string;
+  showHiddenFiles: boolean;
+  requestDirectoryListing: (path: string) => Promise<ExplorerDirectory | null>;
+  onLevelListed: (paths: string[]) => void;
+}): Promise<void> {
+  let level = [rootPath];
+  let listedCount = 0;
+  while (level.length > 0 && listedCount < MAX_EXPAND_ALL_DIRECTORIES) {
+    level = level.slice(0, MAX_EXPAND_ALL_DIRECTORIES - listedCount);
+    listedCount += level.length;
+    const listed = (await Promise.all(level.map(requestDirectoryListing))).filter(
+      (directory): directory is ExplorerDirectory => directory !== null,
+    );
+    onLevelListed(listed.map((directory) => directory.path));
+    level = listed.flatMap((directory) =>
+      filterVisibleExplorerEntries(directory.entries, showHiddenFiles)
+        .filter((entry) => entry.kind === "directory")
+        .map((entry) => entry.path),
+    );
+  }
 }
 
 function rowsForDirectory(

@@ -21,6 +21,7 @@ import {
   type StyleProp,
   type TextInputKeyPressEventData,
   type ViewStyle,
+  type ViewToken,
 } from "react-native";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
@@ -66,8 +67,11 @@ import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { buildWorkspaceExplorerStateKey } from "@/hooks/use-file-explorer-actions";
 import { usePanelStore, type ExpandedPathsUpdate, type SortOption } from "@/stores/panel-store";
 import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
+import { pathBaseName } from "@/utils/path";
 import { isHiddenExplorerPath } from "@/file-explorer/visibility";
 import {
+  expandDirectoryTree,
+  explorerAncestorPaths,
   flattenExplorerTree,
   reconcileRestoredExpandedPaths,
   restoreExpandedDirectories,
@@ -75,6 +79,7 @@ import {
   showHiddenFilesAndRestoreExpandedDirectories,
   type ExplorerTreeRow,
 } from "@/file-explorer/tree";
+import { useExplorerRevealStore } from "@/file-explorer/reveal";
 import { useWorkspaceFileDragSource } from "@/attachments/use-workspace-file-drag-source";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useToast } from "@/contexts/toast-context";
@@ -86,6 +91,8 @@ const SORT_OPTIONS: { value: SortOption }[] = [
   { value: "modified" },
   { value: "size" },
 ];
+
+const FULLY_VISIBLE_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 100 };
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -125,6 +132,8 @@ interface TreeRowItemProps {
   onOpenFileToSide?: (path: string) => void;
   onNewEntry?: (parentPath: string, kind: "file" | "directory") => void;
   onCollapseDirectory?: (path: string) => void;
+  onExpandAllSubfolders: (path: string) => void;
+  onCollapseAllSubfolders: (path: string) => void;
   onRenameEntry?: (entry: ExplorerEntry) => void;
   onDuplicateEntry?: (entry: ExplorerEntry) => void;
   onDeleteEntry?: (entry: ExplorerEntry) => void;
@@ -251,6 +260,8 @@ function TreeRowItem({
   onOpenFileToSide,
   onNewEntry,
   onCollapseDirectory,
+  onExpandAllSubfolders,
+  onCollapseAllSubfolders,
   onRenameEntry,
   onDuplicateEntry,
   onDeleteEntry,
@@ -329,6 +340,14 @@ function TreeRowItem({
     onCollapseDirectory?.(entry.path);
   }, [entry.path, onCollapseDirectory]);
 
+  const handleExpandAllSubfolders = useCallback(() => {
+    onExpandAllSubfolders(entry.path);
+  }, [entry.path, onExpandAllSubfolders]);
+
+  const handleCollapseAllSubfolders = useCallback(() => {
+    onCollapseAllSubfolders(entry.path);
+  }, [entry.path, onCollapseAllSubfolders]);
+
   const handleRename = useCallback(() => {
     onRenameEntry?.(entry);
   }, [onRenameEntry, entry]);
@@ -389,6 +408,8 @@ function TreeRowItem({
         onNewFile={onNewEntry ? handleNewFile : undefined}
         onNewFolder={onNewEntry ? handleNewFolder : undefined}
         onCollapseFolder={isDirectory && isExpanded ? handleCollapseDirectory : undefined}
+        onExpandAllSubfolders={handleExpandAllSubfolders}
+        onCollapseAllSubfolders={handleCollapseAllSubfolders}
         onRename={onRenameEntry ? handleRename : undefined}
         onDuplicate={onDuplicateEntry ? handleDuplicate : undefined}
         onDelete={onDeleteEntry ? handleDelete : undefined}
@@ -480,10 +501,7 @@ export function FileExplorerPane({
     workspaceStateKey ? state.expandedPathsByWorkspace[workspaceStateKey] : undefined,
   );
   const setExpandedPathsForWorkspace = usePanelStore((state) => state.setExpandedPathsForWorkspace);
-  const expandedPaths = useMemo(
-    () => new Set(expandedPathsArray && expandedPathsArray.length > 0 ? expandedPathsArray : ["."]),
-    [expandedPathsArray],
-  );
+  const expandedPaths = useMemo(() => new Set(expandedPathsArray ?? ["."]), [expandedPathsArray]);
 
   const explorerDerived = useMemo(() => deriveExplorerFields(explorerState), [explorerState]);
   const { directories, pendingRequest, isExplorerLoading, error, selectedEntryPath } =
@@ -586,6 +604,42 @@ export function FileExplorerPane({
     [setExpandedPathsForWorkspace, workspaceStateKey],
   );
 
+  const handleExpandAllSubfolders = useCallback(
+    (path: string) => {
+      if (!workspaceStateKey) {
+        return;
+      }
+      void expandDirectoryTree({
+        rootPath: path,
+        showHiddenFiles,
+        requestDirectoryListing: (directoryPath) =>
+          requestDirectoryListing(directoryPath, {
+            recordHistory: false,
+            setCurrentPath: false,
+          }),
+        onLevelListed: (paths) =>
+          setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
+            Array.from(new Set([...currentPaths, ...paths])),
+          ),
+      });
+    },
+    [requestDirectoryListing, setExpandedPathsForWorkspace, showHiddenFiles, workspaceStateKey],
+  );
+
+  const handleCollapseAllSubfolders = useCallback(
+    (path: string) => {
+      if (!workspaceStateKey) {
+        return;
+      }
+      setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
+        currentPaths.filter(
+          (expandedPath) => expandedPath === path || !isExplorerPathWithin(expandedPath, path),
+        ),
+      );
+    },
+    [setExpandedPathsForWorkspace, workspaceStateKey],
+  );
+
   const handleCopyPath = useCallback(
     async (path: string) => {
       await Clipboard.setStringAsync(
@@ -645,20 +699,18 @@ export function FileExplorerPane({
       if (!workspaceStateKey) {
         return;
       }
-      if (parentPath !== ".") {
-        setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
-          setExpandedDirectoryPath({
-            currentExpandedPaths: currentPaths,
-            directoryPath: parentPath,
-            expanded: true,
-          }),
-        );
-        if (!directories.has(parentPath)) {
-          void requestDirectoryListing(parentPath, {
-            recordHistory: false,
-            setCurrentPath: false,
-          });
-        }
+      setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
+        setExpandedDirectoryPath({
+          currentExpandedPaths: currentPaths,
+          directoryPath: parentPath,
+          expanded: true,
+        }),
+      );
+      if (!directories.has(parentPath)) {
+        void requestDirectoryListing(parentPath, {
+          recordHistory: false,
+          setCurrentPath: false,
+        });
       }
       setPendingEdit({ type: "create", parentPath, kind });
     },
@@ -910,8 +962,32 @@ export function FileExplorerPane({
     [directories, expandedPaths, showHiddenFiles, sortOption],
   );
 
+  const rootRow = useMemo<ExplorerTreeRow>(
+    () => ({
+      entry: {
+        name: pathBaseName(normalizedWorkspaceRoot),
+        path: ".",
+        kind: "directory",
+        size: 0,
+        modifiedAt: "",
+      },
+      depth: 0,
+    }),
+    [normalizedWorkspaceRoot],
+  );
+
+  const visibleTreeRows = useMemo<ExplorerTreeRow[]>(() => {
+    if (!directories.has(".")) {
+      return [];
+    }
+    if (!expandedPaths.has(".")) {
+      return [rootRow];
+    }
+    return [rootRow, ...treeRows.map((row) => ({ ...row, depth: row.depth + 1 }))];
+  }, [directories, expandedPaths, rootRow, treeRows]);
+
   const listRows = useMemo<ExplorerListRow[]>(() => {
-    const rows: ExplorerListRow[] = treeRows.map((row) =>
+    const rows: ExplorerListRow[] = visibleTreeRows.map((row) =>
       pendingEdit?.type === "rename" && pendingEdit.entry.path === row.entry.path
         ? { type: "rename", entry: row.entry, depth: row.depth }
         : { type: "entry", row },
@@ -921,12 +997,12 @@ export function FileExplorerPane({
     }
     let insertionIndex = 0;
     let depth = 0;
-    if (pendingEdit.parentPath !== ".") {
-      const parentIndex = treeRows.findIndex((row) => row.entry.path === pendingEdit.parentPath);
-      if (parentIndex >= 0) {
-        insertionIndex = parentIndex + 1;
-        depth = treeRows[parentIndex].depth + 1;
-      }
+    const parentIndex = visibleTreeRows.findIndex(
+      (row) => row.entry.path === pendingEdit.parentPath,
+    );
+    if (parentIndex >= 0) {
+      insertionIndex = parentIndex + 1;
+      depth = visibleTreeRows[parentIndex].depth + 1;
     }
     rows.splice(insertionIndex, 0, {
       type: "draft",
@@ -935,7 +1011,72 @@ export function FileExplorerPane({
       depth,
     });
     return rows;
-  }, [pendingEdit, treeRows]);
+  }, [pendingEdit, visibleTreeRows]);
+
+  const revealRequest = useExplorerRevealStore((state) => state.request);
+  const pendingScrollPathRef = useRef<string>(undefined);
+  const viewablePathsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!workspaceStateKey || revealRequest?.workspaceStateKey !== workspaceStateKey) {
+      return;
+    }
+    useExplorerRevealStore.setState({ request: undefined });
+    const ancestors = explorerAncestorPaths(revealRequest.path);
+    pendingScrollPathRef.current = revealRequest.path;
+    selectExplorerEntry(revealRequest.path);
+    setExpandedPathsForWorkspace(workspaceStateKey, (currentPaths) =>
+      Array.from(new Set([...currentPaths, ...ancestors])),
+    );
+    for (const path of ancestors) {
+      if (!directories.has(path)) {
+        void requestDirectoryListing(path, { recordHistory: false, setCurrentPath: false });
+      }
+    }
+  }, [
+    directories,
+    requestDirectoryListing,
+    revealRequest,
+    selectExplorerEntry,
+    setExpandedPathsForWorkspace,
+    workspaceStateKey,
+  ]);
+
+  // Scrolls once the revealed row exists, which can take several listings after the request.
+  useEffect(() => {
+    const path = pendingScrollPathRef.current;
+    if (!path || !treeListRef.current) {
+      return;
+    }
+    const index = listRows.findIndex((row) => row.type === "entry" && row.row.entry.path === path);
+    if (index < 0) {
+      return;
+    }
+    pendingScrollPathRef.current = undefined;
+    if (!viewablePathsRef.current.has(path)) {
+      treeListRef.current.scrollToIndex({ index, viewPosition: 0.5, animated: true });
+    }
+  }, [listRows]);
+
+  const handleViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<ExplorerListRow>[] }) => {
+      viewablePathsRef.current = new Set(
+        viewableItems.flatMap(({ item }) => (item.type === "entry" ? [item.row.entry.path] : [])),
+      );
+    },
+    [],
+  );
+
+  // Rows have no fixed height, so jump near the estimated offset, then retry once rendered.
+  const handleScrollToIndexFailed = useCallback(
+    ({ index, averageItemLength }: { index: number; averageItemLength: number }) => {
+      treeListRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+      requestAnimationFrame(() => {
+        treeListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true });
+      });
+    },
+    [],
+  );
 
   const showInitialLoading = resolveShowInitialLoading({
     directories,
@@ -968,12 +1109,13 @@ export function FileExplorerPane({
           />
         );
       }
+      const isRoot = info.item.row.entry.path === ".";
       return (
         <TreeRowDispatcher
           serverId={serverId}
           workspaceId={workspaceId}
           row={info.item.row}
-          index={info.index}
+          testID={isRoot ? "file-explorer-row-root" : `file-explorer-row-${info.index - 1}`}
           expandedPaths={expandedPaths}
           selectedEntryPath={selectedEntryPath}
           isDirectoryLoading={isDirectoryLoading}
@@ -990,9 +1132,11 @@ export function FileExplorerPane({
           onOpenFileToSide={onOpenFileToSide}
           onNewEntry={fsEntryOpsEnabled ? handleNewEntry : undefined}
           onCollapseDirectory={handleCollapseDirectory}
-          onRenameEntry={fsEntryOpsEnabled ? handleRenameEntry : undefined}
-          onDuplicateEntry={fsEntryDuplicateEnabled ? handleDuplicateEntry : undefined}
-          onDeleteEntry={fsEntryOpsEnabled ? handleDeleteEntry : undefined}
+          onExpandAllSubfolders={handleExpandAllSubfolders}
+          onCollapseAllSubfolders={handleCollapseAllSubfolders}
+          onRenameEntry={fsEntryOpsEnabled && !isRoot ? handleRenameEntry : undefined}
+          onDuplicateEntry={fsEntryDuplicateEnabled && !isRoot ? handleDuplicateEntry : undefined}
+          onDeleteEntry={fsEntryOpsEnabled && !isRoot ? handleDeleteEntry : undefined}
         />
       );
     },
@@ -1000,6 +1144,7 @@ export function FileExplorerPane({
       expandedPaths,
       fsEntryDuplicateEnabled,
       fsEntryOpsEnabled,
+      handleCollapseAllSubfolders,
       handleCollapseDirectory,
       handleCopyPath,
       handleCopyRelativePath,
@@ -1010,6 +1155,7 @@ export function FileExplorerPane({
       handleDuplicateEntry,
       handleEditCancel,
       handleEntryPress,
+      handleExpandAllSubfolders,
       handleNewEntry,
       handleRenameCommit,
       handleRenameEntry,
@@ -1074,6 +1220,8 @@ export function FileExplorerPane({
         treeListRef={treeListRef}
         scrollbar={scrollbar}
         renderTreeRow={renderTreeRow}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
         handleSortCycle={handleSortCycle}
         handleToggleHiddenFiles={handleToggleHiddenFiles}
         handleRefresh={handleRefresh}
@@ -1151,6 +1299,8 @@ interface FileExplorerPaneContentProps {
   treeListRef: RefObject<FlatList<ExplorerListRow> | null>;
   scrollbar: OverlayFlatListScrollbar;
   renderTreeRow: (info: ListRenderItemInfo<ExplorerListRow>) => ReactElement;
+  onViewableItemsChanged: (info: { viewableItems: ViewToken<ExplorerListRow>[] }) => void;
+  onScrollToIndexFailed: (info: { index: number; averageItemLength: number }) => void;
   handleSortCycle: () => void;
   handleToggleHiddenFiles: () => void;
   handleRefresh: () => void;
@@ -1177,6 +1327,8 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
     treeListRef,
     scrollbar,
     renderTreeRow,
+    onViewableItemsChanged,
+    onScrollToIndexFailed,
     handleSortCycle,
     handleToggleHiddenFiles,
     handleRefresh,
@@ -1356,6 +1508,9 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
                 data={listRows}
                 renderItem={renderTreeRow}
                 keyExtractor={listRowKeyExtractor}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={FULLY_VISIBLE_VIEWABILITY_CONFIG}
+                onScrollToIndexFailed={onScrollToIndexFailed}
                 testID="file-explorer-tree-scroll"
                 contentContainerStyle={styles.entriesContent}
                 onLayout={scrollbar.onLayout}
@@ -1474,7 +1629,7 @@ function TreeRowDispatcher({
   serverId,
   workspaceId,
   row,
-  index,
+  testID,
   expandedPaths,
   selectedEntryPath,
   isDirectoryLoading,
@@ -1491,6 +1646,8 @@ function TreeRowDispatcher({
   onOpenFileToSide,
   onNewEntry,
   onCollapseDirectory,
+  onExpandAllSubfolders,
+  onCollapseAllSubfolders,
   onRenameEntry,
   onDuplicateEntry,
   onDeleteEntry,
@@ -1498,7 +1655,7 @@ function TreeRowDispatcher({
   serverId: string;
   workspaceId?: string | null;
   row: ExplorerTreeRow;
-  index: number;
+  testID: string;
   expandedPaths: Set<string>;
   selectedEntryPath: string | null;
   isDirectoryLoading: (path: string) => boolean;
@@ -1515,6 +1672,8 @@ function TreeRowDispatcher({
   onOpenFileToSide?: (path: string) => void;
   onNewEntry?: (parentPath: string, kind: "file" | "directory") => void;
   onCollapseDirectory?: (path: string) => void;
+  onExpandAllSubfolders: (path: string) => void;
+  onCollapseAllSubfolders: (path: string) => void;
   onRenameEntry?: (entry: ExplorerEntry) => void;
   onDuplicateEntry?: (entry: ExplorerEntry) => void;
   onDeleteEntry?: (entry: ExplorerEntry) => void;
@@ -1548,16 +1707,20 @@ function TreeRowDispatcher({
       onOpenFileToSide={onOpenFileToSide}
       onNewEntry={onNewEntry}
       onCollapseDirectory={onCollapseDirectory}
+      onExpandAllSubfolders={onExpandAllSubfolders}
+      onCollapseAllSubfolders={onCollapseAllSubfolders}
       onRenameEntry={onRenameEntry}
       onDuplicateEntry={onDuplicateEntry}
       onDeleteEntry={onDeleteEntry}
-      testID={`file-explorer-row-${index}`}
+      testID={testID}
     />
   );
 }
 
 function isExplorerPathWithin(candidatePath: string, parentPath: string): boolean {
-  return candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);
+  return (
+    parentPath === "." || candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`)
+  );
 }
 
 function replaceExplorerPathPrefix(
