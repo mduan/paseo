@@ -486,6 +486,9 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
   if (typeof sanitized.totalCostUnavailable === "boolean") {
     result.totalCostUnavailable = sanitized.totalCostUnavailable;
   }
+  if (typeof sanitized.totalCostEstimated === "boolean") {
+    result.totalCostEstimated = sanitized.totalCostEstimated;
+  }
   return Object.keys(result).length ? result : undefined;
 }
 

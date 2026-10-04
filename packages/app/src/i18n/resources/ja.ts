@@ -2002,6 +2002,8 @@ export const ja: TranslationResources = {
     sessionCostEstimate: "API の定価に基づく推定",
     sessionCostUnavailable: "利用不可",
     sessionCostBeforeTurn: "(このターンより前)",
+    sessionCostEstimated: "(推定)",
+    sessionCostEstimatedBeforeTurn: "(推定、このターンより前)",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {
