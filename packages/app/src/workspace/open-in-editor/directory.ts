@@ -44,7 +44,8 @@ export function useOpenDirectoryInEditor({
       }
       const target = planWorkspaceOpenTargets({
         workspaceDirectory,
-        directoryPath,
+        // "." is the workspace itself; the planner opens the workspace when no directory is given.
+        directoryPath: directoryPath === "." ? null : directoryPath,
         desktopTargets: [preferredTarget],
         canUseDesktopBridge: isAvailable,
         isLocalExecution,
