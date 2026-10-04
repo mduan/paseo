@@ -109,7 +109,7 @@ export function FileActionsContextMenuContent({
       fileKind === "directory" && onOpenInEditor && editorTargetName
         ? {
             key: "open-in-editor",
-            group: "open",
+            group: "reference",
             label: t("workspace.fileActions.openIn", { target: editorTargetName }),
             icon: ExternalLink,
             onSelect: onOpenInEditor,
@@ -168,7 +168,6 @@ export function FileActionsContextMenuContent({
             onSelect: onOpenFile,
           }
         : null,
-      openInEditorAction,
       optionalFileAction(availableFile, onOpenToSide, {
         key: "open-to-side",
         group: "open",
@@ -202,6 +201,7 @@ export function FileActionsContextMenuContent({
             onSelect: onReveal,
           }
         : null,
+      openInEditorAction,
       availableFile && onDownload
         ? {
             key: "download",
