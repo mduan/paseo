@@ -1,8 +1,9 @@
 import { supportsUsageReports } from "@getpaseo/client/internal/daemon-client";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { skipToken, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useShallow } from "zustand/shallow";
 import { useFetchQuery } from "@/data/query";
+import { useAppSettings } from "@/hooks/use-settings";
 import {
   getHostRuntimeStore,
   useHostRuntimeConnectionStatuses,
@@ -19,6 +20,7 @@ import {
   type UsageQueryState,
   type UsageRefresh,
 } from "./model";
+import { usageAutoRefreshMs } from "./preferences";
 import type { UsageReportEntry, UsageView } from "./types";
 
 // The daemon caches each report for five minutes, so re-reading it is cheap. Only
@@ -109,6 +111,23 @@ export function useUsageHostReports(serverId: string | null): UsageReportEntry[]
     staleTimeMs: REPORTS_STALE_TIME_MS,
   });
   return query.data ?? NO_REPORTS;
+}
+
+/**
+ * Force-refreshes the host's reports on the user's auto-refresh interval, so the sidebar summary
+ * moves without opening the Usage screen. Mount it once; every mount runs its own timer.
+ */
+export function useUsageAutoRefresh(serverId: string | null): void {
+  const queryClient = useQueryClient();
+  const { settings } = useAppSettings();
+  const intervalMs = usageAutoRefreshMs(settings.usageAutoRefresh);
+  useEffect(() => {
+    if (!serverId || !intervalMs) return;
+    const timer = setInterval(() => {
+      void refreshReports(queryClient, serverId).catch(() => undefined);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [queryClient, serverId, intervalMs]);
 }
 
 /** Every host with whether it is connected and reports usage, in host order. */

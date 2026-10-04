@@ -20,6 +20,29 @@ export interface UsagePreferences {
   serverId: string | null;
 }
 
+/** How often the usage host's reports refresh on their own. Device-local. */
+export enum UsageAutoRefresh {
+  Manual = "manual",
+  FiveMinutes = "5m",
+  FifteenMinutes = "15m",
+  ThirtyMinutes = "30m",
+  OneHour = "1h",
+}
+
+export const DEFAULT_USAGE_AUTO_REFRESH = UsageAutoRefresh.Manual;
+
+const USAGE_AUTO_REFRESH_MS: Record<UsageAutoRefresh, number | undefined> = {
+  [UsageAutoRefresh.Manual]: undefined,
+  [UsageAutoRefresh.FiveMinutes]: 5 * 60_000,
+  [UsageAutoRefresh.FifteenMinutes]: 15 * 60_000,
+  [UsageAutoRefresh.ThirtyMinutes]: 30 * 60_000,
+  [UsageAutoRefresh.OneHour]: 60 * 60_000,
+};
+
+export function usageAutoRefreshMs(autoRefresh: UsageAutoRefresh): number | undefined {
+  return USAGE_AUTO_REFRESH_MS[autoRefresh];
+}
+
 export const DEFAULT_USAGE_PREFERENCES: UsagePreferences = {
   displayAs: "used",
   pins: null,

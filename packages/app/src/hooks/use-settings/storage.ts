@@ -5,7 +5,9 @@ import type { DesktopSettings } from "@/desktop/settings/desktop-settings";
 import type { AppLanguage } from "@/i18n/locales";
 import type { SidebarNavPreference } from "@/sidebar-nav/model";
 import {
+  DEFAULT_USAGE_AUTO_REFRESH,
   DEFAULT_USAGE_PREFERENCES,
+  UsageAutoRefresh,
   UsagePreferencesSchema,
   type UsagePreferences,
 } from "@/usage/preferences";
@@ -100,6 +102,7 @@ export interface AppSettings {
   sidebarFooterItems: SidebarNavPreference[];
   /** How usage reads and which windows the sidebar summary shows. */
   usage: UsagePreferences;
+  usageAutoRefresh: UsageAutoRefresh;
   autoExpandReasoning: boolean;
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
@@ -163,6 +166,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarNavItems: [],
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
+  usageAutoRefresh: DEFAULT_USAGE_AUTO_REFRESH,
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
@@ -264,6 +268,7 @@ const StoredAppSettingsSchema = z
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     usage: UsagePreferencesSchema,
+    usageAutoRefresh: z.enum(UsageAutoRefresh).catch(DEFAULT_USAGE_AUTO_REFRESH),
     autoExpandReasoning: z.boolean().catch(false),
     toolCallDetailLevel: z
       .enum(["overview", "detailed"])
