@@ -459,6 +459,13 @@ export class ClaudeTaskProtocolSource {
     return this.updatePresentation(id, { usage });
   }
 
+  /** Cost estimated from the subagent's transcript, which the session reads as usage grows. */
+  observeCost(taskId: string, costUsd: number): SubagentObservation[] {
+    const id = this.subagentIdByTaskId.get(taskId);
+    if (!id) return [];
+    return this.updatePresentation(id, { costUsd });
+  }
+
   /**
    * Effort as reported by a hook firing inside a subagent.
    *

@@ -591,6 +591,20 @@ describe("ClaudeTaskProtocolSource usage and runtime", () => {
     ]);
   });
 
+  it("adds the estimated cost after the token count", () => {
+    const source = new ClaudeTaskProtocolSource();
+    source.observe(taskStarted());
+    source.observe(taskProgress({ total_tokens: 16484 }));
+    expect(source.observeCost("a1730a6215e1f5cf6", 0.5)).toEqual([
+      {
+        kind: "subtitle",
+        id: "toolu_01DgLoPMW9",
+        subtitle: "general-purpose · 16.5k tokens · $0.50 (est.)",
+      },
+    ]);
+    expect(source.observeCost("b51skux0z", 0.5)).toEqual([]);
+  });
+
   it("ignores usage for a task it never declared", () => {
     const source = new ClaudeTaskProtocolSource();
     expect(source.observe(taskProgress({ total_tokens: 1 }, "b51skux0z"))).toEqual([]);

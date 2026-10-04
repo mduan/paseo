@@ -1,3 +1,7 @@
+import {
+  formatSubagentCost,
+  formatSubagentTokens,
+} from "../../../provider-subagents/subtitle-format.js";
 import { findClaudeModel } from "../models.js";
 
 export interface ClaudeSubagentUsage {
@@ -9,6 +13,8 @@ export interface ClaudeSubagentPresentationFacts {
   model?: string;
   effort?: string;
   usage?: ClaudeSubagentUsage;
+  /** Estimated from list prices; Claude reports no cost per subagent. */
+  costUsd?: number;
 }
 
 /** Build the complete compact subtitle Claude exposes to provider-neutral clients. */
@@ -19,7 +25,8 @@ export function buildClaudeSubagentSubtitle(
     readPart(facts.title),
     formatModel(facts.model),
     formatEffort(facts.effort),
-    formatTokens(facts.usage?.totalTokens),
+    formatSubagentTokens(facts.usage?.totalTokens),
+    formatSubagentCost(facts.costUsd),
   ].filter((part): part is string => part !== undefined);
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
@@ -44,10 +51,4 @@ function formatEffort(effort: string | undefined): string | undefined {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function formatTokens(totalTokens: number | undefined): string | undefined {
-  if (typeof totalTokens !== "number" || totalTokens <= 0) return undefined;
-  if (totalTokens < 1000) return `${Math.round(totalTokens)} tokens`;
-  return `${Math.round(totalTokens / 100) / 10}k tokens`;
 }

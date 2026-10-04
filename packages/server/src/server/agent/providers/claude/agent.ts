@@ -61,6 +61,8 @@ import {
   parseClaudeWorkflowRun,
 } from "./subagents/workflow-replay-source.js";
 import { readClaudeWorkflowResultFile } from "./subagents/workflow-output.js";
+import { ClaudeTranscriptCost } from "./subagents/transcript-cost.js";
+import { getSharedCodexPriceList } from "../codex/pricing.js";
 import { buildClaudeFeatures, claudeModelSupportsFastMode } from "./feature-definitions.js";
 import {
   buildBinaryDiagnosticRows,
@@ -2093,6 +2095,8 @@ class ClaudeAgentSession implements AgentSession {
     getToolInput: (toolUseId) => this.toolUseCache.get(toolUseId)?.input ?? null,
     readWorkflowResult: readClaudeWorkflowResultFile,
   });
+  /** Task id -> cost reader over that subagent's transcript. */
+  private readonly subagentCosts = new Map<string, ClaudeTranscriptCost>();
   private readonly sidechainTracker = new ClaudeSidechainTracker({
     getToolInput: (toolUseId) => this.toolUseCache.get(toolUseId)?.input ?? null,
     // Releases that predate the task protocol announce nothing, so the tracker keeps deriving
@@ -2707,6 +2711,7 @@ class ClaudeAgentSession implements AgentSession {
     this.turnState = "idle";
     this.sidechainTracker.clear();
     this.taskProtocolSource.reset();
+    this.subagentCosts.clear();
     this.input?.end();
     this.query?.close?.();
     await this.awaitWithTimeout(this.query?.interrupt?.(), "close query interrupt");
@@ -4146,6 +4151,7 @@ class ClaudeAgentSession implements AgentSession {
     for (const event of foldSubagentObservations(subagentObservations)) {
       events.push({ type: "provider_subagent", provider: "claude", event });
     }
+    this.refreshSubagentCost(message);
     for (const observation of subagentObservations) {
       if (observation.kind !== "declared") continue;
       if (!this.taskProtocolSource.needsSyntheticParentToolCard(observation.id)) continue;
@@ -4850,6 +4856,52 @@ class ClaudeAgentSession implements AgentSession {
 
   private pushEvent(event: AgentStreamEvent) {
     this.notifySubscribers(event);
+  }
+
+  /**
+   * Claude reports only a token count per subagent, so each usage report re-prices the
+   * subagent's transcript from the point the previous report reached.
+   */
+  private refreshSubagentCost(message: SDKMessage): void {
+    if (message.type !== "system") return;
+    if (message.subtype !== "task_progress" && message.subtype !== "task_notification") return;
+    const taskId = (message as { task_id?: unknown }).task_id;
+    if (typeof taskId !== "string" || !this.taskProtocolSource.isDeclaredTask(taskId)) return;
+    void this.readSubagentCost(taskId);
+  }
+
+  private async readSubagentCost(taskId: string): Promise<void> {
+    try {
+      const transcript = this.subagentTranscriptCost(taskId);
+      if (!transcript) return;
+      const prices = await getSharedCodexPriceList(this.logger).get();
+      const costUsd = prices ? await transcript.read(prices) : undefined;
+      if (costUsd === undefined) return;
+      for (const event of foldSubagentObservations(
+        this.taskProtocolSource.observeCost(taskId, costUsd),
+      )) {
+        this.notifySubscribers({ type: "provider_subagent", provider: "claude", event });
+      }
+    } catch (error) {
+      this.logger.debug({ err: error, taskId }, "Failed to estimate Claude subagent cost");
+    }
+  }
+
+  private subagentTranscriptCost(taskId: string): ClaudeTranscriptCost | undefined {
+    const existing = this.subagentCosts.get(taskId);
+    if (existing) return existing;
+    const historyPath = this.claudeSessionId ? this.resolveHistoryPath(this.claudeSessionId) : null;
+    if (!historyPath) return undefined;
+    // Claude Code names a subagent's transcript after the same id the task protocol calls task_id.
+    const transcriptPath = path.join(
+      claudeSubagentsDirectory(historyPath),
+      `agent-${taskId}.jsonl`,
+    );
+    // Workflows and transcript-less tasks never get one; don't fetch prices for them.
+    if (!fs.existsSync(transcriptPath)) return undefined;
+    const transcript = new ClaudeTranscriptCost(transcriptPath);
+    this.subagentCosts.set(taskId, transcript);
+    return transcript;
   }
 
   /**
@@ -5884,12 +5936,17 @@ interface ClaudeSidechainHistory {
 
 const CLAUDE_SUBAGENT_META_FILE = /^agent-(.+)\.meta\.json$/;
 
+function claudeSessionDirectory(historyPath: string): string {
+  return path.join(path.dirname(historyPath), path.basename(historyPath, ".jsonl"));
+}
+
+function claudeSubagentsDirectory(historyPath: string): string {
+  return path.join(claudeSessionDirectory(historyPath), "subagents");
+}
+
 function readClaudeSidechainHistory(historyPath: string): ClaudeSidechainHistory {
-  const sessionDirectory = path.join(
-    path.dirname(historyPath),
-    path.basename(historyPath, ".jsonl"),
-  );
-  const sidechainDirectory = path.join(sessionDirectory, "subagents");
+  const sessionDirectory = claudeSessionDirectory(historyPath);
+  const sidechainDirectory = claudeSubagentsDirectory(historyPath);
   const history: ClaudeSidechainHistory = {
     contents: [],
     workflowContents: [],

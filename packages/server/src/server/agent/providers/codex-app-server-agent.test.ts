@@ -92,6 +92,7 @@ import {
   waitForProviderSubagent,
   waitForTimelineToolCall,
 } from "./codex/test-utils/fake-app-server.js";
+import { CodexPriceList } from "./codex/pricing.js";
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import { asInternals as castInternals, createStub } from "../../test-utils/class-mocks.js";
 import { buildProviderRegistry } from "../provider-registry.js";
@@ -3280,6 +3281,80 @@ describe("Codex app-server provider", () => {
       id: "child-thread-1",
       status: "completed",
     });
+  });
+
+  test("reports a child's tokens and estimated cost in its subtitle", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "codex-child-cost-"));
+    const rolloutPath = path.join(dir, "rollout.jsonl");
+    const priceFile = path.join(dir, "prices.json");
+    writeFileSync(
+      priceFile,
+      JSON.stringify({ "gpt-6-luna": { input_cost_per_token: 1e-6, output_cost_per_token: 1e-5 } }),
+    );
+    writeFileSync(
+      rolloutPath,
+      [
+        { type: "turn_context", payload: { model: "gpt-6-luna" } },
+        {
+          type: "event_msg",
+          payload: {
+            type: "token_count",
+            info: {
+              total_token_usage: { total_tokens: 1_100_000 },
+              // 1M uncached × $1/M + 100k output × $10/M = $2.00
+              last_token_usage: { input_tokens: 1_000_000, output_tokens: 100_000 },
+            },
+          },
+        },
+      ]
+        .map((line) => `${JSON.stringify(line)}\n`)
+        .join(""),
+    );
+    const appServer = createFakeCodexAppServer({
+      "thread/read": (params) =>
+        (params as { threadId?: unknown } | undefined)?.threadId === "child-thread"
+          ? { thread: { path: rolloutPath, turns: [] } }
+          : { thread: { turns: [] } },
+    });
+    const session = new CodexAppServerAgentSession(
+      createConfig({ cwd: "/workspace/project" }),
+      null,
+      createTestLogger(),
+      async () => appServer.child,
+      { codexPriceList: new CodexPriceList({ logger: createTestLogger(), cacheFile: priceFile }) },
+    );
+    const subtitles: (string | null | undefined)[] = [];
+    session.subscribe((event) => {
+      if (event.type === "provider_subagent" && event.event.type === "upsert") {
+        if (event.event.subtitle !== undefined) subtitles.push(event.event.subtitle);
+      }
+    });
+
+    try {
+      const resultPromise = session.run("Delegate the investigation.");
+      await appServer.waitForTurnStart();
+      appServer.startsSubAgent({
+        callId: "call-child",
+        threadId: "child-thread",
+        agentPath: "/root/child",
+      });
+      appServer.reportsTokenUsage({ threadId: "child-thread", lastTotalTokens: 42_000 });
+
+      await vi.waitFor(() => {
+        expect(subtitles).toEqual([
+          "Child · 42k tokens",
+          "Child · gpt-6-luna · 42k tokens · $2.00 (est.)",
+        ]);
+      });
+
+      appServer.completeTurn({ threadId: "child-thread" });
+      appServer.completeTurn();
+      await resultPromise;
+      appServer.assertNoErrors();
+    } finally {
+      await session.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("keeps a settled child completed until Codex starts another child turn", async () => {

@@ -22,6 +22,17 @@ describe("buildClaudeSubagentSubtitle", () => {
     expect(buildClaudeSubagentSubtitle({ model: "glm-5.1" })).toBe("glm-5.1");
   });
 
+  it("marks the cost as an estimate", () => {
+    expect(
+      buildClaudeSubagentSubtitle({
+        title: "Explore",
+        usage: { totalTokens: 2_000 },
+        costUsd: 1.844,
+      }),
+    ).toBe("Explore · 2k tokens · $1.84 (est.)");
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("$0.0012 (est.)");
+  });
+
   it("omits facts that were not observed", () => {
     expect(buildClaudeSubagentSubtitle({ title: "Explore", usage: { totalTokens: 0 } })).toBe(
       "Explore",

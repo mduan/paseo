@@ -63,6 +63,7 @@ export interface FakeCodexAppServer {
   startsTurn(params: { threadId: string; turnId?: string }): void;
   startsCompaction(params: { threadId: string; itemId: string }): void;
   updatesPlan(params: { threadId: string; steps: string[] }): void;
+  reportsTokenUsage(params: { threadId: string; lastTotalTokens: number }): void;
   completeTurn(params?: {
     threadId?: string;
     status?: "completed" | "failed" | "interrupted";
@@ -399,6 +400,13 @@ export function createFakeCodexAppServer(
           },
         })}\n`,
       );
+    },
+    reportsTokenUsage(params) {
+      writeNotification("thread/tokenUsage/updated", {
+        threadId: params.threadId,
+        turnId: "turn-1",
+        tokenUsage: { last: { totalTokens: params.lastTotalTokens } },
+      });
     },
     startsSubAgent(params) {
       writeSubAgentActivity("item/completed", { ...params, kind: "started" });
