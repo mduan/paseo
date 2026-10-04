@@ -17,7 +17,12 @@ import { useSessionStore, type ExplorerFile } from "@/stores/session-store";
 import { filePreviewRenderKind } from "@/components/file-pane-render-mode";
 import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-url";
 import { getFileNameFromPath } from "@/attachments/utils";
-import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
+import {
+  resolveFilePreviewReadTarget,
+  workspaceRelativeFilePath,
+  type FilePreviewReadTarget,
+} from "@/file-explorer/preview-target";
+import { useReviewDraftScope } from "@/git/use-working-diff";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useAppActivelyVisible } from "@/hooks/use-app-visible";
@@ -34,6 +39,8 @@ import { FileEditorModel, getFileConflictCallout, type FileConflictCallout } fro
 import { createFileObservationSource } from "./editor/observation-source";
 import { FileEditorView } from "./editor/view";
 import { FileSourceView } from "./source/view";
+import type { EditorVisualTheme } from "./editor/extensions.web";
+import type { FileReviewConfig } from "./editor/review-layer.web";
 import type { FileConflictAlertState } from "./conflict-alert";
 import type { LiveFileModel } from "./live-file/model";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -54,9 +61,28 @@ interface FilePreviewBodyProps {
   location: WorkspaceFileLocation;
   navigationRevision: number;
   imagePreviewUri: string | null;
+  review?: FileReviewConfig;
 }
 
 type TextExplorerFile = ExplorerFile & { kind: "text" };
+
+function editorVisualTheme(theme: Theme): EditorVisualTheme {
+  return {
+    colorScheme: theme.colorScheme,
+    background: theme.colors.surface0,
+    foreground: theme.colors.foreground,
+    cursor: theme.colors.terminal.cursor,
+    foregroundMuted: theme.colors.foregroundMuted,
+    border: theme.colors.border,
+    selection: theme.colors.terminal.selectionBackground,
+    accent: theme.colors.accent,
+    accentForeground: theme.colors.accentForeground,
+    reviewHighlight: theme.colors.terminal.blue,
+    monoFont: theme.fontFamily.mono,
+    codeFontSize: theme.fontSize.code,
+    syntax: theme.colors.syntax,
+  };
+}
 
 function trimNonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -81,29 +107,17 @@ function ReadonlySource({
   filename,
   location,
   navigationRevision,
+  review,
 }: {
   preview: ExplorerFile;
   filename: string;
   location: WorkspaceFileLocation;
   navigationRevision: number;
+  review?: FileReviewConfig;
 }) {
   const theme = UnistylesRuntime.getTheme();
   const { t } = useTranslation();
-  const visualTheme = useMemo(
-    () => ({
-      colorScheme: theme.colorScheme,
-      background: theme.colors.surface0,
-      foreground: theme.colors.foreground,
-      cursor: theme.colors.terminal.cursor,
-      foregroundMuted: theme.colors.foregroundMuted,
-      border: theme.colors.border,
-      selection: theme.colors.terminal.selectionBackground,
-      monoFont: theme.fontFamily.mono,
-      codeFontSize: theme.fontSize.code,
-      syntax: theme.colors.syntax,
-    }),
-    [theme],
-  );
+  const visualTheme = useMemo(() => editorVisualTheme(theme), [theme]);
   return (
     <FileSourceView
       content={preview.content ?? ""}
@@ -113,6 +127,7 @@ function ReadonlySource({
       size={preview.size}
       theme={visualTheme}
       tooLargeMessage={t("panels.file.tooLargeToDisplay")}
+      review={review}
     />
   );
 }
@@ -135,6 +150,7 @@ function FilePreviewBody({
   location,
   navigationRevision,
   imagePreviewUri,
+  review,
 }: FilePreviewBodyProps) {
   const { t } = useTranslation();
   const filePath = location.path;
@@ -194,6 +210,7 @@ function FilePreviewBody({
         filename={filePath}
         location={location}
         navigationRevision={navigationRevision}
+        review={review}
       />
     );
   }
@@ -221,11 +238,13 @@ function FilePreviewBody({
 
 export function FilePane({
   serverId,
+  workspaceId,
   workspaceRoot,
   location,
   navigationRevision,
 }: {
   serverId: string;
+  workspaceId: string;
   workspaceRoot: string;
   location: WorkspaceFileLocation;
   navigationRevision: number;
@@ -251,6 +270,13 @@ export function FilePane({
         : null,
     [normalizedFilePath, normalizedWorkspaceRoot],
   );
+
+  const review = useFileReviewConfig({
+    serverId,
+    workspaceId,
+    workspaceRoot: normalizedWorkspaceRoot,
+    readTarget,
+  });
 
   // Re-read the file when this pane becomes visible again (#445). `isActive`
   // covers tab switches; active app visibility covers backgrounding and returning
@@ -316,7 +342,32 @@ export function FilePane({
       location={location}
       navigationRevision={navigationRevision}
       imagePreviewUri={imagePreviewUri}
+      review={review}
     />
+  );
+}
+
+/**
+ * Review comments go in the same draft as the diff's, so they need a git checkout and a file
+ * inside the workspace. The CodeMirror viewers are web only.
+ */
+function useFileReviewConfig(input: {
+  serverId: string;
+  workspaceId: string;
+  workspaceRoot: string;
+  readTarget: FilePreviewReadTarget | null;
+}): FileReviewConfig | undefined {
+  const { reviewDraftKey, isGit } = useReviewDraftScope({
+    serverId: input.serverId,
+    workspaceId: input.workspaceId,
+    cwd: input.workspaceRoot,
+  });
+  const filePath = input.readTarget
+    ? workspaceRelativeFilePath({ target: input.readTarget, workspaceRoot: input.workspaceRoot })
+    : null;
+  return useMemo(
+    () => (isWeb && isGit && filePath ? { reviewDraftKey, filePath } : undefined),
+    [filePath, isGit, reviewDraftKey],
   );
 }
 
@@ -357,6 +408,7 @@ function FilePanePresentation({
   location,
   navigationRevision,
   imagePreviewUri,
+  review,
 }: {
   serverId: string;
   client: DaemonClient | null;
@@ -378,6 +430,7 @@ function FilePanePresentation({
   location: WorkspaceFileLocation;
   navigationRevision: number;
   imagePreviewUri: string | null;
+  review?: FileReviewConfig;
 }) {
   if (!client && readTarget) {
     return (
@@ -407,6 +460,7 @@ function FilePanePresentation({
         isMobile={isMobile}
         location={location}
         navigationRevision={navigationRevision}
+        review={review}
       />
     );
   }
@@ -449,6 +503,7 @@ function FilePanePresentation({
         location={location}
         navigationRevision={navigationRevision}
         imagePreviewUri={imagePreviewUri}
+        review={review}
       />
     </View>
   );
@@ -469,6 +524,7 @@ function EditableFilePane({
   isMobile,
   location,
   navigationRevision,
+  review,
 }: {
   client: DaemonClient;
   cwd: string;
@@ -484,6 +540,7 @@ function EditableFilePane({
   isMobile: boolean;
   location: WorkspaceFileLocation;
   navigationRevision: number;
+  review?: FileReviewConfig;
 }) {
   const { settings } = useAppSettings();
   const { t } = useTranslation();
@@ -523,32 +580,7 @@ function EditableFilePane({
   const suspendPendingSave = useCallback(() => model.suspendAutosave(), [model]);
   usePublishPanelInstanceAttributes({ modified: snapshot.modified, suspendPendingSave });
   const theme = UnistylesRuntime.getTheme();
-  const visualTheme = useMemo(
-    () => ({
-      colorScheme: theme.colorScheme,
-      background: theme.colors.surface0,
-      foreground: theme.colors.foreground,
-      cursor: theme.colors.terminal.cursor,
-      foregroundMuted: theme.colors.foregroundMuted,
-      border: theme.colors.border,
-      selection: theme.colors.terminal.selectionBackground,
-      monoFont: theme.fontFamily.mono,
-      codeFontSize: theme.fontSize.code,
-      syntax: theme.colors.syntax,
-    }),
-    [
-      theme.colors.border,
-      theme.colors.foreground,
-      theme.colors.foregroundMuted,
-      theme.colors.surface0,
-      theme.colors.syntax,
-      theme.colors.terminal.cursor,
-      theme.colors.terminal.selectionBackground,
-      theme.colorScheme,
-      theme.fontFamily.mono,
-      theme.fontSize.code,
-    ],
-  );
+  const visualTheme = useMemo(() => editorVisualTheme(theme), [theme]);
 
   useEffect(() => () => model.dispose(), [model]);
 
@@ -612,6 +644,7 @@ function EditableFilePane({
           theme={visualTheme}
           onCursorChange={setCursor}
           onVimModeChange={handleVimModeChange}
+          review={review}
         />
       ) : (
         <FilePreviewBody
@@ -622,6 +655,7 @@ function EditableFilePane({
           location={location}
           navigationRevision={navigationRevision}
           imagePreviewUri={null}
+          review={review}
         />
       )}
     </View>

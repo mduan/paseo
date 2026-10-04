@@ -22,6 +22,10 @@ export interface EditorVisualTheme {
   foregroundMuted: string;
   border: string;
   selection: string;
+  accent: string;
+  accentForeground: string;
+  /** Tint of lines picked for a review comment, as in the diff. */
+  reviewHighlight: string;
   monoFont: string;
   codeFontSize: number;
   syntax: Record<HighlightStyle, string>;
@@ -78,6 +82,10 @@ export function editorTheme(theme: EditorVisualTheme) {
         ".cm-activeLine": { backgroundColor: "transparent" },
         ".cm-activeLineGutter": { backgroundColor: "transparent", color: theme.foreground },
         ".cm-line-target": { backgroundColor: theme.selection },
+        ".cm-review-highlight": {
+          backgroundColor: `color-mix(in srgb, ${theme.reviewHighlight} 20%, transparent)`,
+        },
+        ".cm-review-add": { backgroundColor: theme.accent, color: theme.accentForeground },
         "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
           backgroundColor: theme.selection,
         },

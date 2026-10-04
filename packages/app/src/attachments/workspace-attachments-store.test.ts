@@ -172,6 +172,30 @@ describe("workspace attachments store", () => {
     ]);
   });
 
+  it("replaces only the review attachment of a scope", () => {
+    resetWorkspaceAttachmentsStore();
+    const scopeKey = buildWorkspaceAttachmentScopeKey({
+      serverId: "local",
+      workspaceId: "workspace-1",
+      cwd: "/repo",
+    });
+    const context = contextAttachment("comment-1");
+    const first = reviewAttachment("First.");
+    const second = reviewAttachment("Second.");
+    const store = useWorkspaceAttachmentsStore.getState();
+
+    store.setReviewAttachment({ scopeKey, attachment: first });
+    store.addWorkspaceAttachment({ scopeKey, attachment: context });
+    store.setReviewAttachment({ scopeKey, attachment: second });
+    expect(useWorkspaceAttachmentsStore.getState().attachmentsByScope[scopeKey]).toEqual([
+      context,
+      second,
+    ]);
+
+    store.setReviewAttachment({ scopeKey, attachment: null });
+    expect(useWorkspaceAttachmentsStore.getState().attachmentsByScope[scopeKey]).toEqual([context]);
+  });
+
   it("collects attachments across requested scopes in scope order", () => {
     const draftScopeKey = buildDraftWorkspaceAttachmentScopeKey("draft-1");
     const workspaceScopeKey = buildWorkspaceAttachmentScopeKey({

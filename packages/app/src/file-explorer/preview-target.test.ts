@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveFilePreviewReadTarget } from "./preview-target";
+import { resolveFilePreviewReadTarget, workspaceRelativeFilePath } from "./preview-target";
 
 describe("resolveFilePreviewReadTarget", () => {
   it("uses the workspace cwd for relative paths", () => {
@@ -68,6 +68,40 @@ describe("resolveFilePreviewReadTarget", () => {
       resolveFilePreviewReadTarget({
         path: "src/app.ts",
         workspaceRoot: "relative/root",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("workspaceRelativeFilePath", () => {
+  const workspaceRoot = "/Users/test/project/";
+
+  it("keeps a relative path and strips the workspace root from an absolute one", () => {
+    expect(
+      workspaceRelativeFilePath({
+        target: { cwd: "/Users/test/project", path: "./src/message.tsx" },
+        workspaceRoot,
+      }),
+    ).toBe("src/message.tsx");
+    expect(
+      workspaceRelativeFilePath({
+        target: { cwd: "/Users/test/project", path: "/Users/test/project/src/message.tsx" },
+        workspaceRoot,
+      }),
+    ).toBe("src/message.tsx");
+  });
+
+  it("has no path for a file outside the workspace", () => {
+    expect(
+      workspaceRelativeFilePath({
+        target: { cwd: "/", path: "/etc/hosts" },
+        workspaceRoot,
+      }),
+    ).toBeNull();
+    expect(
+      workspaceRelativeFilePath({
+        target: { cwd: "~", path: "~/notes.md" },
+        workspaceRoot,
       }),
     ).toBeNull();
   });

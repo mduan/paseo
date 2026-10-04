@@ -90,7 +90,7 @@ import type { WorkspaceTabPlacement } from "@/stores/workspace-layout-actions";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { isWeb } from "@/constants/platform";
-import { usePublishWorkingDiffAttachment, useWorkingDiff } from "@/git/use-working-diff";
+import { useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { DiffTooLargeState } from "@/git/diff-too-large-state";
 import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
@@ -1593,7 +1593,6 @@ export function ChangesSurface({
     diffTooLarge,
     isDiffLoading,
     reviewActions,
-    reviewAttachment,
     onExpandGap,
   } = useWorkingDiff({
     serverId,
@@ -1601,13 +1600,6 @@ export function ChangesSurface({
     cwd,
     ignoreWhitespace: preferences.hideWhitespace,
     enabled: enabled !== false,
-  });
-  usePublishWorkingDiffAttachment({
-    serverId,
-    workspaceId: workspaceId ?? undefined,
-    cwd,
-    attachment: reviewAttachment,
-    enabled: true,
   });
   const {
     status: pullRequestStatus,

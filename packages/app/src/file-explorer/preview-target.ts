@@ -105,3 +105,20 @@ export function resolveFilePreviewReadTarget(input: {
     path: previewPath,
   };
 }
+
+/** The read target's path relative to the workspace root, or null for a file outside it. */
+export function workspaceRelativeFilePath(input: {
+  target: FilePreviewReadTarget;
+  workspaceRoot: string;
+}): string | null {
+  const root = normalizeForPathComparison(input.workspaceRoot.trim());
+  if (!root || normalizeForPathComparison(input.target.cwd) !== root) {
+    return null;
+  }
+  const path = normalizeForPathComparison(input.target.path);
+  if (!isAbsolutePath(path)) {
+    return path.replace(/^(\.\/)+/, "") || null;
+  }
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) || null : null;
+}

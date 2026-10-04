@@ -262,6 +262,43 @@ describe("prompt attachments", () => {
     );
   });
 
+  it("omits the hunk header line for a comment without one", () => {
+    expect(
+      renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo",
+        mode: "base",
+        comments: [
+          {
+            filePath: "src/index.ts",
+            side: "new",
+            lineNumber: 2,
+            body: "Rename this.",
+            context: {
+              hunkHeader: "",
+              targetLine: { oldLineNumber: null, newLineNumber: 2, type: "context", content: "b" },
+              lines: [
+                { oldLineNumber: null, newLineNumber: 1, type: "context", content: "a" },
+                { oldLineNumber: null, newLineNumber: 2, type: "context", content: "b" },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Paseo review attachment (base)",
+        "CWD: /tmp/repo",
+        "",
+        "Comment 1: src/index.ts:R2",
+        "Rename this.",
+        "   -  1  a",
+        ">  -  2  b",
+      ].join("\n"),
+    );
+  });
+
   it("renders github_issue attachments as readable text", () => {
     expect(
       renderPromptAttachmentAsText({

@@ -210,6 +210,7 @@ import {
 } from "@/workspace/file-open";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-checkout-status";
+import { usePublishReviewAttachment } from "@/git/use-working-diff";
 import { useHasPullRequest, usePullRequestAutoAdd } from "@/panels/pull-request";
 
 const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
@@ -1385,6 +1386,17 @@ function WorkspaceDocumentTitleEffectSlot({
       )}
     </WorkspaceTabPresentationResolver>
   );
+}
+
+/** Review comments reach the composer whichever panes are open, so this lives at workspace level. */
+function WorkspaceReviewAttachmentPublisher(input: {
+  serverId: string;
+  workspaceId: string;
+  cwd: string | null;
+}) {
+  // Without a directory the checkout status never loads, so nothing is published.
+  usePublishReviewAttachment({ ...input, cwd: input.cwd ?? "" });
+  return null;
 }
 
 function shouldShowWorkspaceScreenHeader(input: {
@@ -4164,6 +4176,11 @@ function WorkspaceScreenContent({
           serverId={normalizedServerId}
           workspaceId={normalizedWorkspaceId}
           isRouteFocused={isRouteFocused}
+        />
+        <WorkspaceReviewAttachmentPublisher
+          serverId={normalizedServerId}
+          workspaceId={normalizedWorkspaceId}
+          cwd={workspaceDirectory}
         />
         <View style={styles.threePaneRow}>
           <FloatingPanelPortalHostNameProvider hostName={workspaceFloatingPanelPortalHostName}>

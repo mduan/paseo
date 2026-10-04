@@ -103,12 +103,11 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
         const location = isSingleLine
           ? formatReviewLine(end)
           : `${formatReviewLine(start)}-${formatReviewLine(end)}`;
-        lines.push(
-          "",
-          `Comment ${index + 1}: ${comment.filePath}:${location}`,
-          comment.body,
-          comment.context.hunkHeader,
-        );
+        lines.push("", `Comment ${index + 1}: ${comment.filePath}:${location}`, comment.body);
+        // File viewer comments have no hunk.
+        if (comment.context.hunkHeader) {
+          lines.push(comment.context.hunkHeader);
+        }
         const contextLines = comment.context.lines;
         const startIndex = contextLines.findIndex((line) => isReviewLine(line, start));
         const endIndex = contextLines.findIndex((line) => isReviewLine(line, end));

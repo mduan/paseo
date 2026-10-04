@@ -7,6 +7,8 @@ import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";
 import { editorTheme } from "../editor/extensions.web";
 import { lineTargetHighlight, revealLineTarget } from "../editor/line-target.web";
+import { fileReviewCompartment } from "../editor/review-comments.web";
+import { FileReviewLayer, type FileReviewConfig } from "../editor/review-layer.web";
 import { selectSourcePresentation, type SourcePresentation } from "./presentation";
 
 interface FileSourceViewProps {
@@ -17,6 +19,7 @@ interface FileSourceViewProps {
   size: number;
   theme: EditorVisualTheme;
   tooLargeMessage: string;
+  review?: FileReviewConfig;
 }
 
 const languageCompartment = new Compartment();
@@ -30,6 +33,7 @@ export function FileSourceView({
   size,
   theme,
   tooLargeMessage,
+  review,
 }: FileSourceViewProps) {
   const presentation = selectSourcePresentation({ size, platform: "web" });
   if (presentation === "unsupported") {
@@ -47,6 +51,7 @@ export function FileSourceView({
       navigationRevision={navigationRevision}
       presentation={presentation}
       theme={theme}
+      review={review}
     />
   );
 }
@@ -58,12 +63,14 @@ function ReadonlyCodeMirror({
   navigationRevision,
   presentation,
   theme,
+  review,
 }: Omit<FileSourceViewProps, "size" | "tooLargeMessage"> & {
   presentation: Exclude<SourcePresentation, "unsupported">;
 }) {
   const [find] = useState(() => new FileFindModel());
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const [mountedView, setMountedView] = useState<EditorView>();
   const initial = useRef({ content, filename, presentation, theme });
 
   useEffect(() => {
@@ -82,6 +89,7 @@ function ReadonlyCodeMirror({
           }),
           EditorView.editable.of(false),
           lineTargetHighlight,
+          fileReviewCompartment.of([]),
           languageCompartment.of(
             languageFor({ filename: values.filename, presentation: values.presentation }),
           ),
@@ -90,9 +98,11 @@ function ReadonlyCodeMirror({
       }),
     });
     viewRef.current = view;
+    setMountedView(view);
     return () => {
       view.destroy();
       viewRef.current = null;
+      setMountedView(undefined);
     };
   }, [find]);
 
@@ -121,6 +131,7 @@ function ReadonlyCodeMirror({
     <div style={FRAME_STYLE}>
       <div ref={hostRef} data-testid="file-source-editor" style={HOST_STYLE} />
       <FileFind model={find} editor={viewRef} />
+      {mountedView && review ? <FileReviewLayer view={mountedView} review={review} /> : null}
     </div>
   );
 }

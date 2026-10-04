@@ -9,6 +9,8 @@ import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
 import { editorBaseExtensions, editorTheme, type EditorVisualTheme } from "./extensions.web";
 import { lineTargetHighlight, revealLineTarget } from "./line-target.web";
+import { fileReviewCompartment } from "./review-comments.web";
+import { FileReviewLayer, type FileReviewConfig } from "./review-layer.web";
 
 interface FileEditorViewProps {
   model: FileEditorModel;
@@ -19,6 +21,7 @@ interface FileEditorViewProps {
   theme: EditorVisualTheme;
   onCursorChange(position: { line: number; column: number }): void;
   onVimModeChange(mode: string | null): void;
+  review?: FileReviewConfig;
 }
 
 const languageCompartment = new Compartment();
@@ -39,10 +42,12 @@ export function FileEditorView({
   theme,
   onCursorChange,
   onVimModeChange,
+  review,
 }: FileEditorViewProps) {
   const [find] = useState(() => new FileFindModel());
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const [mountedView, setMountedView] = useState<EditorView>();
   const snapshot = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   const initial = useRef({ filename, model, theme, vimEnabled, content: snapshot.content });
   const onCursorChangeRef = useRef(onCursorChange);
@@ -60,6 +65,7 @@ export function FileEditorView({
           find.extension,
           ...editorBaseExtensions(() => void values.model.save()),
           lineTargetHighlight,
+          fileReviewCompartment.of([]),
           languageCompartment.of(getLanguageForFile(values.filename)?.extension ?? []),
           wrappingCompartment.of(wrappingForFile(values.filename)),
           themeCompartment.of(editorTheme(values.theme)),
@@ -81,10 +87,12 @@ export function FileEditorView({
       }),
     });
     viewRef.current = view;
+    setMountedView(view);
     onCursorChangeRef.current({ line: 1, column: 1 });
     return () => {
       view.destroy();
       viewRef.current = null;
+      setMountedView(undefined);
     };
   }, [find]);
 
@@ -148,6 +156,7 @@ export function FileEditorView({
         style={HOST_STYLE}
       />
       <FileFind model={find} editor={viewRef} />
+      {mountedView && review ? <FileReviewLayer view={mountedView} review={review} /> : null}
     </div>
   );
 }

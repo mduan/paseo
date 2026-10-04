@@ -21,6 +21,7 @@ import { isWeb } from "@/constants/platform";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import type { Theme } from "@/styles/theme";
 import { useReviewDraftComments, useReviewDraftStore, type ReviewDraftComment } from "./store";
+import type { ReviewDraftCommentContext } from "./state";
 import { buildReviewableDiffTargetKey, type ReviewableDiffTarget } from "@/utils/diff-layout";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import {
@@ -95,7 +96,12 @@ export function groupInlineReviewCommentsByTarget(
   return grouped;
 }
 
-export function useInlineReviewController(input: { reviewDraftKey: string }): InlineReviewActions {
+export function useInlineReviewController(input: {
+  reviewDraftKey: string;
+  /** Surrounding lines for a new comment, read from the viewer it is made in. */
+  buildContext: (range: ReviewLineRange) => ReviewDraftCommentContext | undefined;
+}): InlineReviewActions {
+  const { buildContext } = input;
   const reviewComments = useReviewDraftComments(input.reviewDraftKey);
   const commentsByTarget = useMemo(
     () => groupInlineReviewCommentsByTarget(reviewComments),
@@ -137,13 +143,14 @@ export function useInlineReviewController(input: { reviewDraftKey: string }): In
             startSide: current.start?.side,
             startLineNumber: current.start?.lineNumber,
             content: current.target.content,
+            context: buildContext(editorLineRange(current)),
             body: trimmedBody,
           },
         });
       }
       return true;
     },
-    [addComment, input.reviewDraftKey, updateComment],
+    [addComment, buildContext, input.reviewDraftKey, updateComment],
   );
 
   const openEditor = useCallback(

@@ -1,7 +1,11 @@
 import { z } from "zod";
+import { ReviewAttachmentCommentSchema } from "@getpaseo/protocol/messages";
 
 export type ReviewDraftMode = "uncommitted" | "base";
 export type ReviewDraftSide = "old" | "new";
+
+const ReviewDraftCommentContextSchema = ReviewAttachmentCommentSchema.shape.context;
+export type ReviewDraftCommentContext = z.infer<typeof ReviewDraftCommentContextSchema>;
 
 export interface ReviewDraftComment {
   id: string;
@@ -13,6 +17,8 @@ export interface ReviewDraftComment {
   startLineNumber?: number;
   /** The anchor line's text, so the comment still has context once that line is out of the diff. */
   content?: string;
+  /** Lines around the range, captured by the viewer the comment was made in. */
+  context?: ReviewDraftCommentContext;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +42,7 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   startSide: z.enum(["old", "new"]).optional(),
   startLineNumber: z.number().int().positive().optional(),
   content: z.string().optional(),
+  context: ReviewDraftCommentContextSchema.optional(),
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
