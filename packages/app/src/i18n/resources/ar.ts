@@ -517,6 +517,11 @@ export const ar: TranslationResources = {
         noFiles: "لا توجد ملفات",
         noVisibleFiles: "لا توجد ملفات مرئية",
       },
+      search: {
+        placeholder: "البحث في الملفات",
+        clear: "مسح البحث",
+        noResults: "لا توجد ملفات مطابقة",
+      },
       states: {
         unavailable: "Workspace غير متوفر",
         loading: "جارٍ تحميل الملفات...",

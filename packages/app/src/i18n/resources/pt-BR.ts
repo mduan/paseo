@@ -522,6 +522,11 @@ export const ptBR: TranslationResources = {
         noFiles: "Nenhum arquivo",
         noVisibleFiles: "Nenhum arquivo visível",
       },
+      search: {
+        placeholder: "Buscar arquivos",
+        clear: "Limpar busca",
+        noResults: "Nenhum arquivo correspondente",
+      },
       states: {
         unavailable: "Workspace indisponível",
         loading: "Carregando arquivos...",

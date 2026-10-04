@@ -38,6 +38,8 @@ import {
   WORKSPACE_TREE_LOADING_ICON_SIZE,
 } from "@/components/tree-primitives";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SearchField } from "@/components/ui/search-field";
+import { FileExplorerSearchResults } from "@/components/file-explorer-search-results";
 import {
   PaneContentToolbar,
   paneContentToolbarIconSize,
@@ -1058,6 +1060,9 @@ export function FileExplorerPane({
       style={styles.container}
     >
       <FileExplorerPaneContent
+        serverId={serverId}
+        workspaceId={workspaceId ?? null}
+        onOpenFile={onOpenFile}
         error={error}
         isCompact={isCompact}
         showInitialLoading={showInitialLoading}
@@ -1132,6 +1137,9 @@ function RootCreationContextTarget({
 }
 
 interface FileExplorerPaneContentProps {
+  serverId: string;
+  workspaceId: string | null;
+  onOpenFile?: (filePath: string) => void;
   error: string | null;
   isCompact: boolean;
   showInitialLoading: boolean;
@@ -1155,6 +1163,9 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const {
+    serverId,
+    workspaceId,
+    onOpenFile,
     error,
     isCompact,
     showInitialLoading,
@@ -1175,6 +1186,7 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
   } = props;
 
   const showHiddenFiles = usePanelStore((state) => state.explorerShowHiddenFiles);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleNewFileAtRoot = useCallback(() => {
     onNewEntryAtRoot?.(".", "file");
@@ -1313,42 +1325,61 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
           </ToolbarButton>
         </ToolbarControls>
       </PaneContentToolbar>
-      <ContextMenu>
-        <RootCreationContextTarget enabled={Boolean(onNewEntryAtRoot)}>
-          {listRows.length === 0 ? (
-            <View style={styles.centerState}>
-              <Text style={styles.emptyText}>{emptyLabel}</Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={treeListRef}
-              style={styles.treeList}
-              data={listRows}
-              renderItem={renderTreeRow}
-              keyExtractor={listRowKeyExtractor}
-              testID="file-explorer-tree-scroll"
-              contentContainerStyle={styles.entriesContent}
-              onLayout={scrollbar.onLayout}
-              onScroll={scrollbar.onScroll}
-              onContentSizeChange={scrollbar.onContentSizeChange}
-              scrollEventThrottle={16}
-              showsVerticalScrollIndicator={!scrollbar.enabled}
-              initialNumToRender={24}
-              maxToRenderPerBatch={40}
-              windowSize={12}
+      <View style={styles.searchRow}>
+        <SearchField
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t("workspace.fileExplorer.search.placeholder")}
+          clearAccessibilityLabel={t("workspace.fileExplorer.search.clear")}
+          testID="files-search-input"
+          clearTestID="files-search-clear"
+        />
+      </View>
+      {searchQuery.trim() && onOpenFile ? (
+        <FileExplorerSearchResults
+          serverId={serverId}
+          workspaceId={workspaceId}
+          query={searchQuery}
+          onOpenFile={onOpenFile}
+        />
+      ) : (
+        <ContextMenu>
+          <RootCreationContextTarget enabled={Boolean(onNewEntryAtRoot)}>
+            {listRows.length === 0 ? (
+              <View style={styles.centerState}>
+                <Text style={styles.emptyText}>{emptyLabel}</Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={treeListRef}
+                style={styles.treeList}
+                data={listRows}
+                renderItem={renderTreeRow}
+                keyExtractor={listRowKeyExtractor}
+                testID="file-explorer-tree-scroll"
+                contentContainerStyle={styles.entriesContent}
+                onLayout={scrollbar.onLayout}
+                onScroll={scrollbar.onScroll}
+                onContentSizeChange={scrollbar.onContentSizeChange}
+                scrollEventThrottle={16}
+                showsVerticalScrollIndicator={!scrollbar.enabled}
+                initialNumToRender={24}
+                maxToRenderPerBatch={40}
+                windowSize={12}
+              />
+            )}
+            {listRows.length > 0 ? scrollbar.overlay : null}
+          </RootCreationContextTarget>
+          {onNewEntryAtRoot ? (
+            <FileActionsContextMenuContent
+              fileKind="directory"
+              onNewFile={handleNewFileAtRoot}
+              onNewFolder={handleNewFolderAtRoot}
+              testIDPrefix="files-empty-area"
             />
-          )}
-          {listRows.length > 0 ? scrollbar.overlay : null}
-        </RootCreationContextTarget>
-        {onNewEntryAtRoot ? (
-          <FileActionsContextMenuContent
-            fileKind="directory"
-            onNewFile={handleNewFileAtRoot}
-            onNewFolder={handleNewFolderAtRoot}
-            testIDPrefix="files-empty-area"
-          />
-        ) : null}
-      </ContextMenu>
+          ) : null}
+        </ContextMenu>
+      )}
     </View>
   );
 }
@@ -1683,6 +1714,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: theme.colors.surfaceSidebar,
+  },
+  searchRow: {
+    flexDirection: "row",
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[2],
     backgroundColor: theme.colors.surfaceSidebar,
   },
   sortTrigger: {

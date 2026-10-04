@@ -523,6 +523,11 @@ export const fr: TranslationResources = {
         noFiles: "Aucun fichier",
         noVisibleFiles: "Aucun fichier visible",
       },
+      search: {
+        placeholder: "Rechercher des fichiers",
+        clear: "Effacer la recherche",
+        noResults: "Aucun fichier correspondant",
+      },
       states: {
         unavailable: "Workspacen'est pas disponible",
         loading: "Chargement des fichiers...",
