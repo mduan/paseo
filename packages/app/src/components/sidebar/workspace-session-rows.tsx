@@ -410,8 +410,9 @@ function AgentActivityAge({ serverId, agentId }: { serverId: string; agentId: st
   return label ? <Text style={styles.age}>{label}</Text> : null;
 }
 
-// The icon lines up under the workspace status slot: row padding plus centering 14px in 16px.
-const SESSION_ROW_INSET = 8 + 1 - 4;
+// The icon sits just right of the workspace status dot: row padding, centering 14px in 16px, and a
+// 4px indent.
+const SESSION_ROW_INSET = 8 + 1 - 4 + 4;
 
 const styles = StyleSheet.create((theme) => ({
   list: {
@@ -442,8 +443,9 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
   },
+  // The workspace group already paints surfaceSidebarHover while hovered.
   rowHovered: {
-    backgroundColor: theme.colors.surfaceSidebarHover,
+    backgroundColor: theme.colors.surface2,
   },
   rowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
