@@ -26,7 +26,6 @@ import { useFocusedChatTarget } from "@/panels/use-add-file-to-chat";
 import { useAgentTurnDiff, useTurnDiffsEnabled } from "@/turn-diffs/queries";
 
 const LAST_TURN_TARGET = { kind: "last_turn" } as const;
-const SESSION_TARGET = { kind: "session" } as const;
 
 interface UseWorkingDiffOptions {
   serverId: string;
@@ -151,13 +150,7 @@ function useResolvedDiffComparison(input: {
   const selectUncommitted = useCallback(() => selectComparison("uncommitted"), [selectComparison]);
   const selectBase = useCallback(() => selectComparison("base"), [selectComparison]);
   const turnModes = useMemo(
-    () =>
-      turnDiffsEnabled
-        ? {
-            selectLastTurn: () => selectComparison("last_turn"),
-            selectSession: () => selectComparison("session"),
-          }
-        : null,
+    () => (turnDiffsEnabled ? { selectLastTurn: () => selectComparison("last_turn") } : null),
     [selectComparison, turnDiffsEnabled],
   );
   const isTurn = isTurnDiffComparison(comparison);
@@ -211,7 +204,7 @@ function useTurnComparisonDiff(input: {
   const query = useAgentTurnDiff({
     serverId: input.serverId,
     agentId,
-    target: input.comparison === "session" ? SESSION_TARGET : LAST_TURN_TARGET,
+    target: LAST_TURN_TARGET,
     ignoreWhitespace: input.ignoreWhitespace,
     enabled: input.enabled && input.comparison !== null,
   });

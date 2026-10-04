@@ -1,12 +1,12 @@
 export type CheckoutDiffComparison = "uncommitted" | "base";
 /** Frozen snapshots of the focused agent's turns; they don't follow the dirty state. */
-export type TurnDiffComparison = "last_turn" | "session";
+export type TurnDiffComparison = "last_turn";
 export type WorkingDiffComparison = CheckoutDiffComparison | TurnDiffComparison;
 
 export function isTurnDiffComparison(
   comparison: WorkingDiffComparison,
 ): comparison is TurnDiffComparison {
-  return comparison === "last_turn" || comparison === "session";
+  return comparison === "last_turn";
 }
 
 export interface WorkingDiffComparisonOverride {

@@ -284,7 +284,6 @@ export function DiffLayoutToggle({
 
 interface TurnDiffModes {
   selectLastTurn: () => void;
-  selectSession: () => void;
 }
 
 interface DiffModeMenuProps {
@@ -299,7 +298,6 @@ const DIFF_MODE_LABEL_KEYS = {
   uncommitted: "workspace.git.diff.uncommitted",
   base: "workspace.git.diff.committed",
   last_turn: "workspace.git.diff.lastTurn",
-  session: "workspace.git.diff.chatSession",
 } as const satisfies Record<WorkingDiffComparison, string>;
 
 export function DiffModeMenu({
@@ -357,13 +355,6 @@ export function DiffModeMenu({
               onSelect={turnModes.selectLastTurn}
             >
               {t(DIFF_MODE_LABEL_KEYS.last_turn)}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testID={`${testIDPrefix}-mode-session`}
-              selected={diffMode === "session"}
-              onSelect={turnModes.selectSession}
-            >
-              {t(DIFF_MODE_LABEL_KEYS.session)}
             </DropdownMenuItem>
           </>
         ) : null}
@@ -1191,7 +1182,6 @@ function resolveChangesEmptyMessage(input: {
 }): string {
   if (input.isTurnSnapshotMissing) return input.t("workspace.git.diff.noTurnSnapshot");
   if (input.diffMode === "last_turn") return input.t("workspace.git.diff.noLastTurnChanges");
-  if (input.diffMode === "session") return input.t("workspace.git.diff.noSessionChanges");
   return input.t("diffViewer.empty");
 }
 
