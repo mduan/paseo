@@ -579,23 +579,6 @@ function ChangesHeader({ compact, repository, comparison, sidebarSurface }: Chan
         model={repository}
         sidebarSurface={sidebarSurface}
       />
-      {repository.branchName && repository.baseRefLabel ? (
-        <ChangesToolbarRow
-          compact={compact}
-          sidebarSurface={sidebarSurface}
-          testID="changes-base-header"
-          trailing="glyph"
-        >
-          <ChangesToolbarLeading>
-            <BaseRefSwitcher
-              baseRefLabel={repository.baseRefLabel}
-              serverId={repository.serverId}
-              workspaceId={repository.workspaceId ?? repository.cwd}
-              cwd={repository.cwd}
-            />
-          </ChangesToolbarLeading>
-        </ChangesToolbarRow>
-      ) : null}
       <ChangesComparisonToolbar
         compact={compact}
         model={comparison}
@@ -691,6 +674,14 @@ function ChangesRepositoryToolbar({
           isGitCheckout
           testID="changes-branch-switcher"
         />
+        {model.branchName && model.baseRefLabel ? (
+          <BaseRefSwitcher
+            baseRefLabel={model.baseRefLabel}
+            serverId={model.serverId}
+            workspaceId={model.workspaceId ?? model.cwd}
+            cwd={model.cwd}
+          />
+        ) : null}
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
         {model.pullRequest ? (

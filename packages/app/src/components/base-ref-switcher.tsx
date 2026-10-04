@@ -138,8 +138,10 @@ const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 1,
-    minWidth: 0,
+    // Shares a row with the branch switcher: the branch name truncates first, and the cap
+    // keeps a long base name from taking the whole row.
+    flexShrink: 0,
+    maxWidth: "50%",
     gap: theme.spacing[1],
   },
   anchor: {
