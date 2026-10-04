@@ -413,7 +413,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-cmd-alt-e-mac",
     action: "workspace.tab.rename",
-    combo: "Cmd+Alt+E",
+    combo: "Cmd+Alt+T",
     when: { mac: true, commandCenter: false },
     help: {
       id: "workspace-tab-rename",
@@ -424,7 +424,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "workspace-tab-rename-ctrl-alt-e-non-mac",
     action: "workspace.tab.rename",
-    combo: "Ctrl+Alt+E",
+    combo: "Ctrl+Alt+T",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "workspace-tab-rename",
@@ -1076,7 +1076,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "theme-cycle-cmd-shift-t-mac",
     action: "theme.cycle",
-    combo: "Cmd+Alt+T",
+    combo: "",
     when: { mac: true, commandCenter: false },
     help: {
       id: "cycle-theme",
@@ -1087,7 +1087,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
   {
     id: "theme-cycle-ctrl-alt-t-non-mac",
     action: "theme.cycle",
-    combo: "Ctrl+Alt+T",
+    combo: "",
     when: { mac: false, commandCenter: false, terminal: false },
     help: {
       id: "cycle-theme",

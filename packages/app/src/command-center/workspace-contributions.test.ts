@@ -75,6 +75,16 @@ function source(gitActions: GitActions): {
         unpin: "Unpin",
         showSetup: "Show setup",
         labelsGroup: "Labels",
+        newTab: "New tab",
+        searchFiles: "Search files",
+        previousWorkspace: "Previous workspace",
+        nextWorkspace: "Next workspace",
+        focusMessageInput: "Focus message input",
+        cycleAgentMode: "Cycle agent mode",
+        toggleVoiceMode: "Toggle voice mode",
+        toggleDictation: "Start/stop dictation",
+        interruptAgent: "Interrupt agent",
+        toggleVoiceMute: "Mute/unmute voice mode",
       },
       icons: {},
       shortcuts: {},
@@ -102,6 +112,8 @@ function source(gitActions: GitActions): {
       toggleLabel: (name, assigned) => {
         toggledLabels.push({ name, assigned });
       },
+      searchFiles: () => undefined,
+      navigateWorkspace: () => undefined,
     },
     runGitActions,
     dispatched,
@@ -347,6 +359,25 @@ describe("workspace command center contributions", () => {
     );
     expect(focusToggles).toHaveLength(1);
     expect(focusToggles[0]?.id).toBe("pane:focus-mode-toggle");
+  });
+
+  it("lists agent input commands only on an agent tab and dispatches them to the composer", () => {
+    const fixture = source({ primary: null, secondary: [], menu: [] });
+    expect(
+      buildWorkspaceCommandCenterContributions(fixture.value).some((item) =>
+        item.id.startsWith("agent-input:"),
+      ),
+    ).toBe(false);
+
+    fixture.value.activeTabKind = "agent";
+    fixture.value.activeTabCount = 1;
+    fixture.value.activeTabIndex = 0;
+    const interrupt = buildWorkspaceCommandCenterContributions(fixture.value).find(
+      (item) => item.id === "agent-input:interrupt",
+    );
+    void interrupt?.run();
+
+    expect(fixture.dispatched).toEqual([{ id: "agent.interrupt", scope: "global" }]);
   });
 
   it("omits the labels group when the catalog hasn't loaded", () => {

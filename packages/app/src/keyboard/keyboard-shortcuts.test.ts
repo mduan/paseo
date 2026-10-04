@@ -345,10 +345,10 @@ describe("keyboard-shortcuts", () => {
     // Option+[ -> "“", Option+Shift+W -> "„", etc.). Every Alt-bound
     // letter / bracket shortcut must still resolve.
     {
-      name: "matches Cmd+Alt+T to cycle theme on macOS when Option substitutes event.key",
+      name: "matches Cmd+Alt+T to rename tab on macOS when Option substitutes event.key",
       event: { key: "\u2020", code: "KeyT", metaKey: true, altKey: true },
       context: { isMac: true },
-      action: "theme.cycle",
+      action: "workspace.tab.rename",
     },
     {
       name: "matches Alt+Shift+[ to previous tab on macOS when Option substitutes event.key",
@@ -538,9 +538,9 @@ describe("keyboard-shortcuts", () => {
     },
     // Sanity: the macOS Option-substitution fallback must still respect
     // modifier checks — pressing Option+T alone (no Cmd) must not trigger
-    // the Cmd+Alt+T theme-cycle binding.
+    // the Cmd+Alt+T rename-tab binding.
     {
-      name: "does not cycle theme on macOS when Cmd is missing (Alt+T alone)",
+      name: "does not rename tab on macOS when Cmd is missing (Alt+T alone)",
       event: { key: "\u2020", code: "KeyT", altKey: true },
       context: { isMac: true },
     },
