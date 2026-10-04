@@ -72,6 +72,45 @@ describe("CodexPrices", () => {
   });
 });
 
+describe("CodexPrices.claudeRequestCostUsd", () => {
+  const prices = new CodexPrices({
+    "claude-opus-5-5": {
+      input_cost_per_token: 4e-6,
+      cache_creation_input_token_cost: 5e-6,
+      cache_creation_input_token_cost_above_1hr: 8e-6,
+      cache_read_input_token_cost: 2e-7,
+      output_cost_per_token: 2e-5,
+    },
+  });
+
+  test("prices input, each cache write duration, cache reads, and output separately", () => {
+    // 10k × $4/M + 20k × $5/M + 30k × $8/M + 1M × $0.20/M + 5k × $20/M = $0.68
+    expect(
+      prices.claudeRequestCostUsd({
+        model: "claude-opus-5-5",
+        inputTokens: 10_000,
+        cacheWrite5mTokens: 20_000,
+        cacheWrite1hTokens: 30_000,
+        cacheReadTokens: 1_000_000,
+        outputTokens: 5_000,
+      }),
+    ).toBeCloseTo(0.68);
+  });
+
+  test("has no price for a model missing from the list", () => {
+    expect(
+      prices.claudeRequestCostUsd({
+        model: "claude-unknown",
+        inputTokens: 1,
+        cacheWrite5mTokens: 0,
+        cacheWrite1hTokens: 0,
+        cacheReadTokens: 0,
+        outputTokens: 1,
+      }),
+    ).toBeUndefined();
+  });
+});
+
 describe("CodexPriceList", () => {
   let dir: string;
   let cacheFile: string;

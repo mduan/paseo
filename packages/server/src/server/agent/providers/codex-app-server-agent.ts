@@ -54,8 +54,9 @@ import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
 import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
-import { CodexPriceList, type CodexPrices } from "./codex/pricing.js";
+import { type CodexPriceList, type CodexPrices, getSharedCodexPriceList } from "./codex/pricing.js";
 import { CodexRolloutCost } from "./codex/rollout-cost.js";
+import { formatSubagentCost, formatSubagentTokens } from "../provider-subagents/subtitle-format.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -1053,14 +1054,6 @@ function filterCodexThreadsByCwd(
   return threads.filter(
     (thread) => typeof thread.cwd === "string" && belongsToWorkspace(thread.cwd),
   );
-}
-
-let sharedCodexPriceList: CodexPriceList | undefined;
-
-// One price list per daemon, so every Codex session and custom Codex provider shares one fetch.
-function getSharedCodexPriceList(logger: Logger): CodexPriceList {
-  sharedCodexPriceList ??= new CodexPriceList({ logger });
-  return sharedCodexPriceList;
 }
 
 enum CodexCostStatus {
@@ -3466,6 +3459,15 @@ interface CodexSubAgentCallState {
   childThreadIds: Set<string>;
 }
 
+/** What a child thread's subtitle reports. Codex reports tokens per thread but no cost. */
+interface CodexSubAgentUsage {
+  model?: string;
+  tokens?: number;
+  costUsd?: number;
+  rolloutCost?: Promise<CodexRolloutCost | undefined>;
+  subtitle?: string;
+}
+
 function resolveCodexParentSubagentId(
   parentCallId: string | null,
   emittingThreadId: string | null,
@@ -3548,6 +3550,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   private emittedProviderSubagentUserMessageKeys = new Set<string>();
   private subAgentCallsByCallId = new Map<string, CodexSubAgentCallState>();
   private subAgentCallIdByChildThreadId = new Map<string, string>();
+  private subAgentUsageByThreadId = new Map<string, CodexSubAgentUsage>();
   private pendingSubAgentNotificationsByThreadId = new Map<string, ParsedCodexNotification[]>();
   private warnedUnknownNotificationMethods = new Set<string>();
   private warnedInvalidNotificationPayloads = new Set<string>();
@@ -4040,6 +4043,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const { timeline, subAgentRoutes } = history;
     this.subAgentCallsByCallId.clear();
     this.subAgentCallIdByChildThreadId.clear();
+    this.subAgentUsageByThreadId.clear();
     this.pendingSubAgentNotificationsByThreadId.clear();
     this.persistedProviderSubagentEvents = [];
     this.loadingPersistedHistory = true;
@@ -5514,6 +5518,9 @@ export class CodexAppServerAgentSession implements AgentSession {
 
   private dispatchSubAgentNotification(parsed: ParsedCodexNotification, callId: string): void {
     switch (parsed.kind) {
+      case "token_usage_updated":
+        this.handleSubAgentTokenUsage(parsed);
+        return;
       case "thread_started":
         this.emitSubAgentActivityUpdate(callId, "running", { reopen: true });
         return;
@@ -6310,6 +6317,61 @@ export class CodexAppServerAgentSession implements AgentSession {
       });
     }
     void this.refreshRolloutCost();
+  }
+
+  private handleSubAgentTokenUsage(
+    parsed: Extract<ParsedCodexNotification, { kind: "token_usage_updated" }>,
+  ): void {
+    const threadId = parsed.threadId;
+    if (!threadId) return;
+    let usage = this.subAgentUsageByThreadId.get(threadId);
+    if (!usage) {
+      usage = {};
+      this.subAgentUsageByThreadId.set(threadId, usage);
+    }
+    // The last request's context, which is what the Claude subagent rows report as tokens too.
+    usage.tokens = toAgentUsage(parsed.tokenUsage)?.contextWindowUsedTokens;
+    this.emitSubAgentSubtitle(threadId, usage);
+    void this.refreshSubAgentCost(threadId, usage);
+  }
+
+  private async refreshSubAgentCost(threadId: string, usage: CodexSubAgentUsage): Promise<void> {
+    const priceList = this.deps.codexPriceList;
+    if (!priceList) return;
+    try {
+      usage.rolloutCost ??= this.openRolloutCost(threadId);
+      const rolloutCost = await usage.rolloutCost;
+      const prices = await priceList.get();
+      if (!rolloutCost || !prices) return;
+      usage.costUsd = await rolloutCost.read({ prices, serviceTier: this.serviceTier });
+      usage.model = rolloutCost.model;
+      if (this.subAgentUsageByThreadId.get(threadId) !== usage) return;
+      this.emitSubAgentSubtitle(threadId, usage);
+    } catch (error) {
+      usage.rolloutCost = undefined;
+      this.logger.warn({ error, threadId }, "Failed to read a Codex subagent rollout for its cost");
+    }
+  }
+
+  private emitSubAgentSubtitle(threadId: string, usage: CodexSubAgentUsage): void {
+    // A provider subtitle replaces the row's agent type, so it leads with it.
+    const callId = this.subAgentCallIdByChildThreadId.get(threadId);
+    const detail = callId ? this.subAgentCallsByCallId.get(callId)?.toolCall.detail : undefined;
+    const subtitle = [
+      detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
+      usage.model,
+      formatSubagentTokens(usage.tokens),
+      formatSubagentCost(usage.costUsd),
+    ]
+      .filter((part): part is string => part !== undefined)
+      .join(" · ");
+    if (!subtitle || subtitle === usage.subtitle) return;
+    usage.subtitle = subtitle;
+    this.emitEvent({
+      type: "provider_subagent",
+      provider: CODEX_PROVIDER,
+      event: { type: "upsert", id: threadId, subtitle },
+    });
   }
 
   private async refreshRolloutCost(): Promise<void> {

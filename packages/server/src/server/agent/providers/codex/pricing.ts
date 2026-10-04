@@ -26,7 +26,16 @@ export interface CodexRequestUsage {
   outputTokens: number;
 }
 
-/** OpenAI list prices for one model request, keyed by Codex model slug. */
+export interface ClaudeRequestUsage {
+  model: string | undefined;
+  inputTokens: number;
+  cacheWrite5mTokens: number;
+  cacheWrite1hTokens: number;
+  cacheReadTokens: number;
+  outputTokens: number;
+}
+
+/** List prices for one model request, keyed by Codex model slug or Claude model id. */
 export class CodexPrices {
   constructor(private readonly entries: Record<string, unknown>) {}
 
@@ -56,6 +65,41 @@ export class CodexPrices {
       outputTokens * outputRate
     );
   }
+
+  /**
+   * Returns undefined for a model missing from the price list.
+   * ponytail: ignores Anthropic's long-context rate, which LiteLLM lists only for some models.
+   */
+  claudeRequestCostUsd({
+    model,
+    inputTokens,
+    cacheWrite5mTokens,
+    cacheWrite1hTokens,
+    cacheReadTokens,
+    outputTokens,
+  }: ClaudeRequestUsage): number | undefined {
+    const entry = model ? toRecord(this.entries[model]) : undefined;
+    if (!entry) return undefined;
+    const inputRate = readNumber(entry.input_cost_per_token);
+    const outputRate = readNumber(entry.output_cost_per_token);
+    if (inputRate === undefined || outputRate === undefined) return undefined;
+    const cacheWrite5mRate = readNumber(entry.cache_creation_input_token_cost) ?? inputRate;
+    const cacheWrite1hRate =
+      readNumber(entry.cache_creation_input_token_cost_above_1hr) ?? cacheWrite5mRate;
+    const cacheReadRate = readNumber(entry.cache_read_input_token_cost) ?? inputRate;
+    // Anthropic counts cache reads and writes apart from input tokens.
+    return (
+      inputTokens * inputRate +
+      cacheWrite5mTokens * cacheWrite5mRate +
+      cacheWrite1hTokens * cacheWrite1hRate +
+      cacheReadTokens * cacheReadRate +
+      outputTokens * outputRate
+    );
+  }
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 interface RateTier {
@@ -170,6 +214,14 @@ export class CodexPriceList {
       return undefined;
     }
   }
+}
+
+let sharedCodexPriceList: CodexPriceList | undefined;
+
+// One price list per daemon, so every session that estimates cost shares one fetch.
+export function getSharedCodexPriceList(logger: Logger): CodexPriceList {
+  sharedCodexPriceList ??= new CodexPriceList({ logger });
+  return sharedCodexPriceList;
 }
 
 function parsePriceList(text: string): CodexPrices {
