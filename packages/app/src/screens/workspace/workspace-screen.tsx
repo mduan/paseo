@@ -1,4 +1,6 @@
+import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { registerWorkspaceTabMenuBuilder } from "@/stores/workspace-tab-menu-registry";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import { getOpenAgentTabLabel } from "@getpaseo/protocol/agent-labels";
 import {
@@ -66,6 +68,7 @@ import {
   collectAllTabs,
   DEFAULT_PANE_ID,
   findPaneById,
+  findPaneContainingTab,
   getFocusedBrowserId,
   FOCUSED_PANE_PLACEMENT,
   selectExplorerSidebarPaneId,
@@ -131,6 +134,7 @@ import {
   type WorkspaceDesktopTabRowItem,
 } from "@/screens/workspace/workspace-desktop-tabs-row";
 import {
+  buildWorkspaceDesktopTabActions,
   buildWorkspaceTabMenuEntries,
   type WorkspaceTabMenuLabels,
 } from "@/screens/workspace/workspace-tab-menu";
@@ -2975,6 +2979,56 @@ function WorkspaceScreenContent({
     },
     [handleCloseOtherTabsInPane, tabs],
   );
+
+  useEffect(() => {
+    if (!persistenceKey || !workspaceLayout) return;
+    const root = workspaceLayout.root;
+    return registerWorkspaceTabMenuBuilder(persistenceKey, (tabId) => {
+      const tab = allTabDescriptorsById.get(tabId);
+      const pane = findPaneContainingTab(root, tabId);
+      if (!tab || !pane) return null;
+      const paneTabs = pane.tabIds.flatMap((id) => allTabDescriptorsById.get(id) ?? []);
+      return buildWorkspaceDesktopTabActions({
+        tab,
+        index: paneTabs.findIndex((paneTab) => paneTab.tabId === tabId),
+        tabCount: paneTabs.length,
+        onCopyResumeCommand: handleCopyResumeCommand,
+        onCopyAgentId: handleCopyAgentId,
+        onCopyTerminalId: handleCopyTerminalId,
+        onCopyFilePath: handleCopyFilePath,
+        onReloadAgent: handleReloadAgent,
+        // The rename modal only renders on the focused workspace, so bring this one forward.
+        onRenameTab: (renameTab) => {
+          navigateToWorkspace({
+            serverId: normalizedServerId,
+            workspaceId: normalizedWorkspaceId,
+            target: renameTab.target,
+          });
+          handleRenameTab(renameTab);
+        },
+        onCloseTab: handleCloseTabById,
+        onCloseTabsToLeft: (id) => handleCloseTabsToLeftInPane(id, paneTabs),
+        onCloseTabsToRight: (id) => handleCloseTabsToRightInPane(id, paneTabs),
+        onCloseOtherTabs: (id) => handleCloseOtherTabsInPane(id, paneTabs),
+      }).menuEntries;
+    });
+  }, [
+    allTabDescriptorsById,
+    handleCloseOtherTabsInPane,
+    handleCloseTabById,
+    handleCloseTabsToLeftInPane,
+    handleCloseTabsToRightInPane,
+    handleCopyAgentId,
+    handleCopyFilePath,
+    handleCopyResumeCommand,
+    handleCopyTerminalId,
+    handleReloadAgent,
+    handleRenameTab,
+    normalizedServerId,
+    normalizedWorkspaceId,
+    persistenceKey,
+    workspaceLayout,
+  ]);
 
   const handleClosePane = useCallback(
     async (paneId: string) => {
