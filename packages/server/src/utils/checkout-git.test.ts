@@ -1068,6 +1068,21 @@ const x = 1;
     });
   });
 
+  it("keeps a chosen base on a detached HEAD across commits", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    execFileSync("git", ["checkout", "-b", "develop"], { cwd: repoDir });
+    commitFile(repoDir, "develop.txt", "develop\n", "develop commit");
+    execFileSync("git", ["checkout", "--detach"], { cwd: repoDir });
+
+    await setCurrentBranchBaseRef(repoDir, "refs/heads/develop");
+    commitFile(repoDir, "detached.txt", "detached\n", "detached commit");
+
+    await expect(getCheckoutStatus(repoDir, { paseoHome })).resolves.toMatchObject({
+      baseRef: "develop",
+      baseRefLabel: "develop",
+    });
+  });
+
   it("does not report incoming additions when the base branch is behind its remote", async () => {
     const { cloneDir } = setupRemoteTrackingMain(repoDir, tempDir);
     commitFile(cloneDir, "file.txt", "remote one\nremote two\n", "remote update");

@@ -1309,23 +1309,43 @@ function branchBaseRefConfigKey(branch: string): string {
   return `branch.${branch}.paseoBaseRef`;
 }
 
-async function getBranchBaseRef(
+// A detached HEAD has no branch to key on, and its commit moves with every commit or
+// checkout, so the base is keyed by checkout path instead. Linked worktrees share one
+// config file, so the path keeps them apart.
+function detachedBaseRefConfigKey(worktreeRoot: string): string {
+  return `paseo.${worktreeRoot}.detachedBaseRef`;
+}
+
+async function baseRefConfigKey(
   cwd: string,
-  branch: string,
+  branch: string | null,
   context?: CheckoutContext,
 ): Promise<string | null> {
-  return getGitConfigValue(cwd, branchBaseRefConfigKey(branch), context);
+  if (branch) {
+    return branchBaseRefConfigKey(branch);
+  }
+  const worktreeRoot = await getWorktreeRoot(cwd, context);
+  return worktreeRoot ? detachedBaseRefConfigKey(worktreeRoot) : null;
+}
+
+async function getBranchBaseRef(
+  cwd: string,
+  branch: string | null,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  const key = await baseRefConfigKey(cwd, branch, context);
+  return key ? getGitConfigValue(cwd, key, context) : null;
 }
 
 export async function setCurrentBranchBaseRef(cwd: string, baseRef: string): Promise<void> {
   if (!isQualifiedBranchRef(baseRef) || !(await doesGitRefExist(cwd, baseRef))) {
     throw new Error(`Base ref not found: ${baseRef}`);
   }
-  const branch = await getCurrentBranch(cwd);
-  if (!branch) {
-    throw new Error("Cannot set a base branch in detached HEAD state");
+  const key = await baseRefConfigKey(cwd, await getCurrentBranch(cwd));
+  if (!key) {
+    throw new NotGitRepoError(cwd);
   }
-  await runGitCommand(["config", branchBaseRefConfigKey(branch), baseRef], { cwd });
+  await runGitCommand(["config", key, baseRef], { cwd });
 }
 
 async function getStoredBaseRefForCwd(
@@ -1336,7 +1356,7 @@ async function getStoredBaseRefForCwd(
     return context.facts.storedBaseRef;
   }
   const currentBranch = await getCurrentBranch(cwd, context);
-  const branchBaseRef = currentBranch ? await getBranchBaseRef(cwd, currentBranch, context) : null;
+  const branchBaseRef = await getBranchBaseRef(cwd, currentBranch, context);
   if (branchBaseRef) {
     return branchBaseRef;
   }
@@ -2131,9 +2151,7 @@ export async function getCheckoutSnapshotFacts(
   const paseoWorktreeMetadata = inspected.paseoWorktree.isPaseoOwnedWorktree
     ? readPaseoWorktreeMetadata(inspected.paseoWorktree.worktreeRoot)
     : null;
-  const branchBaseRef = inspected.currentBranch
-    ? await getBranchBaseRef(cwd, inspected.currentBranch, context)
-    : null;
+  const branchBaseRef = await getBranchBaseRef(cwd, inspected.currentBranch, context);
   const storedBaseRef = branchBaseRef ?? storedBaseRefFromMetadata(paseoWorktreeMetadata);
   const resolvedBaseRef = storedBaseRef ?? (await resolveBaseRef(cwd, context));
   const mainRepoRoot = await getMainRepoRootFromCommonDir(
