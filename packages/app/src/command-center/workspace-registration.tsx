@@ -294,7 +294,7 @@ export function useWorkspaceCommandCenterActions(): void {
           previousTab: t("settings.shortcuts.help.previousTab"),
           nextTab: t("settings.shortcuts.help.nextTab"),
           closeCurrentTab: t("settings.shortcuts.help.closeCurrentTab"),
-          renameTab: t("workspace.tabs.menu.rename"),
+          renameTab: t("settings.shortcuts.help.renameTab"),
           reloadAgent: t("workspace.tabs.menu.reloadAgent"),
           copyResumeCommand: t("workspace.tabs.menu.copyResumeCommand"),
           copyAgentId: t("workspace.tabs.menu.copyAgentId"),

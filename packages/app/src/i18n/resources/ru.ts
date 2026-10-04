@@ -2351,6 +2351,7 @@ export const ru: TranslationResources = {
         archiveWorkspace: "Архивировать рабочее пространство",
         newTab: "Новая вкладка",
         closeCurrentTab: "Закрыть текущую вкладку",
+        renameTab: "Переименовать вкладку",
         jumpToWorkspace: "Перейти к рабочему пространству",
         jumpToTab: "Перейти на вкладку",
         previousWorkspace: "Предыдущее рабочее пространство",

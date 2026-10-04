@@ -217,6 +217,7 @@ const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
   "workspace-tab-target-changes": "workspace.tabs.actions.changes",
   "workspace-tab-target-files": "workspace.tabs.actions.files",
   "workspace-tab-close-current": "settings.shortcuts.help.closeCurrentTab",
+  "workspace-tab-rename": "settings.shortcuts.help.renameTab",
   "workspace-jump-index": "settings.shortcuts.help.jumpToWorkspace",
   "workspace-tab-jump-index": "settings.shortcuts.help.jumpToTab",
   "workspace-prev": "settings.shortcuts.help.previousWorkspace",
