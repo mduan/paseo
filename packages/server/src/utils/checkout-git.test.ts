@@ -47,6 +47,7 @@ import {
   isPaseoWorktreePath,
   isDescendantPath,
   warmCheckoutShortstatInBackground,
+  listCheckoutCommits,
 } from "./checkout-git.js";
 import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import { startGitCommandMetrics, stopGitCommandMetrics } from "./run-git-command.js";
@@ -1066,6 +1067,26 @@ const x = 1;
       baseRefLabel: "develop",
       aheadBehind: { ahead: 0, behind: 1 },
     });
+  });
+
+  it("keeps a chosen base on a detached HEAD across commits", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    execFileSync("git", ["checkout", "-b", "develop"], { cwd: repoDir });
+    commitFile(repoDir, "develop.txt", "develop\n", "develop commit");
+    execFileSync("git", ["checkout", "--detach"], { cwd: repoDir });
+
+    await setCurrentBranchBaseRef(repoDir, "refs/heads/develop");
+    commitFile(repoDir, "detached.txt", "detached\n", "detached commit");
+
+    await expect(getCheckoutStatus(repoDir, { paseoHome })).resolves.toMatchObject({
+      baseRef: "develop",
+      baseRefLabel: "develop",
+      aheadBehind: { ahead: 1, behind: 0 },
+    });
+    const { commits } = await listCheckoutCommits({ cwd: repoDir });
+    expect(commits.filter((commit) => !commit.isOnBase).map((commit) => commit.subject)).toEqual([
+      "detached commit",
+    ]);
   });
 
   it("does not report incoming additions when the base branch is behind its remote", async () => {

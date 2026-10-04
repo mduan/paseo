@@ -76,22 +76,18 @@ export function BranchSwitcher({
     [branchLeadingSlot],
   );
 
-  if (!displayedBranchName) {
-    return null;
-  }
-
   return (
     <View ref={anchorRef} collapsable={false} style={styles.anchor}>
       <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild>
           <ToolbarLabelSelectTrigger
             testID={testID}
-            label={displayedBranchName}
+            label={displayedBranchName ?? t("branchSwitcher.detachedHead")}
             open={isOpen}
             onPress={handleOpen}
             accessibilityRole="button"
             accessibilityLabel={t("branchSwitcher.currentBranch", {
-              branchName: displayedBranchName,
+              branchName: displayedBranchName ?? t("branchSwitcher.detachedHead"),
             })}
           />
         </TooltipTrigger>
@@ -101,7 +97,7 @@ export function BranchSwitcher({
       </Tooltip>
       <Combobox
         options={branchOptions}
-        value={displayedBranchName}
+        value={displayedBranchName ?? ""}
         onSelect={handleBranchSelect}
         searchable
         placeholder={t("branchSwitcher.placeholder")}
