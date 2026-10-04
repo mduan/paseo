@@ -1547,6 +1547,7 @@ export const en = {
     openPath: "Open path",
   },
   branchSwitcher: {
+    detachedHead: "Detached HEAD",
     triggerTooltip: "Switch workspace branch",
     currentBranch: "Current branch: {{branchName}}. Press to switch branch.",
     placeholder: "Switch branch...",

@@ -1571,6 +1571,7 @@ export const fr: TranslationResources = {
     openPath: "Ouvrir le chemin",
   },
   branchSwitcher: {
+    detachedHead: "HEAD détaché",
     triggerTooltip: "Changer la branche de l’espace de travail",
     currentBranch: "Branche actuelle:{{branchName}}. Appuyez pour changer de branche.",
     placeholder: "Changer de branche...",

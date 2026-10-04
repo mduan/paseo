@@ -674,7 +674,7 @@ function ChangesRepositoryToolbar({
           isGitCheckout
           testID="changes-branch-switcher"
         />
-        {model.branchName && model.baseRefLabel ? (
+        {model.baseRefLabel ? (
           <BaseRefSwitcher
             baseRefLabel={model.baseRefLabel}
             serverId={model.serverId}
