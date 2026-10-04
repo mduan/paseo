@@ -14,10 +14,15 @@ import type { TurnFooterHost } from "./layout";
 import { AssistantForkMenu, type AssistantForkRequest } from "@/components/assistant-fork-menu";
 import { SyncedLoader } from "@/components/synced-loader";
 import { useRetainedPanelActive } from "@/components/retained-panel";
+import { create } from "zustand";
+import { getStreamItemMessageId } from "./presentation";
 
 const ThemedSyncedLoader = withUnistyles(SyncedLoader);
 const workingIndicatorColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 export const TURN_FOOTER_BOTTOM_SPACING = SPACING[2];
+
+/** The assistant message under the pointer, so its footer can reveal while the response is hovered. */
+export const useHoveredResponseStore = create<{ messageId?: string }>(() => ({}));
 
 export type TurnContentStrategy = StreamStrategy;
 export type AssistantTurnForkHandler = (
@@ -194,13 +199,18 @@ function CompletedTurnFooter({
     },
     [boundary, onForkAssistantTurn],
   );
+  const messageItem = items[startIndex];
+  const messageId = messageItem ? getStreamItemMessageId(messageItem) : undefined;
+  const responseHovered = useHoveredResponseStore(
+    (state) => messageId !== undefined && state.messageId === messageId,
+  );
   return (
-    <View style={stylesheet.turnFooterSlot}>
+    <View style={[stylesheet.turnFooterSlot, stylesheet.completedTurnFooterSlot]}>
       <AssistantTurnFooter
         getContent={getContent}
         completedAt={timing?.completedAt}
         onFork={boundary && onForkAssistantTurn ? handleFork : undefined}
-        alwaysShowActions={alwaysShowActions}
+        alwaysShowActions={alwaysShowActions || responseHovered}
       />
     </View>
   );
@@ -219,6 +229,10 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   turnFooterRow: {
     marginTop: theme.spacing[1],
+  },
+  // Full width, so the footer's hover target spans the whole row, not just its actions.
+  completedTurnFooterSlot: {
+    alignSelf: "stretch",
   },
   turnFooterSlot: {
     flexDirection: "row",

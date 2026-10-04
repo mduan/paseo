@@ -74,6 +74,7 @@ import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import {
   CompletedTurnFooterRow,
   TurnFooter,
+  useHoveredResponseStore,
   TURN_FOOTER_BOTTOM_SPACING,
   type AssistantTurnForkHandler,
   type InFlightTurnForkHandler,
@@ -202,6 +203,11 @@ function renderStreamItemWithTurnFooter(input: {
       itemId={input.layoutItem.item.id}
       belowItemId={input.layoutItem.belowItem?.id}
       gapBelow={input.layoutItem.gapBelow}
+      responseMessageId={
+        input.layoutItem.item.kind === "assistant_message"
+          ? getStreamItemMessageId(input.layoutItem.item)
+          : undefined
+      }
     >
       {input.content}
     </StreamItemWrapper>
@@ -1728,6 +1734,9 @@ const stylesheet = StyleSheet.create((theme) => ({
   list: {
     flex: 1,
   },
+  responseHoverTarget: {
+    position: "relative",
+  },
   streamItemWrapper: {
     width: "100%",
     maxWidth: theme.contentMaxWidth,
@@ -1877,14 +1886,25 @@ interface StreamItemWrapperProps {
   itemId: string;
   belowItemId: string | undefined;
   gapBelow: number;
+  /** Set on assistant message rows; hovering one reveals its turn's footer actions. */
+  responseMessageId: string | undefined;
   children: ReactNode;
 }
 
-function StreamItemWrapper({ itemId, belowItemId, gapBelow, children }: StreamItemWrapperProps) {
+function StreamItemWrapper({
+  itemId,
+  belowItemId,
+  gapBelow,
+  responseMessageId,
+  children,
+}: StreamItemWrapperProps) {
   // The toggle moves between the final message and the first work row, which take different
   // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
   const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
-  const marginBottom = isAboveWorkToggle ? 0 : gapBelow;
+  const gap = isAboveWorkToggle ? 0 : gapBelow;
+  // Response rows take the gap as padding inside their hover target, so the pointer stays over
+  // the response between paragraphs.
+  const marginBottom = responseMessageId ? 0 : gap;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],
@@ -1892,6 +1912,39 @@ function StreamItemWrapper({ itemId, belowItemId, gapBelow, children }: StreamIt
   return (
     <View style={wrapperStyle}>
       <WorkToggleButton itemId={itemId} />
+      {responseMessageId ? (
+        <ResponseHoverTarget messageId={responseMessageId} paddingBottom={gap}>
+          {children}
+        </ResponseHoverTarget>
+      ) : (
+        children
+      )}
+    </View>
+  );
+}
+
+// Wraps only the row's content, so hovering the "Worked for" toggle above it does not count.
+function ResponseHoverTarget({
+  messageId,
+  paddingBottom,
+  children,
+}: {
+  messageId: string;
+  paddingBottom: number;
+  children: ReactNode;
+}) {
+  const handlePointerEnter = useCallback(
+    () => useHoveredResponseStore.setState({ messageId }),
+    [messageId],
+  );
+  const handlePointerLeave = useCallback(() => {
+    if (useHoveredResponseStore.getState().messageId === messageId) {
+      useHoveredResponseStore.setState({ messageId: undefined });
+    }
+  }, [messageId]);
+  const style = useMemo(() => [stylesheet.responseHoverTarget, { paddingBottom }], [paddingBottom]);
+  return (
+    <View style={style} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       {children}
     </View>
   );
