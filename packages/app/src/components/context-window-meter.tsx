@@ -116,26 +116,29 @@ function ContextWindowCostDetails({
 }) {
   const { t } = useTranslation();
   const cost = resolveAgentCostBreakdown({ totalCostUsd, subagentCostUsd });
-  const own = cost ? formatSessionCost(cost.ownCostUsd) : null;
-  const total = cost?.subagentCostUsd ? formatSessionCost(cost.totalCostUsd) : null;
+  const total = cost ? formatSessionCost(cost.totalCostUsd) : null;
+  // Own cost only adds information when native subagents spent money too.
+  const own = cost?.subagentCostUsd ? formatSessionCost(cost.ownCostUsd) : null;
   const suffix = getSessionCostSuffix({
     estimated: totalCostEstimated,
     excludesCurrentTurn: costExcludesCurrentTurn,
   });
   const formatCost = (value: string) => (suffix ? `${value} ${t(suffix)}` : value);
 
-  if (own) {
+  if (total) {
     return (
       <>
-        <Text style={styles.tooltipDetail}>
-          {t("contextWindow.ownCost", { cost: formatCost(own) })}
-        </Text>
-        {total ? (
+        {own ? (
           <Text style={styles.tooltipDetail}>
-            {t("contextWindow.totalCost", { cost: formatCost(total) })}
+            {t("contextWindow.ownCost", { cost: formatCost(own) })}
           </Text>
         ) : null}
-        <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+        <Text style={styles.tooltipDetail}>
+          {t("contextWindow.totalCost", { cost: formatCost(total) })}
+        </Text>
+        {totalCostEstimated ? (
+          <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+        ) : null}
       </>
     );
   }
