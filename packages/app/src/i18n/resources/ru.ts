@@ -2017,8 +2017,6 @@ export const ru: TranslationResources = {
     sessionCostEstimate: "Оценка по прейскуранту API",
     sessionCostUnavailable: "Недоступно",
     sessionCostBeforeTurn: "(до этого хода)",
-    sessionCostEstimated: "(оценка)",
-    sessionCostEstimatedBeforeTurn: "(оценка, до этого хода)",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

@@ -2032,8 +2032,6 @@ export const es: TranslationResources = {
     sessionCostEstimate: "Estimado con precios de lista de la API",
     sessionCostUnavailable: "No disponible",
     sessionCostBeforeTurn: "(antes de este turno)",
-    sessionCostEstimated: "(est.)",
-    sessionCostEstimatedBeforeTurn: "(est., antes de este turno)",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {

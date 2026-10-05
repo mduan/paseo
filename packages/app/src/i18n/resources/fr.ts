@@ -2037,8 +2037,6 @@ export const fr: TranslationResources = {
     sessionCostEstimate: "Estimation au prix catalogue de l'API",
     sessionCostUnavailable: "Indisponible",
     sessionCostBeforeTurn: "(avant ce tour)",
-    sessionCostEstimated: "(est.)",
-    sessionCostEstimatedBeforeTurn: "(est., avant ce tour)",
     accessibility: "Fenêtre contextuelle{{percentage}}% utilisé",
   },
   review: {

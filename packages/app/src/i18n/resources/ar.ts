@@ -1984,8 +1984,6 @@ export const ar: TranslationResources = {
     sessionCostEstimate: "تقدير بأسعار API المعلنة",
     sessionCostUnavailable: "غير متاح",
     sessionCostBeforeTurn: "(قبل هذه الجولة)",
-    sessionCostEstimated: "(تقديري)",
-    sessionCostEstimatedBeforeTurn: "(تقديري، قبل هذه الجولة)",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
   review: {

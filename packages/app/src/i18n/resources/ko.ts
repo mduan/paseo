@@ -1994,8 +1994,6 @@ export const ko: TranslationResources = {
     sessionCostEstimate: "API 정가 기준 추정치",
     sessionCostUnavailable: "사용할 수 없음",
     sessionCostBeforeTurn: "(이번 턴 이전)",
-    sessionCostEstimated: "(추정)",
-    sessionCostEstimatedBeforeTurn: "(추정, 이번 턴 이전)",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
   review: {

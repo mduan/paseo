@@ -88,19 +88,6 @@ function getMeterGeometry(showPercentage: boolean, glyphSize?: number) {
   };
 }
 
-function getSessionCostSuffix({
-  estimated,
-  excludesCurrentTurn,
-}: {
-  estimated: boolean;
-  excludesCurrentTurn: boolean;
-}) {
-  if (estimated && excludesCurrentTurn) return "contextWindow.sessionCostEstimatedBeforeTurn";
-  if (estimated) return "contextWindow.sessionCostEstimated";
-  if (excludesCurrentTurn) return "contextWindow.sessionCostBeforeTurn";
-  return undefined;
-}
-
 function ContextWindowCostDetails({
   totalCostUsd,
   subagentCostUsd,
@@ -119,11 +106,10 @@ function ContextWindowCostDetails({
   const total = cost ? formatSessionCost(cost.totalCostUsd) : null;
   // Own cost only adds information when native subagents spent money too.
   const own = cost?.subagentCostUsd ? formatSessionCost(cost.ownCostUsd) : null;
-  const suffix = getSessionCostSuffix({
-    estimated: totalCostEstimated,
-    excludesCurrentTurn: costExcludesCurrentTurn,
-  });
-  const formatCost = (value: string) => (suffix ? `${value} ${t(suffix)}` : value);
+  const formatCost = (value: string) => {
+    const shown = totalCostEstimated ? `~${value}` : value;
+    return costExcludesCurrentTurn ? `${shown} ${t("contextWindow.sessionCostBeforeTurn")}` : shown;
+  };
 
   if (total) {
     return (
