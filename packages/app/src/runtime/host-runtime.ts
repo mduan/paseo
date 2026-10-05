@@ -69,6 +69,7 @@ import { mountBrowserAutomationDaemonClientHandler } from "@/desktop/browser/aut
 import { schedulesQueryBaseKey } from "@/schedules/aggregated-schedules";
 import { dispatchComposerAgentMessage, sendQueuedComposerMessageNow } from "@/composer/actions";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
+import { getActiveMessageSubmissions } from "@/composer/submission/model";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
@@ -2397,6 +2398,11 @@ export class HostRuntimeStore {
     const queue = session?.queuedMessages.get(agentId);
     const client = session?.client;
     if (!client || !queue?.length || session.initializingAgents.get(agentId) === true) {
+      return;
+    }
+    // A pending send (e.g. "send now" on a queued message) interrupts the running turn,
+    // which looks like a stop. Its new turn is about to start, so don't race it.
+    if (getActiveMessageSubmissions(session.messageSubmissions.get(agentId)).length > 0) {
       return;
     }
     this.queuedAgentDrainInFlight.add(drainKey);
