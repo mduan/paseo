@@ -2788,7 +2788,7 @@ const styles = StyleSheet.create((theme) => ({
   // The border and gap set each workspace apart from its neighbours' nested session rows.
   workspaceRowContainer: {
     position: "relative",
-    marginBottom: 2,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.lg,
