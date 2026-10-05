@@ -30,11 +30,9 @@ describe("buildClaudeSubagentSubtitle", () => {
         costUsd: 1.844,
         subagentCostUsd: 0.5,
       }),
-    ).toBe("Explore · 2k tokens · $1.84 own (est.) · $2.34 total (est.)");
-    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("$0.0012 own (est.)");
-    expect(buildClaudeSubagentSubtitle({ costUsd: 0, subagentCostUsd: 1 })).toBe(
-      "$0.00 own (est.) · $1.00 total (est.)",
-    );
+    ).toBe("Explore · 2k tokens · ~$2.34");
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("~$0.0012");
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0, subagentCostUsd: 1 })).toBe("~$1.00");
   });
 
   it("omits facts that were not observed", () => {

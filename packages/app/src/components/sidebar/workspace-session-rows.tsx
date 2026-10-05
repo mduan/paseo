@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { AgentUsage } from "@getpaseo/protocol/agent-types";
 import { useShallow } from "zustand/react/shallow";
@@ -41,7 +40,7 @@ import {
   WorkspaceTabPresentationResolver,
   type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
-import { formatSessionCost, resolveAgentCostBreakdown } from "@/components/agent-cost";
+import { formatSessionCost } from "@/components/agent-cost";
 import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { filterSelectableModels } from "@/provider-selection/model-catalog";
@@ -494,28 +493,12 @@ function AgentPreview({
   );
 }
 
-/** Session cost, marked "(est.)" when Paseo priced the provider's token counts itself. */
-function formatAgentCost({
-  t,
-  usage,
-}: {
-  t: TFunction;
-  usage: AgentUsage | null | undefined;
-}): string | null {
-  const cost = resolveAgentCostBreakdown({
-    totalCostUsd: usage?.totalCostUsd,
-    subagentCostUsd: usage?.subagentCostUsd,
-  });
-  if (!cost) return null;
-  const suffix = usage?.totalCostEstimated ? ` ${t("contextWindow.sessionCostEstimated")}` : "";
-  const own = formatSessionCost(cost.ownCostUsd);
-  if (!own) return null;
-  const formattedOwn = t("contextWindow.ownCostCompact", { cost: own });
-  if (cost.subagentCostUsd <= 0) return `${formattedOwn}${suffix}`;
-  const total = formatSessionCost(cost.totalCostUsd);
-  return total
-    ? `${formattedOwn}${suffix} · ${t("contextWindow.totalCostCompact", { cost: total })}${suffix}`
-    : `${formattedOwn}${suffix}`;
+/** Total session cost, prefixed "~" when Paseo priced the provider's token counts itself. */
+function formatAgentCost(usage: AgentUsage | null | undefined): string | null {
+  if (typeof usage?.totalCostUsd !== "number") return null;
+  const total = formatSessionCost(usage.totalCostUsd);
+  if (!total) return null;
+  return usage.totalCostEstimated ? `~${total}` : total;
 }
 
 /** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
@@ -536,7 +519,7 @@ function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: st
     selection.selectedThinkingId
       ? t("workspace.tabs.effort", { effort: selection.displayThinking })
       : null,
-    formatAgentCost({ t, usage: agent?.lastUsage }),
+    formatAgentCost(agent?.lastUsage),
   ].filter(Boolean);
   return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
 }

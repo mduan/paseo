@@ -12,7 +12,7 @@ function formatSubagentCost(costUsd: number | undefined): string | undefined {
   return `$${amount}`;
 }
 
-/** Own cost is always shown; recursive total follows only when native descendants spent money. */
+/** Subagent rows show the estimated cost of the subagent and all its native descendants. */
 export function formatSubagentCosts({
   ownCostUsd,
   subagentCostUsd,
@@ -20,11 +20,7 @@ export function formatSubagentCosts({
   ownCostUsd: number | undefined;
   subagentCostUsd: number | undefined;
 }): string[] {
-  const own = formatSubagentCost(ownCostUsd);
-  if (!own) return [];
-  const parts = [`${own} own (est.)`];
-  if (typeof subagentCostUsd !== "number" || subagentCostUsd <= 0) return parts;
-  const total = formatSubagentCost((ownCostUsd ?? 0) + subagentCostUsd);
-  if (total) parts.push(`${total} total (est.)`);
-  return parts;
+  if (typeof ownCostUsd !== "number") return [];
+  const total = formatSubagentCost(ownCostUsd + Math.max(0, subagentCostUsd ?? 0));
+  return total ? [`~${total}`] : [];
 }

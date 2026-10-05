@@ -3370,7 +3370,7 @@ describe("Codex app-server provider", () => {
       await vi.waitFor(() => {
         expect(subtitles).toEqual([
           "Child · 42k tokens",
-          "Child · gpt-6-luna · 42k tokens · $2.00 own (est.)",
+          "Child · gpt-6-luna · 42k tokens · ~$2.00",
         ]);
         expect(usages.at(-1)).toMatchObject({
           subagentCostUsd: 2,

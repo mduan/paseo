@@ -229,12 +229,12 @@ describe("ClaudeTaskProtocolSource", () => {
       {
         kind: "subtitle",
         id: "toolu_direct",
-        subtitle: "general-purpose · Sonnet 5 · $1.00 own (est.) · $3.00 total (est.)",
+        subtitle: "general-purpose · Sonnet 5 · ~$3.00",
       },
       {
         kind: "subtitle",
         id: "toolu_nested",
-        subtitle: "general-purpose · $2.00 own (est.)",
+        subtitle: "general-purpose · ~$2.00",
       },
     ]);
   });
@@ -612,7 +612,7 @@ describe("ClaudeTaskProtocolSource usage and runtime", () => {
       {
         kind: "subtitle",
         id: "toolu_01DgLoPMW9",
-        subtitle: "general-purpose · 16.5k tokens · $0.50 own (est.)",
+        subtitle: "general-purpose · 16.5k tokens · ~$0.50",
       },
     ]);
     expect(source.observeCost("b51skux0z", 0.5)).toEqual([]);

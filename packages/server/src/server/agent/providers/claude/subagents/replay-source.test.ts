@@ -635,9 +635,9 @@ describe("observeReplaySubagentCosts", () => {
       {
         kind: "subtitle",
         id: "child",
-        subtitle: "Explore · $0.50 own (est.) · $0.75 total (est.)",
+        subtitle: "Explore · ~$0.75",
       },
-      { kind: "subtitle", id: "grandchild", subtitle: "$0.25 own (est.)" },
+      { kind: "subtitle", id: "grandchild", subtitle: "~$0.25" },
     ]);
   });
 });
