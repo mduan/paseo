@@ -219,6 +219,9 @@ export interface AgentUsage {
   inputTokens?: number;
   cachedInputTokens?: number;
   outputTokens?: number;
+  /** Cost attributed to provider-native descendants. Paseo-managed agents are excluded. */
+  subagentCostUsd?: number;
+  /** Total cost for this provider session, including provider-native descendants. */
   totalCostUsd?: number;
   /** The provider can estimate cost, but its price list could not be loaded. */
   totalCostUnavailable?: boolean;
@@ -637,6 +640,8 @@ export interface AgentLaunchContext {
    * total restarts with their process add it, so a resume or reload keeps the session total.
    */
   priorTotalCostUsd?: number;
+  /** Provider-native descendant cost reported before this session object existed. */
+  priorSubagentCostUsd?: number;
 }
 
 export interface AgentCreateSessionOptions {

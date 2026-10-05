@@ -3,12 +3,14 @@ import Svg, { Circle } from "react-native-svg";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatSessionCost, resolveAgentCostBreakdown } from "./agent-cost";
 import { formatTokenCount } from "./context-window-meter.utils";
 
 interface ContextWindowMeterProps {
   maxTokens: number | null;
   usedTokens: number | null;
   totalCostUsd?: number | null;
+  subagentCostUsd?: number | null;
   /** The provider estimates cost but could not load its price list. */
   totalCostUnavailable?: boolean;
   /** Paseo estimated the cost from token counts; the provider reports none. */
@@ -47,16 +49,6 @@ function getUsagePercentage(maxTokens: number, usedTokens: number): number | nul
 
 function clampPercentage(value: number): number {
   return Math.max(0, Math.min(100, value));
-}
-
-export function formatSessionCost(value: number): string | null {
-  if (!Number.isFinite(value) || value <= 0) {
-    return null;
-  }
-  if (value < 0.01) {
-    return `$${value.toFixed(4)}`;
-  }
-  return `$${value.toFixed(2)}`;
 }
 
 function getMeterColors(
@@ -109,10 +101,56 @@ function getSessionCostSuffix({
   return undefined;
 }
 
+function ContextWindowCostDetails({
+  totalCostUsd,
+  subagentCostUsd,
+  totalCostUnavailable,
+  totalCostEstimated,
+  costExcludesCurrentTurn,
+}: {
+  totalCostUsd: number | null | undefined;
+  subagentCostUsd: number | null | undefined;
+  totalCostUnavailable: boolean;
+  totalCostEstimated: boolean;
+  costExcludesCurrentTurn: boolean;
+}) {
+  const { t } = useTranslation();
+  const cost = resolveAgentCostBreakdown({ totalCostUsd, subagentCostUsd });
+  const own = cost ? formatSessionCost(cost.ownCostUsd) : null;
+  const total = cost?.subagentCostUsd ? formatSessionCost(cost.totalCostUsd) : null;
+  const suffix = getSessionCostSuffix({
+    estimated: totalCostEstimated,
+    excludesCurrentTurn: costExcludesCurrentTurn,
+  });
+  const formatCost = (value: string) => (suffix ? `${value} ${t(suffix)}` : value);
+
+  if (own) {
+    return (
+      <>
+        <Text style={styles.tooltipDetail}>
+          {t("contextWindow.ownCost", { cost: formatCost(own) })}
+        </Text>
+        {total ? (
+          <Text style={styles.tooltipDetail}>
+            {t("contextWindow.totalCost", { cost: formatCost(total) })}
+          </Text>
+        ) : null}
+        <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
+      </>
+    );
+  }
+  return totalCostUnavailable ? (
+    <Text style={styles.tooltipDetail}>
+      {t("contextWindow.sessionCost", { cost: t("contextWindow.sessionCostUnavailable") })}
+    </Text>
+  ) : null;
+}
+
 export function ContextWindowMeter({
   maxTokens,
   usedTokens,
   totalCostUsd,
+  subagentCostUsd,
   totalCostUnavailable = false,
   totalCostEstimated = false,
   costExcludesCurrentTurn = false,
@@ -161,12 +199,6 @@ export function ContextWindowMeter({
   const { svgSize, center, radius, strokeWidth, circumference, containerStyle } = geometry;
   const dashOffset = circumference - (clampedPercentage / 100) * circumference;
   const colors = getMeterColors(clampedPercentage, theme);
-  const formattedSessionCost =
-    typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null;
-  const sessionCostSuffix = getSessionCostSuffix({
-    estimated: totalCostEstimated,
-    excludesCurrentTurn: costExcludesCurrentTurn,
-  });
 
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile>
@@ -225,23 +257,13 @@ export function ContextWindowMeter({
               max: formatTokenCount(maxTokens),
             })}
           </Text>
-          {formattedSessionCost ? (
-            <>
-              <Text style={styles.tooltipDetail}>
-                {t("contextWindow.sessionCost", {
-                  cost: sessionCostSuffix
-                    ? `${formattedSessionCost} ${t(sessionCostSuffix)}`
-                    : formattedSessionCost,
-                })}
-              </Text>
-              <Text style={styles.tooltipDetail}>{t("contextWindow.sessionCostEstimate")}</Text>
-            </>
-          ) : null}
-          {!formattedSessionCost && totalCostUnavailable ? (
-            <Text style={styles.tooltipDetail}>
-              {t("contextWindow.sessionCost", { cost: t("contextWindow.sessionCostUnavailable") })}
-            </Text>
-          ) : null}
+          <ContextWindowCostDetails
+            totalCostUsd={totalCostUsd}
+            subagentCostUsd={subagentCostUsd}
+            totalCostUnavailable={totalCostUnavailable}
+            totalCostEstimated={totalCostEstimated}
+            costExcludesCurrentTurn={costExcludesCurrentTurn}
+          />
         </View>
       </TooltipContent>
     </Tooltip>

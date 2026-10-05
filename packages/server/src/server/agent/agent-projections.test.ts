@@ -299,11 +299,17 @@ describe("toAgentPayload", () => {
 
   it("keeps the cost flags in the usage payload", () => {
     const agent = createManagedAgent({
-      lastUsage: { inputTokens: 10, totalCostUnavailable: true, totalCostEstimated: false },
+      lastUsage: {
+        inputTokens: 10,
+        subagentCostUsd: 0.25,
+        totalCostUnavailable: true,
+        totalCostEstimated: false,
+      },
     });
 
     expect(toAgentPayload(agent).lastUsage).toEqual({
       inputTokens: 10,
+      subagentCostUsd: 0.25,
       totalCostUnavailable: true,
       totalCostEstimated: false,
     });
@@ -314,6 +320,7 @@ describe("toAgentPayload", () => {
       "inputTokens",
       "cachedInputTokens",
       "outputTokens",
+      "subagentCostUsd",
       "totalCostUsd",
       "contextWindowMaxTokens",
       "contextWindowUsedTokens",

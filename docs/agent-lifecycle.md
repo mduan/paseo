@@ -191,6 +191,8 @@ Provider timelines use the same structural timeline item format but deliberately
 
 Provider descriptors may include one compact subtitle. The provider owns its contents and formatting; clients display and truncate it without interpreting provider-specific model, thinking, or usage fields.
 
+Cost accounting stays within one provider session. It never includes Paseo subagents. Each provider subagent reports its own cost. If it has native descendants, it also reports its subtree total. Codex sums rollout costs. Claude separates its inclusive SDK total with transcript estimates.
+
 ### Claude provider subagents: the task protocol
 
 Claude Code announces subagent lifecycle on the SDK stream (`task_started` / `task_updated` / `task_notification` / `task_progress`), and Paseo reads those announcements rather than reconstructing them from sidechain frames. The live source (`subagents/live-source.ts`) and the replay source (`subagents/replay-source.ts`) both translate into one observation vocabulary (`subagents/observation.ts`), so a fact is derived once for both paths instead of once per path. Gotchas that are not obvious from the SDK types:

@@ -41,7 +41,7 @@ import {
   WorkspaceTabPresentationResolver,
   type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
-import { formatSessionCost } from "@/components/context-window-meter";
+import { formatSessionCost, resolveAgentCostBreakdown } from "@/components/agent-cost";
 import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { filterSelectableModels } from "@/provider-selection/model-catalog";
@@ -502,11 +502,20 @@ function formatAgentCost({
   t: TFunction;
   usage: AgentUsage | null | undefined;
 }): string | null {
-  const cost =
-    typeof usage?.totalCostUsd === "number" ? formatSessionCost(usage.totalCostUsd) : null;
-  return cost && usage?.totalCostEstimated
-    ? `${cost} ${t("contextWindow.sessionCostEstimated")}`
-    : cost;
+  const cost = resolveAgentCostBreakdown({
+    totalCostUsd: usage?.totalCostUsd,
+    subagentCostUsd: usage?.subagentCostUsd,
+  });
+  if (!cost) return null;
+  const suffix = usage?.totalCostEstimated ? ` ${t("contextWindow.sessionCostEstimated")}` : "";
+  const own = formatSessionCost(cost.ownCostUsd);
+  if (!own) return null;
+  const formattedOwn = t("contextWindow.ownCostCompact", { cost: own });
+  if (cost.subagentCostUsd <= 0) return `${formattedOwn}${suffix}`;
+  const total = formatSessionCost(cost.totalCostUsd);
+  return total
+    ? `${formattedOwn}${suffix} · ${t("contextWindow.totalCostCompact", { cost: total })}${suffix}`
+    : `${formattedOwn}${suffix}`;
 }
 
 /** Model, effort, and session cost; each part is left out when the agent doesn't report it. */

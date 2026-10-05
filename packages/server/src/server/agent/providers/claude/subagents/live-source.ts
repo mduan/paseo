@@ -1,6 +1,7 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 import type { AgentMetadata } from "../../../agent-sdk-types.js";
+import { rollupProviderSubagentCosts } from "../../../provider-subagents/cost.js";
 import type { ProviderSubagentStatus } from "../../../provider-subagents/store.js";
 import { resolveObservedClaudeModelId } from "../models.js";
 import type { SubagentObservation } from "./observation.js";
@@ -179,6 +180,8 @@ export class ClaudeTaskProtocolSource {
   private readonly lastStatusById = new Map<string, ProviderSubagentStatus>();
   /** Claude facts stay inside the provider boundary; clients receive one compact subtitle. */
   private readonly presentationById = new Map<string, ClaudeSubagentPresentationFacts>();
+  private readonly parentSubagentIdById = new Map<string, string>();
+  private readonly directCostUsdById = new Map<string, number>();
   private readonly lastSubtitleById = new Map<string, string>();
   private sawTaskStarted = false;
   private sawAnyTask = false;
@@ -210,6 +213,10 @@ export class ClaudeTaskProtocolSource {
    */
   get announcesTasks(): boolean {
     return this.sawAnyTask;
+  }
+
+  get costTaskIds(): ReadonlySet<string> {
+    return new Set(this.subagentIdByTaskId.keys());
   }
 
   /**
@@ -280,6 +287,8 @@ export class ClaudeTaskProtocolSource {
     this.backgroundedIds.clear();
     this.lastStatusById.clear();
     this.presentationById.clear();
+    this.parentSubagentIdById.clear();
+    this.directCostUsdById.clear();
     this.lastSubtitleById.clear();
     this.sawTaskStarted = false;
     this.sawAnyTask = false;
@@ -372,6 +381,7 @@ export class ClaudeTaskProtocolSource {
     this.canonicalIdByToolUseId.set(id, id);
     this.declaredIds.add(id);
     this.lastStatusById.set(id, "running");
+    if (parentSubagentId) this.parentSubagentIdById.set(id, parentSubagentId);
 
     // An explicit `name` on the Task call wins over the agent type, matching how replay titles the
     // same subagent. Without it a fan-out of five Explores reads as five identical rows.
@@ -463,7 +473,28 @@ export class ClaudeTaskProtocolSource {
   observeCost(taskId: string, costUsd: number): SubagentObservation[] {
     const id = this.subagentIdByTaskId.get(taskId);
     if (!id) return [];
-    return this.updatePresentation(id, { costUsd });
+    this.directCostUsdById.set(id, costUsd);
+    const costs = this.costRollup();
+    const observations: SubagentObservation[] = [];
+    for (const [subagentId, cost] of costs.byId) {
+      observations.push(
+        ...this.updatePresentation(subagentId, {
+          costUsd: this.directCostUsdById.get(subagentId),
+          subagentCostUsd: cost.subagentCostUsd,
+        }),
+      );
+    }
+    return observations;
+  }
+
+  private costRollup() {
+    return rollupProviderSubagentCosts(
+      [...this.declaredIds].map((id) => ({
+        id,
+        parentSubagentId: this.parentSubagentIdById.get(id) ?? null,
+        ownCostUsd: this.directCostUsdById.get(id) ?? 0,
+      })),
+    );
   }
 
   /**

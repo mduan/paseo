@@ -193,6 +193,7 @@ export interface AgentUsage {
   inputTokens?: number;
   cachedInputTokens?: number;
   outputTokens?: number;
+  subagentCostUsd?: number;
   totalCostUsd?: number;
   /** The provider can estimate cost, but its price list could not be loaded. */
   totalCostUnavailable?: boolean;

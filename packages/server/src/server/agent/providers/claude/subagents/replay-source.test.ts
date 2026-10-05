@@ -141,7 +141,7 @@ describe("observeReplaySubagents", () => {
   });
 
   it("drops a meta-linked subagent when the parent never declared its Task", () => {
-    const observations = observeReplaySubagents({
+    const replay = observeReplaySubagents({
       subagents: [
         {
           agentId: AGENT_ID,
@@ -151,9 +151,10 @@ describe("observeReplaySubagents", () => {
       ],
       parent: emptyParent(),
       convertEntry: () => [],
-    }).observations;
+    });
 
-    expect(observations).toEqual([]);
+    expect(replay.observations).toEqual([]);
+    expect(replay.taskIds).toEqual(new Set());
   });
 
   it("falls back to the scraped link when there is no meta file", () => {

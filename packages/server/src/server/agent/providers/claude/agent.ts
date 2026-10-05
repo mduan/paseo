@@ -62,7 +62,7 @@ import {
 } from "./subagents/workflow-replay-source.js";
 import { readClaudeWorkflowResultFile } from "./subagents/workflow-output.js";
 import { ClaudeTranscriptCost } from "./subagents/transcript-cost.js";
-import { getSharedCodexPriceList } from "../codex/pricing.js";
+import { type CodexPrices, getSharedCodexPriceList } from "../codex/pricing.js";
 import { buildClaudeFeatures, claudeModelSupportsFastMode } from "./feature-definitions.js";
 import {
   buildBinaryDiagnosticRows,
@@ -423,6 +423,7 @@ interface ClaudeAgentSessionOptions {
   agentId?: string;
   launchEnv?: Record<string, string>;
   priorTotalCostUsd?: number;
+  priorSubagentCostUsd?: number;
   persistSession?: boolean;
   logger: Logger;
   queryFactory?: ClaudeQueryFactory;
@@ -1540,6 +1541,7 @@ export class ClaudeAgentClient implements AgentClient {
       agentId: launchContext?.agentId,
       launchEnv: launchContext?.env,
       priorTotalCostUsd: launchContext?.priorTotalCostUsd,
+      priorSubagentCostUsd: launchContext?.priorSubagentCostUsd,
       persistSession: options?.persistSession,
       logger: this.logger,
       queryFactory: this.queryFactory,
@@ -1571,6 +1573,7 @@ export class ClaudeAgentClient implements AgentClient {
       agentId: launchContext?.agentId,
       launchEnv: launchContext?.env,
       priorTotalCostUsd: launchContext?.priorTotalCostUsd,
+      priorSubagentCostUsd: launchContext?.priorSubagentCostUsd,
       logger: this.logger,
       queryFactory: this.queryFactory,
       resolveBinary: this.resolveBinary,
@@ -2056,6 +2059,7 @@ class ClaudeAgentSession implements AgentSession {
   // restart, so the session total is the cost of earlier processes plus the current one.
   private costBeforeQueryUsd: number;
   private queryCostUsd = 0;
+  private subagentCostUsd: number;
   private readonly agentId?: string;
   private readonly defaults?: { agents?: Record<string, AgentDefinition> };
   private readonly runtimeSettings?: ProviderRuntimeSettings;
@@ -2097,6 +2101,7 @@ class ClaudeAgentSession implements AgentSession {
   });
   /** Task id -> cost reader over that subagent's transcript. */
   private readonly subagentCosts = new Map<string, ClaudeTranscriptCost>();
+  private readonly replaySubagentTaskIds = new Set<string>();
   private readonly sidechainTracker = new ClaudeSidechainTracker({
     getToolInput: (toolUseId) => this.toolUseCache.get(toolUseId)?.input ?? null,
     // Releases that predate the task protocol announce nothing, so the tracker keeps deriving
@@ -2139,6 +2144,7 @@ class ClaudeAgentSession implements AgentSession {
     assertClaudeThinkingOptionSupported(config.model, config.thinkingOptionId);
     this.launchEnv = options.launchEnv;
     this.costBeforeQueryUsd = options.priorTotalCostUsd ?? 0;
+    this.subagentCostUsd = options.priorSubagentCostUsd ?? 0;
     this.agentId = options.agentId;
     this.defaults = options.defaults;
     this.runtimeSettings = options.runtimeSettings;
@@ -2712,6 +2718,7 @@ class ClaudeAgentSession implements AgentSession {
     this.sidechainTracker.clear();
     this.taskProtocolSource.reset();
     this.subagentCosts.clear();
+    this.replaySubagentTaskIds.clear();
     this.input?.end();
     this.query?.close?.();
     await this.awaitWithTimeout(this.query?.interrupt?.(), "close query interrupt");
@@ -4711,7 +4718,13 @@ class ClaudeAgentSession implements AgentSession {
     }
     // A crash or startup-error result can carry a zeroed total; keep the running one.
     this.queryCostUsd = Math.max(this.queryCostUsd, usage.totalCostUsd);
-    return { ...usage, totalCostUsd: this.costBeforeQueryUsd + this.queryCostUsd };
+    const totalCostUsd = this.costBeforeQueryUsd + this.queryCostUsd;
+    const subagentCostUsd = Math.min(this.subagentCostUsd, totalCostUsd);
+    return {
+      ...usage,
+      totalCostUsd,
+      ...(subagentCostUsd > 0 ? { subagentCostUsd } : {}),
+    };
   }
 
   private handlePermissionRequest: CanUseTool = async (
@@ -4875,16 +4888,54 @@ class ClaudeAgentSession implements AgentSession {
       const transcript = this.subagentTranscriptCost(taskId);
       if (!transcript) return;
       const prices = await getSharedCodexPriceList(this.logger).get();
-      const costUsd = prices ? await transcript.read(prices) : undefined;
+      if (!prices) return;
+      const costUsd = await transcript.read(prices);
       if (costUsd === undefined) return;
       for (const event of foldSubagentObservations(
         this.taskProtocolSource.observeCost(taskId, costUsd),
       )) {
         this.notifySubscribers({ type: "provider_subagent", provider: "claude", event });
       }
+      await this.refreshSubagentCostTotal(prices);
     } catch (error) {
       this.logger.debug({ err: error, taskId }, "Failed to estimate Claude subagent cost");
     }
+  }
+
+  private async refreshSubagentCostTotal(prices: CodexPrices): Promise<void> {
+    const historyPath = this.claudeSessionId ? this.resolveHistoryPath(this.claudeSessionId) : null;
+    if (!historyPath) return;
+    const directory = claudeSubagentsDirectory(historyPath);
+    let entries: string[];
+    try {
+      entries = await promises.readdir(directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    const admittedTaskIds = new Set([
+      ...this.replaySubagentTaskIds,
+      ...this.taskProtocolSource.costTaskIds,
+    ]);
+    const costs = await Promise.all(
+      entries
+        .filter((entry) => entry.startsWith("agent-") && entry.endsWith(".jsonl"))
+        .map(async (entry) => {
+          const taskId = entry.slice("agent-".length, -".jsonl".length);
+          if (!admittedTaskIds.has(taskId)) return undefined;
+          return this.subagentTranscriptCost(taskId)?.read(prices);
+        }),
+    );
+    let subagentCostUsd = 0;
+    for (const cost of costs) subagentCostUsd += cost ?? 0;
+    this.subagentCostUsd = subagentCostUsd;
+    const totalCostUsd = this.costBeforeQueryUsd + this.queryCostUsd;
+    if (totalCostUsd <= 0 || this.subagentCostUsd <= 0) return;
+    this.notifySubscribers({
+      type: "usage_updated",
+      provider: "claude",
+      usage: { subagentCostUsd: Math.min(this.subagentCostUsd, totalCostUsd) },
+    });
   }
 
   private subagentTranscriptCost(taskId: string): ClaudeTranscriptCost | undefined {
@@ -5049,6 +5100,7 @@ class ClaudeAgentSession implements AgentSession {
       parent: readClaudeReplayParentFacts(parentEntries),
       convertEntry: (entry) => this.convertHistoryEntry(entry as ClaudeHistoryEntry),
     });
+    for (const taskId of subagentReplay.taskIds) this.replaySubagentTaskIds.add(taskId);
     const observations = [
       ...subagentReplay.observations,
       ...observeReplayWorkflows({

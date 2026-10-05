@@ -56,7 +56,11 @@ import { curateAgentActivity } from "../activity-curator.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
 import { type CodexPriceList, type CodexPrices, getSharedCodexPriceList } from "./codex/pricing.js";
 import { CodexRolloutCost } from "./codex/rollout-cost.js";
-import { formatSubagentCost, formatSubagentTokens } from "../provider-subagents/subtitle-format.js";
+import { rollupProviderSubagentCosts } from "../provider-subagents/cost.js";
+import {
+  formatSubagentCosts,
+  formatSubagentTokens,
+} from "../provider-subagents/subtitle-format.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -1090,18 +1094,24 @@ function isSameCostEstimate(left: CodexCostEstimate, right: CodexCostEstimate): 
 
 // All cost fields are always written, undefined included, so the agent manager's usage merge on
 // turn completion cannot keep a stale value from the previous state.
-function withCostEstimate(usage: AgentUsage, estimate: CodexCostEstimate): AgentUsage {
+function withCostEstimate(
+  usage: AgentUsage,
+  estimate: CodexCostEstimate,
+  subagentCostUsd: number,
+): AgentUsage {
   switch (estimate.status) {
     case CodexCostStatus.Estimated:
       return {
         ...usage,
-        totalCostUsd: estimate.costUsd,
+        ...(subagentCostUsd > 0 ? { subagentCostUsd } : { subagentCostUsd: undefined }),
+        totalCostUsd: estimate.costUsd + subagentCostUsd,
         totalCostUnavailable: false,
         totalCostEstimated: true,
       };
     case CodexCostStatus.Unavailable:
       return {
         ...usage,
+        subagentCostUsd: undefined,
         totalCostUsd: undefined,
         totalCostUnavailable: true,
         totalCostEstimated: undefined,
@@ -1109,6 +1119,7 @@ function withCostEstimate(usage: AgentUsage, estimate: CodexCostEstimate): Agent
     case CodexCostStatus.Pending:
       return {
         ...usage,
+        subagentCostUsd: undefined,
         totalCostUsd: undefined,
         totalCostUnavailable: undefined,
         totalCostEstimated: undefined,
@@ -4103,6 +4114,9 @@ export class CodexAppServerAgentSession implements AgentSession {
         parentSubagentId: next.parentSubagentId,
       });
       try {
+        const usage: CodexSubAgentUsage = {};
+        this.subAgentUsageByThreadId.set(next.route.childThreadId, usage);
+        await this.refreshSubAgentCost(next.route.childThreadId, usage, client);
         const childHistory = await loadCodexThreadHistoryTimeline({
           threadId: next.route.childThreadId,
           cwd: this.config.cwd ?? null,
@@ -6323,7 +6337,10 @@ export class CodexAppServerAgentSession implements AgentSession {
     parsed: Extract<ParsedCodexNotification, { kind: "token_usage_updated" }>,
   ): void {
     const usage = toAgentUsage(parsed.tokenUsage);
-    this.latestUsage = usage ? withCostEstimate(usage, this.costEstimate) : undefined;
+    const subagentCostUsd = this.subagentCostRollup().totalCostUsd;
+    this.latestUsage = usage
+      ? withCostEstimate(usage, this.costEstimate, subagentCostUsd)
+      : undefined;
     if (this.latestUsage) {
       this.notifySubscribers({
         type: "usage_updated",
@@ -6350,25 +6367,33 @@ export class CodexAppServerAgentSession implements AgentSession {
     void this.refreshSubAgentCost(threadId, usage);
   }
 
-  private async refreshSubAgentCost(threadId: string, usage: CodexSubAgentUsage): Promise<void> {
+  private async refreshSubAgentCost(
+    threadId: string,
+    usage: CodexSubAgentUsage,
+    client: CodexAppServerClientLike | null = this.client,
+  ): Promise<void> {
     const priceList = this.deps.codexPriceList;
     if (!priceList) return;
     try {
-      usage.rolloutCost ??= this.openRolloutCost(threadId);
+      usage.rolloutCost ??= this.openRolloutCost(threadId, client);
       const rolloutCost = await usage.rolloutCost;
       const prices = await priceList.get();
       if (!rolloutCost || !prices) return;
       usage.costUsd = await rolloutCost.read({ prices, serviceTier: this.serviceTier });
       usage.model = rolloutCost.model;
       if (this.subAgentUsageByThreadId.get(threadId) !== usage) return;
-      this.emitSubAgentSubtitle(threadId, usage);
+      this.refreshCostPresentation();
     } catch (error) {
       usage.rolloutCost = undefined;
       this.logger.warn({ error, threadId }, "Failed to read a Codex subagent rollout for its cost");
     }
   }
 
-  private emitSubAgentSubtitle(threadId: string, usage: CodexSubAgentUsage): void {
+  private emitSubAgentSubtitle(
+    threadId: string,
+    usage: CodexSubAgentUsage,
+    subagentCostUsd = 0,
+  ): void {
     // A provider subtitle replaces the row's agent type, so it leads with it.
     const callId = this.subAgentCallIdByChildThreadId.get(threadId);
     const detail = callId ? this.subAgentCallsByCallId.get(callId)?.toolCall.detail : undefined;
@@ -6376,7 +6401,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
       usage.model,
       formatSubagentTokens(usage.tokens),
-      formatSubagentCost(usage.costUsd),
+      ...formatSubagentCosts({ ownCostUsd: usage.costUsd, subagentCostUsd }),
     ]
       .filter((part): part is string => part !== undefined)
       .join(" · ");
@@ -6386,6 +6411,30 @@ export class CodexAppServerAgentSession implements AgentSession {
       type: "provider_subagent",
       provider: CODEX_PROVIDER,
       event: { type: "upsert", id: threadId, subtitle },
+    });
+  }
+
+  private subagentCostRollup() {
+    return rollupProviderSubagentCosts(
+      [...this.subAgentCallIdByChildThreadId].map(([threadId, callId]) => ({
+        id: threadId,
+        parentSubagentId: this.subAgentCallsByCallId.get(callId)?.parentSubagentId ?? null,
+        ownCostUsd: this.subAgentUsageByThreadId.get(threadId)?.costUsd ?? 0,
+      })),
+    );
+  }
+
+  private refreshCostPresentation(): void {
+    const costs = this.subagentCostRollup();
+    for (const [threadId, usage] of this.subAgentUsageByThreadId) {
+      this.emitSubAgentSubtitle(threadId, usage, costs.byId.get(threadId)?.subagentCostUsd);
+    }
+    if (!this.latestUsage) return;
+    this.latestUsage = withCostEstimate(this.latestUsage, this.costEstimate, costs.totalCostUsd);
+    this.notifySubscribers({
+      type: "usage_updated",
+      provider: CODEX_PROVIDER,
+      usage: this.latestUsage,
     });
   }
 
@@ -6416,7 +6465,11 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (isSameCostEstimate(this.costEstimate, estimate)) return;
     this.costEstimate = estimate;
     if (!this.latestUsage) return;
-    this.latestUsage = withCostEstimate(this.latestUsage, estimate);
+    this.latestUsage = withCostEstimate(
+      this.latestUsage,
+      estimate,
+      this.subagentCostRollup().totalCostUsd,
+    );
     this.notifySubscribers({
       type: "usage_updated",
       provider: CODEX_PROVIDER,
@@ -6424,10 +6477,13 @@ export class CodexAppServerAgentSession implements AgentSession {
     });
   }
 
-  private async openRolloutCost(threadId: string): Promise<CodexRolloutCost | undefined> {
-    if (!this.client) return undefined;
+  private async openRolloutCost(
+    threadId: string,
+    client: CodexAppServerClientLike | null = this.client,
+  ): Promise<CodexRolloutCost | undefined> {
+    if (!client) return undefined;
     const response = toObjectRecord(
-      await this.client.request("thread/read", { threadId, includeTurns: false }),
+      await client.request("thread/read", { threadId, includeTurns: false }),
     );
     // Thread.path is marked unstable in the app-server schema; without it there is no estimate.
     const rolloutPath = toObjectRecord(response?.thread)?.path;

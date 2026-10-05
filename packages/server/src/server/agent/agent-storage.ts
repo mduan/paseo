@@ -46,6 +46,7 @@ const STORED_USAGE_SCHEMA = z.object({
   inputTokens: z.number().optional(),
   cachedInputTokens: z.number().optional(),
   outputTokens: z.number().optional(),
+  subagentCostUsd: z.number().optional(),
   totalCostUsd: z.number().optional(),
   totalCostUnavailable: z.boolean().optional(),
   totalCostEstimated: z.boolean().optional(),
