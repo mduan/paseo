@@ -1,5 +1,5 @@
 import {
-  formatSubagentCost,
+  formatSubagentCosts,
   formatSubagentTokens,
 } from "../../../provider-subagents/subtitle-format.js";
 import { findClaudeModel } from "../models.js";
@@ -15,6 +15,8 @@ export interface ClaudeSubagentPresentationFacts {
   usage?: ClaudeSubagentUsage;
   /** Estimated from list prices; Claude reports no cost per subagent. */
   costUsd?: number;
+  /** Recursive cost of provider-native descendants, excluding this subagent. */
+  subagentCostUsd?: number;
 }
 
 /** Build the complete compact subtitle Claude exposes to provider-neutral clients. */
@@ -26,7 +28,10 @@ export function buildClaudeSubagentSubtitle(
     formatModel(facts.model),
     formatEffort(facts.effort),
     formatSubagentTokens(facts.usage?.totalTokens),
-    formatSubagentCost(facts.costUsd),
+    ...formatSubagentCosts({
+      ownCostUsd: facts.costUsd,
+      subagentCostUsd: facts.subagentCostUsd,
+    }),
   ].filter((part): part is string => part !== undefined);
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }

@@ -2032,11 +2032,11 @@ export const fr: TranslationResources = {
     used: "{{percentage}}% utilisé",
     tokens: "Jetons{{used}}/{{max}}",
     sessionCost: "Coût de la séance{{cost}}",
+    ownCost: "Coût propre : {{cost}}",
+    totalCost: "Coût total : {{cost}}",
     sessionCostEstimate: "Estimation au prix catalogue de l'API",
     sessionCostUnavailable: "Indisponible",
     sessionCostBeforeTurn: "(avant ce tour)",
-    sessionCostEstimated: "(est.)",
-    sessionCostEstimatedBeforeTurn: "(est., avant ce tour)",
     accessibility: "Fenêtre contextuelle{{percentage}}% utilisé",
   },
   review: {

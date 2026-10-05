@@ -224,6 +224,19 @@ describe("ClaudeTaskProtocolSource", () => {
       }),
     );
     expect(source.needsSyntheticParentToolCard("toolu_nested")).toBe(false);
+    source.observeCost("direct-task", 1);
+    expect(source.observeCost("nested-task", 2)).toEqual([
+      {
+        kind: "subtitle",
+        id: "toolu_direct",
+        subtitle: "general-purpose · Sonnet 5 · ~$3.00",
+      },
+      {
+        kind: "subtitle",
+        id: "toolu_nested",
+        subtitle: "general-purpose · ~$2.00",
+      },
+    ]);
   });
 
   it("resolves a background task to the sidechain agent that launched it", () => {
@@ -599,7 +612,7 @@ describe("ClaudeTaskProtocolSource usage and runtime", () => {
       {
         kind: "subtitle",
         id: "toolu_01DgLoPMW9",
-        subtitle: "general-purpose · 16.5k tokens · $0.50 (est.)",
+        subtitle: "general-purpose · 16.5k tokens · ~$0.50",
       },
     ]);
     expect(source.observeCost("b51skux0z", 0.5)).toEqual([]);

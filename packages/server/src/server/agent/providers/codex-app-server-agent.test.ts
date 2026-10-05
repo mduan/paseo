@@ -15,6 +15,7 @@ import type {
   AgentSessionConfig,
   AgentSlashCommand,
   AgentStreamEvent,
+  AgentUsage,
 } from "../agent-sdk-types.js";
 import {
   buildCodexAppServerEnv,
@@ -3285,14 +3286,15 @@ describe("Codex app-server provider", () => {
 
   test("reports a child's tokens and estimated cost in its subtitle", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "codex-child-cost-"));
-    const rolloutPath = path.join(dir, "rollout.jsonl");
+    const rootRolloutPath = path.join(dir, "root-rollout.jsonl");
+    const childRolloutPath = path.join(dir, "child-rollout.jsonl");
     const priceFile = path.join(dir, "prices.json");
     writeFileSync(
       priceFile,
       JSON.stringify({ "gpt-6-luna": { input_cost_per_token: 1e-6, output_cost_per_token: 1e-5 } }),
     );
     writeFileSync(
-      rolloutPath,
+      childRolloutPath,
       [
         { type: "turn_context", payload: { model: "gpt-6-luna" } },
         {
@@ -3310,11 +3312,33 @@ describe("Codex app-server provider", () => {
         .map((line) => `${JSON.stringify(line)}\n`)
         .join(""),
     );
+    writeFileSync(
+      rootRolloutPath,
+      [
+        { type: "turn_context", payload: { model: "gpt-6-luna" } },
+        {
+          type: "event_msg",
+          payload: {
+            type: "token_count",
+            info: {
+              total_token_usage: { total_tokens: 550_000 },
+              // 500k uncached × $1/M + 50k output × $10/M = $1.00
+              last_token_usage: { input_tokens: 500_000, output_tokens: 50_000 },
+            },
+          },
+        },
+      ]
+        .map((line) => `${JSON.stringify(line)}\n`)
+        .join(""),
+    );
     const appServer = createFakeCodexAppServer({
-      "thread/read": (params) =>
-        (params as { threadId?: unknown } | undefined)?.threadId === "child-thread"
-          ? { thread: { path: rolloutPath, turns: [] } }
-          : { thread: { turns: [] } },
+      "thread/read": (params) => {
+        const threadId = (params as { threadId?: unknown } | undefined)?.threadId;
+        if (threadId === "child-thread") {
+          return { thread: { path: childRolloutPath, turns: [] } };
+        }
+        return { thread: { path: rootRolloutPath, turns: [] } };
+      },
     });
     const session = new CodexAppServerAgentSession(
       createConfig({ cwd: "/workspace/project" }),
@@ -3324,15 +3348,18 @@ describe("Codex app-server provider", () => {
       { codexPriceList: new CodexPriceList({ logger: createTestLogger(), cacheFile: priceFile }) },
     );
     const subtitles: (string | null | undefined)[] = [];
+    const usages: AgentUsage[] = [];
     session.subscribe((event) => {
       if (event.type === "provider_subagent" && event.event.type === "upsert") {
         if (event.event.subtitle !== undefined) subtitles.push(event.event.subtitle);
       }
+      if (event.type === "usage_updated") usages.push(event.usage);
     });
 
     try {
       const resultPromise = session.run("Delegate the investigation.");
       await appServer.waitForTurnStart();
+      appServer.reportsTokenUsage({ threadId: "thread-1", lastTotalTokens: 10_000 });
       appServer.startsSubAgent({
         callId: "call-child",
         threadId: "child-thread",
@@ -3343,8 +3370,13 @@ describe("Codex app-server provider", () => {
       await vi.waitFor(() => {
         expect(subtitles).toEqual([
           "Child · 42k tokens",
-          "Child · gpt-6-luna · 42k tokens · $2.00 (est.)",
+          "Child · gpt-6-luna · 42k tokens · ~$2.00",
         ]);
+        expect(usages.at(-1)).toMatchObject({
+          subagentCostUsd: 2,
+          totalCostUsd: 3,
+          totalCostEstimated: true,
+        });
       });
 
       appServer.completeTurn({ threadId: "child-thread" });

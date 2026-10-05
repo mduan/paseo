@@ -2012,11 +2012,11 @@ export const ru: TranslationResources = {
     used: "Использовано: {{percentage}}%",
     tokens: "Токены: {{used}} / {{max}}",
     sessionCost: "Стоимость сессии: {{cost}}",
+    ownCost: "Собственная стоимость: {{cost}}",
+    totalCost: "Общая стоимость: {{cost}}",
     sessionCostEstimate: "Оценка по прейскуранту API",
     sessionCostUnavailable: "Недоступно",
     sessionCostBeforeTurn: "(до этого хода)",
-    sessionCostEstimated: "(оценка)",
-    sessionCostEstimatedBeforeTurn: "(оценка, до этого хода)",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

@@ -273,6 +273,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
       status: agent?.status ?? null,
       contextWindowMaxTokens: usage.contextWindowMaxTokens ?? null,
       contextWindowUsedTokens: usage.contextWindowUsedTokens ?? null,
+      subagentCostUsd: usage.subagentCostUsd ?? null,
       totalCostUsd: usage.totalCostUsd ?? null,
       totalCostUnavailable: usage.totalCostUnavailable ?? false,
       totalCostEstimated: usage.totalCostEstimated ?? false,
@@ -284,6 +285,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
 function renderContextWindowMeter({
   contextWindowMaxTokens,
   contextWindowUsedTokens,
+  subagentCostUsd,
   totalCostUsd,
   totalCostUnavailable,
   totalCostEstimated,
@@ -294,6 +296,7 @@ function renderContextWindowMeter({
 }: {
   contextWindowMaxTokens: number | null;
   contextWindowUsedTokens: number | null;
+  subagentCostUsd: number | null;
   totalCostUsd: number | null;
   totalCostUnavailable: boolean;
   totalCostEstimated: boolean;
@@ -310,6 +313,7 @@ function renderContextWindowMeter({
     <ContextWindowMeter
       maxTokens={contextWindowMaxTokens}
       usedTokens={contextWindowUsedTokens}
+      subagentCostUsd={subagentCostUsd}
       totalCostUsd={totalCostUsd}
       totalCostUnavailable={totalCostUnavailable}
       totalCostEstimated={totalCostEstimated}
@@ -2097,6 +2101,7 @@ function ComposerContentImpl({
       renderContextWindowMeter({
         contextWindowMaxTokens,
         contextWindowUsedTokens,
+        subagentCostUsd: agentState.subagentCostUsd,
         totalCostUsd: agentState.totalCostUsd,
         totalCostUnavailable: agentState.totalCostUnavailable,
         totalCostEstimated: agentState.totalCostEstimated,
@@ -2109,6 +2114,7 @@ function ComposerContentImpl({
     [
       contextWindowMaxTokens,
       contextWindowUsedTokens,
+      agentState.subagentCostUsd,
       agentState.totalCostUsd,
       agentState.totalCostUnavailable,
       agentState.totalCostEstimated,

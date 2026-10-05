@@ -2551,13 +2551,13 @@ describe("ClaudeAgentSession context window usage", () => {
     });
     const session = await client.createSession(
       { provider: "claude", cwd: process.cwd() },
-      { priorTotalCostUsd: 1 },
+      { priorSubagentCostUsd: 0.4, priorTotalCostUsd: 1 },
     );
 
     try {
       const result = await session.run("turn");
 
-      expect(result.usage?.totalCostUsd).toBe(1.25);
+      expect(result.usage).toMatchObject({ subagentCostUsd: 0.4, totalCostUsd: 1.25 });
     } finally {
       await session.close();
     }

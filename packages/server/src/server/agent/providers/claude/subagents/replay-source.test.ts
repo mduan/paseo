@@ -8,6 +8,7 @@ import {
 import { ClaudeTaskProtocolSource } from "./live-source.js";
 import { foldSubagentObservations, type SubagentObservation } from "./observation.js";
 import {
+  observeReplaySubagentCosts,
   observeReplaySubagents,
   parseClaudeSubagentMeta,
   type ClaudeReplayEntry,
@@ -141,7 +142,7 @@ describe("observeReplaySubagents", () => {
   });
 
   it("drops a meta-linked subagent when the parent never declared its Task", () => {
-    const observations = observeReplaySubagents({
+    const replay = observeReplaySubagents({
       subagents: [
         {
           agentId: AGENT_ID,
@@ -151,9 +152,10 @@ describe("observeReplaySubagents", () => {
       ],
       parent: emptyParent(),
       convertEntry: () => [],
-    }).observations;
+    });
 
-    expect(observations).toEqual([]);
+    expect(replay.observations).toEqual([]);
+    expect(replay.taskIds).toEqual(new Set());
   });
 
   it("falls back to the scraped link when there is no meta file", () => {
@@ -614,5 +616,28 @@ describe("live and replay agree", () => {
       status: "completed",
       toolCallId: TOOL_USE_ID,
     });
+  });
+});
+
+describe("observeReplaySubagentCosts", () => {
+  it("adds own cost and the descendant total to restored subtitles", () => {
+    const observations = observeReplaySubagentCosts(
+      [
+        { id: "child", taskId: "a-child", facts: { title: "Explore" } },
+        { id: "grandchild", taskId: "a-grand", parentSubagentId: "child", facts: {} },
+      ],
+      new Map([
+        ["a-child", 0.5],
+        ["a-grand", 0.25],
+      ]),
+    );
+    expect(observations).toEqual([
+      {
+        kind: "subtitle",
+        id: "child",
+        subtitle: "Explore · ~$0.75",
+      },
+      { kind: "subtitle", id: "grandchild", subtitle: "~$0.25" },
+    ]);
   });
 });

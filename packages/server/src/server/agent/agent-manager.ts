@@ -669,6 +669,10 @@ function totalCostOf(usage: AgentUsage | undefined): number | undefined {
   return usage?.totalCostUsd;
 }
 
+function subagentCostOf(usage: AgentUsage | undefined): number | undefined {
+  return usage?.subagentCostUsd;
+}
+
 function buildImportedTimelineRows(entries: readonly ImportedTimelineEntry[]): AgentTimelineRow[] {
   const rows: AgentTimelineRow[] = [];
   for (const entry of entries) {
@@ -1433,6 +1437,7 @@ export class AgentManager {
       },
     );
     launchContext.priorTotalCostUsd = totalCostOf(record?.lastUsage);
+    launchContext.priorSubagentCostUsd = subagentCostOf(record?.lastUsage);
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
     const session = await client.resumeSession(
       handle,
@@ -1663,6 +1668,7 @@ export class AgentManager {
       { reason: "refresh", purpose: "interactive", workspaceId: existing.workspaceId },
     );
     launchContext.priorTotalCostUsd = totalCostOf(preservedLastUsage);
+    launchContext.priorSubagentCostUsd = subagentCostOf(preservedLastUsage);
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
     if (
       Object.keys(storedConfig.mcpServers ?? {}).length > 0 &&

@@ -2027,11 +2027,11 @@ export const es: TranslationResources = {
     used: "{{percentage}}% utilizado",
     tokens: "Fichas{{used}}/{{max}}",
     sessionCost: "Costo de la sesión{{cost}}",
+    ownCost: "Costo propio: {{cost}}",
+    totalCost: "Costo total: {{cost}}",
     sessionCostEstimate: "Estimado con precios de lista de la API",
     sessionCostUnavailable: "No disponible",
     sessionCostBeforeTurn: "(antes de este turno)",
-    sessionCostEstimated: "(est.)",
-    sessionCostEstimatedBeforeTurn: "(est., antes de este turno)",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {

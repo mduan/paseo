@@ -2012,11 +2012,11 @@ export const ptBR: TranslationResources = {
     used: "{{percentage}}% usado",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Custo da sessão {{cost}}",
+    ownCost: "Custo próprio: {{cost}}",
+    totalCost: "Custo total: {{cost}}",
     sessionCostEstimate: "Estimativa com preços de tabela da API",
     sessionCostUnavailable: "Indisponível",
     sessionCostBeforeTurn: "(antes deste turno)",
-    sessionCostEstimated: "(est.)",
-    sessionCostEstimatedBeforeTurn: "(est., antes deste turno)",
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
   review: {

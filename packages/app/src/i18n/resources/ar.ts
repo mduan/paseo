@@ -1979,11 +1979,11 @@ export const ar: TranslationResources = {
     used: "تم استخدام{{percentage}}%",
     tokens: "رموز{{used}}/{{max}}",
     sessionCost: "تكلفة الجلسة{{cost}}",
+    ownCost: "التكلفة الخاصة: {{cost}}",
+    totalCost: "التكلفة الإجمالية: {{cost}}",
     sessionCostEstimate: "تقدير بأسعار API المعلنة",
     sessionCostUnavailable: "غير متاح",
     sessionCostBeforeTurn: "(قبل هذه الجولة)",
-    sessionCostEstimated: "(تقديري)",
-    sessionCostEstimatedBeforeTurn: "(تقديري، قبل هذه الجولة)",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
   review: {

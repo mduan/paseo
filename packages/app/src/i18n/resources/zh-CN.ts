@@ -1957,11 +1957,11 @@ export const zhCN: TranslationResources = {
     used: "已使用 {{percentage}}%",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "会话费用 {{cost}}",
+    ownCost: "自身费用：{{cost}}",
+    totalCost: "总费用：{{cost}}",
     sessionCostEstimate: "按 API 标价估算",
     sessionCostUnavailable: "不可用",
     sessionCostBeforeTurn: "(本轮之前)",
-    sessionCostEstimated: "(估算)",
-    sessionCostEstimatedBeforeTurn: "(估算，本轮之前)",
     accessibility: "上下文窗口已使用 {{percentage}}%",
   },
   review: {

@@ -22,15 +22,17 @@ describe("buildClaudeSubagentSubtitle", () => {
     expect(buildClaudeSubagentSubtitle({ model: "glm-5.1" })).toBe("glm-5.1");
   });
 
-  it("marks the cost as an estimate", () => {
+  it("shows own cost and adds recursive total only when descendants have cost", () => {
     expect(
       buildClaudeSubagentSubtitle({
         title: "Explore",
         usage: { totalTokens: 2_000 },
         costUsd: 1.844,
+        subagentCostUsd: 0.5,
       }),
-    ).toBe("Explore · 2k tokens · $1.84 (est.)");
-    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("$0.0012 (est.)");
+    ).toBe("Explore · 2k tokens · ~$2.34");
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("~$0.0012");
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0, subagentCostUsd: 1 })).toBe("~$1.00");
   });
 
   it("omits facts that were not observed", () => {
