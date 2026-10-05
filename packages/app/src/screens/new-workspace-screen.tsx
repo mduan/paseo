@@ -386,7 +386,7 @@ function PickerOptionItem({
   disabled,
   onPress,
   isBranch,
-  divergenceLabel,
+  metaLabel,
   current,
   inSync,
   accessibilityLabel,
@@ -401,7 +401,7 @@ function PickerOptionItem({
   disabled: boolean;
   onPress: () => void;
   isBranch: boolean;
-  divergenceLabel?: string;
+  metaLabel?: string;
   current?: boolean;
   inSync?: boolean;
   accessibilityLabel?: string;
@@ -422,15 +422,15 @@ function PickerOptionItem({
   );
   const { t } = useTranslation();
   const labelAccessory = useMemo(() => {
-    if (!divergenceLabel && !inSync && !current) return undefined;
+    if (!metaLabel && !inSync && !current) return undefined;
     return (
       <>
-        {divergenceLabel ? <Text style={styles.refDivergenceLabel}>{divergenceLabel}</Text> : null}
-        {!divergenceLabel && inSync ? <Link size={iconSize} color={iconColor} /> : null}
+        {metaLabel ? <Text style={styles.refMetaLabel}>{metaLabel}</Text> : null}
+        {!metaLabel && inSync ? <Link size={iconSize} color={iconColor} /> : null}
         {current ? <StatusBadge label={t("newWorkspace.refPicker.current")} size="xs" /> : null}
       </>
     );
-  }, [divergenceLabel, inSync, current, iconSize, iconColor, t]);
+  }, [metaLabel, inSync, current, iconSize, iconColor, t]);
   return (
     <ComboboxItem
       testID={testID}
@@ -567,12 +567,10 @@ function NewWorkspacePickerOption({
   const testID = isBranch
     ? `new-workspace-ref-picker-branch-${item.name}`
     : `new-workspace-ref-picker-pr-${item.item.number}`;
-  let description: string | undefined;
-  if (isBranch) {
-    description = item.detached ? item.name : undefined;
-  } else if (item.item.baseRefName) {
-    description = t("newWorkspace.refPicker.intoBase", { baseRef: item.item.baseRefName });
-  }
+  const description =
+    !isBranch && item.item.baseRefName
+      ? t("newWorkspace.refPicker.intoBase", { baseRef: item.item.baseRefName })
+      : undefined;
 
   return (
     <PickerOptionItem
@@ -584,7 +582,7 @@ function NewWorkspacePickerOption({
       disabled={isPending}
       onPress={onPress}
       isBranch={isBranch}
-      divergenceLabel={isBranch ? item.divergenceLabel : undefined}
+      metaLabel={branchMetaLabel(item)}
       current={isBranch ? item.current : undefined}
       inSync={isBranch ? item.inSync : undefined}
       accessibilityLabel={isBranch ? item.accessibilityLabel : undefined}
@@ -774,6 +772,12 @@ function useWorkspaceIsolation(input: {
     canCreateWorktree,
     showRefPicker: !supportsMultiplicity || canCreateWorktree,
   };
+}
+
+// Muted text right after the name: a detached HEAD's short SHA, else ahead/behind.
+function branchMetaLabel(item: PickerItem): string | undefined {
+  if (item.kind !== "branch") return undefined;
+  return item.detached ? item.name : item.divergenceLabel;
 }
 
 function refPickerItemLabel(t: TFunction, item: PickerItem): string {
@@ -2734,7 +2738,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     color: theme.colors.popoverForeground,
   },
-  refDivergenceLabel: {
+  refMetaLabel: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
     fontVariant: ["tabular-nums"],
