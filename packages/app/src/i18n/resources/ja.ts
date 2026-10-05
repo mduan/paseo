@@ -1331,6 +1331,8 @@ export const ja: TranslationResources = {
       current: "現在",
       defaultBranch: "デフォルトブランチ",
       currentCheckout: "現在のチェックアウト",
+      detachedHead: "デタッチされたHEAD",
+      currentSuffix: "{{name}}（現在）",
     },
     launch: {
       title: "What to launch",

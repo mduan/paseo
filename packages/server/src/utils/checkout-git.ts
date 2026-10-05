@@ -896,6 +896,8 @@ export interface CheckoutStatusGitNonPaseo {
   // branch has no upstream or git could not resolve it. aheadOfOrigin/behindOfOrigin are
   // measured against exactly this ref.
   upstreamRef: string | null;
+  // Set only on a detached HEAD; there is no branch to name the starting point.
+  headSha?: string | null;
   aheadOfOrigin: number | null;
   behindOfOrigin: number | null;
   hasRemote: boolean;
@@ -913,6 +915,7 @@ export interface CheckoutStatusGitPaseo {
   baseRefLabel?: string | null;
   aheadBehind: AheadBehind | null;
   upstreamRef: string | null;
+  headSha?: string | null;
   aheadOfOrigin: number | null;
   behindOfOrigin: number | null;
   hasRemote: boolean;
@@ -2398,6 +2401,7 @@ export async function getCheckoutStatus(
   const upstreamRef = upstreamStatus?.ref ?? null;
   const aheadOfOrigin = upstreamStatus?.aheadBehind.ahead ?? null;
   const behindOfOrigin = upstreamStatus?.aheadBehind.behind ?? null;
+  const headSha = currentBranch ? null : await getCurrentHeadSha(cwd, factsContext);
 
   if (paseoWorktree.isPaseoOwnedWorktree && baseRef) {
     return {
@@ -2410,6 +2414,7 @@ export async function getCheckoutStatus(
       baseRefLabel,
       aheadBehind,
       upstreamRef,
+      headSha,
       aheadOfOrigin,
       behindOfOrigin,
       hasRemote,
@@ -2429,6 +2434,7 @@ export async function getCheckoutStatus(
     baseRefLabel,
     aheadBehind,
     upstreamRef,
+    headSha,
     aheadOfOrigin,
     behindOfOrigin,
     hasRemote,

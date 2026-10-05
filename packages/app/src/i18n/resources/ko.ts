@@ -1324,6 +1324,8 @@ export const ko: TranslationResources = {
       current: "현재",
       defaultBranch: "기본 브랜치",
       currentCheckout: "현재 체크아웃",
+      detachedHead: "분리된 HEAD",
+      currentSuffix: "{{name}} (현재)",
     },
     launch: {
       title: "What to launch",

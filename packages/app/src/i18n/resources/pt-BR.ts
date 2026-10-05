@@ -1343,6 +1343,8 @@ export const ptBR: TranslationResources = {
       current: "Atual",
       defaultBranch: "Branch padrão",
       currentCheckout: "Checkout atual",
+      detachedHead: "HEAD desanexado",
+      currentSuffix: "{{name}} (atual)",
     },
     launch: {
       title: "What to launch",

@@ -1325,6 +1325,8 @@ export const en = {
       current: "Current",
       defaultBranch: "Default branch",
       currentCheckout: "Current checkout",
+      detachedHead: "Detached HEAD",
+      currentSuffix: "{{name}} (current)",
     },
     launch: {
       title: "What to launch",

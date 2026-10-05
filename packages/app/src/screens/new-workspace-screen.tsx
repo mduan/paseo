@@ -422,18 +422,15 @@ function PickerOptionItem({
   );
   const { t } = useTranslation();
   const labelAccessory = useMemo(() => {
-    if (!divergenceLabel && !current) return undefined;
+    if (!divergenceLabel && !inSync && !current) return undefined;
     return (
       <>
         {divergenceLabel ? <Text style={styles.refDivergenceLabel}>{divergenceLabel}</Text> : null}
+        {!divergenceLabel && inSync ? <Link size={iconSize} color={iconColor} /> : null}
         {current ? <StatusBadge label={t("newWorkspace.refPicker.current")} size="xs" /> : null}
       </>
     );
-  }, [divergenceLabel, current, t]);
-  const trailingSlot = useMemo(
-    () => (inSync ? <Link size={iconSize} color={iconColor} /> : undefined),
-    [inSync, iconSize, iconColor],
-  );
+  }, [divergenceLabel, inSync, current, iconSize, iconColor, t]);
   return (
     <ComboboxItem
       testID={testID}
@@ -445,7 +442,6 @@ function PickerOptionItem({
       onPress={onPress}
       leadingSlot={leadingSlot}
       labelAccessory={labelAccessory}
-      trailingSlot={trailingSlot}
       accessibilityLabel={accessibilityLabel}
     />
   );
@@ -571,15 +567,17 @@ function NewWorkspacePickerOption({
   const testID = isBranch
     ? `new-workspace-ref-picker-branch-${item.name}`
     : `new-workspace-ref-picker-pr-${item.item.number}`;
-  const description =
-    !isBranch && item.item.baseRefName
-      ? t("newWorkspace.refPicker.intoBase", { baseRef: item.item.baseRefName })
-      : undefined;
+  let description: string | undefined;
+  if (isBranch) {
+    description = item.detached ? item.name : undefined;
+  } else if (item.item.baseRefName) {
+    description = t("newWorkspace.refPicker.intoBase", { baseRef: item.item.baseRefName });
+  }
 
   return (
     <PickerOptionItem
       testID={testID}
-      label={pickerItemLabel(item)}
+      label={refPickerItemLabel(t, item)}
       description={description}
       selected={selected}
       active={active}
@@ -776,6 +774,12 @@ function useWorkspaceIsolation(input: {
     canCreateWorktree,
     showRefPicker: !supportsMultiplicity || canCreateWorktree,
   };
+}
+
+function refPickerItemLabel(t: TFunction, item: PickerItem): string {
+  return item.kind === "branch" && item.detached
+    ? t("newWorkspace.refPicker.detachedHead")
+    : pickerItemLabel(item);
 }
 
 function isolationLabel(t: TFunction, isolation: "local" | "worktree"): string {
@@ -1948,13 +1952,18 @@ export function NewWorkspaceScreen({
         branchDetails,
         prItems,
         baseItem,
-        currentBranch: checkoutStatus?.currentBranch,
+        currentItem: checkoutStatus ? currentBranchPickerItem(checkoutStatus) : null,
       }),
     [baseItem, branchDetails, checkoutStatus, prItems],
   );
   const triggerLabel = useMemo(() => {
     const displayItem = itemById.get(selectedOptionId);
-    if (displayItem) return pickerItemLabel(displayItem);
+    if (displayItem) {
+      const label = refPickerItemLabel(t, displayItem);
+      return displayItem.kind === "branch" && displayItem.current
+        ? t("newWorkspace.refPicker.currentSuffix", { name: label })
+        : label;
+    }
     // Nothing resolved: still loading, or a detached HEAD with no base. Local keeps the
     // checkout as it is; a worktree branches off whatever the daemon resolves as the default.
     return isLocalCheckout
@@ -2147,7 +2156,8 @@ export function NewWorkspaceScreen({
             selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
           )
         : undefined;
-      if (!createsWorktree && refSelection?.kind === "branch") {
+      // A detached HEAD row is what is already checked out; there is nothing to switch to.
+      if (!createsWorktree && refSelection?.kind === "branch" && !refSelection.detached) {
         const switched = await connectedClient.checkoutSwitchBranch(
           selectedSourceDirectory,
           refSelection.refName,

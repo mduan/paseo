@@ -1306,6 +1306,8 @@ export const zhCN: TranslationResources = {
       current: "当前",
       defaultBranch: "默认分支",
       currentCheckout: "当前检出",
+      detachedHead: "分离的 HEAD",
+      currentSuffix: "{{name}}（当前）",
     },
     launch: {
       title: "What to launch",

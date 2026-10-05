@@ -1317,6 +1317,8 @@ export const ar: TranslationResources = {
       current: "الحالي",
       defaultBranch: "الفرع الافتراضي",
       currentCheckout: "النسخة الحالية",
+      detachedHead: "HEAD منفصل",
+      currentSuffix: "{{name}} (الحالي)",
     },
     launch: {
       title: "What to launch",

@@ -1335,6 +1335,8 @@ export const ru: TranslationResources = {
       current: "Текущая",
       defaultBranch: "Ветка по умолчанию",
       currentCheckout: "Текущий checkout",
+      detachedHead: "Отсоединённый HEAD",
+      currentSuffix: "{{name}} (текущая)",
     },
     launch: {
       title: "Что запустить",

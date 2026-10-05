@@ -5273,6 +5273,9 @@ const CheckoutStatusCommonSchema = z.object({
   // upstream branch name is not necessarily currentBranch, so composing one is wrong.
   // aheadOfOrigin/behindOfOrigin are measured against exactly this ref.
   upstreamRef: z.string().nullable().optional(),
+  // The commit HEAD points at, sent only on a detached HEAD so clients can offer it as a
+  // starting point. Null on a branch.
+  headSha: z.string().nullable().optional(),
   // The ref the checkout is compared against, for display: "origin/main" or "main".
   // Clients still send baseRef back in requests.
   baseRefLabel: z.string().nullable().optional(),

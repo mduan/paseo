@@ -1353,6 +1353,8 @@ export const fr: TranslationResources = {
       current: "Actuelle",
       defaultBranch: "Branche par défaut",
       currentCheckout: "Checkout actuel",
+      detachedHead: "HEAD détachée",
+      currentSuffix: "{{name}} (actuelle)",
     },
     launch: {
       title: "What to launch",

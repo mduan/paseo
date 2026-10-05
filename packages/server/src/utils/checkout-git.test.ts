@@ -506,6 +506,16 @@ describe("checkout git utilities", () => {
     ).toContain("refs/heads/feature/new-name");
   });
 
+  it("reports the HEAD commit only on a detached HEAD", async () => {
+    const onBranch = await getCheckoutStatus(repoDir);
+    expect(onBranch.isGit && onBranch.headSha).toBe(null);
+
+    const sha = execSync("git rev-parse HEAD", { cwd: repoDir }).toString().trim();
+    execSync(`git checkout --detach ${sha}`, { cwd: repoDir, stdio: "ignore" });
+    const detached = await getCheckoutStatus(repoDir);
+    expect(detached.isGit && detached.headSha).toBe(sha);
+  });
+
   it("handles status/diff/commit in a normal repo", async () => {
     writeFileSync(join(repoDir, "file.txt"), "updated\n");
 

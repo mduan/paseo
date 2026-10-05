@@ -23,6 +23,8 @@ export type PickerItem =
       inSync?: boolean;
       // The branch checked out in the source checkout.
       current?: boolean;
+      // A detached HEAD: refName is the commit, name its short form.
+      detached?: boolean;
       committerDate?: number;
     }
   | {
@@ -129,6 +131,8 @@ export interface BaseRefCheckoutStatus {
   // The base the daemon resolves for this checkout: a picked base, else the repository default
   // branch. A bare branch name, e.g. "main".
   baseRef?: string | null;
+  // The commit a detached HEAD points at.
+  headSha?: string | null;
 }
 
 // Display only. The exact ref is what every request carries; this is how git prints it, so
@@ -141,16 +145,28 @@ function shortRefName(refName: string): string {
   return refName;
 }
 
-// A local checkout switches branches in place, so picking nothing means staying on the
-// branch that is already checked out.
-export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
-  const currentBranch = status.currentBranch;
-  if (!currentBranch) return null;
+function localBranchPickerItem(branch: string): PickerItem {
   return {
     kind: "branch",
-    name: currentBranch,
-    refName: `refs/heads/${currentBranch}`,
-    accessibilityLabel: `${currentBranch}, local branch`,
+    name: branch,
+    refName: `refs/heads/${branch}`,
+    accessibilityLabel: `${branch}, local branch`,
+  };
+}
+
+// What the source checkout has checked out: its branch, or the commit of a detached HEAD.
+// A local checkout switches in place, so picking nothing means staying on this.
+export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
+  if (status.currentBranch) return localBranchPickerItem(status.currentBranch);
+  const headSha = status.headSha?.trim();
+  if (!headSha) return null;
+  const shortSha = headSha.slice(0, 7);
+  return {
+    kind: "branch",
+    name: shortSha,
+    refName: headSha,
+    detached: true,
+    accessibilityLabel: `Detached HEAD at ${shortSha}`,
   };
 }
 
@@ -160,11 +176,11 @@ export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerIt
 //
 // The default is the source checkout's local branch, so unpushed commits on it carry into the
 // new workspace. Pick the remote row to branch off what's published instead. A detached HEAD
-// has no branch, so it falls back to the checkout's base. That is sent as the bare name, which
-// the daemon resolves local-first, then origin; baseOptionId marks the row the same way.
+// falls back to the checkout's base; its commit stays one pick away as the current row. The
+// base is sent as the bare name, which the daemon resolves local-first, then origin;
+// baseOptionId marks the row the same way.
 export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
-  const current = currentBranchPickerItem(status);
-  if (current) return current;
+  if (status.currentBranch) return localBranchPickerItem(status.currentBranch);
   const baseRef = status.baseRef?.trim();
   if (!baseRef) return null;
   return {
@@ -251,7 +267,7 @@ export function buildPickerOptionData(input: {
   branchDetails: readonly BranchPickerDetail[];
   prItems: readonly ForgeSearchItem[];
   baseItem: PickerItem | null;
-  currentBranch?: string | null;
+  currentItem?: PickerItem | null;
 }): PickerOptionData {
   const itemById = new Map<string, PickerItem>();
   const timedOptions: TimedOption[] = [];
@@ -292,7 +308,7 @@ export function buildPickerOptionData(input: {
     });
   }
   const currentOptionId = markCurrentBranch({
-    currentBranch: input.currentBranch,
+    currentItem: input.currentItem ?? null,
     itemById,
     timedOptions,
   });
@@ -307,14 +323,14 @@ export function buildPickerOptionData(input: {
   return { options: timedOptions.map((t) => t.option), itemById, selectedOptionId };
 }
 
-// The checked-out branch gets its own row even when suggestions omit it, flagged so the row
-// can say so. Returns its option id, or "" on a detached HEAD.
+// What is checked out gets its own row even when suggestions omit it, flagged so the row
+// can say so. Returns its option id, or "" when nothing is known.
 function markCurrentBranch(input: {
-  currentBranch: string | null | undefined;
+  currentItem: PickerItem | null;
   itemById: Map<string, PickerItem>;
   timedOptions: TimedOption[];
 }): string {
-  const currentItem = currentBranchPickerItem({ currentBranch: input.currentBranch ?? null });
+  const { currentItem } = input;
   if (currentItem?.kind !== "branch") return "";
   const id = baseOptionId(currentItem, input.itemById);
   const listed = input.itemById.get(id);

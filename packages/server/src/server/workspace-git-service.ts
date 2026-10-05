@@ -167,6 +167,7 @@ export interface WorkspaceGitRuntimeSnapshot {
     baseRefLabel?: string | null;
     aheadBehind: { ahead: number; behind: number } | null;
     upstreamRef: string | null;
+    headSha?: string | null;
     aheadOfOrigin: number | null;
     behindOfOrigin: number | null;
     hasRemote: boolean;
@@ -3378,6 +3379,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       baseRefLabel: checkoutStatus.baseRefLabel,
       aheadBehind: checkoutStatus.aheadBehind,
       upstreamRef: checkoutStatus.upstreamRef,
+      headSha: checkoutStatus.headSha ?? null,
       aheadOfOrigin: checkoutStatus.aheadOfOrigin,
       behindOfOrigin: checkoutStatus.behindOfOrigin,
       hasRemote: checkoutStatus.hasRemote,

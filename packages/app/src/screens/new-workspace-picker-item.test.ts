@@ -383,6 +383,16 @@ describe("currentBranchPickerItem", () => {
     });
   });
 
+  it("is the commit on a detached head", () => {
+    expect(
+      currentBranchPickerItem({
+        currentBranch: null,
+        headSha: "0123456789abcdef",
+        baseRef: "main",
+      }),
+    ).toMatchObject({ detached: true, name: "0123456", refName: "0123456789abcdef" });
+  });
+
   it("ignores the base on a detached head", () => {
     expect(currentBranchPickerItem({ currentBranch: null, baseRef: "main" })).toBeNull();
   });
@@ -411,7 +421,7 @@ describe("buildPickerOptionData current branch", () => {
       branchDetails,
       prItems: [],
       baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
-      currentBranch: "feature",
+      currentItem: currentBranchPickerItem({ currentBranch: "feature" }),
     });
 
     expect(data.options.map((option) => option.label)).toEqual([
@@ -431,7 +441,7 @@ describe("buildPickerOptionData current branch", () => {
       branchDetails,
       prItems: [],
       baseItem: picked ?? null,
-      currentBranch: "feature",
+      currentItem: currentBranchPickerItem({ currentBranch: "feature" }),
     });
 
     expect(data.options.map((option) => option.label)).toEqual([
@@ -450,7 +460,7 @@ describe("buildPickerOptionData current branch", () => {
       branchDetails,
       prItems: [],
       baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
-      currentBranch: "unlisted",
+      currentItem: currentBranchPickerItem({ currentBranch: "unlisted" }),
     });
 
     expect(data.options.map((option) => option.label).slice(0, 2)).toEqual(["feature", "unlisted"]);
@@ -461,14 +471,14 @@ describe("buildPickerOptionData current branch", () => {
       branchDetails,
       prItems: [],
       baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
-      currentBranch: "feature",
+      currentItem: currentBranchPickerItem({ currentBranch: "feature" }),
     });
     const picked = first.itemById.get(first.selectedOptionId) ?? null;
     const again = buildPickerOptionData({
       branchDetails: [],
       prItems: [],
       baseItem: picked,
-      currentBranch: "feature",
+      currentItem: currentBranchPickerItem({ currentBranch: "feature" }),
     });
 
     expect(again.itemById.get(again.selectedOptionId)).toMatchObject({
@@ -481,7 +491,7 @@ describe("buildPickerOptionData current branch", () => {
       branchDetails,
       prItems: [],
       baseItem: defaultBasePickerItem({ currentBranch: null, baseRef: "main" }),
-      currentBranch: null,
+      currentItem: null,
     });
 
     expect([...data.itemById.values()].some((item) => item.kind === "branch" && item.current)).toBe(
@@ -520,5 +530,45 @@ describe("buildPickerOptionData detached base", () => {
 
     expect(data.selectedOptionId).toBe(branchPickerOptionId("refs/remotes/origin/main"));
     expect(data.options.map((option) => option.label)).toEqual(["origin/main"]);
+  });
+});
+
+describe("buildPickerOptionData detached HEAD row", () => {
+  const status = { currentBranch: null, headSha: "0123456789abcdef", baseRef: "main" };
+  const branchDetails: BranchPickerDetail[] = [
+    { name: "main", committerDate: 10, hasLocal: true, hasRemote: false },
+    { name: "other", committerDate: 20, hasLocal: true, hasRemote: false },
+  ];
+
+  it("follows the default base as the current row", () => {
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: defaultBasePickerItem(status),
+      currentItem: currentBranchPickerItem(status),
+    });
+
+    expect(data.options.map((option) => option.label)).toEqual(["main", "0123456", "other"]);
+    expect(data.itemById.get(branchPickerOptionId("0123456789abcdef"))).toMatchObject({
+      current: true,
+      detached: true,
+    });
+  });
+
+  it("is the selected row when it is the default", () => {
+    const current = currentBranchPickerItem(status);
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: current,
+      currentItem: current,
+    });
+
+    expect(data.options[0]?.label).toBe("0123456");
+    expect(data.itemById.get(data.selectedOptionId)).toMatchObject({ current: true });
+    expect(pickerItemToCheckoutRequest(data.itemById.get(data.selectedOptionId) ?? null)).toEqual({
+      action: "branch-off",
+      refName: "0123456789abcdef",
+    });
   });
 });

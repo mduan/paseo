@@ -1353,6 +1353,8 @@ export const es: TranslationResources = {
       current: "Actual",
       defaultBranch: "Rama predeterminada",
       currentCheckout: "Checkout actual",
+      detachedHead: "HEAD separado",
+      currentSuffix: "{{name}} (actual)",
     },
     launch: {
       title: "What to launch",

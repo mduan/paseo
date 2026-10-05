@@ -265,6 +265,31 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       });
     });
 
+    it("branches off a detached HEAD commit", async () => {
+      const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir }).toString().trim();
+      execFileSync(
+        "git",
+        ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "later"],
+        {
+          cwd: repoDir,
+        },
+      );
+      execFileSync("git", ["checkout", "--detach", sha], { cwd: repoDir });
+
+      const result = await createLegacyWorktreeForTest({
+        cwd: repoDir,
+        worktreeSlug: "from-detached",
+        source: { kind: "branch-off", baseBranch: sha, branchName: "feature/detached" },
+        runSetup: false,
+        paseoHome,
+      });
+
+      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: result.worktreePath })
+        .toString()
+        .trim();
+      expect(head).toBe(sha);
+    });
+
     it("checks out an existing local branch that is not checked out elsewhere", async () => {
       execFileSync("git", ["branch", "dev"], { cwd: repoDir });
 
