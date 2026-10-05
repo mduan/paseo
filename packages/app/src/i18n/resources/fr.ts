@@ -1350,6 +1350,9 @@ export const fr: TranslationResources = {
       noMatchingRefs: "Aucune référence correspondante.",
       searchPlaceholder: "Rechercher des succursales et des PR",
       title: "Commencer à partir de",
+      current: "Actuelle",
+      defaultBranch: "Branche par défaut",
+      currentCheckout: "Checkout actuel",
     },
     launch: {
       title: "What to launch",

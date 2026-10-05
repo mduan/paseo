@@ -361,22 +361,144 @@ describe("defaultBasePickerItem", () => {
     });
   });
 
-  it("has no default for detached HEAD", () => {
+  it("falls back to the checkout's base on a detached HEAD", () => {
+    expect(defaultBasePickerItem({ currentBranch: null, baseRef: "main" })).toMatchObject({
+      name: "main",
+      refName: "main",
+    });
+  });
+
+  it("has no default for a detached HEAD without a base", () => {
     expect(defaultBasePickerItem({ currentBranch: null })).toBeNull();
+    expect(defaultBasePickerItem({ currentBranch: null, baseRef: null })).toBeNull();
   });
 });
 
 describe("currentBranchPickerItem", () => {
-  it("defaults to the checked-out local branch even when it has an upstream", () => {
-    expect(
-      currentBranchPickerItem({
-        currentBranch: "feature",
-        upstreamRef: "refs/remotes/origin/feature",
-      }),
-    ).toMatchObject({ kind: "branch", name: "feature", refName: "refs/heads/feature" });
+  it("defaults to the checked-out local branch", () => {
+    expect(currentBranchPickerItem({ currentBranch: "feature" })).toMatchObject({
+      kind: "branch",
+      name: "feature",
+      refName: "refs/heads/feature",
+    });
+  });
+
+  it("ignores the base on a detached head", () => {
+    expect(currentBranchPickerItem({ currentBranch: null, baseRef: "main" })).toBeNull();
   });
 
   it("returns null on a detached head", () => {
     expect(currentBranchPickerItem({ currentBranch: null })).toBeNull();
+  });
+});
+
+describe("buildPickerOptionData current branch", () => {
+  const branchDetails: BranchPickerDetail[] = [
+    { name: "feature", committerDate: 30, hasLocal: true, hasRemote: false },
+    { name: "newer", committerDate: 40, hasLocal: true, hasRemote: false },
+    {
+      name: "main",
+      committerDate: 10,
+      hasLocal: true,
+      hasRemote: true,
+      localAhead: 1,
+      localBehind: 0,
+    },
+  ];
+
+  it("shows the current branch once when it is the base", () => {
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
+      currentBranch: "feature",
+    });
+
+    expect(data.options.map((option) => option.label)).toEqual([
+      "feature",
+      "newer",
+      "main",
+      "origin/main",
+    ]);
+    expect(data.itemById.get(data.selectedOptionId)).toMatchObject({ current: true });
+  });
+
+  it("puts the current branch second when another base is picked", () => {
+    const picked = buildBranchPickerItems(branchDetails).find(
+      (item) => item.kind === "branch" && item.refName === "refs/heads/main",
+    );
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: picked ?? null,
+      currentBranch: "feature",
+    });
+
+    expect(data.options.map((option) => option.label)).toEqual([
+      "main",
+      "feature",
+      "newer",
+      "origin/main",
+    ]);
+    const current = data.itemById.get(branchPickerOptionId("refs/heads/feature"));
+    expect(current).toMatchObject({ current: true });
+    expect(data.itemById.get(data.selectedOptionId)).not.toMatchObject({ current: true });
+  });
+
+  it("adds the current branch when suggestions omit it", () => {
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
+      currentBranch: "unlisted",
+    });
+
+    expect(data.options.map((option) => option.label).slice(0, 2)).toEqual(["feature", "unlisted"]);
+  });
+
+  it("marks no current row on a detached HEAD", () => {
+    const data = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: null, baseRef: "main" }),
+      currentBranch: null,
+    });
+
+    expect([...data.itemById.values()].some((item) => item.kind === "branch" && item.current)).toBe(
+      false,
+    );
+  });
+});
+
+describe("buildPickerOptionData detached base", () => {
+  it("marks the local row for a bare base, as the daemon resolves it", () => {
+    const data = buildPickerOptionData({
+      branchDetails: [
+        {
+          name: "main",
+          committerDate: 10,
+          hasLocal: true,
+          hasRemote: true,
+          localAhead: 0,
+          localBehind: 0,
+        },
+      ],
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: null, baseRef: "main" }),
+    });
+
+    expect(data.selectedOptionId).toBe(branchPickerOptionId("refs/heads/main"));
+    expect(data.options.map((option) => option.label)).toEqual(["main", "origin/main"]);
+  });
+
+  it("falls back to the origin row when there is no local branch", () => {
+    const data = buildPickerOptionData({
+      branchDetails: [{ name: "main", committerDate: 10, hasLocal: false, hasRemote: true }],
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: null, baseRef: "main" }),
+    });
+
+    expect(data.selectedOptionId).toBe(branchPickerOptionId("refs/remotes/origin/main"));
+    expect(data.options.map((option) => option.label)).toEqual(["origin/main"]);
   });
 });

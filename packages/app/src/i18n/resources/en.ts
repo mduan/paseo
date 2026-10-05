@@ -1322,6 +1322,9 @@ export const en = {
       noMatchingRefs: "No matching refs.",
       searchPlaceholder: "Search branches and PRs",
       title: "Start from",
+      current: "Current",
+      defaultBranch: "Default branch",
+      currentCheckout: "Current checkout",
     },
     launch: {
       title: "What to launch",

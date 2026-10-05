@@ -1314,6 +1314,9 @@ export const ar: TranslationResources = {
       noMatchingRefs: "لا توجد مراجع مطابقة.",
       searchPlaceholder: "بحث الفروع والعلاقات العامة",
       title: "ابدأ من",
+      current: "الحالي",
+      defaultBranch: "الفرع الافتراضي",
+      currentCheckout: "النسخة الحالية",
     },
     launch: {
       title: "What to launch",

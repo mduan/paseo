@@ -1350,6 +1350,9 @@ export const es: TranslationResources = {
       noMatchingRefs: "No hay árbitros coincidentes.",
       searchPlaceholder: "Buscar sucursales y relaciones públicas",
       title: "Empezar desde",
+      current: "Actual",
+      defaultBranch: "Rama predeterminada",
+      currentCheckout: "Checkout actual",
     },
     launch: {
       title: "What to launch",

@@ -227,6 +227,8 @@ export interface ComboboxItemProps {
   description?: string;
   kind?: "directory" | "file";
   leadingSlot?: ReactNode;
+  /** Sits right after the label; the label truncates before it does. */
+  labelAccessory?: ReactNode;
   trailingSlot?: ReactNode;
   selected?: boolean;
   active?: boolean;
@@ -243,6 +245,7 @@ export function ComboboxItem({
   description,
   kind,
   leadingSlot,
+  labelAccessory,
   trailingSlot,
   selected,
   active,
@@ -298,9 +301,18 @@ export function ComboboxItem({
     >
       {leadingContent}
       <View style={itemContentStyle}>
-        <Text numberOfLines={1} style={styles.comboboxItemLabel}>
-          {label}
-        </Text>
+        {labelAccessory ? (
+          <View style={styles.comboboxItemLabelRow}>
+            <Text numberOfLines={1} style={styles.comboboxItemLabelShrink}>
+              {label}
+            </Text>
+            <View style={styles.comboboxItemLabelAccessory}>{labelAccessory}</View>
+          </View>
+        ) : (
+          <Text numberOfLines={1} style={styles.comboboxItemLabel}>
+            {label}
+          </Text>
+        )}
         {description ? (
           <Text numberOfLines={1} style={styles.comboboxItemDescription}>
             {description}
@@ -1718,6 +1730,23 @@ const styles = StyleSheet.create((theme) => ({
   comboboxItemLabel: {
     fontSize: theme.fontSize.base,
     color: theme.colors.foreground,
+    flexShrink: 0,
+  },
+  comboboxItemLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minWidth: 0,
+  },
+  comboboxItemLabelShrink: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foreground,
+    flexShrink: 1,
+  },
+  comboboxItemLabelAccessory: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
     flexShrink: 0,
   },
   comboboxItemDescription: {

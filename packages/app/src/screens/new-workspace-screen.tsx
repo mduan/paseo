@@ -33,6 +33,7 @@ import { HostStatusDot } from "@/components/host-status-dot";
 import { HostPicker } from "@/components/hosts/host-picker";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { Combobox, ComboboxItem } from "@/components/ui/combobox";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { ComboboxOption as ComboboxOptionType, ComboboxProps } from "@/components/ui/combobox";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { Shortcut } from "@/components/ui/shortcut";
@@ -385,7 +386,8 @@ function PickerOptionItem({
   disabled,
   onPress,
   isBranch,
-  trailingLabel,
+  divergenceLabel,
+  current,
   inSync,
   accessibilityLabel,
   iconColor,
@@ -399,7 +401,8 @@ function PickerOptionItem({
   disabled: boolean;
   onPress: () => void;
   isBranch: boolean;
-  trailingLabel?: string;
+  divergenceLabel?: string;
+  current?: boolean;
   inSync?: boolean;
   accessibilityLabel?: string;
   iconColor: string;
@@ -417,11 +420,20 @@ function PickerOptionItem({
     ),
     [isBranch, iconSize, iconColor],
   );
-  const trailingSlot = useMemo(() => {
-    if (trailingLabel) return <Text style={styles.refDivergenceLabel}>{trailingLabel}</Text>;
-    if (inSync) return <Link size={iconSize} color={iconColor} />;
-    return undefined;
-  }, [trailingLabel, inSync, iconSize, iconColor]);
+  const { t } = useTranslation();
+  const labelAccessory = useMemo(() => {
+    if (!divergenceLabel && !current) return undefined;
+    return (
+      <>
+        {divergenceLabel ? <Text style={styles.refDivergenceLabel}>{divergenceLabel}</Text> : null}
+        {current ? <StatusBadge label={t("newWorkspace.refPicker.current")} size="xs" /> : null}
+      </>
+    );
+  }, [divergenceLabel, current, t]);
+  const trailingSlot = useMemo(
+    () => (inSync ? <Link size={iconSize} color={iconColor} /> : undefined),
+    [inSync, iconSize, iconColor],
+  );
   return (
     <ComboboxItem
       testID={testID}
@@ -432,6 +444,7 @@ function PickerOptionItem({
       disabled={disabled}
       onPress={onPress}
       leadingSlot={leadingSlot}
+      labelAccessory={labelAccessory}
       trailingSlot={trailingSlot}
       accessibilityLabel={accessibilityLabel}
     />
@@ -573,7 +586,8 @@ function NewWorkspacePickerOption({
       disabled={isPending}
       onPress={onPress}
       isBranch={isBranch}
-      trailingLabel={isBranch ? item.divergenceLabel : undefined}
+      divergenceLabel={isBranch ? item.divergenceLabel : undefined}
+      current={isBranch ? item.current : undefined}
       inSync={isBranch ? item.inSync : undefined}
       accessibilityLabel={isBranch ? item.accessibilityLabel : undefined}
       iconColor={theme.colors.foregroundMuted}
@@ -1934,13 +1948,19 @@ export function NewWorkspaceScreen({
         branchDetails,
         prItems,
         baseItem,
+        currentBranch: checkoutStatus?.currentBranch,
       }),
-    [baseItem, branchDetails, prItems],
+    [baseItem, branchDetails, checkoutStatus, prItems],
   );
   const triggerLabel = useMemo(() => {
     const displayItem = itemById.get(selectedOptionId);
-    return displayItem ? pickerItemLabel(displayItem) : "main";
-  }, [itemById, selectedOptionId]);
+    if (displayItem) return pickerItemLabel(displayItem);
+    // Nothing resolved: still loading, or a detached HEAD with no base. Local keeps the
+    // checkout as it is; a worktree branches off whatever the daemon resolves as the default.
+    return isLocalCheckout
+      ? t("newWorkspace.refPicker.currentCheckout")
+      : t("newWorkspace.refPicker.defaultBranch");
+  }, [isLocalCheckout, itemById, selectedOptionId, t]);
   const selectPickerItem = useCallback(
     (item: PickerItem) => {
       const nextAttachments = syncPickerPrAttachment({

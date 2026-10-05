@@ -1340,6 +1340,9 @@ export const ptBR: TranslationResources = {
       noMatchingRefs: "Nenhuma ref correspondente.",
       searchPlaceholder: "Buscar branches e PRs",
       title: "Começar de",
+      current: "Atual",
+      defaultBranch: "Branch padrão",
+      currentCheckout: "Checkout atual",
     },
     launch: {
       title: "What to launch",

@@ -1332,6 +1332,9 @@ export const ru: TranslationResources = {
       noMatchingRefs: "Нет подходящих веток или PR.",
       searchPlaceholder: "Поиск веток и PR",
       title: "Начать с",
+      current: "Текущая",
+      defaultBranch: "Ветка по умолчанию",
+      currentCheckout: "Текущий checkout",
     },
     launch: {
       title: "Что запустить",

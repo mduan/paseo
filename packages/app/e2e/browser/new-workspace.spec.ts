@@ -825,7 +825,7 @@ test.describe("New workspace flow", () => {
 
         await openStartingRefPicker(page);
         await expectStartingRefRows(page, [
-          "main, local branch, 2 commits ahead of origin main",
+          "main, local branch, 2 commits ahead of origin main, current branch",
           "origin/main, origin branch",
         ]);
         const screenshotPath = testInfo.outputPath("ref-picker-local-ahead.png");

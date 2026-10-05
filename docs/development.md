@@ -371,8 +371,12 @@ for machine-readable output.
 ## Worktree starting refs
 
 A new worktree starts from the source checkout's local current branch, so unpushed local commits
-carry into the new workspace. Pick the remote row to branch off what's published. The picker
-collapses identical refs; divergent local or non-origin refs remain explicit, qualified choices.
+carry into the new workspace. Pick the remote row to branch off what's published. A detached HEAD
+has no branch, so it starts from the checkout's base (`baseRef` in checkout status: a picked base,
+else the repository default branch). The app sends that bare name and the daemon resolves it
+local-first, then origin; the picker marks the same row, so the label matches what gets created.
+The picker collapses identical refs; divergent local or non-origin refs remain explicit, qualified
+choices.
 
 A picked remote ref is sent exact because the remote and branch names cannot be inferred. Worktrees
 retain that ref for comparisons and updates from base while exposing its branch name to the UI.

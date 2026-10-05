@@ -1328,6 +1328,9 @@ export const ja: TranslationResources = {
       noMatchingRefs: "一致するRefがありません。",
       searchPlaceholder: "ブランチとPRを検索",
       title: "開始点",
+      current: "現在",
+      defaultBranch: "デフォルトブランチ",
+      currentCheckout: "現在のチェックアウト",
     },
     launch: {
       title: "What to launch",

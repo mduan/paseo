@@ -1321,6 +1321,9 @@ export const ko: TranslationResources = {
       noMatchingRefs: "일치하는 ref가 없습니다.",
       searchPlaceholder: "브랜치와 PR 검색",
       title: "시작 위치",
+      current: "현재",
+      defaultBranch: "기본 브랜치",
+      currentCheckout: "현재 체크아웃",
     },
     launch: {
       title: "What to launch",

@@ -21,6 +21,8 @@ export type PickerItem =
       divergenceLabel?: string;
       // The local ref points at the same commit as its origin counterpart.
       inSync?: boolean;
+      // The branch checked out in the source checkout.
+      current?: boolean;
       committerDate?: number;
     }
   | {
@@ -124,6 +126,9 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
 
 export interface BaseRefCheckoutStatus {
   currentBranch: string | null;
+  // The base the daemon resolves for this checkout: a picked base, else the repository default
+  // branch. A bare branch name, e.g. "main".
+  baseRef?: string | null;
 }
 
 // Display only. The exact ref is what every request carries; this is how git prints it, so
@@ -136,23 +141,6 @@ function shortRefName(refName: string): string {
   return refName;
 }
 
-// The one owner of "what do we branch off when the user picked nothing". The checkmarked
-// row, the trigger label, and the created ref all read this; computing it twice is how the
-// picker once showed local main while branching off something else.
-//
-// The default is the source checkout's local branch, so unpushed commits on it carry into the
-// new workspace. Pick the remote row to branch off what's published instead.
-export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
-  const currentBranch = status.currentBranch;
-  if (!currentBranch) return null;
-  return {
-    kind: "branch",
-    name: currentBranch,
-    refName: `refs/heads/${currentBranch}`,
-    accessibilityLabel: `${currentBranch}, local branch`,
-  };
-}
-
 // A local checkout switches branches in place, so picking nothing means staying on the
 // branch that is already checked out.
 export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
@@ -163,6 +151,27 @@ export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerIt
     name: currentBranch,
     refName: `refs/heads/${currentBranch}`,
     accessibilityLabel: `${currentBranch}, local branch`,
+  };
+}
+
+// The one owner of "what do we branch off when the user picked nothing". The checkmarked
+// row, the trigger label, and the created ref all read this; computing it twice is how the
+// picker once showed local main while branching off something else.
+//
+// The default is the source checkout's local branch, so unpushed commits on it carry into the
+// new workspace. Pick the remote row to branch off what's published instead. A detached HEAD
+// has no branch, so it falls back to the checkout's base. That is sent as the bare name, which
+// the daemon resolves local-first, then origin; baseOptionId marks the row the same way.
+export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
+  const current = currentBranchPickerItem(status);
+  if (current) return current;
+  const baseRef = status.baseRef?.trim();
+  if (!baseRef) return null;
+  return {
+    kind: "branch",
+    name: baseRef,
+    refName: baseRef,
+    accessibilityLabel: `${baseRef}, default branch`,
   };
 }
 
@@ -226,6 +235,7 @@ export interface PickerOptionData {
 // Rows sort by group, then newest first within a group.
 enum PickerGroup {
   Base,
+  Current,
   Local,
   Remote,
   ChangeRequest,
@@ -241,6 +251,7 @@ export function buildPickerOptionData(input: {
   branchDetails: readonly BranchPickerDetail[];
   prItems: readonly ForgeSearchItem[];
   baseItem: PickerItem | null;
+  currentBranch?: string | null;
 }): PickerOptionData {
   const itemById = new Map<string, PickerItem>();
   const timedOptions: TimedOption[] = [];
@@ -280,27 +291,65 @@ export function buildPickerOptionData(input: {
       timestamp: 0,
     });
   }
+  const currentOptionId = markCurrentBranch({
+    currentBranch: input.currentBranch,
+    itemById,
+    timedOptions,
+  });
   // The base sorts first: it is what a workspace is created from unless you pick something.
+  // The checked-out branch follows it, so the way back is always one row away.
   for (const timed of timedOptions) {
     if (timed.option.id === selectedOptionId) timed.group = PickerGroup.Base;
+    else if (timed.option.id === currentOptionId) timed.group = PickerGroup.Current;
   }
 
   timedOptions.sort((a, b) => a.group - b.group || b.timestamp - a.timestamp);
   return { options: timedOptions.map((t) => t.option), itemById, selectedOptionId };
 }
 
+// The checked-out branch gets its own row even when suggestions omit it, flagged so the row
+// can say so. Returns its option id, or "" on a detached HEAD.
+function markCurrentBranch(input: {
+  currentBranch: string | null | undefined;
+  itemById: Map<string, PickerItem>;
+  timedOptions: TimedOption[];
+}): string {
+  const currentItem = currentBranchPickerItem({ currentBranch: input.currentBranch ?? null });
+  if (currentItem?.kind !== "branch") return "";
+  const id = baseOptionId(currentItem, input.itemById);
+  const listed = input.itemById.get(id);
+  if (!listed) {
+    input.timedOptions.push({
+      option: { id, label: pickerItemLabel(currentItem) },
+      group: PickerGroup.Current,
+      timestamp: 0,
+    });
+  }
+  const base = listed?.kind === "branch" ? listed : currentItem;
+  input.itemById.set(id, {
+    ...base,
+    current: true,
+    accessibilityLabel: `${base.accessibilityLabel}, current branch`,
+  });
+  return id;
+}
+
 function baseOptionId(baseItem: PickerItem, itemById: ReadonlyMap<string, PickerItem>): string {
   const id = pickerOptionId(baseItem);
+  if (itemById.has(id) || baseItem.kind !== "branch") return id;
+  return (
+    baseOptionIdCandidates(baseItem.refName)
+      .map(branchPickerOptionId)
+      .find((candidate) => itemById.has(candidate)) ?? id
+  );
+}
+
+function baseOptionIdCandidates(refName: string): string[] {
   // COMPAT(branchProvenance): a daemon without provenance lists local main as the bare row
   // "main", which is the same branch as the default base refs/heads/main. Remove with the
   // bare rows in buildBranchPickerItems.
-  if (
-    !itemById.has(id) &&
-    baseItem.kind === "branch" &&
-    baseItem.refName.startsWith("refs/heads/")
-  ) {
-    const bareId = branchPickerOptionId(shortRefName(baseItem.refName));
-    if (itemById.has(bareId)) return bareId;
-  }
-  return id;
+  if (refName.startsWith("refs/heads/")) return [shortRefName(refName)];
+  if (refName.startsWith("refs/")) return [];
+  // A bare name resolves the way the daemon resolves it: local first, then origin.
+  return [`refs/heads/${refName}`, `${REMOTE_TRACKING_PREFIX}origin/${refName}`];
 }

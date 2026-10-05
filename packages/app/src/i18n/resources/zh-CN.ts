@@ -1303,6 +1303,9 @@ export const zhCN: TranslationResources = {
       noMatchingRefs: "没有匹配的 refs。",
       searchPlaceholder: "搜索分支和 PR",
       title: "起始位置",
+      current: "当前",
+      defaultBranch: "默认分支",
+      currentCheckout: "当前检出",
     },
     launch: {
       title: "What to launch",
