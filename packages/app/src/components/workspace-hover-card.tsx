@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
+  Anchor,
   Check,
   Copy,
   ExternalLink,
@@ -330,10 +331,10 @@ function WorkspaceHoverCardContent({
           ) : null}
           {status?.baseRefLabel ? (
             <CopyableInfoRow
-              icon={ThemedGitBranch}
-              value={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}`}
+              icon={ThemedAnchor}
+              value={status.baseRefLabel}
               copyValue={status.baseRefLabel}
-              copyLabel={t("workspace.hoverCard.copyBranchName")}
+              copyLabel={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}. ${t("workspace.hoverCard.copyBranchName")}`}
               testID="hover-card-workspace-base-branch"
             />
           ) : null}
@@ -364,6 +365,7 @@ function WorkspaceHoverCardContent({
 }
 
 const ThemedGitBranch = withUnistyles(GitBranch);
+const ThemedAnchor = withUnistyles(Anchor);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedServer = withUnistyles(Server);
 const ThemedFileDiff = withUnistyles(FileDiff);
