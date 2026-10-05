@@ -115,6 +115,7 @@ import {
 } from "./new-workspace-fork-context";
 import {
   buildPickerOptionData,
+  currentBranchPickerItem,
   defaultBasePickerItem,
   pickerItemLabel,
   pickerItemToCheckoutRequest,
@@ -231,7 +232,7 @@ const metaChevron = <MetaChevron />;
 // Stable reference so the keyboard-action handler doesn't re-register each render.
 const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = ["workspace.project.pick"];
 // Height of a single picker-trigger badge. The Base-row spacer reserves exactly
-// this so toggling Isolation to Local hides the row without shifting the form.
+// this so a project without a ref picker (non-git) doesn't shift the form.
 const BADGE_HEIGHT = 28;
 
 function RefPickerBadgeContent({
@@ -759,7 +760,7 @@ function useWorkspaceIsolation(input: {
     setIsolation,
     effectiveIsolation: isWorktree ? "worktree" : "local",
     canCreateWorktree,
-    showRefPicker: !supportsMultiplicity || isWorktree,
+    showRefPicker: !supportsMultiplicity || canCreateWorktree,
   };
 }
 
@@ -767,6 +768,31 @@ function isolationLabel(t: TFunction, isolation: "local" | "worktree"): string {
   return isolation === "worktree"
     ? t("newWorkspace.isolation.worktree")
     : t("newWorkspace.isolation.local");
+}
+
+// Local switches the source checkout's branch in place, so it defaults to the current
+// branch and offers no PRs; those only apply to new worktrees.
+function resolveRefPickerMode(input: {
+  supportsMultiplicity: boolean;
+  effectiveIsolation: "local" | "worktree";
+  selectedItem: PickerItem | null;
+  pickerQueryEnabled: boolean;
+}) {
+  const isLocalCheckout = input.supportsMultiplicity && input.effectiveIsolation === "local";
+  if (!isLocalCheckout) {
+    return {
+      isLocalCheckout,
+      refSelection: input.selectedItem,
+      defaultRefPickerItem: defaultBasePickerItem,
+      prSearchEnabled: input.pickerQueryEnabled,
+    };
+  }
+  return {
+    isLocalCheckout,
+    refSelection: input.selectedItem?.kind === "github-pr" ? null : input.selectedItem,
+    defaultRefPickerItem: currentBranchPickerItem,
+    prSearchEnabled: false,
+  };
 }
 
 function normalizeBranchDetails(
@@ -1847,6 +1873,13 @@ export function NewWorkspaceScreen({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
       worktreeSupport,
     });
+  const { isLocalCheckout, refSelection, defaultRefPickerItem, prSearchEnabled } =
+    resolveRefPickerMode({
+      supportsMultiplicity: supportsWorkspaceMultiplicity,
+      effectiveIsolation,
+      selectedItem,
+      pickerQueryEnabled,
+    });
 
   const branchSuggestionsQuery = useQuery({
     queryKey: [
@@ -1877,7 +1910,7 @@ export function NewWorkspaceScreen({
     query: debouncedPickerSearchQuery,
     kinds: ["change_request"],
     supportsForgeSearch,
-    enabled: pickerQueryEnabled,
+    enabled: prSearchEnabled,
   });
 
   const branchDetails = useMemo(
@@ -1887,13 +1920,13 @@ export function NewWorkspaceScreen({
   const forgeSearchAuthenticated =
     !githubPrSearchQuery.data || githubPrSearchQuery.data.authState === "authenticated";
   const prItems: ForgeSearchItem[] = useMemo(() => {
-    if (!forgeSearchAuthenticated) return [];
+    if (isLocalCheckout || !forgeSearchAuthenticated) return [];
     return githubPrSearchQuery.data?.items ?? [];
-  }, [forgeSearchAuthenticated, githubPrSearchQuery.data?.items]);
+  }, [forgeSearchAuthenticated, githubPrSearchQuery.data?.items, isLocalCheckout]);
 
   const baseItem = useMemo(
-    () => selectedItem ?? (checkoutStatus ? defaultBasePickerItem(checkoutStatus) : null),
-    [checkoutStatus, selectedItem],
+    () => refSelection ?? (checkoutStatus ? defaultRefPickerItem(checkoutStatus) : null),
+    [checkoutStatus, defaultRefPickerItem, refSelection],
   );
   const { options, itemById, selectedOptionId }: PickerOptionData = useMemo(
     () =>
@@ -2094,6 +2127,13 @@ export function NewWorkspaceScreen({
             selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
           )
         : undefined;
+      if (!createsWorktree && refSelection?.kind === "branch") {
+        const switched = await connectedClient.checkoutSwitchBranch(
+          selectedSourceDirectory,
+          refSelection.refName,
+        );
+        if (switched.error) throw new Error(switched.error.message);
+      }
       const normalizedWorkspace = await createMultiplicityWorkspace({
         idempotencyKey: creationIdentity.draftId,
         worktreeSlug: creationIdentity.worktreeSlug,
@@ -2120,6 +2160,7 @@ export function NewWorkspaceScreen({
       effectiveIsolation,
       mergeWorkspaces,
       queryClient,
+      refSelection,
       selectedItem,
       selectedProject,
       selectedServerId,
@@ -2394,7 +2435,7 @@ export function NewWorkspaceScreen({
       anchorRef: pickerAnchorRef,
       open: openPicker,
       selectedSourceDirectory,
-      selectedItem,
+      selectedItem: refSelection,
       triggerLabel,
       options,
       selectedOptionId,

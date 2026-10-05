@@ -160,6 +160,19 @@ export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem
   };
 }
 
+// A local checkout switches branches in place, so picking nothing means staying on the
+// branch that is already checked out.
+export function currentBranchPickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
+  const currentBranch = status.currentBranch;
+  if (!currentBranch) return null;
+  return {
+    kind: "branch",
+    name: currentBranch,
+    refName: `refs/heads/${currentBranch}`,
+    accessibilityLabel: `${currentBranch}, local branch`,
+  };
+}
+
 export function pickerItemToCheckoutRequest(
   item: PickerItem | null,
 ): PickerCheckoutRequest | undefined {

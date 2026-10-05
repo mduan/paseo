@@ -5,6 +5,7 @@ import {
   branchPickerOptionId,
   buildBranchPickerItems,
   buildPickerOptionData,
+  currentBranchPickerItem,
   defaultBasePickerItem,
   pickerItemToCheckoutRequest,
   type PickerItem,
@@ -376,5 +377,20 @@ describe("defaultBasePickerItem", () => {
 
   it("has no default for detached HEAD", () => {
     expect(defaultBasePickerItem({ currentBranch: null })).toBeNull();
+  });
+});
+
+describe("currentBranchPickerItem", () => {
+  it("defaults to the checked-out local branch even when it has an upstream", () => {
+    expect(
+      currentBranchPickerItem({
+        currentBranch: "feature",
+        upstreamRef: "refs/remotes/origin/feature",
+      }),
+    ).toMatchObject({ kind: "branch", name: "feature", refName: "refs/heads/feature" });
+  });
+
+  it("returns null on a detached head", () => {
+    expect(currentBranchPickerItem({ currentBranch: null })).toBeNull();
   });
 });
