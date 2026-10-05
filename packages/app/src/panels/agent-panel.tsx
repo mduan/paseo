@@ -326,6 +326,11 @@ function useAgentPanelDescriptor(
   target: { kind: "agent"; agentId: string },
   context: { serverId: string },
 ): PanelDescriptor {
+  const subagents = useSubagentsForParent({
+    serverId: context.serverId,
+    parentAgentId: target.agentId,
+    includeDescendants: true,
+  });
   const descriptorState = useSessionStore(
     useShallow((state) => {
       const session = state.sessions[context.serverId];
@@ -358,6 +363,7 @@ function useAgentPanelDescriptor(
           pendingPermissionCount: descriptorState.pendingPermissionCount,
           requiresAttention: descriptorState.requiresAttention,
           attentionReason: descriptorState.attentionReason,
+          hasRunningSubagents: subagents.some((row) => row.status === "running"),
         })
       : null,
   };

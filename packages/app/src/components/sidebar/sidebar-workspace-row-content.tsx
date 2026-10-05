@@ -187,8 +187,8 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   );
 });
 
-// The chevron takes the status slot on hover rather than adding a column. Touch has no hover, so
-// tapping the status visual toggles there.
+// Expanded rows leave status to their tab rows. Collapsed rows show the chevron on hover;
+// tapping the leading visual also toggles on touch.
 function WorkspaceLeadingSlot({
   toggle,
   showChevron,
@@ -203,6 +203,7 @@ function WorkspaceLeadingSlot({
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   if (!toggle?.visible) return children;
   const Chevron = toggle.expanded ? ThemedChevronDown : ThemedChevronRight;
+  const showCaret = toggle.expanded || showChevron;
   return (
     <Pressable
       onPress={toggle.onToggle}
@@ -217,7 +218,7 @@ function WorkspaceLeadingSlot({
       accessibilityState={accessibilityState}
       testID="sidebar-workspace-expand-chevron"
     >
-      {showChevron ? <Chevron size={12} uniProps={foregroundMutedColorMapping} /> : children}
+      {showCaret ? <Chevron size={12} uniProps={foregroundMutedColorMapping} /> : children}
     </Pressable>
   );
 }

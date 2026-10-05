@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { selectProviderSubagentsForParent, selectSubagentsForParent } from "./select";
 import { useProviderSubagentStore } from "./provider-store";
 import { useSessionStore, type Agent } from "@/stores/session-store";
+import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
 
 const SERVER_ID = "server-1";
 const AGENT_TIMESTAMP = new Date("2026-03-08T10:00:00.000Z");
@@ -68,6 +69,96 @@ afterEach(() => {
 });
 
 describe("selectSubagentsForParent", () => {
+  it("keeps ancestor tabs running as managed and native descendants start and stop", () => {
+    const parent = makeAgent({ id: "parent", workspaceId: "workspace" });
+    const child = makeAgent({ id: "child", parentAgentId: parent.id, workspaceId: "workspace" });
+    const grandchild = makeAgent({
+      id: "grandchild",
+      parentAgentId: child.id,
+      workspaceId: "workspace",
+      status: "running",
+    });
+    setAgents([parent, child, grandchild]);
+    const status = (parentAgentId: string) => {
+      const params = { serverId: SERVER_ID, parentAgentId, includeDescendants: true };
+      const rows = selectSubagentsForParent(
+        useSessionStore.getState(),
+        params,
+        EMPTY_PENDING_ARCHIVE_IDS,
+      );
+      const providerRows = [parentAgentId, ...rows.map((row) => row.id)].flatMap((id) =>
+        selectProviderSubagentsForParent(
+          useProviderSubagentStore.getState(),
+          { ...params, parentAgentId: id },
+          true,
+        ),
+      );
+      return deriveSidebarStateBucket({
+        status: "idle",
+        hasRunningSubagents: [...rows, ...providerRows].some((row) => row.status === "running"),
+      });
+    };
+    expect(status(parent.id)).toBe("running");
+    expect(status(child.id)).toBe("running");
+    setAgents([parent, child, { ...grandchild, status: "idle" }]);
+    expect(status(parent.id)).toBe("done");
+
+    const nativeChild = {
+      id: "native-grandchild",
+      parentAgentId: child.id,
+      parentSubagentId: "native-child",
+      provider: "codex" as const,
+      title: null,
+      description: null,
+      status: "running" as const,
+      createdAt: AGENT_TIMESTAMP.toISOString(),
+      updatedAt: AGENT_TIMESTAMP.toISOString(),
+      toolCallId: null,
+    };
+    useProviderSubagentStore.getState().replaceList("other-host", child.id, [nativeChild]);
+    expect(status(parent.id)).toBe("done");
+    useProviderSubagentStore.getState().replaceList(SERVER_ID, child.id, [nativeChild]);
+    expect(status(parent.id)).toBe("running");
+    expect(status(child.id)).toBe("running");
+    useProviderSubagentStore.getState().applyUpdate(SERVER_ID, {
+      kind: "upsert",
+      subagent: { ...nativeChild, status: "completed" },
+    });
+    expect(status(parent.id)).toBe("done");
+  });
+
+  it("excludes archived, detached, unrelated and other-workspace children from tab activity", () => {
+    const parent = makeAgent({ id: "parent", workspaceId: "workspace" });
+    setAgents([
+      parent,
+      makeAgent({
+        id: "archived",
+        parentAgentId: parent.id,
+        workspaceId: parent.workspaceId,
+        status: "running",
+        archivedAt: AGENT_TIMESTAMP,
+      }),
+      makeAgent({ id: "detached", workspaceId: parent.workspaceId, status: "running" }),
+      makeAgent({
+        id: "unrelated",
+        parentAgentId: "another-parent",
+        workspaceId: parent.workspaceId,
+        status: "running",
+      }),
+      makeAgent({
+        id: "other-workspace",
+        parentAgentId: parent.id,
+        workspaceId: "elsewhere",
+        status: "running",
+      }),
+    ]);
+    const params = { serverId: SERVER_ID, parentAgentId: parent.id, includeDescendants: true };
+    const select = () =>
+      selectSubagentsForParent(useSessionStore.getState(), params, EMPTY_PENDING_ARCHIVE_IDS);
+    expect(select()).toEqual([]);
+    expect(select()).toBe(select());
+  });
+
   it("hides cached provider children when the host does not support them", () => {
     useProviderSubagentStore.getState().applyUpdate(SERVER_ID, {
       kind: "upsert",
