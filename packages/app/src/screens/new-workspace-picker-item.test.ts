@@ -263,10 +263,12 @@ const mainRow: BranchPickerDetail = {
 
 describe("buildPickerOptionData", () => {
   it("pins the base, then local, origin, and PRs, each newest first", () => {
-    const baseItem = defaultBasePickerItem({
-      currentBranch: "main",
-      upstreamRef: "refs/remotes/origin/main",
-    });
+    const baseItem: PickerItem = {
+      kind: "branch",
+      name: "origin/main",
+      refName: "refs/remotes/origin/main",
+      accessibilityLabel: "origin/main, origin branch",
+    };
     const data = buildPickerOptionData({
       branchDetails: [
         {
@@ -296,10 +298,12 @@ describe("buildPickerOptionData", () => {
   });
 
   it("adds a fork upstream absent from branch suggestions", () => {
-    const baseItem = defaultBasePickerItem({
-      currentBranch: "main",
-      upstreamRef: "refs/remotes/upstream/main",
-    });
+    const baseItem: PickerItem = {
+      kind: "branch",
+      name: "upstream/main",
+      refName: "refs/remotes/upstream/main",
+      accessibilityLabel: "upstream/main, upstream branch",
+    };
     const data = buildPickerOptionData({
       branchDetails: [{ ...mainRow, localAhead: 0, localBehind: 0 }],
       prItems: [],
@@ -314,7 +318,7 @@ describe("buildPickerOptionData", () => {
     expect(data.selectedOptionId).toBe(branchPickerOptionId("refs/remotes/upstream/main"));
   });
 
-  it("selects the bare legacy row for an old daemon's local default", () => {
+  it("selects the bare legacy row for the local default", () => {
     const baseItem = defaultBasePickerItem({ currentBranch: "main" });
     const data = buildPickerOptionData({
       branchDetails: [
@@ -350,25 +354,7 @@ describe("buildPickerOptionData", () => {
 });
 
 describe("defaultBasePickerItem", () => {
-  it("uses origin when the current branch tracks origin", () => {
-    expect(
-      defaultBasePickerItem({
-        currentBranch: "main",
-        upstreamRef: "refs/remotes/origin/main",
-      }),
-    ).toMatchObject({ refName: "refs/remotes/origin/main", name: "origin/main" });
-  });
-
-  it("uses the exact non-origin upstream", () => {
-    expect(
-      defaultBasePickerItem({
-        currentBranch: "main",
-        upstreamRef: "refs/remotes/upstream/main",
-      }),
-    ).toMatchObject({ refName: "refs/remotes/upstream/main", name: "upstream/main" });
-  });
-
-  it("keeps old-daemon behavior local", () => {
+  it("uses the local current branch", () => {
     expect(defaultBasePickerItem({ currentBranch: "main" })).toMatchObject({
       refName: "refs/heads/main",
       name: "main",

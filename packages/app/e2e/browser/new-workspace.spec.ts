@@ -39,9 +39,7 @@ import {
   commitLocalOnly,
   createTempGitRepo,
   readRepoRef,
-  readWorktreeBaseMetadata,
   readWorktreeBranchInfo,
-  trackForkUpstream,
 } from "../support/helpers/workspace";
 import {
   createLocalGithubPrFixture,
@@ -795,97 +793,53 @@ test.describe("New workspace flow", () => {
       };
     }
 
-    test("branches off the upstream when the local branch is ahead and the picker is untouched", async ({
+    test("branches off the local ref when the local branch is ahead and the picker is untouched", async ({
       page,
     }) => {
       const tempRepo = await createTempGitRepo("ref-default-ahead-", { withRemote: true });
 
       try {
-        const originHead = readRepoRef(tempRepo.path, "refs/remotes/origin/main");
         commitLocalOnly(tempRepo.path, "one");
         const localHead = commitLocalOnly(tempRepo.path, "two");
 
         const openedProject = await openWorktreeComposerForRepo(page, tempRepo.path);
         const created = await createWorktreeAndRead(page, openedProject);
 
-        expect(created.branchInfo.hasAncestor(originHead)).toBe(true);
-        expect(created.branchInfo.hasAncestor(localHead)).toBe(false);
-      } finally {
-        await tempRepo.cleanup();
-      }
-    });
-
-    test("branches off the local ref when the local row is chosen explicitly", async ({
-      page,
-    }, testInfo) => {
-      const tempRepo = await createTempGitRepo("ref-default-local-pick-", { withRemote: true });
-
-      try {
-        commitLocalOnly(tempRepo.path, "one");
-        const localHead = commitLocalOnly(tempRepo.path, "two");
-
-        const openedProject = await openWorktreeComposerForRepo(page, tempRepo.path);
-
-        await openStartingRefPicker(page);
-        await expectStartingRefRows(page, [
-          "origin/main, origin branch",
-          "main, local branch, 2 commits ahead of origin main",
-        ]);
-        const screenshotPath = testInfo.outputPath("ref-picker-local-ahead.png");
-        await captureStartingRefPicker(page, screenshotPath);
-        await testInfo.attach("Ref picker: local ahead of upstream", {
-          path: screenshotPath,
-          contentType: "image/png",
-        });
-        await startingRefRow(page, "main, local branch, 2 commits ahead of origin main").click();
-        await expectPickerSelected(page, "main");
-        await expect(page.getByRole("button", { name: "Starting ref" })).not.toContainText(
-          "origin/main",
-        );
-
-        const created = await createWorktreeAndRead(page, openedProject);
         expect(created.branchInfo.hasAncestor(localHead)).toBe(true);
       } finally {
         await tempRepo.cleanup();
       }
     });
 
-    test("branches off a fork's upstream remote and records the branch name", async ({
+    test("branches off origin when the origin row is chosen explicitly", async ({
       page,
     }, testInfo) => {
-      const tempRepo = await createTempGitRepo("ref-default-fork-", { withRemote: true });
+      const tempRepo = await createTempGitRepo("ref-default-origin-pick-", { withRemote: true });
 
       try {
-        const upstreamHead = await trackForkUpstream(tempRepo.path);
         const originHead = readRepoRef(tempRepo.path, "refs/remotes/origin/main");
+        commitLocalOnly(tempRepo.path, "one");
+        const localHead = commitLocalOnly(tempRepo.path, "two");
 
         const openedProject = await openWorktreeComposerForRepo(page, tempRepo.path);
 
         await openStartingRefPicker(page);
-        // Branch suggestions only know about origin, so the upstream the fork actually
-        // tracks gets its own row rather than silently sharing origin's.
         await expectStartingRefRows(page, [
-          "upstream/main, upstream branch",
+          "main, local branch, 2 commits ahead of origin main",
           "origin/main, origin branch",
         ]);
-        await expectPickerSelected(page, "upstream/main");
-        const screenshotPath = testInfo.outputPath("ref-picker-fork.png");
+        const screenshotPath = testInfo.outputPath("ref-picker-local-ahead.png");
         await captureStartingRefPicker(page, screenshotPath);
-        await testInfo.attach("Ref picker: fork tracking upstream/main", {
+        await testInfo.attach("Ref picker: local ahead of origin", {
           path: screenshotPath,
           contentType: "image/png",
         });
-        await closeBranchPicker(page);
+        await startingRefRow(page, "origin/main, origin branch").click();
+        await expectPickerSelected(page, "origin/main");
 
         const created = await createWorktreeAndRead(page, openedProject);
-
-        expect(created.branchInfo.hasAncestor(upstreamHead)).toBe(true);
-        expect(upstreamHead).not.toBe(originHead);
-        // The name is what the UI shows; the ref is what resolves back to this commit.
-        expect(await readWorktreeBaseMetadata(created.workspaceDirectory)).toEqual({
-          baseRefName: "main",
-          baseRef: "refs/remotes/upstream/main",
-        });
+        expect(created.branchInfo.hasAncestor(originHead)).toBe(true);
+        expect(created.branchInfo.hasAncestor(localHead)).toBe(false);
       } finally {
         await tempRepo.cleanup();
       }

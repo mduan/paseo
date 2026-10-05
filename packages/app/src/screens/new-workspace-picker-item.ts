@@ -124,7 +124,6 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
 
 export interface BaseRefCheckoutStatus {
   currentBranch: string | null;
-  upstreamRef?: string | null;
 }
 
 // Display only. The exact ref is what every request carries; this is how git prints it, so
@@ -141,22 +140,16 @@ function shortRefName(refName: string): string {
 // row, the trigger label, and the created ref all read this; computing it twice is how the
 // picker once showed local main while branching off something else.
 //
-// The upstream wins when the branch has one, because branching off the local ref silently
-// carries unpushed commits into the new workspace. The daemon sends the resolved ref rather
-// than a remote name, so a fork tracking upstream/main branches from upstream/main.
+// The default is the source checkout's local branch, so unpushed commits on it carry into the
+// new workspace. Pick the remote row to branch off what's published instead.
 export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
   const currentBranch = status.currentBranch;
   if (!currentBranch) return null;
-  // COMPAT(checkoutUpstreamRef): added in v0.2.6, remove after 2027-02-01 once the daemon
-  // floor sends upstreamRef. Daemons that predate it omit the field, which lands on the
-  // local ref — the base those daemons always used.
-  const refName = status.upstreamRef ?? `refs/heads/${currentBranch}`;
-  const name = shortRefName(refName);
   return {
     kind: "branch",
-    name,
-    refName,
-    accessibilityLabel: status.upstreamRef ? `${name}, upstream branch` : `${name}, local branch`,
+    name: currentBranch,
+    refName: `refs/heads/${currentBranch}`,
+    accessibilityLabel: `${currentBranch}, local branch`,
   };
 }
 
