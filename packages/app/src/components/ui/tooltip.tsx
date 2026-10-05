@@ -30,6 +30,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { FloatingSurface } from "@/components/ui/floating";
 import { isNative, isWeb } from "@/constants/platform";
 import { getOverlayRoot, OVERLAY_Z } from "@/lib/overlay-root";
+import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
 
 type Side = "top" | "bottom" | "left" | "right";
 type Align = "start" | "center" | "end";
@@ -45,10 +46,17 @@ interface TooltipContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
   triggerRef: React.RefObject<View | null>;
+  contentRef: React.RefObject<View | null>;
   enabled: boolean;
+  interactive: boolean;
+  scheduleClose: () => void;
+  cancelClose: () => void;
   openOnPress: boolean;
   delayDuration: number;
 }
+
+// How long an interactive tooltip stays open after the pointer leaves the safe zone.
+const INTERACTIVE_CLOSE_GRACE_MS = 100;
 
 const TooltipContext = createContext<TooltipContextValue | null>(null);
 
@@ -231,6 +239,7 @@ export function Tooltip({
   delayDuration = 0,
   enabledOnDesktop = true,
   enabledOnMobile = false,
+  interactive: interactiveProp = false,
   children,
 }: PropsWithChildren<{
   open?: boolean;
@@ -239,8 +248,12 @@ export function Tooltip({
   delayDuration?: number;
   enabledOnDesktop?: boolean;
   enabledOnMobile?: boolean;
+  /** Web desktop: keep the tooltip open while the pointer crosses to and rests on it. */
+  interactive?: boolean;
 }>): ReactElement {
   const triggerRef = useRef<View>(null);
+  const contentRef = useRef<View>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [isOpen, setIsOpen] = useControllableOpenState({
     open,
     defaultOpen,
@@ -250,17 +263,54 @@ export function Tooltip({
   const isCompact = useIsCompactFormFactor();
   const opensOnPress = isNative || isCompact;
   const enabled = opensOnPress ? enabledOnMobile : enabledOnDesktop;
+  const interactive = interactiveProp && isWeb && !opensOnPress;
+
+  const cancelClose = useCallback(() => {
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = undefined;
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    if (closeTimerRef.current) return;
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = undefined;
+      setIsOpen(false);
+    }, INTERACTIVE_CLOSE_GRACE_MS);
+  }, [setIsOpen]);
+
+  useEffect(() => cancelClose, [cancelClose]);
+
+  useHoverSafeZone({
+    enabled: interactive && isOpen,
+    triggerRef,
+    contentRef,
+    onEnterSafeZone: cancelClose,
+    onLeaveSafeZone: scheduleClose,
+  });
 
   const value = useMemo<TooltipContextValue>(
     () => ({
       open: isOpen,
       setOpen: setIsOpen,
       triggerRef,
+      contentRef,
       enabled,
+      interactive,
+      scheduleClose,
+      cancelClose,
       openOnPress: opensOnPress,
       delayDuration,
     }),
-    [isOpen, setIsOpen, enabled, opensOnPress, delayDuration],
+    [
+      isOpen,
+      setIsOpen,
+      enabled,
+      interactive,
+      scheduleClose,
+      cancelClose,
+      opensOnPress,
+      delayDuration,
+    ],
   );
 
   return <TooltipContext.Provider value={value}>{children}</TooltipContext.Provider>;
@@ -318,17 +368,23 @@ export function TooltipTrigger({
   const handleHoverIn = useCallback(
     (e?: unknown) => {
       if (isCallable(onHoverIn)) onHoverIn(e);
-      scheduleOpen();
+      ctx.cancelClose();
+      if (!ctx.open) scheduleOpen();
     },
-    [onHoverIn, scheduleOpen],
+    [ctx, onHoverIn, scheduleOpen],
   );
 
   const handleHoverOut = useCallback(
     (e?: unknown) => {
       if (isCallable(onHoverOut)) onHoverOut(e);
+      if (ctx.interactive) {
+        clearOpenTimer();
+        ctx.scheduleClose();
+        return;
+      }
       close();
     },
-    [onHoverOut, close],
+    [clearOpenTimer, ctx, onHoverOut, close],
   );
 
   const handleFocus = useCallback(
@@ -517,9 +573,10 @@ export function TooltipContent({
   // exact same positioning math as DropdownMenu, without hover feedback loops.
   if (isWeb) {
     return createPortal(
-      <View pointerEvents="none" style={styles.portalOverlay}>
+      <View pointerEvents={ctx.interactive ? "box-none" : "none"} style={styles.portalOverlay}>
         <FloatingSurface
-          pointerEvents="none"
+          ref={ctx.contentRef}
+          pointerEvents={ctx.interactive ? "auto" : "none"}
           entering={FadeIn.duration(80)}
           exiting={FadeOut.duration(80)}
           collapsable={false}
