@@ -9,7 +9,9 @@ import {
 } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import type { AgentUsage } from "@getpaseo/protocol/agent-types";
 import { useShallow } from "zustand/react/shallow";
 import {
   DropdownMenu,
@@ -492,6 +494,21 @@ function AgentPreview({
   );
 }
 
+/** Session cost, marked "(est.)" when Paseo priced the provider's token counts itself. */
+function formatAgentCost({
+  t,
+  usage,
+}: {
+  t: TFunction;
+  usage: AgentUsage | null | undefined;
+}): string | null {
+  const cost =
+    typeof usage?.totalCostUsd === "number" ? formatSessionCost(usage.totalCostUsd) : null;
+  return cost && usage?.totalCostEstimated
+    ? `${cost} ${t("contextWindow.sessionCostEstimated")}`
+    : cost;
+}
+
 /** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
 function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: string }) {
   const { t } = useTranslation();
@@ -505,13 +522,12 @@ function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: st
     runtimeThinkingOptionId: agent?.runtimeInfo?.thinkingOptionId,
     explicitThinkingOptionId: agent?.thinkingOptionId,
   });
-  const totalCostUsd = agent?.lastUsage?.totalCostUsd;
   const parts = [
     selection.activeModelId ? selection.displayModel : null,
     selection.selectedThinkingId
       ? t("workspace.tabs.effort", { effort: selection.displayThinking })
       : null,
-    typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null,
+    formatAgentCost({ t, usage: agent?.lastUsage }),
   ].filter(Boolean);
   return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
 }
