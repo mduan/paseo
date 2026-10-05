@@ -917,7 +917,10 @@ function StatusWorkspaceRowInnerContent({
                 disabled={isArchiving}
                 accessibilityRole="button"
                 accessibilityState={accessibilityState}
-                style={workspaceRowStyle}
+                style={[
+                  workspaceRowStyle,
+                  sessions.rows.length > 0 && styles.workspaceRowWithSessions,
+                ]}
                 highlightStyle={styles.workspaceRowPressed}
                 onPressIn={handlePressIn}
                 onTouchMove={moveDragPress}
@@ -1167,7 +1170,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceRow: {
     minHeight: 36,
-    marginBottom: theme.spacing[0.5],
     paddingVertical: theme.spacing[2],
     paddingLeft: theme.spacing[2],
     paddingRight: theme.spacing[3],
@@ -1177,6 +1179,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "flex-start",
     gap: theme.spacing[1],
     userSelect: "none",
+  },
+  workspaceRowWithSessions: {
+    marginBottom: theme.spacing[0.5],
   },
   workspaceRowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
