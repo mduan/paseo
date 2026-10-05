@@ -33,6 +33,7 @@ import { Portal } from "@gorhom/portal";
 import { useBottomSheetModalInternal } from "@gorhom/bottom-sheet";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
+import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { PrBadge } from "@/components/sidebar-workspace-list";
@@ -231,6 +232,10 @@ function WorkspaceHoverCardContent({
   contentRef: React.RefObject<View | null>;
 }): ReactElement | null {
   const { t } = useTranslation();
+  const { status } = useCheckoutStatusQuery({
+    serverId: workspace.serverId,
+    cwd: workspace.workspaceDirectory,
+  });
   const bottomSheetInternal = useBottomSheetModalInternal(true);
   const [triggerRect, setTriggerRect] = useState<Rect | null>(null);
   const [contentSize, setContentSize] = useState<{ width: number; height: number } | null>(null);
@@ -321,6 +326,15 @@ function WorkspaceHoverCardContent({
               copyValue={workspace.currentBranch}
               copyLabel={t("workspace.hoverCard.copyBranchName")}
               testID="hover-card-workspace-branch"
+            />
+          ) : null}
+          {status?.baseRefLabel ? (
+            <CopyableInfoRow
+              icon={ThemedGitBranch}
+              value={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}`}
+              copyValue={status.baseRefLabel}
+              copyLabel={t("workspace.hoverCard.copyBranchName")}
+              testID="hover-card-workspace-base-branch"
             />
           ) : null}
           {workspace.workspaceDirectoryLabel ? (
