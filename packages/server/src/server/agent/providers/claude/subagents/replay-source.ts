@@ -5,7 +5,12 @@ import { normalizeProviderReplayTimestamp } from "../../../provider-history-time
 import type { ProviderSubagentStatus } from "../../../provider-subagents/store.js";
 import { resolveObservedClaudeModelId } from "../models.js";
 import type { SubagentObservation } from "./observation.js";
-import { buildClaudeSubagentSubtitle, type ClaudeSubagentUsage } from "./presentation.js";
+import { rollupProviderSubagentCosts } from "../../../provider-subagents/cost.js";
+import {
+  buildClaudeSubagentSubtitle,
+  type ClaudeSubagentPresentationFacts,
+  type ClaudeSubagentUsage,
+} from "./presentation.js";
 
 /**
  * Rebuilds subagent observations from a persisted session, producing the same vocabulary the
@@ -247,37 +252,69 @@ function declareSubagent(
   };
 }
 
-function observeSubtitle(
+/** A replayed subagent whose subtitle gains a cost once its transcript is priced. */
+export interface ClaudeReplaySubagentCostTarget {
+  id: string;
+  taskId: string;
+  parentSubagentId?: string;
+  facts: ClaudeSubagentPresentationFacts;
+  timestamp?: string;
+}
+
+function readSubtitleFacts(
   subagent: ClaudeReplaySubagentInput,
-  link: ParentLink,
   title: string | undefined,
-): SubagentObservation | null {
-  const runtime = readRuntime(subagent.entries);
+): ClaudeSubagentPresentationFacts {
   const usage = readUsage(subagent.entries);
+  return { title, ...readRuntime(subagent.entries), ...(usage ? { usage } : {}) };
+}
+
+function buildSubtitleObservation(
+  id: string,
+  facts: ClaudeSubagentPresentationFacts,
+  timestamp: string | undefined,
+): SubagentObservation | null {
   const hasDetails =
-    runtime.model !== undefined ||
-    runtime.effort !== undefined ||
-    (usage?.totalTokens !== undefined && usage.totalTokens > 0);
+    facts.model !== undefined ||
+    facts.effort !== undefined ||
+    (facts.usage?.totalTokens !== undefined && facts.usage.totalTokens > 0) ||
+    facts.costUsd !== undefined;
   if (!hasDetails) return null;
-  const subtitle = buildClaudeSubagentSubtitle({
-    title,
-    ...runtime,
-    ...(usage ? { usage } : {}),
-  });
+  const subtitle = buildClaudeSubagentSubtitle(facts);
   if (!subtitle) return null;
-  const timestamp = normalizeProviderReplayTimestamp(subagent.entries.at(-1)?.timestamp);
-  return {
-    kind: "subtitle",
-    id: link.id,
-    subtitle,
-    ...(timestamp ? { timestamp } : {}),
-  };
+  return { kind: "subtitle", id, subtitle, ...(timestamp ? { timestamp } : {}) };
+}
+
+/** Rebuild replayed subtitles with each transcript's own cost and its descendants' rollup. */
+export function observeReplaySubagentCosts(
+  targets: readonly ClaudeReplaySubagentCostTarget[],
+  costUsdByTaskId: ReadonlyMap<string, number>,
+): SubagentObservation[] {
+  const costs = rollupProviderSubagentCosts(
+    targets.map((target) => ({
+      id: target.id,
+      parentSubagentId: target.parentSubagentId ?? null,
+      ownCostUsd: costUsdByTaskId.get(target.taskId) ?? 0,
+    })),
+  );
+  return targets.flatMap((target) => {
+    const costUsd = costUsdByTaskId.get(target.taskId);
+    const subagentCostUsd = costs.byId.get(target.id)?.subagentCostUsd ?? 0;
+    if (costUsd === undefined && subagentCostUsd <= 0) return [];
+    const observation = buildSubtitleObservation(
+      target.id,
+      { ...target.facts, costUsd: costUsd ?? 0, subagentCostUsd },
+      target.timestamp,
+    );
+    return observation ? [observation] : [];
+  });
 }
 
 function observeSubagent(
   subagent: ClaudeReplaySubagentInput,
   parent: ClaudeReplayParentFacts,
   convertEntry: (entry: ClaudeReplayEntry) => AgentTimelineItem[],
+  costTargets: ClaudeReplaySubagentCostTarget[],
   parentSubagentId?: string,
 ): SubagentObservation[] {
   const link = resolveParentLink(subagent, parent);
@@ -287,8 +324,18 @@ function observeSubagent(
   const observations: SubagentObservation[] = [
     declareSubagent(subagent, link, toolCall, parentSubagentId),
   ];
-  const subtitle = observeSubtitle(subagent, link, toolCall?.title ?? subagent.meta?.agentType);
+  const facts = readSubtitleFacts(subagent, toolCall?.title ?? subagent.meta?.agentType);
+  const subtitleTimestamp =
+    normalizeProviderReplayTimestamp(subagent.entries.at(-1)?.timestamp) ?? undefined;
+  const subtitle = buildSubtitleObservation(link.id, facts, subtitleTimestamp);
   if (subtitle) observations.push(subtitle);
+  costTargets.push({
+    id: link.id,
+    taskId: subagent.agentId,
+    ...(parentSubagentId ? { parentSubagentId } : {}),
+    facts,
+    ...(subtitleTimestamp ? { timestamp: subtitleTimestamp } : {}),
+  });
 
   for (const entry of subagent.entries) {
     const timestamp = normalizeProviderReplayTimestamp(entry.timestamp);
@@ -341,8 +388,10 @@ export function observeReplaySubagents(input: {
   observations: SubagentObservation[];
   taskIds: ReadonlySet<string>;
   toolOwners: ReadonlyMap<string, string>;
+  costTargets: readonly ClaudeReplaySubagentCostTarget[];
 } {
   const observations: SubagentObservation[] = [];
+  const costTargets: ClaudeReplaySubagentCostTarget[] = [];
   const taskIds = new Set<string>();
   const toolOwners = new Map<string, string>();
   const unresolved = [...input.subagents].sort(
@@ -366,13 +415,15 @@ export function observeReplaySubagents(input: {
       // Only proven descendants may own notifications; ambient sidecars cannot claim them.
       taskIds.add(subagent.agentId);
       recordReplayToolOwners(toolOwners, subagent.entries, link.id);
-      observations.push(...observeSubagent(subagent, parent, input.convertEntry, ownerId));
+      observations.push(
+        ...observeSubagent(subagent, parent, input.convertEntry, costTargets, ownerId),
+      );
       if (subagent.parentFacts) resolvedParents.set(link.id, subagent.parentFacts);
       unresolved.splice(index, 1);
       madeProgress = true;
     }
   }
-  return { observations, taskIds, toolOwners };
+  return { observations, taskIds, toolOwners, costTargets };
 }
 
 function resolveReplayOwner(

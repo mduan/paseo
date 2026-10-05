@@ -8,6 +8,7 @@ import {
 import { ClaudeTaskProtocolSource } from "./live-source.js";
 import { foldSubagentObservations, type SubagentObservation } from "./observation.js";
 import {
+  observeReplaySubagentCosts,
   observeReplaySubagents,
   parseClaudeSubagentMeta,
   type ClaudeReplayEntry,
@@ -615,5 +616,28 @@ describe("live and replay agree", () => {
       status: "completed",
       toolCallId: TOOL_USE_ID,
     });
+  });
+});
+
+describe("observeReplaySubagentCosts", () => {
+  it("adds own cost and the descendant total to restored subtitles", () => {
+    const observations = observeReplaySubagentCosts(
+      [
+        { id: "child", taskId: "a-child", facts: { title: "Explore" } },
+        { id: "grandchild", taskId: "a-grand", parentSubagentId: "child", facts: {} },
+      ],
+      new Map([
+        ["a-child", 0.5],
+        ["a-grand", 0.25],
+      ]),
+    );
+    expect(observations).toEqual([
+      {
+        kind: "subtitle",
+        id: "child",
+        subtitle: "Explore · $0.50 own (est.) · $0.75 total (est.)",
+      },
+      { kind: "subtitle", id: "grandchild", subtitle: "$0.25 own (est.)" },
+    ]);
   });
 });

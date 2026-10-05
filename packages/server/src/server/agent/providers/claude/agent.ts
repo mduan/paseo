@@ -50,7 +50,9 @@ import {
   type ClaudeHookObservationInput,
 } from "./subagents/live-source.js";
 import {
+  observeReplaySubagentCosts,
   observeReplaySubagents,
+  type ClaudeReplaySubagentCostTarget,
   parseClaudeSubagentMeta,
   type ClaudeReplayParentFacts,
   type ClaudeSubagentMeta,
@@ -2117,6 +2119,7 @@ class ClaudeAgentSession implements AgentSession {
     { type: "provider_subagent" }
   >[] = [];
   private historyPending = false;
+  private replaySubagentCostTargets: readonly ClaudeReplaySubagentCostTarget[] = [];
   private turnState: TurnState = "idle";
   private nextTurnOrdinal = 1;
   private cancelCurrentTurn: (() => void) | null = null;
@@ -2410,8 +2413,10 @@ class ClaudeAgentSession implements AgentSession {
     }
     const history = this.persistedHistory;
     const providerSubagentEvents = this.persistedProviderSubagentEvents;
+    const costTargets = this.replaySubagentCostTargets;
     this.persistedHistory = [];
     this.persistedProviderSubagentEvents = [];
+    this.replaySubagentCostTargets = [];
     this.historyPending = false;
     for (const entry of history) {
       yield {
@@ -2422,6 +2427,29 @@ class ClaudeAgentSession implements AgentSession {
       };
     }
     yield* providerSubagentEvents;
+    yield* await this.replaySubagentCostEvents(costTargets);
+  }
+
+  /** Replay has no task frames to trigger pricing, so restored subagents are priced here. */
+  private async replaySubagentCostEvents(
+    targets: readonly ClaudeReplaySubagentCostTarget[],
+  ): Promise<Extract<AgentStreamEvent, { type: "provider_subagent" }>[]> {
+    if (targets.length === 0) return [];
+    try {
+      const prices = await getSharedCodexPriceList(this.logger).get();
+      if (!prices) return [];
+      const costUsdByTaskId = new Map<string, number>();
+      for (const target of targets) {
+        const costUsd = await this.subagentTranscriptCost(target.taskId)?.read(prices);
+        if (costUsd !== undefined) costUsdByTaskId.set(target.taskId, costUsd);
+      }
+      return foldSubagentObservations(observeReplaySubagentCosts(targets, costUsdByTaskId)).map(
+        (event) => ({ type: "provider_subagent", provider: "claude", event }),
+      );
+    } catch (error) {
+      this.logger.warn({ err: error }, "Failed to estimate restored Claude subagent costs");
+      return [];
+    }
   }
 
   async getAvailableModes(): Promise<AgentMode[]> {
@@ -3025,6 +3053,7 @@ class ClaudeAgentSession implements AgentSession {
     this.persistedHistory = [];
     this.persistedProviderSubagentEvents = [];
     this.historyPending = false;
+    this.replaySubagentCostTargets = [];
     this.userMessageIds = [];
     this.emittedUserMessageIds.clear();
     this.rewindTurnAnchors.length = 0;
@@ -3056,6 +3085,7 @@ class ClaudeAgentSession implements AgentSession {
     this.persistedHistory = [];
     this.persistedProviderSubagentEvents = [];
     this.historyPending = false;
+    this.replaySubagentCostTargets = [];
     this.userMessageIds = [];
     this.emittedUserMessageIds.clear();
     this.rewindTurnAnchors.length = 0;
@@ -4074,6 +4104,7 @@ class ClaudeAgentSession implements AgentSession {
     this.persistedHistory = [];
     this.persistedProviderSubagentEvents = [];
     this.historyPending = false;
+    this.replaySubagentCostTargets = [];
     this.cachedRuntimeInfo = null;
     this.queryRestartNeeded = false;
     this.autonomousTurn = null;
@@ -5101,6 +5132,7 @@ class ClaudeAgentSession implements AgentSession {
       convertEntry: (entry) => this.convertHistoryEntry(entry as ClaudeHistoryEntry),
     });
     for (const taskId of subagentReplay.taskIds) this.replaySubagentTaskIds.add(taskId);
+    this.replaySubagentCostTargets = subagentReplay.costTargets;
     const observations = [
       ...subagentReplay.observations,
       ...observeReplayWorkflows({
