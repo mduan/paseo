@@ -318,7 +318,9 @@ export function AnchoredSurface({
       : {
           ...(typeof width === "number" ? { width } : null),
           ...(typeof minWidth === "number" ? { minWidth } : null),
-          ...(typeof maxWidth === "number" ? { maxWidth } : null),
+          ...(typeof maxWidth === "number"
+            ? { maxWidth: Math.min(maxWidth, screenWidth - horizontalPadding * 2) }
+            : null),
         };
     return [
       resolvedWidthStyle,

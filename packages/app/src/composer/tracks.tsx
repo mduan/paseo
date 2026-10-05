@@ -69,7 +69,7 @@ export interface ComposerTrackPillProps {
  * surface still shrinks to its content and clamps to the viewport.
  */
 const PANEL_MIN_WIDTH = 280;
-const PANEL_MAX_WIDTH = 620;
+const PANEL_MAX_WIDTH = 800;
 const PANEL_MAX_HEIGHT = 440;
 /**
  * Gap between the pill and its panel. Wider than a dropdown's, because the panel is not a menu
