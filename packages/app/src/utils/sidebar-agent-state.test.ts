@@ -6,6 +6,14 @@ import {
 } from "./sidebar-agent-state";
 
 describe("deriveSidebarStateBucket", () => {
+  it("keeps a finished parent running until its children finish", () => {
+    const input = { status: "idle" as const, requiresAttention: true, hasRunningSubagents: true };
+    expect(deriveSidebarStateBucket(input)).toBe("running");
+    expect(deriveSidebarStateBucket({ ...input, hasRunningSubagents: false })).toBe("attention");
+    expect(deriveSidebarStateBucket({ ...input, pendingPermissionCount: 1 })).toBe("needs_input");
+    expect(deriveSidebarStateBucket({ ...input, status: "error" })).toBe("failed");
+  });
+
   it("prioritizes pending permissions as needs_input", () => {
     expect(
       deriveSidebarStateBucket({

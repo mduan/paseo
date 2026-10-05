@@ -7,8 +7,11 @@ import {
 export type SidebarStateBucket = "needs_input" | "failed" | "running" | "attention" | "done";
 export type SidebarAttentionReason = AgentAttentionReason;
 
-export function deriveSidebarStateBucket(input: AgentStateBucketInput): SidebarStateBucket {
-  return deriveAgentStateBucket(input);
+export function deriveSidebarStateBucket(
+  input: AgentStateBucketInput & { hasRunningSubagents?: boolean },
+): SidebarStateBucket {
+  const bucket = deriveAgentStateBucket(input);
+  return input.hasRunningSubagents ? aggregateSidebarStateBuckets([bucket, "running"]) : bucket;
 }
 
 export function isSidebarActiveAgent(input: AgentStateBucketInput): boolean {

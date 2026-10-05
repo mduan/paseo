@@ -96,6 +96,7 @@ import { derivePendingPermissionKey, normalizeAgentSnapshot } from "@/utils/agen
 import { applyLegacyDaemonWorkspaceOwnership } from "@/workspace/legacy-daemon-workspaces";
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
+import { useHasRunningSubagents } from "@/subagents/activity";
 import { buildDraftAgentSetup, type ClientSlashCommand } from "@/client-slash-commands";
 
 interface ChatAgentStateShape {
@@ -326,6 +327,10 @@ function useAgentPanelDescriptor(
   target: { kind: "agent"; agentId: string },
   context: { serverId: string },
 ): PanelDescriptor {
+  const hasRunningSubagents = useHasRunningSubagents({
+    serverId: context.serverId,
+    parentAgentId: target.agentId,
+  });
   const descriptorState = useSessionStore(
     useShallow((state) => {
       const session = state.sessions[context.serverId];
@@ -358,6 +363,7 @@ function useAgentPanelDescriptor(
           pendingPermissionCount: descriptorState.pendingPermissionCount,
           requiresAttention: descriptorState.requiresAttention,
           attentionReason: descriptorState.attentionReason,
+          hasRunningSubagents,
         })
       : null,
   };
