@@ -18,6 +18,7 @@ import type { HostConnection, HostProfile } from "@/types/host-connection";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { createUserMessage } from "@/types/stream";
 import { isAgentArchiving, setAgentArchiving } from "@/hooks/use-archive-agent";
 import { queryClient } from "@/data/query-client";
 import {
@@ -3007,6 +3008,46 @@ describe("HostRuntimeStore", () => {
       ]);
     });
 
+    useSessionStore.getState().clearSession(host.serverId);
+  });
+
+  it("does not drain the queue while another send is still pending", async () => {
+    const host = makeHost({ serverId: "srv_pending_send_queue_drain" });
+    const fakeClient = new FakeDaemonClient();
+    const store = new HostRuntimeStore({
+      deps: {
+        createClient: () => fakeClient as unknown as DaemonClient,
+        connectToDaemon: async () => ({
+          client: fakeClient as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: null,
+        }),
+        getClientId: async () => "cid_pending_send_queue_drain",
+      },
+    });
+    const sessionStore = useSessionStore.getState();
+    sessionStore.initializeSession(host.serverId, fakeClient as unknown as DaemonClient, 1);
+    sessionStore.setQueuedMessages(
+      host.serverId,
+      new Map([["agent", [{ id: "first", text: "wait my turn", attachments: [] }]]]),
+    );
+    // "Send now" on a later queued message interrupts the running turn, which reads as a stop.
+    sessionStore.beginAgentMessageSubmission(
+      host.serverId,
+      "agent",
+      createUserMessage({
+        clientMessageId: "sent-now",
+        text: "jump the queue",
+        timestamp: new Date(),
+      }),
+    );
+
+    store.drainQueuedAgentMessage(host.serverId, "agent");
+
+    expect(fakeClient.sentAgentMessages).toHaveLength(0);
+    expect(useSessionStore.getState().sessions[host.serverId]?.queuedMessages.get("agent")).toEqual(
+      [{ id: "first", text: "wait my turn", attachments: [] }],
+    );
     useSessionStore.getState().clearSession(host.serverId);
   });
 
