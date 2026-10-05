@@ -114,8 +114,8 @@ jobs:
       - name: Install dependencies
         run: node scripts/npm-retry.mjs ci
 
-      - name: Test the fork CLI packer
-        run: node --test scripts/pack-fork-cli.test.mjs
+      - name: Test the fork release scripts
+        run: node --test scripts/pack-fork-cli.test.mjs scripts/bump-fork-version.test.mjs
 
       - name: Build server stack
         run: npm run build:server
