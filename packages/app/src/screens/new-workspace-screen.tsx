@@ -724,25 +724,34 @@ interface WorkspaceIsolationState {
 // Preserve the user's worktree choice while route metadata is provisional. Once
 // the authoritative placement arrives, unsupported projects fall back to local.
 function useWorkspaceIsolation(input: {
+  project: HostProjectListItem | null;
   supportsMultiplicity: boolean;
   worktreeSupport: "supported" | "unsupported" | "unknown";
 }): WorkspaceIsolationState {
-  const { supportsMultiplicity, worktreeSupport } = input;
-  // The last isolation choice is remembered alongside the other New Workspace
-  // form preferences (provider, model, mode). A manual in-screen pick overrides
-  // the remembered default until the screen remounts.
+  const { project, supportsMultiplicity, worktreeSupport } = input;
+  const projectViewKey = project?.viewKey;
   const { preferences, updatePreferences } = useFormPreferences();
-  const [manualIsolation, setManualIsolation] = useState<"local" | "worktree" | null>(null);
-  const isolation = manualIsolation ?? preferences.isolation ?? "local";
+  const [manualIsolationByProject, setManualIsolationByProject] = useState<
+    Record<string, WorkspaceIsolationState["isolation"]>
+  >({});
+  const isolation = projectViewKey
+    ? (manualIsolationByProject[projectViewKey] ??
+      preferences.isolationByProject?.[projectViewKey] ??
+      "local")
+    : "local";
   const canCreateWorktree = supportsMultiplicity && worktreeSupport !== "unsupported";
   const isWorktree = isolation === "worktree" && canCreateWorktree;
 
   const setIsolation = useCallback(
     (value: "local" | "worktree") => {
-      setManualIsolation(value);
-      void updatePreferences({ isolation: value });
+      if (!projectViewKey) return;
+      setManualIsolationByProject((current) => ({ ...current, [projectViewKey]: value }));
+      void updatePreferences((current) => ({
+        ...current,
+        isolationByProject: { ...current.isolationByProject, [projectViewKey]: value },
+      }));
     },
-    [updatePreferences],
+    [projectViewKey, updatePreferences],
   );
 
   return {
@@ -1834,6 +1843,7 @@ export function NewWorkspaceScreen({
   const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
   const { effectiveIsolation, setIsolation, canCreateWorktree, showRefPicker } =
     useWorkspaceIsolation({
+      project: selectedProject,
       supportsMultiplicity: supportsWorkspaceMultiplicity,
       worktreeSupport,
     });

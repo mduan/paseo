@@ -212,19 +212,34 @@ describe("create agent preferences", () => {
     expect(parseFormPreferences({ provider: "codex", surprise: true })).toEqual({});
   });
 
-  it("persists and reloads the workspace isolation choice", async () => {
-    const storage = new FakeCreateAgentPreferenceStorage();
+  it("remembers isolation independently per project after reloading", async () => {
+    const storage = new FakeCreateAgentPreferenceStorage({
+      stored: { provider: "codex", isolation: "worktree" },
+    });
     const preferences = new CreateAgentPreferencesService(storage);
 
-    const save = preferences.update({ isolation: "worktree" });
-    await storage.nextWrite();
-    storage.finishOldestWrite();
-    await save;
+    for (const [project, isolation] of Object.entries({
+      "host-a:project-a": "worktree",
+      "host-a:project-b": "local",
+      "host-b:project-a": "local",
+    } as const)) {
+      const save = preferences.update((current) => ({
+        ...current,
+        isolationByProject: { ...current.isolationByProject, [project]: isolation },
+      }));
+      await storage.nextWrite();
+      storage.finishOldestWrite();
+      await save;
+    }
 
-    expect(storage.savedPreferences()).toEqual({ isolation: "worktree" });
-    expect(await new CreateAgentPreferencesService(storage).load()).toEqual({
-      isolation: "worktree",
+    const reloaded = await new CreateAgentPreferencesService(storage).load();
+    expect(reloaded.provider).toBe("codex");
+    expect(reloaded.isolationByProject).toEqual({
+      "host-a:project-a": "worktree",
+      "host-a:project-b": "local",
+      "host-b:project-a": "local",
     });
+    expect(reloaded.isolationByProject?.["host-a:project-c"]).toBeUndefined();
   });
 
   it("preserves legacy favourites across preference writes until host migration", async () => {

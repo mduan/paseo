@@ -17,6 +17,7 @@ export interface FormPreferences {
   providerPreferences?: Record<string, ProviderPreferences>;
   favoriteModels?: Array<{ provider: string; modelId: string }>;
   isolation?: "local" | "worktree";
+  isolationByProject?: Record<string, NonNullable<FormPreferences["isolation"]>>;
   launchTarget?: LaunchTarget;
 }
 
@@ -47,6 +48,7 @@ export const FormPreferencesSchema = z.strictObject({
     )
     .optional(),
   isolation: z.enum(["local", "worktree"]).optional(),
+  isolationByProject: z.record(z.string(), z.enum(["local", "worktree"])).optional(),
   // What the New workspace composer submits to: the chat agent (default) or a
   // terminal profile. See `@/new-workspace-launch` for resolution/fallback.
   launchTarget: launchTargetSchema.optional(),
