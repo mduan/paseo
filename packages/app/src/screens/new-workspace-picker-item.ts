@@ -326,6 +326,8 @@ function markCurrentBranch(input: {
     });
   }
   const base = listed?.kind === "branch" ? listed : currentItem;
+  // A picked row comes back as the base already marked; mark it once.
+  if (base.current) return id;
   input.itemById.set(id, {
     ...base,
     current: true,

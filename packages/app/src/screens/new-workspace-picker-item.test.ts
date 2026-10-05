@@ -456,6 +456,26 @@ describe("buildPickerOptionData current branch", () => {
     expect(data.options.map((option) => option.label).slice(0, 2)).toEqual(["feature", "unlisted"]);
   });
 
+  it("marks a picked current row once", () => {
+    const first = buildPickerOptionData({
+      branchDetails,
+      prItems: [],
+      baseItem: defaultBasePickerItem({ currentBranch: "feature" }),
+      currentBranch: "feature",
+    });
+    const picked = first.itemById.get(first.selectedOptionId) ?? null;
+    const again = buildPickerOptionData({
+      branchDetails: [],
+      prItems: [],
+      baseItem: picked,
+      currentBranch: "feature",
+    });
+
+    expect(again.itemById.get(again.selectedOptionId)).toMatchObject({
+      accessibilityLabel: "feature, local branch, current branch",
+    });
+  });
+
   it("marks no current row on a detached HEAD", () => {
     const data = buildPickerOptionData({
       branchDetails,
