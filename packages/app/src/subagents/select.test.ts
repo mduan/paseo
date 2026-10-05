@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { selectProviderSubagentsForParent, selectSubagentsForParent } from "./select";
 import { useProviderSubagentStore } from "./provider-store";
 import { useSessionStore, type Agent } from "@/stores/session-store";
-import { hasRunningProviderSubagents, selectSubagentActivity } from "./activity";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
 
 const SERVER_ID = "server-1";
@@ -81,19 +80,22 @@ describe("selectSubagentsForParent", () => {
     });
     setAgents([parent, child, grandchild]);
     const status = (parentAgentId: string) => {
-      const activity = selectSubagentActivity({
-        agents: useSessionStore.getState().sessions[SERVER_ID]?.agents,
-        parentAgentId,
-      });
+      const params = { serverId: SERVER_ID, parentAgentId, includeDescendants: true };
+      const rows = selectSubagentsForParent(
+        useSessionStore.getState(),
+        params,
+        EMPTY_PENDING_ARCHIVE_IDS,
+      );
+      const providerRows = [parentAgentId, ...rows.map((row) => row.id)].flatMap((id) =>
+        selectProviderSubagentsForParent(
+          useProviderSubagentStore.getState(),
+          { ...params, parentAgentId: id },
+          true,
+        ),
+      );
       return deriveSidebarStateBucket({
         status: "idle",
-        hasRunningSubagents:
-          activity.hasRunningAgents ||
-          hasRunningProviderSubagents({
-            descriptors: useProviderSubagentStore.getState().descriptors,
-            serverId: SERVER_ID,
-            parentAgentIds: activity.parentAgentIds,
-          }),
+        hasRunningSubagents: [...rows, ...providerRows].some((row) => row.status === "running"),
       });
     };
     expect(status(parent.id)).toBe("running");
@@ -150,15 +152,11 @@ describe("selectSubagentsForParent", () => {
         status: "running",
       }),
     ]);
-    const params = {
-      agents: useSessionStore.getState().sessions[SERVER_ID]?.agents,
-      parentAgentId: parent.id,
-    };
-    expect(selectSubagentActivity(params)).toEqual({
-      parentAgentIds: [parent.id],
-      hasRunningAgents: false,
-    });
-    expect(selectSubagentActivity(params)).toBe(selectSubagentActivity(params));
+    const params = { serverId: SERVER_ID, parentAgentId: parent.id, includeDescendants: true };
+    const select = () =>
+      selectSubagentsForParent(useSessionStore.getState(), params, EMPTY_PENDING_ARCHIVE_IDS);
+    expect(select()).toEqual([]);
+    expect(select()).toBe(select());
   });
 
   it("hides cached provider children when the host does not support them", () => {

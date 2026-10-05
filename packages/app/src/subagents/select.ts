@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
+import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { usePendingArchiveAgentIds } from "@/hooks/use-archive-agent";
 import equal from "fast-deep-equal";
+import { useShallow } from "zustand/react/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { refreshProviderSubagents, useProviderSubagentStore } from "./provider-store";
@@ -47,7 +49,14 @@ interface SelectSubagentsParams {
   parentAgentId: string;
   /** Select children of this provider subagent instead of children of the managed agent. */
   providerParentSubagentId?: string;
+  includeDescendants?: boolean;
 }
+
+const providerRowsCache = new WeakMap<
+  ProviderSubagentStoreSnapshot["descriptors"],
+  WeakMap<ReadonlySet<string>, Map<string, ProviderSubagentRow[]>>
+>();
+const managedRowsCache = new WeakMap<ReadonlyMap<string, Agent>, Map<string, SubagentRow[]>>();
 
 const EMPTY_SUBAGENT_ROWS: SubagentRow[] = [];
 const EMPTY_PROVIDER_SUBAGENT_ROWS: ProviderSubagentRow[] = [];
@@ -67,6 +76,33 @@ function toSubagentRow(agent: Agent): SubagentRow {
   };
 }
 
+function isDescendantInWorkspace({
+  agent,
+  agents,
+  parentAgentId,
+}: {
+  agent: Agent;
+  agents: ReadonlyMap<string, Agent>;
+  parentAgentId: string;
+}): boolean {
+  const seen = new Set([agent.id]);
+  let current = agent;
+  while (current.parentAgentId) {
+    const parent = agents.get(current.parentAgentId);
+    if (
+      !parent ||
+      parent.archivedAt ||
+      parent.workspaceId !== agent.workspaceId ||
+      seen.has(parent.id)
+    )
+      return false;
+    if (parent.id === parentAgentId) return true;
+    seen.add(parent.id);
+    current = parent;
+  }
+  return false;
+}
+
 export function selectSubagentsForParent(
   state: SessionStoreSnapshot,
   params: SelectSubagentsParams,
@@ -77,24 +113,29 @@ export function selectSubagentsForParent(
     return EMPTY_SUBAGENT_ROWS;
   }
 
-  const rows: SubagentRow[] = [];
-  for (const agent of agents.values()) {
-    if (
-      agent.archivedAt ||
-      pendingArchiveIds.has(agent.id) ||
-      agent.parentAgentId !== params.parentAgentId
-    ) {
-      continue;
+  let cache = managedRowsCache.get(agents);
+  if (!cache) {
+    cache = new Map();
+    managedRowsCache.set(agents, cache);
+  }
+  const key = `${params.parentAgentId}\0${Boolean(params.includeDescendants)}`;
+  let rows = cache.get(key);
+  if (!rows) {
+    rows = [];
+    for (const agent of agents.values()) {
+      if (agent.archivedAt) continue;
+      const belongsToParent = params.includeDescendants
+        ? isDescendantInWorkspace({ agent, agents, parentAgentId: params.parentAgentId })
+        : agent.parentAgentId === params.parentAgentId;
+      if (belongsToParent) rows.push(toSubagentRow(agent));
     }
-    rows.push(toSubagentRow(agent));
+    rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    cache.set(key, rows);
   }
-
-  if (rows.length === 0) {
-    return EMPTY_SUBAGENT_ROWS;
-  }
-
-  rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
-  return rows;
+  const visibleRows = pendingArchiveIds.size
+    ? rows.filter((row) => !pendingArchiveIds.has(row.id))
+    : rows;
+  return visibleRows.length ? visibleRows : EMPTY_SUBAGENT_ROWS;
 }
 
 export function selectProviderSubagentsForParent(
@@ -105,6 +146,19 @@ export function selectProviderSubagentsForParent(
 ): ProviderSubagentRow[] {
   if (!supported) return EMPTY_PROVIDER_SUBAGENT_ROWS;
   if (params.providerParentSubagentId && !nestingSupported) return EMPTY_PROVIDER_SUBAGENT_ROWS;
+  let hiddenCache = providerRowsCache.get(state.descriptors);
+  if (!hiddenCache) {
+    hiddenCache = new WeakMap();
+    providerRowsCache.set(state.descriptors, hiddenCache);
+  }
+  let cache = hiddenCache.get(state.hiddenFromTrack);
+  if (!cache) {
+    cache = new Map();
+    hiddenCache.set(state.hiddenFromTrack, cache);
+  }
+  const cacheKey = `${params.serverId}\0${params.parentAgentId}\0${nestingSupported}\0${params.providerParentSubagentId ?? ""}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
   const rows: ProviderSubagentRow[] = [];
   const prefix = `${params.serverId}\0${params.parentAgentId}\0`;
   for (const [key, subagent] of state.descriptors) {
@@ -129,6 +183,7 @@ export function selectProviderSubagentsForParent(
     });
   }
   rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  cache.set(cacheKey, rows);
   return rows;
 }
 
@@ -146,19 +201,40 @@ export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRo
     (state) =>
       state.sessions[params.serverId]?.serverInfo?.features?.providerSubagentNesting === true,
   );
+  const includeParent = useSessionStore((state) => {
+    if (!params.includeDescendants) return true;
+    const parent = state.sessions[params.serverId]?.agents.get(params.parentAgentId);
+    return Boolean(parent && !parent.archivedAt);
+  });
+  const selectParentAgentIds = useShallow((rows: SubagentRow[]) => {
+    if (!includeParent) return [];
+    const ids = [params.parentAgentId];
+    if (params.includeDescendants) ids.push(...rows.map((row) => row.id));
+    return ids;
+  });
+  const parentAgentIds = selectParentAgentIds(paseoRows);
   const providerRows = useStoreWithEqualityFn(
     useProviderSubagentStore,
-    (state) => selectProviderSubagentsForParent(state, params, supported, nestingSupported),
+    (state) =>
+      parentAgentIds.flatMap((parentAgentId) =>
+        selectProviderSubagentsForParent(
+          state,
+          { ...params, parentAgentId },
+          supported,
+          nestingSupported && !params.includeDescendants,
+        ),
+      ),
     equal,
   );
   const client = useSessionStore((state) => state.sessions[params.serverId]?.client ?? null);
 
+  const connected = useHostRuntimeIsConnected(params.serverId);
   useEffect(() => {
-    if (!client || !supported) return;
-    void refreshProviderSubagents(client, params.serverId, params.parentAgentId).catch(
-      () => undefined,
-    );
-  }, [client, params.parentAgentId, params.serverId, supported]);
+    if (!client || !supported || !connected) return;
+    for (const parentAgentId of parentAgentIds) {
+      void refreshProviderSubagents(client, params.serverId, parentAgentId).catch(() => undefined);
+    }
+  }, [client, parentAgentIds, params.serverId, supported, connected]);
 
   return useMemo(() => {
     if (params.providerParentSubagentId) return providerRows;
