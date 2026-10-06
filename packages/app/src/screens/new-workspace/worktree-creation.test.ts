@@ -155,6 +155,20 @@ describe("worktree creation tracker", () => {
     ]);
   });
 
+  it("only prepares the draft tab when the user is on a non-workspace route such as /new", () => {
+    const { calls, ports } = createPorts({ activeSelection: null });
+    const tracker = createTracker({ ports });
+    tracker.observe(snapshot({ phase: "accepted" }));
+    calls.length = 0;
+
+    const switched = tracker.openWorkspace({ workspaceId: WORKSPACE_ID, target: DRAFT_TARGET });
+
+    expect(switched).toBe(false);
+    expect(calls).toEqual([
+      { port: "prepare", serverId: SERVER_ID, workspaceId: WORKSPACE_ID, target: DRAFT_TARGET },
+    ]);
+  });
+
   it("opens the draft tab through navigation when the user is still on the workspace", () => {
     const { calls, ports } = createPorts({
       activeSelection: { serverId: SERVER_ID, workspaceId: WORKSPACE_ID },

@@ -64,7 +64,7 @@ import {
 import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
 import type { HostProfile } from "@/types/host-connection";
 import {
-  getLastWorkspaceSelection,
+  getForegroundWorkspaceSelection,
   navigateToWorkspace,
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
@@ -1020,7 +1020,7 @@ function buildComposerInitialValues(input: {
 const worktreeCreationPorts: WorktreeCreationPorts = {
   navigateToWorkspace,
   prepareWorkspaceTab,
-  getActiveWorkspaceSelection: getLastWorkspaceSelection,
+  getActiveWorkspaceSelection: getForegroundWorkspaceSelection,
 };
 
 // A worktree create on a host with creation lifecycle outlives this screen; see worktree-creation.ts.
