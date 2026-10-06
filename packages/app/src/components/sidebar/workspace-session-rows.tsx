@@ -367,7 +367,7 @@ function SessionRowHoverTarget({
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
+      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false} interactive>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
           side="right"
