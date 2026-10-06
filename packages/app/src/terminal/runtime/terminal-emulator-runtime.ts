@@ -449,7 +449,7 @@ export class TerminalEmulatorRuntime {
       linkHandler: { activate: openExternalLink },
       lineHeight: 1.0,
       macOptionIsMeta: true,
-      minimumContrastRatio: 4.5,
+      minimumContrastRatio: 1,
       rescaleOverlappingGlyphs: true,
       scrollbar: {
         width: 8,
