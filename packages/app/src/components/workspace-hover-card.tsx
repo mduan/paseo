@@ -99,7 +99,6 @@ function computeHoverCardPosition({
   return { x, y };
 }
 
-const HOVER_GRACE_MS = 100;
 const HOVER_CARD_WIDTH = 260;
 
 interface WorkspaceHoverCardProps {
@@ -144,62 +143,38 @@ function WorkspaceHoverCardDesktop({
   const triggerRef = useRef<View>(null);
   const contentRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
-  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerHoveredRef = useRef(false);
 
-  const clearGraceTimer = useCallback(() => {
-    if (graceTimerRef.current) {
-      clearTimeout(graceTimerRef.current);
-      graceTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    if (graceTimerRef.current) return;
-    graceTimerRef.current = setTimeout(() => {
-      graceTimerRef.current = null;
-      setOpen(false);
-    }, HOVER_GRACE_MS);
-  }, []);
+  // While open, the safe zone covers trigger + content + the bridge between
+  // them. Close only fires when the pointer leaves the safe zone; re-entering
+  // it (including the bridge) cancels the pending close.
+  const { scheduleClose, cancelClose } = useHoverSafeZone({
+    enabled: open,
+    triggerRef,
+    contentRef,
+    onClose: () => setOpen(false),
+  });
 
   const handleTriggerEnter = useCallback(() => {
     triggerHoveredRef.current = true;
-    clearGraceTimer();
+    cancelClose();
     if (!isDragging && !disabled) {
       setOpen(true);
     }
-  }, [clearGraceTimer, disabled, isDragging]);
+  }, [cancelClose, disabled, isDragging]);
 
   const handleTriggerLeave = useCallback(() => {
     triggerHoveredRef.current = false;
     scheduleClose();
   }, [scheduleClose]);
 
-  // While open, the safe zone covers trigger + content + the bridge between
-  // them. Close only fires when the pointer leaves the safe zone; re-entering
-  // it (including the bridge) cancels the pending close.
-  useHoverSafeZone({
-    enabled: open,
-    triggerRef,
-    contentRef,
-    onEnterSafeZone: clearGraceTimer,
-    onLeaveSafeZone: scheduleClose,
-  });
-
   // Close while another row interaction owns attention.
   useEffect(() => {
     if (isDragging || disabled) {
-      clearGraceTimer();
+      cancelClose();
       setOpen(false);
     }
-  }, [clearGraceTimer, disabled, isDragging]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      clearGraceTimer();
-    };
-  }, [clearGraceTimer]);
+  }, [cancelClose, disabled, isDragging]);
 
   return (
     <View

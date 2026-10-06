@@ -55,9 +55,6 @@ interface TooltipContextValue {
   delayDuration: number;
 }
 
-// How long an interactive tooltip stays open after the pointer leaves the safe zone.
-const INTERACTIVE_CLOSE_GRACE_MS = 100;
-
 const TooltipContext = createContext<TooltipContextValue | null>(null);
 
 function useTooltipContext(componentName: string): TooltipContextValue {
@@ -253,7 +250,6 @@ export function Tooltip({
 }>): ReactElement {
   const triggerRef = useRef<View>(null);
   const contentRef = useRef<View>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [isOpen, setIsOpen] = useControllableOpenState({
     open,
     defaultOpen,
@@ -265,27 +261,11 @@ export function Tooltip({
   const enabled = opensOnPress ? enabledOnMobile : enabledOnDesktop;
   const interactive = interactiveProp && isWeb && !opensOnPress;
 
-  const cancelClose = useCallback(() => {
-    clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = undefined;
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    if (closeTimerRef.current) return;
-    closeTimerRef.current = setTimeout(() => {
-      closeTimerRef.current = undefined;
-      setIsOpen(false);
-    }, INTERACTIVE_CLOSE_GRACE_MS);
-  }, [setIsOpen]);
-
-  useEffect(() => cancelClose, [cancelClose]);
-
-  useHoverSafeZone({
+  const { scheduleClose, cancelClose } = useHoverSafeZone({
     enabled: interactive && isOpen,
     triggerRef,
     contentRef,
-    onEnterSafeZone: cancelClose,
-    onLeaveSafeZone: scheduleClose,
+    onClose: () => setIsOpen(false),
   });
 
   const value = useMemo<TooltipContextValue>(
