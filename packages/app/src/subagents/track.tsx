@@ -360,8 +360,8 @@ function SubagentActionButton({
 const styles = StyleSheet.create((theme) => ({
   // `flexBasis: "auto"` rather than `flex: 1`: a zero-basis label contributes nothing to the row's
   // intrinsic width, so the panel measures itself at its floor and truncates every label at once.
+  // No grow: trailing metadata follows the label directly instead of aligning to the row's end.
   rowLabel: {
-    flexGrow: 1,
     flexShrink: 1,
     flexBasis: "auto",
     minWidth: 0,
@@ -378,12 +378,14 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
   },
   actionClusterVisible: {
+    marginLeft: "auto",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
     opacity: 1,
   },
   actionClusterHidden: {
+    marginLeft: "auto",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
