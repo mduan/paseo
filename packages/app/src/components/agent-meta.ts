@@ -20,9 +20,11 @@ type AgentModelSelection = Pick<
 
 /**
  * Session cost including Paseo children, prefixed "~" when Paseo priced any of it from token
- * counts.
+ * counts. Omitted when the agent's own cost is unavailable, so children's cost never reads as the
+ * total.
  */
 function formatAgentCost(usage: AgentUsage | null | undefined): string | undefined {
+  if (usage?.totalCostUnavailable) return undefined;
   if (typeof usage?.totalCostUsd !== "number" && typeof usage?.paseoSubagentCostUsd !== "number") {
     return undefined;
   }

@@ -42,6 +42,15 @@ describe("buildAgentMetaParts", () => {
     ).toBe("~$0.50");
   });
 
+  it("omits cost when the agent's own cost is unavailable", () => {
+    expect(
+      buildAgentMetaParts({
+        selection: SELECTION,
+        usage: { totalCostUnavailable: true, paseoSubagentCostUsd: 0.8 },
+      }).cost,
+    ).toBeUndefined();
+  });
+
   it("omits tokens and cost without usage", () => {
     const parts = buildAgentMetaParts({ selection: SELECTION, usage: undefined });
     expect(parts.tokens).toBeUndefined();
