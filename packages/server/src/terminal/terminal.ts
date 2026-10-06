@@ -25,11 +25,32 @@ let nodePtySpawnHelperChecked = false;
 const TERMINAL_TITLE_DEBOUNCE_MS = 150;
 const TERMINAL_EXIT_OUTPUT_LINE_LIMIT = 12;
 const TERMINAL_EXIT_OUTPUT_CHAR_LIMIT = 16000;
-const TERMINAL_OSC_COLOR_QUERY_RESPONSES = new Map<number, string>([
-  [10, "rgb:e6e6/e6e6/e6e6"],
-  [11, "rgb:0b0b/0b0b/0b0b"],
-  [12, "rgb:e6e6/e6e6/e6e6"],
-]);
+const DEFAULT_OSC_FOREGROUND = "rgb:e6e6/e6e6/e6e6";
+const DEFAULT_OSC_BACKGROUND = "rgb:0b0b/0b0b/0b0b";
+
+export interface TerminalColors {
+  foreground: string;
+  background: string;
+}
+
+// OSC color replies use the X11 `rgb:rrrr/gggg/bbbb` form.
+function toOscRgb(hex: string | undefined): string | undefined {
+  const match = hex && /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return match
+    ? `rgb:${match[1].repeat(2)}/${match[2].repeat(2)}/${match[3].repeat(2)}`
+    : undefined;
+}
+
+// OSC 10 = foreground, 11 = background, 12 = cursor.
+function buildOscColorQueryResponses(colors: TerminalColors | undefined): Map<number, string> {
+  const foreground = toOscRgb(colors?.foreground) ?? DEFAULT_OSC_FOREGROUND;
+  const background = toOscRgb(colors?.background) ?? DEFAULT_OSC_BACKGROUND;
+  return new Map([
+    [10, foreground],
+    [11, background],
+    [12, foreground],
+  ]);
+}
 
 export interface TerminalExitInfo {
   exitCode: number | null;
@@ -132,6 +153,7 @@ export interface CreateTerminalOptions {
   title?: string;
   command?: string;
   args?: string[];
+  colors?: TerminalColors;
 }
 
 function toTerminalActivity(snapshot: {
@@ -902,6 +924,7 @@ export async function createTerminal(options: CreateTerminalOptions): Promise<Te
     title: presetTitle,
     command,
     args = [],
+    colors,
   } = options;
   const resolvedShell = shell ?? resolveDefaultTerminalShell();
 
@@ -1048,7 +1071,7 @@ export async function createTerminal(options: CreateTerminalOptions): Promise<Te
     ptyProcess.write(`\x1b[?${buffer.cursorY + 1};${buffer.cursorX + 1}R`);
     return true;
   });
-  for (const [code, response] of TERMINAL_OSC_COLOR_QUERY_RESPONSES) {
+  for (const [code, response] of buildOscColorQueryResponses(colors)) {
     terminal.parser.registerOscHandler(code, (data) => {
       if (data.trim() !== "?") {
         return false;

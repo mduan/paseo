@@ -1,6 +1,7 @@
 import {
   createTerminal,
   type TerminalActivityTransition,
+  type TerminalColors,
   type TerminalSession,
   type TerminalStateSnapshot,
   type TerminalStateSnapshotOptions,
@@ -62,6 +63,7 @@ export interface TerminalManager {
     args?: string[];
     rows?: number;
     cols?: number;
+    colors?: TerminalColors;
     activityToken?: string;
     activityUrl?: string | null;
   }): Promise<TerminalSession>;
@@ -319,6 +321,7 @@ export function createTerminalManager(
       args?: string[];
       rows?: number;
       cols?: number;
+      colors?: TerminalColors;
       activityToken?: string;
       activityUrl?: string | null;
     }): Promise<TerminalSession> {
@@ -354,6 +357,7 @@ export function createTerminalManager(
             ...(options.args ? { args: options.args } : {}),
             ...(options.rows !== undefined ? { rows: options.rows } : {}),
             ...(options.cols !== undefined ? { cols: options.cols } : {}),
+            ...(options.colors ? { colors: options.colors } : {}),
             ...(mergedEnv ? { env: mergedEnv } : {}),
             activityEnv,
           }),

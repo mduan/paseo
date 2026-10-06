@@ -2,6 +2,7 @@ import type {
   TerminalExitInfo,
   ServerMessage,
   ClientMessage,
+  TerminalColors,
   TerminalStateSnapshot,
   TerminalStateSnapshotOptions,
 } from "./terminal.js";
@@ -29,6 +30,7 @@ export interface WorkerCreateTerminalOptions {
   args?: string[];
   rows?: number;
   cols?: number;
+  colors?: TerminalColors;
   activityToken?: string;
   activityUrl?: string | null;
 }

@@ -6,6 +6,7 @@ import { resolveTerminalProfileLaunch } from "@getpaseo/protocol/terminal-profil
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import { useTranslation } from "react-i18next";
 import { useReplicaQuery } from "@/data/query";
+import { getTerminalQueryColors } from "@/utils/to-xterm-theme";
 import { workspaceTerminalsPushRoute } from "@/data/push-router";
 import {
   buildTerminalsQueryKey,
@@ -139,9 +140,11 @@ export function useWorkspaceTerminals(input: UseWorkspaceTerminalsInput) {
             command: profile.command,
             args: profile.args,
             workspaceId: normalizedWorkspaceId || undefined,
+            colors: getTerminalQueryColors(),
           })
         : await client.createTerminal(workspaceDirectory, undefined, undefined, {
             workspaceId: normalizedWorkspaceId || undefined,
+            colors: getTerminalQueryColors(),
           });
       // The daemon reports a failed spawn (e.g. a profile command that isn't
       // installed) via payload.error with a null terminal. Surface it instead

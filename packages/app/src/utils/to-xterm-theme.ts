@@ -1,4 +1,5 @@
 import type { ITheme } from "@xterm/xterm";
+import { UnistylesRuntime } from "react-native-unistyles";
 
 import type { Theme } from "@/styles/theme";
 
@@ -30,4 +31,11 @@ export function toXtermTheme(terminal: TerminalPalette): ITheme {
     brightCyan: terminal.brightCyan,
     brightWhite: terminal.brightWhite,
   };
+}
+
+// Read at create time: the daemon answers the new terminal's color queries with these, so
+// Codex and similar TUIs choose a palette matching the current light or dark theme.
+export function getTerminalQueryColors(): { foreground: string; background: string } {
+  const { foreground, background } = UnistylesRuntime.getTheme().colors.terminal;
+  return { foreground, background };
 }

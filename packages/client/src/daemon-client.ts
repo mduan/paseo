@@ -5923,6 +5923,7 @@ export class DaemonClient {
       args?: string[];
       workspaceId?: string;
       size?: { rows: number; cols: number };
+      colors?: { foreground: string; background: string };
     },
   ): Promise<CreateTerminalPayload> {
     const resolvedRequestId = this.createRequestId(requestId);
@@ -5935,6 +5936,7 @@ export class DaemonClient {
       args: options?.args,
       ...(options?.workspaceId !== undefined ? { workspaceId: options.workspaceId } : {}),
       ...(options?.size !== undefined ? { size: options.size } : {}),
+      ...(options?.colors !== undefined ? { colors: options.colors } : {}),
       requestId: resolvedRequestId,
     });
     return this.sendCorrelatedRequest({

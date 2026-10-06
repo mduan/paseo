@@ -1066,6 +1066,27 @@ describe.skipIf(isPlatform("win32"))("terminal POSIX-only", () => {
       const ack = getLines(session.getState()).find(isOsc11OkLine) ?? "";
       expect(ack).toBe("OSC11_OK:ESC]11;rgb:0b0b/0b0b/0b0bESC\\");
     });
+
+    it("answers OSC 11 with the background color the viewer requested", async () => {
+      const helperPath = writeOsc11Helper("terminal-osc11-light-helper-");
+
+      const session = trackSession(
+        await createTerminal({
+          workspaceId: "ws-test",
+          cwd: "/tmp",
+          shell: "/bin/sh",
+          env: { PS1: "$ " },
+          colors: { foreground: "#1a1a1e", background: "#ffffff" },
+        }),
+      );
+      await waitForLines(session, ["$"]);
+
+      session.send({ type: "input", data: `${process.execPath} ${helperPath}\r` });
+      await waitForState(session, hasOsc11OkLine);
+
+      const ack = getLines(session.getState()).find(isOsc11OkLine) ?? "";
+      expect(ack).toBe("OSC11_OK:ESC]11;rgb:ffff/ffff/ffffESC\\");
+    });
   });
 
   describe("stream snapshots", () => {

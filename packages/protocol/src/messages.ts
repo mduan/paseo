@@ -3018,6 +3018,15 @@ export const CreateTerminalRequestSchema = z.object({
       cols: z.number().int().positive(),
     })
     .optional(),
+  // Viewer's terminal colors as #rrggbb, answered to OSC 10/11/12 color queries so TUIs like
+  // Codex pick a light or dark palette that matches what the app renders. Daemons without it
+  // answer with a fixed dark palette.
+  colors: z
+    .object({
+      foreground: z.string(),
+      background: z.string(),
+    })
+    .optional(),
   requestId: z.string(),
 });
 
