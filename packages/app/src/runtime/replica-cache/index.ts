@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
+  AgentRuntimeInfoSchema,
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
+  AgentUsageSchema,
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
@@ -258,6 +260,8 @@ const StoredAgentSnapshotSchema = z.strictObject({
   attentionTimestamp: IsoDateSchema.nullable().optional(),
   archivedAt: IsoDateSchema.nullable().optional(),
   lastAssistantPreview: z.string().optional(),
+  runtimeInfo: AgentRuntimeInfoSchema.optional(),
+  lastUsage: AgentUsageSchema.optional(),
 });
 
 const StoredAgentSchema = z.strictObject({
@@ -678,6 +682,8 @@ function serializeAgent(agent: Agent): StoredAgent {
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
     lastAssistantPreview: agent.lastAssistantPreview,
+    runtimeInfo: agent.runtimeInfo,
+    lastUsage: agent.lastUsage,
   };
   return {
     snapshot,
