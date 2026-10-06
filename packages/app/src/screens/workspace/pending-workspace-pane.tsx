@@ -131,5 +131,6 @@ const styles = StyleSheet.create((theme) => ({
   prompt: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+    textAlign: "center",
   },
 }));
