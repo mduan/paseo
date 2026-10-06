@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Archive, Unlink } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useAgentMetaParts } from "@/components/agent-meta";
 import { useProviderIcon } from "@/components/provider-icons";
 import { ComposerTrackActions, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -211,6 +212,7 @@ function SubagentsTrackRow({
         <Text style={styles.rowLabel} numberOfLines={1}>
           {displayLabel}
         </Text>
+        {row.kind === "paseo" ? <PaseoSubagentMeta serverId={serverId} agentId={row.id} /> : null}
         {presentation.subtitle ? (
           <Text style={styles.rowTrailing} numberOfLines={1}>
             {presentation.subtitle}
@@ -236,6 +238,7 @@ function SubagentsTrackRow({
       presentation,
       row.kind,
       row.id,
+      serverId,
     ],
   );
 
@@ -248,6 +251,23 @@ function SubagentsTrackRow({
       {renderRow}
     </ComposerTrackRow>
   );
+}
+
+/** The meta line provider-native rows get from their subtitle: model · effort · tokens · cost. */
+function PaseoSubagentMeta({
+  serverId,
+  agentId,
+}: {
+  serverId: string;
+  agentId: string;
+}): ReactElement | null {
+  const { model, effort, tokens, cost } = useAgentMetaParts({ serverId, agentId });
+  const meta = [model, effort, tokens, cost].filter(Boolean).join(" · ");
+  return meta ? (
+    <Text style={styles.rowTrailing} numberOfLines={1}>
+      {meta}
+    </Text>
+  ) : null;
 }
 
 function SubagentRowActions({

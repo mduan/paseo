@@ -673,6 +673,28 @@ function subagentCostOf(usage: AgentUsage | undefined): number | undefined {
   return usage?.subagentCostUsd;
 }
 
+/** A child with unavailable cost counts as $0 and marks the sum estimated. */
+function sumPaseoChildCosts(
+  childUsages: readonly (AgentUsage | undefined)[],
+): Pick<AgentUsage, "paseoSubagentCostUsd" | "paseoSubagentCostEstimated"> {
+  if (childUsages.length === 0) {
+    return { paseoSubagentCostUsd: undefined, paseoSubagentCostEstimated: undefined };
+  }
+  let costUsd = 0;
+  let estimated = false;
+  for (const usage of childUsages) {
+    costUsd += (usage?.totalCostUsd ?? 0) + (usage?.paseoSubagentCostUsd ?? 0);
+    if (
+      usage?.totalCostEstimated ||
+      usage?.totalCostUnavailable ||
+      usage?.paseoSubagentCostEstimated
+    ) {
+      estimated = true;
+    }
+  }
+  return { paseoSubagentCostUsd: costUsd, paseoSubagentCostEstimated: estimated || undefined };
+}
+
 function buildImportedTimelineRows(entries: readonly ImportedTimelineEntry[]): AgentTimelineRow[] {
   const rows: AgentTimelineRow[] = [];
   for (const entry of entries) {
@@ -783,6 +805,8 @@ export class AgentManager {
   private readonly inFlightAgentCloses = new Map<string, Promise<void>>();
   private readonly reloadedSessionCloses = new WeakMap<AgentSession, Promise<void>>();
   private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
+  private readonly paseoCostSignatures = new Map<string, string>();
+  private paseoSubagentCostTail: Promise<void> = Promise.resolve();
   private readonly agentStreamCoalescer: AgentStreamCoalescer;
   private mcpBaseUrl: string | null;
   private readonly mcpAuthToken: string | null;
@@ -2149,18 +2173,130 @@ export class AgentManager {
   }
 
   private async writeLabels(agentId: string, patch: AgentLabelPatch): Promise<WriteLabelsResult> {
+    const changesParent = Object.hasOwn(patch, PARENT_AGENT_ID_LABEL);
     const liveAgent = this.agents.get(agentId);
     if (liveAgent) {
+      const previousParentAgentId = getParentAgentIdFromLabels(liveAgent.labels);
       liveAgent.labels = applyLabelPatch(liveAgent.labels, patch);
       this.touchUpdatedAt(liveAgent);
       await this.persistSnapshot(liveAgent);
       this.emitState(liveAgent, { persist: false });
+      if (changesParent) {
+        this.refreshChangedParents(previousParentAgentId, liveAgent.labels);
+      }
       const record = this.registry ? await this.registry.get(agentId) : null;
       return { record, live: true };
     }
 
+    const previousParentAgentId =
+      changesParent && this.registry
+        ? getParentAgentIdFromLabels((await this.registry.get(agentId))?.labels)
+        : null;
     const nextRecord = await this.writeStoredMetadata(agentId, { labels: patch });
+    if (changesParent) {
+      this.refreshChangedParents(previousParentAgentId, nextRecord.labels);
+    }
     return { record: nextRecord, live: false };
+  }
+
+  private refreshChangedParents(
+    previousParentAgentId: string | null,
+    labels: Record<string, string>,
+  ): void {
+    const nextParentAgentId = getParentAgentIdFromLabels(labels);
+    if (previousParentAgentId === nextParentAgentId) {
+      return;
+    }
+    if (previousParentAgentId) {
+      this.refreshPaseoSubagentCost(previousParentAgentId);
+    }
+    if (nextParentAgentId) {
+      this.refreshPaseoSubagentCost(nextParentAgentId);
+    }
+  }
+
+  private mergeLastUsage(agent: ManagedAgent, usage: AgentUsage): void {
+    agent.lastUsage = { ...agent.lastUsage, ...usage };
+    const parentAgentId = getParentAgentIdFromLabels(agent.labels);
+    if (!parentAgentId) {
+      return;
+    }
+    const { lastUsage } = agent;
+    const signature = JSON.stringify([
+      lastUsage.totalCostUsd,
+      lastUsage.paseoSubagentCostUsd,
+      lastUsage.totalCostEstimated,
+      lastUsage.totalCostUnavailable,
+      lastUsage.paseoSubagentCostEstimated,
+    ]);
+    if (this.paseoCostSignatures.get(agent.id) === signature) {
+      return;
+    }
+    this.paseoCostSignatures.set(agent.id, signature);
+    this.refreshPaseoSubagentCost(parentAgentId);
+  }
+
+  /**
+   * Recomputes a loaded parent's `paseoSubagentCostUsd` from its direct Paseo children,
+   * live or stored (archived included). Unloaded parents are skipped; they recompute
+   * when they register.
+   */
+  refreshPaseoSubagentCost(parentAgentId: string): void {
+    this.paseoSubagentCostTail = this.paseoSubagentCostTail.then(() =>
+      this.recomputePaseoSubagentCost(parentAgentId).catch((error) => {
+        this.logger.warn(
+          { err: error, agentId: parentAgentId },
+          "Failed to roll up Paseo subagent cost",
+        );
+      }),
+    );
+  }
+
+  private async recomputePaseoSubagentCost(parentAgentId: string): Promise<void> {
+    if (!this.agents.has(parentAgentId)) {
+      return;
+    }
+    const childUsages = await this.listPaseoChildUsages(parentAgentId);
+    const parent = this.agents.get(parentAgentId);
+    if (!parent) {
+      return;
+    }
+    const { paseoSubagentCostUsd, paseoSubagentCostEstimated } = sumPaseoChildCosts(childUsages);
+    if (
+      parent.lastUsage?.paseoSubagentCostUsd === paseoSubagentCostUsd &&
+      parent.lastUsage?.paseoSubagentCostEstimated === paseoSubagentCostEstimated
+    ) {
+      return;
+    }
+    this.mergeLastUsage(parent, { paseoSubagentCostUsd, paseoSubagentCostEstimated });
+    this.emitState(parent);
+  }
+
+  /** Usage of the direct children, live or stored, preferring the live agent. */
+  private async listPaseoChildUsages(parentAgentId: string): Promise<(AgentUsage | undefined)[]> {
+    const records = this.registry ? await this.registry.list() : [];
+    const recordsById = new Map(records.map((record) => [record.id, record]));
+    const labelsOf = (agentId: string) =>
+      this.agents.get(agentId)?.labels ?? recordsById.get(agentId)?.labels;
+
+    // A child that is also an ancestor (self-parenting, A <-> B) would feed its own total back.
+    const ancestors = new Set<string>();
+    let cursor: string | null = parentAgentId;
+    while (cursor && !ancestors.has(cursor)) {
+      ancestors.add(cursor);
+      cursor = getParentAgentIdFromLabels(labelsOf(cursor));
+    }
+
+    const usages: (AgentUsage | undefined)[] = [];
+    for (const agentId of new Set([...recordsById.keys(), ...this.agents.keys()])) {
+      if (
+        !ancestors.has(agentId) &&
+        getParentAgentIdFromLabels(labelsOf(agentId)) === parentAgentId
+      ) {
+        usages.push(this.agents.get(agentId)?.lastUsage ?? recordsById.get(agentId)?.lastUsage);
+      }
+    }
+    return usages;
   }
 
   private async writeStoredMetadata(
@@ -3715,6 +3851,9 @@ export class AgentManager {
       this.assertAgentRegistrationActive(managed);
       this.emitState(managed, { persist: false });
       this.subscribeToSession(managed);
+      // A parent that loads after its Paseo children ran, or reloads with a stale
+      // captured usage, picks up their cost here.
+      this.refreshPaseoSubagentCost(managed.id);
       return { ...managed };
     } catch (error) {
       if (!registered) {
@@ -4487,7 +4626,7 @@ export class AgentManager {
       case "usage_updated":
         // Mid-turn updates carry only the fields that changed (Claude sends just the context
         // window), so merge them and keep the session cost from the last completed turn.
-        agent.lastUsage = { ...agent.lastUsage, ...event.usage };
+        this.mergeLastUsage(agent, event.usage);
         this.emitState(agent);
         return undefined;
       case "mode_changed":
@@ -4648,7 +4787,7 @@ export class AgentManager {
     );
     if (terminalDisposition === "stale") return;
     if (event.usage) {
-      agent.lastUsage = { ...agent.lastUsage, ...event.usage };
+      this.mergeLastUsage(agent, event.usage);
     }
     // If no usage on turn_completed, keep lastUsage as-is so context window
     // data accumulated during streaming isn't lost when the provider omits

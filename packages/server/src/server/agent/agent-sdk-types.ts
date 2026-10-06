@@ -221,19 +221,29 @@ export interface AgentUsage {
   outputTokens?: number;
   /** Cost attributed to provider-native descendants. Paseo-managed agents are excluded. */
   subagentCostUsd?: number;
-  /** Total cost for this provider session, including provider-native descendants. */
+  /**
+   * Total cost for this provider session, including provider-native descendants.
+   * Excludes Paseo children; Claude's resume baseline depends on that.
+   */
   totalCostUsd?: number;
   /** The provider can estimate cost, but its price list could not be loaded. */
   totalCostUnavailable?: boolean;
   /** Paseo priced the provider's token counts itself; the provider reports no cost. */
   totalCostEstimated?: boolean;
+  /**
+   * Sum of direct Paseo children's totals, including their own Paseo subtotals.
+   * Computed by AgentManager, never by providers.
+   */
+  paseoSubagentCostUsd?: number;
+  /** At least one Paseo child's cost is estimated or unavailable. */
+  paseoSubagentCostEstimated?: boolean;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
 }
 
 export type AgentUsageNumericField = Exclude<
   keyof AgentUsage,
-  "totalCostUnavailable" | "totalCostEstimated"
+  "totalCostUnavailable" | "totalCostEstimated" | "paseoSubagentCostEstimated"
 >;
 
 export const TOOL_CALL_ICON_NAMES = [

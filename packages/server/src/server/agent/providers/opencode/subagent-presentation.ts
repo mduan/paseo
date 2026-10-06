@@ -1,3 +1,5 @@
+import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
+
 export interface OpenCodeSubagentPresentationFacts {
   /** OpenCode agent name running the child, e.g. "general", "explore". */
   agentName?: string;
@@ -46,7 +48,7 @@ export function buildOpenCodeSubagentSubtitle(
     readPart(facts.agentName),
     readPart(facts.modelId),
     formatVariant(facts.variant),
-    formatTokens(facts.totalTokens),
+    formatSubagentTokens(facts.totalTokens),
   ].filter((part): part is string => part !== undefined);
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
@@ -83,10 +85,4 @@ function formatVariant(variant: string | undefined): string | undefined {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function formatTokens(totalTokens: number | undefined): string | undefined {
-  if (typeof totalTokens !== "number" || totalTokens <= 0) return undefined;
-  if (totalTokens < 1000) return `${Math.round(totalTokens)} tokens`;
-  return `${Math.round(totalTokens / 100) / 10}k tokens`;
 }

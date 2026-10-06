@@ -476,6 +476,7 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
     "outputTokens",
     "subagentCostUsd",
     "totalCostUsd",
+    "paseoSubagentCostUsd",
     "contextWindowMaxTokens",
     "contextWindowUsedTokens",
   ];
@@ -489,6 +490,9 @@ function sanitizeUsage(value: unknown): AgentUsage | undefined {
   }
   if (typeof sanitized.totalCostEstimated === "boolean") {
     result.totalCostEstimated = sanitized.totalCostEstimated;
+  }
+  if (typeof sanitized.paseoSubagentCostEstimated === "boolean") {
+    result.paseoSubagentCostEstimated = sanitized.paseoSubagentCostEstimated;
   }
   return Object.keys(result).length ? result : undefined;
 }

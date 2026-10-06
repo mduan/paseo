@@ -57,10 +57,8 @@ import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async
 import { type CodexPriceList, type CodexPrices, getSharedCodexPriceList } from "./codex/pricing.js";
 import { CodexRolloutCost } from "./codex/rollout-cost.js";
 import { rollupProviderSubagentCosts } from "../provider-subagents/cost.js";
-import {
-  formatSubagentCosts,
-  formatSubagentTokens,
-} from "../provider-subagents/subtitle-format.js";
+import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
+import { formatSubagentCosts } from "../provider-subagents/subtitle-format.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,

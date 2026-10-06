@@ -11,6 +11,10 @@ interface ContextWindowMeterProps {
   usedTokens: number | null;
   totalCostUsd?: number | null;
   subagentCostUsd?: number | null;
+  /** Sum of direct Paseo children's totals, shown as part of the subagents' cost. */
+  paseoSubagentCostUsd?: number | null;
+  /** At least one Paseo child's cost is estimated or unavailable. */
+  paseoSubagentCostEstimated?: boolean;
   /** The provider estimates cost but could not load its price list. */
   totalCostUnavailable?: boolean;
   /** Paseo estimated the cost from token counts; the provider reports none. */
@@ -91,20 +95,30 @@ function getMeterGeometry(showPercentage: boolean, glyphSize?: number) {
 function ContextWindowCostDetails({
   totalCostUsd,
   subagentCostUsd,
+  paseoSubagentCostUsd,
+  paseoSubagentCostEstimated,
   totalCostUnavailable,
-  totalCostEstimated,
+  totalCostEstimated: providerCostEstimated,
   costExcludesCurrentTurn,
 }: {
   totalCostUsd: number | null | undefined;
   subagentCostUsd: number | null | undefined;
+  paseoSubagentCostUsd: number | null | undefined;
+  paseoSubagentCostEstimated: boolean;
   totalCostUnavailable: boolean;
   totalCostEstimated: boolean;
   costExcludesCurrentTurn: boolean;
 }) {
   const { t } = useTranslation();
-  const cost = resolveAgentCostBreakdown({ totalCostUsd, subagentCostUsd });
+  const cost = resolveAgentCostBreakdown({
+    totalCostUsd,
+    subagentCostUsd,
+    paseoSubagentCostUsd,
+    totalCostUnavailable,
+  });
+  const totalCostEstimated = providerCostEstimated || paseoSubagentCostEstimated;
   const total = cost ? formatSessionCost(cost.totalCostUsd) : null;
-  // Own cost only adds information when native subagents spent money too.
+  // Own cost only adds information when subagents spent money too.
   const own = cost?.subagentCostUsd ? formatSessionCost(cost.ownCostUsd) : null;
   const formatCost = (value: string) => {
     const shown = totalCostEstimated ? `~${value}` : value;
@@ -140,6 +154,8 @@ export function ContextWindowMeter({
   usedTokens,
   totalCostUsd,
   subagentCostUsd,
+  paseoSubagentCostUsd,
+  paseoSubagentCostEstimated = false,
   totalCostUnavailable = false,
   totalCostEstimated = false,
   costExcludesCurrentTurn = false,
@@ -249,6 +265,8 @@ export function ContextWindowMeter({
           <ContextWindowCostDetails
             totalCostUsd={totalCostUsd}
             subagentCostUsd={subagentCostUsd}
+            paseoSubagentCostUsd={paseoSubagentCostUsd}
+            paseoSubagentCostEstimated={paseoSubagentCostEstimated}
             totalCostUnavailable={totalCostUnavailable}
             totalCostEstimated={totalCostEstimated}
             costExcludesCurrentTurn={costExcludesCurrentTurn}
