@@ -109,6 +109,11 @@ import {
   useWorkspaceSetupStore,
 } from "@/stores/workspace-setup-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
+import {
+  usePendingWorkspaceCreationStore,
+  useVisiblePendingWorkspaceCreation,
+} from "@/stores/pending-workspace-creation-store";
+import { PendingWorkspacePane } from "@/screens/workspace/pending-workspace-pane";
 import { useWorkspaceTerminalSessionRetention } from "@/terminal/hooks/use-workspace-terminal-session-retention";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -876,6 +881,18 @@ function useStableTabDescriptorMap(tabDescriptors: WorkspaceTabDescriptor[]) {
   return tabDescriptorMap;
 }
 
+function useNormalizedWorkspaceRouteIds(input: { serverId: string; workspaceId: string }) {
+  const normalizedServerId = useMemo(
+    () => trimNonEmpty(decodeSegment(input.serverId)) ?? "",
+    [input.serverId],
+  );
+  const normalizedWorkspaceId = useMemo(
+    () => resolveWorkspaceRouteId({ routeWorkspaceId: input.workspaceId }) ?? "",
+    [input.workspaceId],
+  );
+  return { normalizedServerId, normalizedWorkspaceId };
+}
+
 export const WorkspaceScreen = memo(function WorkspaceScreen({
   serverId,
   workspaceId,
@@ -889,11 +906,38 @@ export const WorkspaceScreen = memo(function WorkspaceScreen({
       traceInstant("paseo.workspace.unmount", { serverId, workspaceId });
     };
   }, [serverId, workspaceId]);
+  const { normalizedServerId, normalizedWorkspaceId } = useNormalizedWorkspaceRouteIds({
+    serverId,
+    workspaceId,
+  });
+  // Only while the session store lacks the workspace: withholding the body also skips its
+  // missing-workspace handling.
+  const pendingCreation = useVisiblePendingWorkspaceCreation({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+  });
+  const { handleDismissMissingWorkspace } = useWorkspaceRouteActions(normalizedServerId);
+  const handleDismissPendingCreation = useCallback(() => {
+    handleDismissMissingWorkspace();
+    usePendingWorkspaceCreationStore
+      .getState()
+      .remove({ serverId: normalizedServerId, workspaceId: normalizedWorkspaceId });
+  }, [handleDismissMissingWorkspace, normalizedServerId, normalizedWorkspaceId]);
+  const isFocused = isRouteFocused ?? navigationFocused;
+  if (pendingCreation) {
+    return (
+      <PendingWorkspacePane
+        entry={pendingCreation}
+        isActive={isFocused}
+        onDismiss={handleDismissPendingCreation}
+      />
+    );
+  }
   return (
     <WorkspaceScreenContent
       serverId={serverId}
       workspaceId={workspaceId}
-      isRouteFocused={isRouteFocused ?? navigationFocused}
+      isRouteFocused={isFocused}
       recoveryRequested={recoveryRequested ?? false}
     />
   );
@@ -1583,12 +1627,10 @@ function WorkspaceScreenContent({
   const isFocusModeEnabled = usePanelStore((state) => state.desktop.focusModeEnabled);
   const toggleFocusMode = usePanelStore((state) => state.toggleFocusMode);
 
-  const normalizedServerId = useMemo(() => trimNonEmpty(decodeSegment(serverId)) ?? "", [serverId]);
-
-  const normalizedWorkspaceId = useMemo(
-    () => resolveWorkspaceRouteId({ routeWorkspaceId: workspaceId }) ?? "",
-    [workspaceId],
-  );
+  const { normalizedServerId, normalizedWorkspaceId } = useNormalizedWorkspaceRouteIds({
+    serverId,
+    workspaceId,
+  });
   const workspaceDescriptor = useWorkspace(normalizedServerId, normalizedWorkspaceId);
   useEffect(() => {
     if (!normalizedServerId || !normalizedWorkspaceId || workspaceDescriptor) return;

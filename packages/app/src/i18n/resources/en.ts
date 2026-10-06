@@ -431,6 +431,10 @@ export const en = {
     },
   },
   workspace: {
+    pending: {
+      creating: "Creating worktree...",
+      elapsed: "{{time}} elapsed",
+    },
     route: {
       loading: "Loading workspace",
       connecting: "Connecting",
@@ -1240,6 +1244,7 @@ export const en = {
         serviceRunning: "Service {{name}} running",
         serviceUnhealthy: "Service {{name}} unhealthy",
         creating: "Creating...",
+        failed: "Failed",
       },
       checks: {
         passed: "Passed: {{count}}",

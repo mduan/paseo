@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ComposerAttachment } from "@/attachments/types";
 import type { MessagePayload } from "@/composer/types";
+import type { CreationSnapshot } from "@getpaseo/protocol/messages";
 import { isEmptyWorkspaceSubmission, runCreateEmptyWorkspace } from "./new-workspace-empty";
 
 function payload(
@@ -39,6 +40,39 @@ describe("runCreateEmptyWorkspace", () => {
       attachments: [],
       withInitialAgent: false,
     });
+    expect(recorded).toEqual([{ serverId: "server-abc", workspaceId: "workspace-123" }]);
+  });
+});
+
+describe("runCreateEmptyWorkspace creation events", () => {
+  it("forwards creation snapshots to the caller while the workspace is created", async () => {
+    const accepted: CreationSnapshot = {
+      kind: "workspace",
+      idempotencyKey: "key-1",
+      revision: 1,
+      phase: "accepted",
+      workspaceId: "workspace-123",
+      agentId: null,
+      error: null,
+    };
+    const ensureWorkspace = vi
+      .fn()
+      .mockImplementation(async (request: { onEvent?: (snapshot: CreationSnapshot) => void }) => {
+        request.onEvent?.(accepted);
+        return { id: "workspace-123" };
+      });
+    const snapshots: CreationSnapshot[] = [];
+    const { navigate, recorded } = createRecordingNavigate();
+
+    await runCreateEmptyWorkspace({
+      payload: payload(),
+      ensureWorkspace,
+      onEvent: (snapshot) => snapshots.push(snapshot),
+      serverId: "server-abc",
+      navigate,
+    });
+
+    expect(snapshots).toEqual([accepted]);
     expect(recorded).toEqual([{ serverId: "server-abc", workspaceId: "workspace-123" }]);
   });
 });

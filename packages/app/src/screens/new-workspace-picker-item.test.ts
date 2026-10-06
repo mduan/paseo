@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import {
   type BranchPickerDetail,
@@ -8,6 +8,7 @@ import {
   currentBranchPickerItem,
   defaultBasePickerItem,
   pickerItemToCheckoutRequest,
+  resolveWorktreeCheckoutRequest,
   type PickerItem,
 } from "./new-workspace-picker-item";
 
@@ -102,6 +103,55 @@ describe("pickerItemToCheckoutRequest", () => {
         projectPath: "acme/repo",
       },
     });
+  });
+});
+
+describe("resolveWorktreeCheckoutRequest", () => {
+  it("builds the request from an explicit pick without loading checkout status", async () => {
+    const loadCheckoutStatus = vi.fn();
+    const item: PickerItem = {
+      kind: "branch",
+      name: "dev",
+      refName: "refs/heads/dev",
+      accessibilityLabel: "dev, local branch",
+    };
+
+    const request = await resolveWorktreeCheckoutRequest({
+      selectedItem: item,
+      loadCheckoutStatus,
+    });
+
+    expect(request).toEqual({ action: "branch-off", refName: "refs/heads/dev" });
+    expect(loadCheckoutStatus).not.toHaveBeenCalled();
+  });
+
+  it("builds a PR checkout request without loading checkout status", async () => {
+    const loadCheckoutStatus = vi.fn();
+
+    const request = await resolveWorktreeCheckoutRequest({
+      selectedItem: { kind: "github-pr", item: prItem },
+      loadCheckoutStatus,
+    });
+
+    expect(request).toEqual({
+      action: "checkout",
+      refName: "feature/picker",
+      checkoutSource: { kind: "change_request", forge: "github", number: 42 },
+      githubPrNumber: 42,
+    });
+    expect(loadCheckoutStatus).not.toHaveBeenCalled();
+  });
+
+  it("branches off the checkout's current branch when nothing is picked", async () => {
+    const loadCheckoutStatus = vi.fn().mockResolvedValue({ currentBranch: "main" });
+
+    const request = await resolveWorktreeCheckoutRequest({
+      selectedItem: null,
+      loadCheckoutStatus,
+    });
+
+    expect(request).toEqual({ action: "branch-off", refName: "refs/heads/main" });
+    expect(loadCheckoutStatus).toHaveBeenCalledOnce();
   });
 });
 

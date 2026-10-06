@@ -87,6 +87,25 @@ export function useActiveWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return selection;
 }
 
+// The workspace the foreground route shows, or null on any other route. Unlike the last
+// workspace selection, which survives a trip to /new or Settings, this one tracks where the
+// user is right now.
+let foregroundWorkspaceSelection: ActiveWorkspaceSelection | null = null;
+
+export function getForegroundWorkspaceSelection(): ActiveWorkspaceSelection | null {
+  return foregroundWorkspaceSelection;
+}
+
+/** Mount once in a component that stays mounted across every route. */
+export function useTrackForegroundWorkspaceSelection(): void {
+  const selection = parseActiveWorkspaceSelection({ pathname: usePathname(), params: {} });
+  const serverId = selection?.serverId;
+  const workspaceId = selection?.workspaceId;
+  useEffect(() => {
+    foregroundWorkspaceSelection = serverId && workspaceId ? { serverId, workspaceId } : null;
+  }, [serverId, workspaceId]);
+}
+
 export function useLastWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return useSyncExternalStore(
     lastWorkspaceSelectionStore.subscribe,

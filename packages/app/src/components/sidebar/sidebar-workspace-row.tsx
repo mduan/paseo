@@ -1,7 +1,7 @@
 import { WorkspaceHoverCard } from "@/components/workspace-hover-card";
 import { memo, useCallback, useMemo, useState, type Ref } from "react";
 import { useTranslation } from "react-i18next";
-import { View, Text, type GestureResponderEvent } from "react-native";
+import { View, type GestureResponderEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { HostBadgeModel } from "@/hosts/appearance";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -52,8 +52,6 @@ interface SidebarWorkspaceRowProps {
   onPress: () => void;
   /** The host pill after the title. Absent → the sidebar spans one host, or this one is hidden. */
   hostBadge?: HostBadgeModel | null;
-  /** Project grouping only: shows a transient "creating" affordance. */
-  isCreating?: boolean;
   /** Project grouping only: drag-to-reorder wiring. Absent → not draggable. */
   drag?: () => void;
   isDragging?: boolean;
@@ -68,7 +66,6 @@ export function SidebarWorkspaceRow({
   canCopyBranchName,
   onPress,
   hostBadge,
-  isCreating = false,
   drag,
   isDragging = false,
   dragHandleProps,
@@ -159,7 +156,6 @@ export function SidebarWorkspaceRow({
         shortcutNumber={shortcutNumber}
         showShortcutBadge={showShortcutBadge}
         hostBadge={hostBadge}
-        isCreating={isCreating}
         isArchiving={isArchiving}
         onPress={onPress}
         drag={drag}
@@ -192,7 +188,6 @@ interface WorkspaceRowBodyProps {
   shortcutNumber: number | null;
   showShortcutBadge: boolean;
   hostBadge?: HostBadgeModel | null;
-  isCreating: boolean;
   isArchiving: boolean;
   onPress: () => void;
   drag?: () => void;
@@ -216,7 +211,6 @@ function WorkspaceRowBody({
   shortcutNumber,
   showShortcutBadge,
   hostBadge,
-  isCreating,
   isArchiving,
   onPress,
   drag,
@@ -335,8 +329,7 @@ function WorkspaceRowBody({
                   serviceSummary={serviceSummary}
                   backdrop={backdrop}
                   isHovered={isHovered}
-                  isLoading={isArchiving || isCreating}
-                  isCreating={isCreating}
+                  isLoading={isArchiving}
                   shortcutNumber={shortcutNumber}
                   showShortcutBadge={showShortcutBadge}
                 >
@@ -346,7 +339,6 @@ function WorkspaceRowBody({
                     trailing={trailing}
                     isHovered={isHovered}
                     isTouchPlatform={isTouchPlatform}
-                    isCreating={isCreating}
                     showShortcutBadge={showShortcutBadge}
                     shortcutNumber={shortcutNumber}
                     archiveLabel={archiveLabel}
@@ -376,7 +368,6 @@ function WorkspaceRowTrailingActions({
   trailing,
   isHovered,
   isTouchPlatform,
-  isCreating,
   showShortcutBadge,
   shortcutNumber,
   archiveLabel,
@@ -395,7 +386,6 @@ function WorkspaceRowTrailingActions({
   trailing: SidebarWorkspaceTrailing;
   isHovered: boolean;
   isTouchPlatform: boolean;
-  isCreating: boolean;
   showShortcutBadge: boolean;
   shortcutNumber: number | null;
   archiveLabel?: string;
@@ -409,7 +399,6 @@ function WorkspaceRowTrailingActions({
   onCopyPath?: () => void;
   onRename?: () => void;
 }) {
-  const { t } = useTranslation();
   const showShortcut = showShortcutBadge && shortcutNumber !== null;
   const {
     trailingPresentation,
@@ -427,44 +416,37 @@ function WorkspaceRowTrailingActions({
   });
   const kebab = useOpenKebabMenuVisibility(showKebabInSlot);
 
-  return (
-    <>
-      {isCreating ? (
-        <Text style={styles.workspaceCreatingText}>{t("sidebar.workspace.status.creating")}</Text>
-      ) : null}
-      {renderSlot ? (
-        <SidebarWorkspaceTrailingActionSlot reserveWidth={reserveSlotWidth}>
-          <SidebarWorkspaceTrailingActionBase presentation={trailingPresentation}>
-            <SidebarWorkspaceTrailingContent workspace={workspace} trailing={trailing} />
-          </SidebarWorkspaceTrailingActionBase>
-          <SidebarWorkspaceTrailingActionOverlay
-            visible={kebab.showKebab}
-            scrimBackdrop={showScrim ? backdrop : undefined}
-          >
-            {onArchive ? (
-              <SidebarWorkspaceMenu
-                {...kebab.menuProps}
-                workspaceKey={workspace.workspaceKey}
-                serverId={workspace.serverId}
-                workspaceId={workspace.workspaceId}
-                workspaceLabels={workspace.labels}
-                onCopyPath={onCopyPath}
-                onCopyBranchName={onCopyBranchName}
-                onRename={onRename}
-                onMarkAsRead={onMarkAsRead}
-                onMarkAsUnread={onMarkAsUnread}
-                onArchive={onArchive}
-                archiveLabel={archiveLabel}
-                archiveStatus={archiveStatus}
-                archivePendingLabel={archivePendingLabel}
-                archiveShortcutKeys={archiveShortcutKeys}
-              />
-            ) : null}
-          </SidebarWorkspaceTrailingActionOverlay>
-        </SidebarWorkspaceTrailingActionSlot>
-      ) : null}
-    </>
-  );
+  return renderSlot ? (
+    <SidebarWorkspaceTrailingActionSlot reserveWidth={reserveSlotWidth}>
+      <SidebarWorkspaceTrailingActionBase presentation={trailingPresentation}>
+        <SidebarWorkspaceTrailingContent workspace={workspace} trailing={trailing} />
+      </SidebarWorkspaceTrailingActionBase>
+      <SidebarWorkspaceTrailingActionOverlay
+        visible={kebab.showKebab}
+        scrimBackdrop={showScrim ? backdrop : undefined}
+      >
+        {onArchive ? (
+          <SidebarWorkspaceMenu
+            {...kebab.menuProps}
+            workspaceKey={workspace.workspaceKey}
+            serverId={workspace.serverId}
+            workspaceId={workspace.workspaceId}
+            workspaceLabels={workspace.labels}
+            onCopyPath={onCopyPath}
+            onCopyBranchName={onCopyBranchName}
+            onRename={onRename}
+            onMarkAsRead={onMarkAsRead}
+            onMarkAsUnread={onMarkAsUnread}
+            onArchive={onArchive}
+            archiveLabel={archiveLabel}
+            archiveStatus={archiveStatus}
+            archivePendingLabel={archivePendingLabel}
+            archiveShortcutKeys={archiveShortcutKeys}
+          />
+        ) : null}
+      </SidebarWorkspaceTrailingActionOverlay>
+    </SidebarWorkspaceTrailingActionSlot>
+  ) : null;
 }
 
 function getWorkspaceRowStyle({
@@ -522,10 +504,5 @@ const styles = StyleSheet.create((theme) => ({
   },
   sidebarRowSelected: {
     backgroundColor: theme.colors.surfaceSidebarSelected,
-  },
-  workspaceCreatingText: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    flexShrink: 0,
   },
 }));

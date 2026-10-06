@@ -439,6 +439,10 @@ export const ja: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "ワークツリーを作成中...",
+      elapsed: "{{time}} 経過",
+    },
     route: {
       loading: "ワークスペースを読み込み中",
       connecting: "接続中",
@@ -1246,6 +1250,7 @@ export const ja: TranslationResources = {
         serviceRunning: "サービス {{name}} 実行中",
         serviceUnhealthy: "サービス {{name}} 異常",
         creating: "作成中...",
+        failed: "失敗",
       },
       checks: {
         passed: "成功: {{count}}",

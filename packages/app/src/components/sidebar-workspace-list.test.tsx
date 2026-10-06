@@ -41,6 +41,11 @@ import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-stor
 import { seedRuntimeWorkspaces } from "@/test/seed-session";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
+import {
+  usePendingWorkspaceCreationStore,
+  useVisiblePendingWorkspaceCreations,
+} from "@/stores/pending-workspace-creation-store";
+import { groupPendingCreationsByProject } from "@/components/sidebar/pending-creations";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { defaultHostAppearance } from "@/hosts/appearance";
 
@@ -285,6 +290,21 @@ function SidebarFrameProbe({ counts }: { counts: RenderCounts }): ReactElement {
   );
 }
 
+function PendingCreationsProbe(): ReactElement {
+  const { projects } = useSidebarWorkspacesList({ hostFilters: [SERVER_ID] });
+  const entries = useVisiblePendingWorkspaceCreations();
+  const grouped = groupPendingCreationsByProject({ projects, entries });
+  return (
+    <>
+      {projects.map((project) => (
+        <div key={project.viewKey} data-testid={`pending-${project.viewKey}`}>
+          {(grouped.get(project.viewKey) ?? []).map((entry) => entry.workspaceId).join(",")}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function getHostController(): HostRuntimeController {
   const controllers = (
     getHostRuntimeStore() as unknown as {
@@ -350,6 +370,7 @@ describe("sidebar workspace render isolation", () => {
         projectOrder: [],
         workspaceOrderByProject: {},
       });
+      usePendingWorkspaceCreationStore.setState({ entriesByKey: {} });
     });
   });
 
@@ -437,5 +458,54 @@ describe("sidebar workspace render isolation", () => {
       "b-one": 1,
       "b-two": 1,
     });
+  });
+
+  it("lists a pending creation under a project with no workspaces until its workspace arrives", async () => {
+    const emptyProjectViewKey = createProjectViewKey({
+      serverId: SERVER_ID,
+      projectId: "project-empty",
+    });
+    act(() => {
+      getHostRuntimeStore().acceptProjectSnapshot(SERVER_ID, {
+        projectId: "project-empty",
+        projectKey: "project-empty",
+        projectDisplayName: "Project Empty",
+        projectCustomName: null,
+        projectRootPath: "/repo/project-empty",
+        projectKind: "git",
+      });
+      usePendingWorkspaceCreationStore.getState().add({
+        serverId: SERVER_ID,
+        workspaceId: "empty-pending",
+        projectId: "project-empty",
+        title: "calm-otter",
+        promptPreview: "",
+      });
+    });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<PendingCreationsProbe />);
+    });
+
+    const pendingText = () =>
+      Array.from(container?.querySelectorAll("[data-testid]") ?? []).find(
+        (element) => element.getAttribute("data-testid") === `pending-${emptyProjectViewKey}`,
+      )?.textContent;
+    expect(pendingText()).toBe("empty-pending");
+
+    act(() => {
+      useSessionStore.getState().mergeWorkspaces(SERVER_ID, [
+        workspace({
+          id: "empty-pending",
+          projectId: "project-empty",
+          projectDisplayName: "Project Empty",
+          name: "calm-otter",
+        }),
+      ]);
+    });
+
+    expect(pendingText()).toBe("");
   });
 });
