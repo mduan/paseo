@@ -246,6 +246,34 @@ afterEach(() => {
 });
 
 describe("terminal emulator runtime in a real browser", () => {
+  it("keeps light-theme input readable on a Codex dark background", async () => {
+    const mounted = createTerminalHost({ width: 720, height: 360 });
+    mounted.runtime.setTheme({
+      theme: { background: "#ffffff", foreground: "#1a1a1e" },
+    });
+    mounted.runtime.write({
+      data: terminalOutput("\x1b[48;2;38;38;38mAsk Codex\x1b[0m"),
+    });
+    await waitFor({
+      predicate: () =>
+        mounted.host.querySelector(".xterm-rows")?.textContent?.includes("Ask Codex") === true,
+    });
+
+    const cell = mounted.host.querySelector<HTMLElement>(".xterm-rows > div > span");
+    if (!cell) throw new Error("Expected rendered Codex input");
+    const colors = getComputedStyle(cell);
+    expect(colors.backgroundColor).toBe("rgb(38, 38, 38)");
+    const channels = colors.color.match(/\d+/g)?.map(Number);
+    if (!channels) throw new Error("Expected RGB foreground");
+    const luminance = channels.slice(0, 3).reduce((sum, channel, index) => {
+      const value = channel / 255;
+      const linear = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      return sum + linear * [0.2126, 0.7152, 0.0722][index];
+    }, 0);
+    const backgroundLuminance = ((38 / 255 + 0.055) / 1.055) ** 2.4;
+    expect((luminance + 0.05) / (backgroundLuminance + 0.05)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("passes configured scrollback to xterm", async () => {
     await page.viewport(900, 600);
     createTerminalHost({ width: 720, height: 360, scrollback: 42_000 });
