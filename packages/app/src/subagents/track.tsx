@@ -13,7 +13,7 @@ import {
   WorkspaceTabIcon,
   type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
-import type { Theme } from "@/styles/theme";
+import { FONT_SIZE, type Theme } from "@/styles/theme";
 import type { SubagentRow } from "./select";
 import type { ArchiveFinishedStatus } from "./use-archive-finished";
 import {
@@ -45,6 +45,11 @@ const IDLE_ARCHIVE_FINISHED_STATUS: ArchiveFinishedStatus = { kind: "idle" };
 
 /** Leading and action glyphs share one size so rows keep a single icon column. */
 const ROW_ICON_SIZE = 14;
+
+/** A long title gives way to the metadata until it is about this many characters wide. */
+const TITLE_FLOOR_CHARS = 15;
+// ponytail: average glyph ≈ half the font size; measure the text if titles need an exact floor.
+const TITLE_FLOOR_WIDTH = TITLE_FLOOR_CHARS * FONT_SIZE.base * 0.5;
 
 function useRowPresentation(row: SubagentRow, serverId: string): WorkspaceTabPresentation {
   const icon = useProviderIcon(row.provider, serverId);
@@ -209,15 +214,11 @@ function SubagentsTrackRow({
     ({ active }: { active: boolean }) => (
       <>
         <WorkspaceTabIcon presentation={presentation} backdrop={active ? "surface2" : "surface1"} />
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          {displayLabel}
-        </Text>
-        {row.kind === "paseo" ? <PaseoSubagentMeta serverId={serverId} agentId={row.id} /> : null}
-        {presentation.subtitle ? (
-          <Text style={styles.rowTrailing} numberOfLines={1}>
-            {presentation.subtitle}
-          </Text>
-        ) : null}
+        {row.kind === "paseo" ? (
+          <PaseoSubagentTitle serverId={serverId} agentId={row.id} label={displayLabel} />
+        ) : (
+          <RowTitle label={displayLabel} meta={presentation.subtitle} />
+        )}
         {row.kind === "paseo" ? (
           <SubagentRowActions
             rowId={row.id}
@@ -254,20 +255,39 @@ function SubagentsTrackRow({
 }
 
 /** The meta line provider-native rows get from their subtitle: model · effort · tokens · cost. */
-function PaseoSubagentMeta({
+function PaseoSubagentTitle({
   serverId,
   agentId,
+  label,
 }: {
   serverId: string;
   agentId: string;
-}): ReactElement | null {
+  label: string;
+}): ReactElement {
   const { model, effort, tokens, cost } = useAgentMetaParts({ serverId, agentId });
   const meta = [model, effort, tokens, cost].filter(Boolean).join(" · ");
-  return meta ? (
-    <Text style={styles.rowTrailing} numberOfLines={1}>
-      {meta}
-    </Text>
-  ) : null;
+  return <RowTitle label={label} meta={meta} />;
+}
+
+/**
+ * The title followed directly by its metadata. A long title takes all of the shrinking until it
+ * reaches its floor, and only then does the metadata truncate: its shrink weight is so large that
+ * the metadata's share rounds to zero while both can shrink. A short title never shrinks.
+ */
+function RowTitle({ label, meta }: { label: string; meta?: string }): ReactElement {
+  const longTitle = label.length > TITLE_FLOOR_CHARS;
+  return (
+    <View style={styles.rowTitle}>
+      <Text style={longTitle ? styles.rowLabelLong : styles.rowLabelShort} numberOfLines={1}>
+        {label}
+      </Text>
+      {meta ? (
+        <Text style={styles.rowTrailing} numberOfLines={1}>
+          {meta}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 function SubagentRowActions({
@@ -368,9 +388,27 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     color: theme.colors.foreground,
   },
-  // Trailing metadata — provider context on a subagent row, progress on the archive row. No width
-  // cap: the panel's own ceiling bounds it. It shrinks twice as fast as the label, so a wordy
-  // provider subtitle gives way first instead of squeezing the thing that names the row.
+  rowTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  rowLabelShort: {
+    flexShrink: 0,
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foreground,
+  },
+  rowLabelLong: {
+    flexShrink: 1_000_000,
+    minWidth: TITLE_FLOOR_WIDTH,
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foreground,
+  },
+  // Trailing metadata — a subagent row's model, effort, and usage, or the archive row's progress.
+  // No width cap: the panel's own ceiling bounds it. Next to the archive row's label it shrinks
+  // twice as fast, so the progress gives way before the label does.
   rowTrailing: {
     flexShrink: 2,
     minWidth: 0,
