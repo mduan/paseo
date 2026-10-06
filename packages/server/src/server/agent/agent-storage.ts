@@ -50,6 +50,8 @@ const STORED_USAGE_SCHEMA = z.object({
   totalCostUsd: z.number().optional(),
   totalCostUnavailable: z.boolean().optional(),
   totalCostEstimated: z.boolean().optional(),
+  paseoSubagentCostUsd: z.number().optional(),
+  paseoSubagentCostEstimated: z.boolean().optional(),
   contextWindowMaxTokens: z.number().optional(),
   contextWindowUsedTokens: z.number().optional(),
 });

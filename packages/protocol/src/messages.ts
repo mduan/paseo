@@ -383,7 +383,7 @@ const AgentCapabilityFlagsSchema: z.ZodType<AgentCapabilityFlags> = z
   })
   .catchall(z.boolean());
 
-const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
+export const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
   inputTokens: z.number().optional(),
   cachedInputTokens: z.number().optional(),
   outputTokens: z.number().optional(),
@@ -391,6 +391,8 @@ const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
   totalCostUsd: z.number().optional(),
   totalCostUnavailable: z.boolean().optional(),
   totalCostEstimated: z.boolean().optional(),
+  paseoSubagentCostUsd: z.number().optional(),
+  paseoSubagentCostEstimated: z.boolean().optional(),
   contextWindowMaxTokens: z.number().optional(),
   contextWindowUsedTokens: z.number().optional(),
 });
@@ -803,7 +805,7 @@ const AgentPersistenceHandleSchema: z.ZodType<AgentPersistenceHandle | null> = z
   })
   .nullable();
 
-const AgentRuntimeInfoSchema: z.ZodType<AgentRuntimeInfo> = z.object({
+export const AgentRuntimeInfoSchema: z.ZodType<AgentRuntimeInfo> = z.object({
   provider: AgentProviderSchema,
   sessionId: z.string().nullable(),
   model: z.string().nullable().optional(),

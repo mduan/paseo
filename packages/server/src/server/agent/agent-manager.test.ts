@@ -11588,3 +11588,174 @@ test("records the files a foreground turn changed as a turn diff", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+class PaseoCostTestClient extends TestAgentClient {
+  readonly sessions: TestAgentSession[] = [];
+
+  override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+    const session = new TestAgentSession(config);
+    this.sessions.push(session);
+    return session;
+  }
+}
+
+async function createPaseoCostHarness() {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-paseo-cost-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const client = new PaseoCostTestClient();
+  const manager = new AgentManager({ clients: { codex: client }, registry: storage, logger });
+  const create = async (parentAgentId?: string) => {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+      labels: parentAgentId ? { [PARENT_AGENT_ID_LABEL]: parentAgentId } : undefined,
+    });
+    return { id: agent.id, session: client.sessions[client.sessions.length - 1] };
+  };
+  const reportUsage = (
+    session: TestAgentSession,
+    usage: Extract<AgentStreamEvent, { type: "usage_updated" }>["usage"],
+  ) => session.pushEvent({ type: "usage_updated", provider: "codex", usage });
+  const cleanup = async () => {
+    for (const agent of manager.listAgents()) await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  };
+  return { manager, storage, create, reportUsage, cleanup };
+}
+
+test("rolls Paseo children's cost into the parent's paseoSubagentCostUsd", async () => {
+  const { manager, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const parent = await create();
+    const child = await create(parent.id);
+    reportUsage(child.session, { totalCostUsd: 1.5 });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage).toMatchObject({
+        paseoSubagentCostUsd: 1.5,
+      });
+    });
+    expect(manager.getAgent(parent.id)?.lastUsage?.totalCostUsd).toBeUndefined();
+  } finally {
+    await cleanup();
+  }
+});
+
+test("propagates a grandchild's cost to the grandparent through the child", async () => {
+  const { manager, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const grandparent = await create();
+    const child = await create(grandparent.id);
+    const grandchild = await create(child.id);
+    reportUsage(child.session, { totalCostUsd: 1 });
+    reportUsage(grandchild.session, { totalCostUsd: 2 });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(child.id)?.lastUsage?.paseoSubagentCostUsd).toBe(2);
+      expect(manager.getAgent(grandparent.id)?.lastUsage?.paseoSubagentCostUsd).toBe(3);
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("keeps counting archived children and drops detached ones", async () => {
+  const { manager, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const parent = await create();
+    const archived = await create(parent.id);
+    const detached = await create(parent.id);
+    reportUsage(archived.session, { totalCostUsd: 1 });
+    reportUsage(detached.session, { totalCostUsd: 4 });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage?.paseoSubagentCostUsd).toBe(5);
+    });
+
+    await manager.archiveAgent(archived.id);
+    await manager.detachAgent(detached.id);
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage?.paseoSubagentCostUsd).toBe(1);
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("marks the parent estimated when a child's cost is estimated or unavailable", async () => {
+  const { manager, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const parent = await create();
+    const estimated = await create(parent.id);
+    reportUsage(estimated.session, { totalCostUsd: 1, totalCostEstimated: true });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage).toMatchObject({
+        paseoSubagentCostUsd: 1,
+        paseoSubagentCostEstimated: true,
+      });
+    });
+
+    const otherParent = await create();
+    const unavailable = await create(otherParent.id);
+    reportUsage(unavailable.session, { totalCostUnavailable: true });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(otherParent.id)?.lastUsage).toMatchObject({
+        paseoSubagentCostUsd: 0,
+        paseoSubagentCostEstimated: true,
+      });
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("a parent loaded after its child finished picks up the child's cost", async () => {
+  const { manager, storage, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const parent = await create();
+    const child = await create(parent.id);
+    await manager.closeAgent(parent.id);
+    reportUsage(child.session, { totalCostUsd: 2.5 });
+    await manager.flush();
+
+    await ensureAgentLoaded(parent.id, { agentManager: manager, agentStorage: storage, logger });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage?.paseoSubagentCostUsd).toBe(2.5);
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("usage merged on turn_completed updates the parent", async () => {
+  const { manager, create, cleanup } = await createPaseoCostHarness();
+  try {
+    const parent = await create();
+    const child = await create(parent.id);
+    child.session.pushEvent({ type: "turn_started", provider: "codex", turnId: "turn-auto" });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(child.id)?.lifecycle).toBe("running");
+    });
+    child.session.pushEvent({
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-auto",
+      usage: { totalCostUsd: 0.75 },
+    });
+    await vi.waitFor(() => {
+      expect(manager.getAgent(parent.id)?.lastUsage?.paseoSubagentCostUsd).toBe(0.75);
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("a self-parent label does not loop the rollup", async () => {
+  const { manager, create, reportUsage, cleanup } = await createPaseoCostHarness();
+  try {
+    const agent = await create();
+    await manager.setLabels(agent.id, { [PARENT_AGENT_ID_LABEL]: agent.id });
+    reportUsage(agent.session, { totalCostUsd: 1 });
+    await manager.flush();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(manager.getAgent(agent.id)?.lastUsage).toEqual({ totalCostUsd: 1 });
+  } finally {
+    await cleanup();
+  }
+});

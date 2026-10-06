@@ -3174,10 +3174,10 @@ export class Session {
   private async handleDeleteAgentRequest(agentId: string, requestId: string): Promise<void> {
     this.sessionLogger.info({ agentId }, `Deleting agent ${agentId} from registry`);
 
-    const knownWorkspaceId =
-      this.agentManager.getAgent(agentId)?.workspaceId ??
-      (await this.agentStorage.get(agentId))?.workspaceId ??
-      null;
+    const liveAgent = this.agentManager.getAgent(agentId);
+    const storedAgent = liveAgent ? null : await this.agentStorage.get(agentId);
+    const knownWorkspaceId = liveAgent?.workspaceId ?? storedAgent?.workspaceId ?? null;
+    const parentAgentId = getParentAgentIdFromLabels(liveAgent?.labels ?? storedAgent?.labels);
 
     // File-backed storage still needs an early delete fence before closeAgent().
     beginAgentDeleteIfSupported(this.agentStorage, agentId);
@@ -3200,6 +3200,9 @@ export class Session {
       await this.agentManager.deleteAgentState(agentId);
     } catch (error) {
       this.sessionLogger.error({ err: error, agentId }, `Failed to fully delete agent ${agentId}`);
+    }
+    if (parentAgentId) {
+      this.agentManager.refreshPaseoSubagentCost(parentAgentId);
     }
 
     this.emit({

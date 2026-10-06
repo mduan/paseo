@@ -1,7 +1,5 @@
-import {
-  formatSubagentCosts,
-  formatSubagentTokens,
-} from "../../../provider-subagents/subtitle-format.js";
+import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
+import { formatSubagentCosts } from "../../../provider-subagents/subtitle-format.js";
 import { findClaudeModel } from "../models.js";
 
 export interface ClaudeSubagentUsage {

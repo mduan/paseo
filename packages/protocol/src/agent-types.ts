@@ -199,6 +199,10 @@ export interface AgentUsage {
   totalCostUnavailable?: boolean;
   /** Paseo priced the provider's token counts itself; the provider reports no cost. */
   totalCostEstimated?: boolean;
+  /** Sum of direct Paseo children's totals, including their own Paseo subtotals. */
+  paseoSubagentCostUsd?: number;
+  /** At least one Paseo child's cost is estimated or unavailable. */
+  paseoSubagentCostEstimated?: boolean;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
 }

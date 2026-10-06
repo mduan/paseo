@@ -10,7 +10,6 @@ import {
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { AgentUsage } from "@getpaseo/protocol/agent-types";
 import { useShallow } from "zustand/react/shallow";
 import {
   DropdownMenu,
@@ -34,16 +33,13 @@ import { workspaceTerminalsPushRoute } from "@/data/push-router";
 import { useReplicaQuery } from "@/data/query";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import { useSettings } from "@/hooks/use-settings";
+import { useAgentMetaParts } from "@/components/agent-meta";
 import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import {
   WorkspaceTabIcon,
   WorkspaceTabPresentationResolver,
   type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
-import { formatSessionCost } from "@/components/agent-cost";
-import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
-import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
-import { filterSelectableModels } from "@/provider-selection/model-catalog";
 import {
   buildTerminalsQueryKey,
   collectScriptTerminalIds,
@@ -493,34 +489,13 @@ function AgentPreview({
   );
 }
 
-/** Total session cost, prefixed "~" when Paseo priced the provider's token counts itself. */
-function formatAgentCost(usage: AgentUsage | null | undefined): string | null {
-  if (typeof usage?.totalCostUsd !== "number") return null;
-  const total = formatSessionCost(usage.totalCostUsd);
-  if (!total) return null;
-  return usage.totalCostEstimated ? `~${total}` : total;
-}
-
 /** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
 function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: string }) {
   const { t } = useTranslation();
-  const agent = useSessionStore((state) => state.sessions[serverId]?.agents?.get(agentId));
-  const { entries } = useProvidersSnapshot(serverId, { cwd: agent?.cwd });
-  const models = entries?.find((entry) => entry.provider === agent?.provider)?.models ?? null;
-  const selection = resolveAgentModelSelection({
-    models: filterSelectableModels(models),
-    runtimeModelId: agent?.runtimeInfo?.model,
-    configuredModelId: agent?.model,
-    runtimeThinkingOptionId: agent?.runtimeInfo?.thinkingOptionId,
-    explicitThinkingOptionId: agent?.thinkingOptionId,
-  });
-  const parts = [
-    selection.activeModelId ? selection.displayModel : null,
-    selection.selectedThinkingId
-      ? t("workspace.tabs.effort", { effort: selection.displayThinking })
-      : null,
-    formatAgentCost(agent?.lastUsage),
-  ].filter(Boolean);
+  const { model, effort, cost } = useAgentMetaParts({ serverId, agentId });
+  const parts = [model, effort ? t("workspace.tabs.effort", { effort }) : null, cost].filter(
+    Boolean,
+  );
   return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
 }
 

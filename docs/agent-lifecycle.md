@@ -191,7 +191,9 @@ Provider timelines use the same structural timeline item format but deliberately
 
 Provider descriptors may include one compact subtitle. The provider owns its contents and formatting; clients display and truncate it without interpreting provider-specific model, thinking, or usage fields.
 
-Cost accounting stays within one provider session. It never includes Paseo subagents. Each provider subagent reports its own cost. If it has native descendants, it also reports its subtree total. Codex sums rollout costs. Claude separates its inclusive SDK total with transcript estimates.
+Provider cost stays within one provider session: `totalCostUsd` never includes Paseo subagents, because Claude resumes from it as a baseline. Each provider subagent reports its own cost. If it has native descendants, it also reports its subtree total. Codex sums rollout costs. Claude separates its inclusive SDK total with transcript estimates.
+
+Paseo subagent cost is a separate field. The daemon sums each loaded parent's direct Paseo children (their `totalCostUsd` plus their own `paseoSubagentCostUsd`) into `paseoSubagentCostUsd`, so grandchildren reach the root through each child's update. Archived children count. Deleted and detached children don't. An unloaded parent is skipped and recomputes when it loads, so an unloaded middle agent holds back propagation to its ancestors until then.
 
 ### Claude provider subagents: the task protocol
 

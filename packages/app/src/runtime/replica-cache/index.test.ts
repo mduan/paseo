@@ -153,6 +153,13 @@ function agent(id = "agent-1"): Agent {
         title: "Cached agent",
         labels: {},
         lastAssistantPreview: "Pushed both branches",
+        runtimeInfo: {
+          provider: "claude",
+          sessionId: "session-1",
+          model: "opus",
+          thinkingOptionId: "high",
+        },
+        lastUsage: { contextWindowUsedTokens: 1200, totalCostUsd: 0.5, paseoSubagentCostUsd: 0.25 },
       },
       SERVER_ID,
     ),
@@ -317,6 +324,12 @@ describe("ReplicaCache", () => {
     expect(restoredDirectory.agents.get("agent-1")?.lastAssistantPreview).toBe(
       "Pushed both branches",
     );
+    expect(restoredDirectory.agents.get("agent-1")?.runtimeInfo?.model).toBe("opus");
+    expect(restoredDirectory.agents.get("agent-1")?.lastUsage).toEqual({
+      contextWindowUsedTokens: 1200,
+      totalCostUsd: 0.5,
+      paseoSubagentCostUsd: 0.25,
+    });
     expect(restoredDirectory.workspaces.get("workspace-1")?.name).toBe("main");
     expect(restoredDirectory.projects.get("project-1")?.projectDisplayName).toBe("Paseo");
     expect(restoredDirectory.checkpoint).toEqual({ agents: { generation: "g", afterSeq: 12 } });
