@@ -440,6 +440,10 @@ export const fr: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "Création de l'arbre de travail...",
+      elapsed: "{{time}} écoulé",
+    },
     route: {
       loading: "Chargement de l'espace de travail",
       connecting: "De liaison",
@@ -1268,6 +1272,7 @@ export const fr: TranslationResources = {
         serviceRunning: "Service {{name}} en cours",
         serviceUnhealthy: "Service {{name}} en échec",
         creating: "Création...",
+        failed: "Échec",
       },
       checks: {
         passed: "Réussis : {{count}}",

@@ -435,6 +435,10 @@ export const ko: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "워크트리를 생성하는 중...",
+      elapsed: "{{time}} 경과",
+    },
     route: {
       loading: "워크스페이스 불러오는 중",
       connecting: "연결 중",
@@ -1239,6 +1243,7 @@ export const ko: TranslationResources = {
         serviceRunning: "서비스 {{name}} 실행 중",
         serviceUnhealthy: "서비스 {{name}} 비정상",
         creating: "생성하는 중...",
+        failed: "실패",
       },
       checks: {
         passed: "통과: {{count}}개",

@@ -434,6 +434,10 @@ export const ar: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "جارٍ إنشاء شجرة العمل...",
+      elapsed: "انقضى {{time}}",
+    },
     route: {
       loading: "جارٍ تحميل مساحة العمل",
       connecting: "الاتصال",
@@ -1232,6 +1236,7 @@ export const ar: TranslationResources = {
         serviceRunning: "الخدمة {{name}} قيد التشغيل",
         serviceUnhealthy: "الخدمة {{name}} غير سليمة",
         creating: "جارٍ الإنشاء...",
+        failed: "فشل",
       },
       checks: {
         passed: "ناجحة: {{count}}",

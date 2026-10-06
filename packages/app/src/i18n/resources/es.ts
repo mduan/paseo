@@ -439,6 +439,10 @@ export const es: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "Creando árbol de trabajo...",
+      elapsed: "{{time}} transcurridos",
+    },
     route: {
       loading: "Cargando espacio de trabajo",
       connecting: "Conectando",
@@ -1268,6 +1272,7 @@ export const es: TranslationResources = {
         serviceRunning: "Servicio {{name}} en ejecución",
         serviceUnhealthy: "Servicio {{name}} con fallos",
         creating: "Creando...",
+        failed: "Falló",
       },
       checks: {
         passed: "Superados: {{count}}",

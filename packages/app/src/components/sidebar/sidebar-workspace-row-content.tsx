@@ -95,7 +95,6 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   backdrop,
   isHovered,
   isLoading,
-  isCreating = false,
   shortcutNumber = null,
   showShortcutBadge = false,
   reserveIdleStatusIndicatorSpace = true,
@@ -112,7 +111,6 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   backdrop: SidebarSurfaceBackdrop;
   isHovered: boolean;
   isLoading: boolean;
-  isCreating?: boolean;
   shortcutNumber?: number | null;
   showShortcutBadge?: boolean;
   /** Keep the empty leading slot when the workspace has no active status. */
@@ -129,12 +127,8 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   // where the two meet — the meta line is handed finished definitions.
   const labels = useWorkspaceLabelDefinitions(workspace.serverId, workspace.labels);
   const workspaceBranchTextStyle = useMemo(
-    () => [
-      styles.workspaceBranchText,
-      isHovered && styles.workspaceBranchTextHovered,
-      isCreating && styles.workspaceBranchTextCreating,
-    ],
-    [isHovered, isCreating],
+    () => [styles.workspaceBranchText, isHovered && styles.workspaceBranchTextHovered],
+    [isHovered],
   );
 
   return (
@@ -569,9 +563,6 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.76,
     flex: 1,
     minWidth: 0,
-  },
-  workspaceBranchTextCreating: {
-    opacity: 0.92,
   },
   workspaceBranchTextHovered: {
     opacity: 1,

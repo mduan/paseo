@@ -434,6 +434,10 @@ export const zhCN: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "正在创建 worktree...",
+      elapsed: "已用 {{time}}",
+    },
     route: {
       loading: "正在加载 workspace",
       connecting: "正在连接",
@@ -1222,6 +1226,7 @@ export const zhCN: TranslationResources = {
         serviceRunning: "服务 {{name}} 运行中",
         serviceUnhealthy: "服务 {{name}} 异常",
         creating: "正在创建...",
+        failed: "失败",
       },
       checks: {
         passed: "成功: {{count}}",

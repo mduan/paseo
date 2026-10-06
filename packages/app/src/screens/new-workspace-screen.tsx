@@ -64,9 +64,11 @@ import {
 import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
 import type { HostProfile } from "@/types/host-connection";
 import {
+  getLastWorkspaceSelection,
   navigateToWorkspace,
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
+import { prepareWorkspaceTab } from "@/utils/workspace-navigation";
 import { normalizeWorkspaceDescriptor, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
 import { buildNewWorkspaceDraftKey, generateDraftId } from "@/stores/draft-keys";
@@ -119,7 +121,7 @@ import {
   currentBranchPickerItem,
   defaultBasePickerItem,
   pickerItemLabel,
-  pickerItemToCheckoutRequest,
+  resolveWorktreeCheckoutRequest,
   type BranchPickerDetail,
   type PickerCheckoutRequest,
   type PickerItem,
@@ -146,6 +148,12 @@ import {
 } from "./workspace/terminals/state";
 import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
 import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
+import {
+  createWorktreeCreationTracker,
+  resolveWorktreeCreationContext,
+  type WorktreeCreationContext,
+  type WorktreeCreationPorts,
+} from "./new-workspace/worktree-creation";
 
 const ThemedFolderPlus = withUnistyles(FolderPlus);
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -853,6 +861,7 @@ interface SubmitDraftInput {
   supportsForgeSearch: boolean;
   resolveClient: () => DaemonClient;
   isStillOnCreateScreen: () => boolean;
+  openWorkspace: (input: { workspaceId: string; target: WorkspaceTabTarget }) => SubmitOutcome;
 }
 
 type NewWorkspaceComposerState = NonNullable<
@@ -951,6 +960,8 @@ interface CreateChatAgentInput {
   supportsForgeSearch: boolean;
   resolveClient: () => DaemonClient;
   isStillOnCreateScreen: () => boolean;
+  /** Set when the host supports creation lifecycle and a worktree is being created. */
+  worktreeCreation?: WorktreeCreationContext;
   labels: {
     composerStateRequired: string;
     selectModel: string;
@@ -1006,6 +1017,42 @@ function buildComposerInitialValues(input: {
   return undefined;
 }
 
+const worktreeCreationPorts: WorktreeCreationPorts = {
+  navigateToWorkspace,
+  prepareWorkspaceTab,
+  getActiveWorkspaceSelection: getLastWorkspaceSelection,
+};
+
+// A worktree create on a host with creation lifecycle outlives this screen; see worktree-creation.ts.
+function useWorktreeCreation(input: {
+  serverId: string;
+  project: HostProjectListItem | null;
+  supportsWorkspaceMultiplicity: boolean;
+  effectiveIsolation: "local" | "worktree";
+  worktreeSlug: string;
+}): { createsWorktree: boolean; worktreeCreation: WorktreeCreationContext | undefined } {
+  const { serverId, project, supportsWorkspaceMultiplicity, effectiveIsolation, worktreeSlug } =
+    input;
+  const { t } = useTranslation();
+  const supportsCreationLifecycle = useHostFeature(serverId, "creationLifecycle");
+  const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
+  const projectId = project ? getHostProjectId(project, serverId) : null;
+  const fallbackError = t("newWorkspace.errors.createWorktreeFailed");
+  const worktreeCreation = useMemo(
+    () =>
+      resolveWorktreeCreationContext({
+        createsWorktree,
+        supportsCreationLifecycle,
+        projectId,
+        title: worktreeSlug,
+        fallbackError,
+        ports: worktreeCreationPorts,
+      }),
+    [createsWorktree, fallbackError, projectId, supportsCreationLifecycle, worktreeSlug],
+  );
+  return { createsWorktree, worktreeCreation };
+}
+
 const pendingWorkspaceSubmissions = new Map<string, Promise<SubmitOutcome>>();
 function runCreateChatAgent(input: CreateChatAgentInput): Promise<SubmitOutcome> {
   const key = JSON.stringify([input.serverId, input.draftId]);
@@ -1021,6 +1068,16 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
   const { payload, composerState, ensureWorkspace, serverId, clearDraft } = input;
   const clearConsumedDraft = captureWorkspaceDraftCleanup(input);
   const { text, attachments, cwd } = payload;
+  const tracker =
+    input.worktreeCreation &&
+    createWorktreeCreationTracker({
+      ...input.worktreeCreation,
+      serverId,
+      promptPreview: text.trim(),
+      isStillOnCreateScreen: input.isStillOnCreateScreen,
+      clearConsumedDraft,
+    });
+  const releaseDraft = tracker ? tracker.clearDraft : clearConsumedDraft;
   if (!composerState) {
     throw new Error(input.labels.composerStateRequired);
   }
@@ -1039,8 +1096,15 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     format: attachmentSubmitFormat,
   });
   const images = await encodeImages(wirePayload.images);
-  let navigated = false;
+  let handedOff = false;
   let outcome: SubmitOutcome = "background";
+  const openWorkspace: SubmitDraftInput["openWorkspace"] = ({ workspaceId, target }) => {
+    if (tracker) {
+      return tracker.openWorkspace({ workspaceId, target }) ? "navigated" : "background";
+    }
+    navigateToWorkspace({ serverId, workspaceId, target });
+    return "navigated";
+  };
   const initialAgent: NonNullable<CreateWorkspaceRequestOptions["agent"]> = {
     config: {
       provider,
@@ -1056,16 +1120,19 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     attachments: wirePayload.attachments?.length ? wirePayload.attachments : undefined,
   };
   const execute = async (requestedAgent = initialAgent): Promise<AgentSnapshotPayload> => {
-    const { agent } = await ensureWorkspace({
+    const creation = ensureWorkspace({
       cwd,
       prompt: text,
       attachments: workspaceNamingAttachments,
       withInitialAgent: true,
       agent: requestedAgent,
       onEvent: (snapshot) => {
-        if (!snapshot.workspace || navigated) return;
-        navigated = true;
-        if (!input.isStillOnCreateScreen()) return;
+        tracker?.observe(snapshot);
+        if (!snapshot.workspace || handedOff) return;
+        handedOff = true;
+        // A tracked creation hands off wherever the user is: the draft tab has to exist to
+        // consume the agent creation even when they have moved on.
+        if (!tracker && !input.isStillOnCreateScreen()) return;
         const workspace = normalizeWorkspaceDescriptor(snapshot.workspace);
         getHostRuntimeStore().acceptWorkspaceSnapshots(serverId, [
           { ...workspace, status: "running" },
@@ -1082,8 +1149,9 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
           draftContextScopeKey: input.draftContextScopeKey,
           resolveClient: input.resolveClient,
           isStillOnCreateScreen: input.isStillOnCreateScreen,
+          openWorkspace,
           serverId,
-          clearDraft,
+          clearDraft: tracker ? tracker.clearDraft : clearDraft,
           draftId: input.draftId,
           initialSetup,
           workspaceId: workspace.id,
@@ -1097,6 +1165,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
         });
       },
     });
+    const { agent } = await (tracker ? tracker.track(creation) : creation);
     if (!agent) throw new Error("Workspace creation returned no agent");
     return agent;
   };
@@ -1113,7 +1182,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
       }),
   };
   await agentCreation.result;
-  if (outcome === "background") clearConsumedDraft();
+  if (outcome === "background") releaseDraft();
   return outcome;
 }
 
@@ -1234,12 +1303,7 @@ function submitWorkspaceDraft(input: SubmitDraftInput): SubmitOutcome {
     agentCreation: input.agentCreation,
   });
   clearDraft("sent");
-  navigateToWorkspace({
-    serverId,
-    workspaceId,
-    target: submission.target,
-  });
-  return "navigated";
+  return input.openWorkspace({ workspaceId, target: submission.target });
 }
 
 function useNewWorkspaceHostSelector(input: {
@@ -1895,6 +1959,13 @@ export function NewWorkspaceScreen({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
       worktreeSupport,
     });
+  const { createsWorktree, worktreeCreation } = useWorktreeCreation({
+    serverId: selectedServerId,
+    project: selectedProject,
+    supportsWorkspaceMultiplicity,
+    effectiveIsolation,
+    worktreeSlug: creationIdentity.worktreeSlug,
+  });
   const { isLocalCheckout, refSelection, defaultRefPickerItem, prSearchEnabled } =
     resolveRefPickerMode({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
@@ -2146,19 +2217,17 @@ export function NewWorkspaceScreen({
         throw new Error("Choose a host for this project");
       }
       const connectedClient = withConnectedClient();
-      const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
-      const checkoutStatusForCreate = createsWorktree
-        ? await ensureCheckoutStatus({
-            queryClient,
-            client: connectedClient,
-            serverId: selectedServerId,
-            cwd: selectedSourceDirectory,
+      const checkoutRequest = createsWorktree
+        ? await resolveWorktreeCheckoutRequest({
+            selectedItem,
+            loadCheckoutStatus: () =>
+              ensureCheckoutStatus({
+                queryClient,
+                client: connectedClient,
+                serverId: selectedServerId,
+                cwd: selectedSourceDirectory,
+              }),
           })
-        : null;
-      const checkoutRequest = checkoutStatusForCreate
-        ? pickerItemToCheckoutRequest(
-            selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
-          )
         : undefined;
       // A detached HEAD row is what is already checked out; there is nothing to switch to.
       if (!createsWorktree && refSelection?.kind === "branch" && !refSelection.detached) {
@@ -2189,9 +2258,9 @@ export function NewWorkspaceScreen({
       return normalizedWorkspace;
     },
     [
+      createsWorktree,
       creationIdentity,
       creationResult,
-      effectiveIsolation,
       mergeWorkspaces,
       queryClient,
       refSelection,
@@ -2199,7 +2268,6 @@ export function NewWorkspaceScreen({
       selectedProject,
       selectedServerId,
       selectedSourceDirectory,
-      supportsWorkspaceMultiplicity,
       t,
       withConnectedClient,
     ],
@@ -2235,11 +2303,24 @@ export function NewWorkspaceScreen({
         if (isEmptyWorkspaceSubmission(payload)) {
           setPendingAction("empty");
           let outcome: SubmitOutcome = "background";
-          await runCreateEmptyWorkspace({
+          const tracker =
+            worktreeCreation &&
+            createWorktreeCreationTracker({
+              ...worktreeCreation,
+              serverId: selectedServerId,
+              promptPreview: "",
+              isStillOnCreateScreen,
+            });
+          const creation = runCreateEmptyWorkspace({
             payload,
             ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
+            onEvent: tracker?.observe,
             serverId: selectedServerId,
             navigate: (targetServerId, workspaceId) => {
+              if (tracker?.navigatedEarly()) {
+                outcome = "navigated";
+                return;
+              }
               if (!isStillOnCreateScreen()) {
                 return;
               }
@@ -2247,6 +2328,7 @@ export function NewWorkspaceScreen({
               navigateToWorkspace({ serverId: targetServerId, workspaceId });
             },
           });
+          await (tracker ? tracker.track(creation) : creation);
           // Nothing navigated, so this screen may still be mounted under another route. Release
           // the pending lock it would otherwise keep forever.
           if (outcome === "background") {
@@ -2269,6 +2351,7 @@ export function NewWorkspaceScreen({
           supportsForgeSearch,
           resolveClient: withConnectedClient,
           isStillOnCreateScreen,
+          worktreeCreation,
           labels: {
             composerStateRequired: t("newWorkspace.errors.composerStateRequired"),
             selectModel: t("newWorkspace.errors.selectModel"),
@@ -2300,6 +2383,7 @@ export function NewWorkspaceScreen({
       toast,
       updateFormPreferences,
       withConnectedClient,
+      worktreeCreation,
     ],
   );
 

@@ -223,6 +223,17 @@ export function pickerItemToCheckoutRequest(
   }
 }
 
+// An explicit pick already names its ref, so only the default base needs the checkout status.
+// Skipping that round trip is what lets a worktree create start without waiting on the source
+// checkout's git state.
+export async function resolveWorktreeCheckoutRequest(input: {
+  selectedItem: PickerItem | null;
+  loadCheckoutStatus: () => Promise<BaseRefCheckoutStatus>;
+}): Promise<PickerCheckoutRequest | undefined> {
+  if (input.selectedItem) return pickerItemToCheckoutRequest(input.selectedItem);
+  return pickerItemToCheckoutRequest(defaultBasePickerItem(await input.loadCheckoutStatus()));
+}
+
 export function prPickerOptionId(number: number): string {
   return `${PR_OPTION_PREFIX}${number}`;
 }

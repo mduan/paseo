@@ -438,6 +438,10 @@ export const ru: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "Создание worktree...",
+      elapsed: "Прошло {{time}}",
+    },
     route: {
       loading: "Загрузка рабочего пространства",
       connecting: "Подключение",
@@ -1250,6 +1254,7 @@ export const ru: TranslationResources = {
         serviceRunning: "Сервис {{name}} запущен",
         serviceUnhealthy: "Сервис {{name}} работает некорректно",
         creating: "Создание...",
+        failed: "Ошибка",
       },
       checks: {
         passed: "Успешные: {{count}}",

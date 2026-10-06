@@ -438,6 +438,10 @@ export const ptBR: TranslationResources = {
     },
   },
   workspace: {
+    pending: {
+      creating: "Criando worktree...",
+      elapsed: "{{time}} decorridos",
+    },
     route: {
       loading: "Carregando workspace",
       connecting: "Conectando",
@@ -1258,6 +1262,7 @@ export const ptBR: TranslationResources = {
         serviceRunning: "Serviço {{name}} em execução",
         serviceUnhealthy: "Serviço {{name}} com falha",
         creating: "Criando...",
+        failed: "Falhou",
       },
       checks: {
         passed: "Aprovados: {{count}}",
