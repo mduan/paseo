@@ -312,6 +312,29 @@ const mainRow: BranchPickerDetail = {
 };
 
 describe("buildPickerOptionData", () => {
+  it.each(["main", "master", "develop"])(
+    "places origin/%s immediately after the local default branch",
+    (name) => {
+      const current = currentBranchPickerItem({ currentBranch: null, headSha: "0123456789abcdef" });
+      const data = buildPickerOptionData({
+        branchDetails: [
+          { name, committerDate: 1, hasLocal: true, hasRemote: true, isDefault: true },
+          { name: "feature", committerDate: 20, hasLocal: true, hasRemote: true },
+        ],
+        prItems: [],
+        baseItem: current,
+        currentItem: current,
+      });
+      expect(data.options.map((option) => option.label)).toEqual([
+        "0123456",
+        "feature",
+        name,
+        `origin/${name}`,
+        "origin/feature",
+      ]);
+    },
+  );
+
   it("pins the base, then local, origin, and PRs, each newest first", () => {
     const baseItem: PickerItem = {
       kind: "branch",
@@ -329,7 +352,7 @@ describe("buildPickerOptionData", () => {
           localAhead: 0,
           localBehind: 0,
         },
-        mainRow,
+        { ...mainRow, isDefault: true },
         { name: "new", committerDate: 20, hasLocal: true, hasRemote: false },
       ],
       prItems: [{ ...prItem, updatedAt: "2099-01-01T00:00:00Z" }],
@@ -573,7 +596,9 @@ describe("buildPickerOptionData detached base", () => {
 
   it("falls back to the origin row when there is no local branch", () => {
     const data = buildPickerOptionData({
-      branchDetails: [{ name: "main", committerDate: 10, hasLocal: false, hasRemote: true }],
+      branchDetails: [
+        { name: "main", committerDate: 10, hasLocal: false, hasRemote: true, isDefault: true },
+      ],
       prItems: [],
       baseItem: defaultBasePickerItem({ currentBranch: null, baseRef: "main" }),
     });

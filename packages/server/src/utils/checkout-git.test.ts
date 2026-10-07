@@ -2333,6 +2333,9 @@ const x = 1;
     execFileSync("git", ["fetch", "origin"], { cwd: repoDir });
 
     const branches = await listBranchSuggestions(repoDir, { limit: 50 });
+    expect(branches.filter((branch) => branch.isDefault).map((branch) => branch.name)).toEqual([
+      "main",
+    ]);
     const branchNames = branches.map((branch) => branch.name);
     expect(branchNames).toContain("main");
     expect(branchNames).toContain("feature/local-only");

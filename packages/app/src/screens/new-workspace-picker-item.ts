@@ -4,6 +4,7 @@ import type { ComboboxOptionModel } from "@/components/ui/combobox-options";
 import { getForgePresentation } from "@/git/forge";
 
 export interface BranchPickerDetail {
+  isDefault?: boolean;
   name: string;
   committerDate: number;
   hasLocal?: boolean;
@@ -331,6 +332,18 @@ export function buildPickerOptionData(input: {
   }
 
   timedOptions.sort((a, b) => a.group - b.group || b.timestamp - a.timestamp);
+  const defaultBranch = input.branchDetails.find((branch) => branch.isDefault);
+  if (defaultBranch?.hasLocal && defaultBranch.hasRemote) {
+    const localId = branchPickerOptionId(`refs/heads/${defaultBranch.name}`);
+    const remoteId = branchPickerOptionId(`refs/remotes/origin/${defaultBranch.name}`);
+    const remoteIndex = timedOptions.findIndex((entry) => entry.option.id === remoteId);
+    // Keep an explicitly selected remote at the top.
+    if (remoteId !== selectedOptionId) {
+      const [remote] = timedOptions.splice(remoteIndex, 1);
+      const localIndex = timedOptions.findIndex((entry) => entry.option.id === localId);
+      timedOptions.splice(localIndex + 1, 0, remote);
+    }
+  }
   return { options: timedOptions.map((t) => t.option), itemById, selectedOptionId };
 }
 

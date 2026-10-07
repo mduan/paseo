@@ -244,6 +244,7 @@ interface GitRef {
 }
 
 export interface BranchSuggestion {
+  isDefault?: boolean;
   name: string;
   committerDate: number;
   hasLocal: boolean;
@@ -321,9 +322,10 @@ export async function listBranchSuggestions(
   const rawQuery = options?.query?.trim().toLowerCase() ?? "";
   const query = normalizeBranchSuggestionName(rawQuery) ?? rawQuery;
 
-  const [localRefs, remoteRefs] = await Promise.all([
+  const [localRefs, remoteRefs, defaultBranch] = await Promise.all([
     listGitRefs(cwd, "refs/heads"),
     listGitRefs(cwd, "refs/remotes/origin"),
+    resolveRepositoryDefaultBranch(cwd),
   ]);
 
   const branchMeta = new Map<string, BranchSuggestionMeta>();
@@ -375,6 +377,7 @@ export async function listBranchSuggestions(
       const meta = branchMeta.get(name);
       const suggestion: BranchSuggestion = {
         name,
+        isDefault: name === normalizeBranchSuggestionName(defaultBranch ?? ""),
         committerDate: meta?.committerDate ?? 0,
         hasLocal: meta?.hasLocal ?? false,
         hasRemote: meta?.hasRemote ?? false,

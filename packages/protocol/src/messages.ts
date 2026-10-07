@@ -6019,6 +6019,7 @@ export const BranchSuggestionsResponseSchema = z.object({
         z.object({
           name: z.string(),
           committerDate: z.number(),
+          isDefault: z.boolean().optional(),
           hasLocal: z.boolean().optional(),
           hasRemote: z.boolean().optional(),
           localAhead: z.number().int().nonnegative().optional(),
