@@ -450,12 +450,7 @@ export async function resolveBranchCheckout(
     const remoteRef = requestedRef.startsWith("refs/remotes/")
       ? requestedRef
       : `refs/remotes/${requestedRef}`;
-    const result = await runGitCommand(["rev-parse", "--verify", "--quiet", remoteRef], {
-      cwd,
-      envOverlay: READ_ONLY_GIT_ENV,
-      acceptExitCodes: [0, 1],
-    });
-    if (result.exitCode === 0) {
+    if (await doesGitRefExist(cwd, remoteRef)) {
       return { kind: BranchCheckoutKind.Remote, remoteRef };
     }
     return { kind: "not-found" };
@@ -469,14 +464,7 @@ export async function resolveBranchCheckout(
     return { kind: "not-found" };
   }
 
-  const localRef = `refs/heads/${normalized}`;
-  const localResult = await runGitCommand(["rev-parse", "--verify", "--quiet", localRef], {
-    cwd,
-    envOverlay: READ_ONLY_GIT_ENV,
-    acceptExitCodes: [0, 1],
-  });
-  const hasLocal = localResult.exitCode === 0;
-  if (hasLocal) {
+  if (await doesGitRefExist(cwd, `refs/heads/${normalized}`)) {
     return { kind: "local", name: normalized };
   }
   if (isExplicitLocal) {
@@ -484,14 +472,7 @@ export async function resolveBranchCheckout(
   }
 
   const remoteRef = `origin/${normalized}`;
-  const remoteRefPath = `refs/remotes/${remoteRef}`;
-  const remoteResult = await runGitCommand(["rev-parse", "--verify", "--quiet", remoteRefPath], {
-    cwd,
-    envOverlay: READ_ONLY_GIT_ENV,
-    acceptExitCodes: [0, 1],
-  });
-  const hasRemote = remoteResult.exitCode === 0;
-  if (hasRemote) {
+  if (await doesGitRefExist(cwd, `refs/remotes/${remoteRef}`)) {
     return { kind: "remote-only", name: normalized, remoteRef };
   }
 
