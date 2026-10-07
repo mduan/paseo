@@ -123,6 +123,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
     settings: { workspaceTitleSource },
   } = useAppSettings();
   const workspaceLabel = resolveSidebarWorkspacePrimaryLabel({ workspace, workspaceTitleSource });
+  const showsSessionRows = Boolean(expandToggle?.visible && expandToggle.expanded);
   // The workspace carries label names; their colors live in its host's catalog, so the row is
   // where the two meet — the meta line is handed finished definitions.
   const labels = useWorkspaceLabelDefinitions(workspace.serverId, workspace.labels);
@@ -143,9 +144,9 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
               iconDataUri={leadingProjectIconDataUri}
               displayName={leadingProjectName}
               projectViewKey={workspace.projectViewKey}
-              statusBucket={workspace.statusBucket}
+              statusBucket={showsSessionRows ? null : workspace.statusBucket}
               backdrop={backdrop}
-              loading={isLoading}
+              loading={!showsSessionRows && isLoading}
               testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
             />
           ) : (

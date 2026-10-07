@@ -513,6 +513,7 @@ describe("sidebar workspace render isolation", () => {
 });
 
 const expandedSessionToggle = { expanded: true, visible: true, onToggle: vi.fn() };
+const collapsedSessionToggle = { ...expandedSessionToggle, expanded: false };
 
 describe("sidebar workspace leading visual", () => {
   beforeEach(() => vi.stubGlobal("React", React));
@@ -523,7 +524,12 @@ describe("sidebar workspace leading visual", () => {
       serverId: SERVER_ID,
       workspace: createWorkspaces()[0],
     });
-    function row(isHovered: boolean) {
+    entry.statusBucket = "needs_input";
+    function row({
+      isHovered = false,
+      isLoading = false,
+      expandToggle = expandedSessionToggle,
+    } = {}) {
       return (
         <QueryClientProvider client={queryClient}>
           <SidebarWorkspaceRowContent
@@ -531,21 +537,26 @@ describe("sidebar workspace leading visual", () => {
             leadingProjectName="Project A"
             backdrop="surfaceSidebar"
             isHovered={isHovered}
-            isLoading={false}
-            expandToggle={expandedSessionToggle}
+            isLoading={isLoading}
+            expandToggle={expandToggle}
           />
         </QueryClientProvider>
       );
     }
-    const view = render(row(false));
+    const view = render(row());
     const iconId = `sidebar-row-project-icon-${entry.workspaceKey}`;
     try {
       expect(view.queryByTestId(iconId)).not.toBeNull();
-      view.rerender(row(true));
+      expect(view.queryByTestId("project-status-badge")).toBeNull();
+      view.rerender(row({ isLoading: true }));
+      expect(view.queryByTestId("project-status-badge")).toBeNull();
+      view.rerender(row({ expandToggle: collapsedSessionToggle }));
+      expect(view.queryByTestId("project-status-badge")).not.toBeNull();
+      view.rerender(row({ isHovered: true }));
       expect(view.queryByTestId(iconId)).toBeNull();
       fireEvent.click(view.getByTestId("sidebar-workspace-expand-chevron"));
       expect(expandedSessionToggle.onToggle).toHaveBeenCalledOnce();
-      view.rerender(row(false));
+      view.rerender(row());
       expect(view.queryByTestId(iconId)).not.toBeNull();
     } finally {
       view.unmount();
