@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { act } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,6 +49,7 @@ import {
 import { groupPendingCreationsByProject } from "@/components/sidebar/pending-creations";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { defaultHostAppearance } from "@/hosts/appearance";
+import { SidebarWorkspaceRowContent } from "@/components/sidebar/sidebar-workspace-row-content";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
@@ -507,5 +509,47 @@ describe("sidebar workspace render isolation", () => {
     });
 
     expect(pendingText()).toBe("");
+  });
+});
+
+const expandedSessionToggle = { expanded: true, visible: true, onToggle: vi.fn() };
+
+describe("sidebar workspace leading visual", () => {
+  beforeEach(() => vi.stubGlobal("React", React));
+  afterEach(() => vi.unstubAllGlobals());
+  it("keeps the project icon on expanded status rows and swaps to the toggle on hover", () => {
+    const queryClient = new QueryClient();
+    const entry = createSidebarWorkspaceEntry({
+      serverId: SERVER_ID,
+      workspace: createWorkspaces()[0],
+    });
+    function row(isHovered: boolean) {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <SidebarWorkspaceRowContent
+            workspace={entry}
+            leadingProjectName="Project A"
+            backdrop="surfaceSidebar"
+            isHovered={isHovered}
+            isLoading={false}
+            expandToggle={expandedSessionToggle}
+          />
+        </QueryClientProvider>
+      );
+    }
+    const view = render(row(false));
+    const iconId = `sidebar-row-project-icon-${entry.workspaceKey}`;
+    try {
+      expect(view.queryByTestId(iconId)).not.toBeNull();
+      view.rerender(row(true));
+      expect(view.queryByTestId(iconId)).toBeNull();
+      fireEvent.click(view.getByTestId("sidebar-workspace-expand-chevron"));
+      expect(expandedSessionToggle.onToggle).toHaveBeenCalledOnce();
+      view.rerender(row(false));
+      expect(view.queryByTestId(iconId)).not.toBeNull();
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
   });
 });

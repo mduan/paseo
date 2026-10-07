@@ -201,20 +201,14 @@ export const WorkspaceSessionRowList = memo(function WorkspaceSessionRowList({
   workspace,
   sessions,
   workspaceSelected,
-  indented = false,
 }: {
   workspace: SidebarWorkspaceEntry;
   sessions: WorkspaceSessionRows;
   workspaceSelected: boolean;
-  /** Matches the extra indent status-group rows carry. */
-  indented?: boolean;
 }) {
   if (sessions.rows.length === 0) return null;
   return (
-    <View
-      style={indented ? styles.listIndented : styles.list}
-      testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}
-    >
+    <View style={styles.list} testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}>
       {sessions.rows.map((row) => (
         <WorkspaceSessionRowItem
           key={row.key}
@@ -525,13 +519,6 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: -theme.spacing[1],
     paddingBottom: theme.spacing[1],
     paddingLeft: theme.spacing[1],
-    paddingRight: theme.spacing[1],
-  },
-  listIndented: {
-    // Tuck under the workspace row's bottom padding; the bottom gutter matches the side gutters.
-    marginTop: -theme.spacing[1],
-    paddingBottom: theme.spacing[1],
-    paddingLeft: theme.spacing[1] + theme.spacing[2],
     paddingRight: theme.spacing[1],
   },
   row: {

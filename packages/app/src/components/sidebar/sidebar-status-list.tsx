@@ -58,7 +58,6 @@ import {
   SidebarWorkspaceTrailingActionBase,
   SidebarWorkspaceTrailingActionOverlay,
   SidebarWorkspaceTrailingActionSlot,
-  sidebarWorkspaceRowStyles,
 } from "@/components/sidebar/sidebar-workspace-row-content";
 import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
@@ -182,7 +181,6 @@ export function SidebarStatusWorkspaceList({
           projectIconByProjectViewKey,
           hostBadgeByServerId,
         })}
-        inStatusGroup={false}
         shortcutNumber={statusShortcutIndex.get(workspace.workspaceKey) ?? null}
         showShortcutBadge={showShortcutBadges}
         canPin={supportsPinningByServerId.get(workspace.serverId) === true}
@@ -374,7 +372,6 @@ function StatusGroupRows({
             <SidebarGroupToggleRow
               expanded={workspacesExpanded}
               onPress={toggleWorkspacesExpanded}
-              indented
               testID={`sidebar-status-group-show-more-${group.key}`}
             />
           ) : null}
@@ -504,7 +501,6 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   canPin,
   onToggleWorkspacePin,
   reserveIdleStatusIndicatorSpace = true,
-  inStatusGroup = true,
   onWorkspacePress,
   drag,
   isDragging = false,
@@ -519,11 +515,6 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   canPin: boolean;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   reserveIdleStatusIndicatorSpace?: boolean;
-  /**
-   * Whether the row sits under a status header, which is what it indents from. Pinned rows
-   * are a flat list under their own header and sit flush.
-   */
-  inStatusGroup?: boolean;
   onWorkspacePress?: () => void;
   drag?: () => void;
   isDragging?: boolean;
@@ -552,7 +543,6 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
       canPin={canPin}
       onToggleWorkspacePin={onToggleWorkspacePin}
       reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-      inStatusGroup={inStatusGroup}
       onPress={handlePress}
       drag={drag}
       isDragging={isDragging}
@@ -572,7 +562,6 @@ function StatusWorkspaceRowWithMenu({
   canPin,
   onToggleWorkspacePin,
   reserveIdleStatusIndicatorSpace = true,
-  inStatusGroup = true,
   onPress,
   drag,
   isDragging = false,
@@ -588,11 +577,6 @@ function StatusWorkspaceRowWithMenu({
   canPin: boolean;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   reserveIdleStatusIndicatorSpace?: boolean;
-  /**
-   * Whether the row sits under a status header, which is what it indents from. Pinned rows
-   * are a flat list under their own header and sit flush.
-   */
-  inStatusGroup?: boolean;
   onPress: () => void;
   drag?: () => void;
   isDragging?: boolean;
@@ -699,7 +683,6 @@ function StatusWorkspaceRowWithMenu({
         isPinned={isPinned}
         onTogglePin={onTogglePin}
         reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-        inStatusGroup={inStatusGroup}
         drag={drag}
         isDragging={isDragging}
         dragHandleProps={dragHandleProps}
@@ -737,8 +720,6 @@ interface StatusWorkspaceRowInnerProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   reserveIdleStatusIndicatorSpace?: boolean;
-  /** Pinned rows are flat under their own header; status-group rows indent from theirs. */
-  inStatusGroup?: boolean;
   drag?: () => void;
   isDragging?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
@@ -784,7 +765,6 @@ function StatusWorkspaceRowInnerContent({
   isPinned,
   onTogglePin,
   reserveIdleStatusIndicatorSpace = true,
-  inStatusGroup = true,
   isDragging = false,
   dragHandleProps,
   dragInteraction,
@@ -862,7 +842,6 @@ function StatusWorkspaceRowInnerContent({
           isPressed,
           selected: rowSelected,
           isHovered: isRowHovered,
-          inStatusGroup,
           isDragging,
         });
         const backdrop = getSidebarRowBackdrop({
@@ -972,7 +951,6 @@ function StatusWorkspaceRowInnerContent({
               workspace={workspace}
               sessions={sessions}
               workspaceSelected={selected}
-              indented={inStatusGroup}
             />
           </View>
         );
@@ -1062,18 +1040,15 @@ function getStatusWorkspaceRowStyle({
   isPressed,
   selected,
   isHovered,
-  inStatusGroup,
   isDragging,
 }: {
   isPressed: boolean;
   selected: boolean;
   isHovered: boolean;
-  inStatusGroup: boolean;
   isDragging: boolean;
 }) {
   return [
     styles.workspaceRow,
-    inStatusGroup && sidebarWorkspaceRowStyles.rowIndented,
     isHovered && styles.workspaceRowHovered,
     selected && styles.sidebarRowSelected,
     isDragging && styles.workspaceRowDragging,

@@ -134,7 +134,10 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   return (
     <View style={styles.workspaceRowContent}>
       <View style={styles.workspaceRowMain}>
-        <WorkspaceLeadingSlot toggle={expandToggle} showChevron={isHovered}>
+        <WorkspaceLeadingSlot
+          toggle={expandToggle}
+          showChevron={isHovered || (!leadingProjectName && Boolean(expandToggle?.expanded))}
+        >
           {leadingProjectName ? (
             <ProjectStatusIndicator
               iconDataUri={leadingProjectIconDataUri}
@@ -181,8 +184,8 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   );
 });
 
-// Expanded rows leave status to their tab rows. Collapsed rows show the chevron on hover;
-// tapping the leading visual also toggles on touch.
+// Project icons stay visible until hover; nested workspace rows keep their expanded caret.
+// Tapping the leading visual also toggles on touch.
 function WorkspaceLeadingSlot({
   toggle,
   showChevron,
@@ -197,7 +200,6 @@ function WorkspaceLeadingSlot({
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   if (!toggle?.visible) return children;
   const Chevron = toggle.expanded ? ThemedChevronDown : ThemedChevronRight;
-  const showCaret = toggle.expanded || showChevron;
   return (
     <Pressable
       onPress={toggle.onToggle}
@@ -212,7 +214,7 @@ function WorkspaceLeadingSlot({
       accessibilityState={accessibilityState}
       testID="sidebar-workspace-expand-chevron"
     >
-      {showCaret ? <Chevron size={12} uniProps={foregroundMutedColorMapping} /> : children}
+      {showChevron ? <Chevron size={12} uniProps={foregroundMutedColorMapping} /> : children}
     </Pressable>
   );
 }
@@ -310,17 +312,6 @@ function getStatusDotColorStyle(bucket: SidebarStateBucket) {
 }
 
 export const sidebarWorkspaceRowStyles = StyleSheet.create((theme) => ({
-  // How far a workspace row sits inside the group header above it — a project row or a
-  // status group header. Both groupings share this one indent, so every grouped workspace row
-  // in the sidebar sits on the same rail regardless of how the list is grouped. Pinned rows
-  // are not grouped and stay flush.
-  //
-  // It is row padding rather than a margin on the list, because the row's hover and selected
-  // backgrounds have to keep spanning the group's full width. Indenting the container instead
-  // pulls the highlight in with the content and the row stops lining up with its header.
-  rowIndented: {
-    paddingLeft: theme.spacing[2] + theme.spacing[2],
-  },
   rowRight: {
     flexDirection: "row",
     alignItems: "flex-start",
