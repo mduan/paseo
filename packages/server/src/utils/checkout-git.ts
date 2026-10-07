@@ -427,9 +427,14 @@ export interface NotFoundBranchCheckoutResolution {
   kind: "not-found";
 }
 
+export enum BranchCheckoutKind {
+  Remote = "remote",
+}
+
 export type BranchCheckoutResolution =
   | LocalBranchCheckoutResolution
   | RemoteOnlyBranchCheckoutResolution
+  | { kind: BranchCheckoutKind.Remote; remoteRef: string }
   | NotFoundBranchCheckoutResolution;
 
 export async function resolveBranchCheckout(
@@ -438,7 +443,28 @@ export async function resolveBranchCheckout(
 ): Promise<BranchCheckoutResolution> {
   await requireGitRepo(cwd);
 
-  const normalized = normalizeBranchSuggestionName(name);
+  const requestedRef = name.trim();
+  const isExplicitRemote =
+    requestedRef.startsWith("refs/remotes/") || requestedRef.startsWith("origin/");
+  if (isExplicitRemote) {
+    const remoteRef = requestedRef.startsWith("refs/remotes/")
+      ? requestedRef
+      : `refs/remotes/${requestedRef}`;
+    const result = await runGitCommand(["rev-parse", "--verify", "--quiet", remoteRef], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+      acceptExitCodes: [0, 1],
+    });
+    if (result.exitCode === 0) {
+      return { kind: BranchCheckoutKind.Remote, remoteRef };
+    }
+    return { kind: "not-found" };
+  }
+
+  const isExplicitLocal = requestedRef.startsWith("refs/heads/");
+  const normalized = isExplicitLocal
+    ? requestedRef.slice("refs/heads/".length)
+    : normalizeBranchSuggestionName(requestedRef);
   if (!normalized) {
     return { kind: "not-found" };
   }
@@ -452,6 +478,9 @@ export async function resolveBranchCheckout(
   const hasLocal = localResult.exitCode === 0;
   if (hasLocal) {
     return { kind: "local", name: normalized };
+  }
+  if (isExplicitLocal) {
+    return { kind: "not-found" };
   }
 
   const remoteRef = `origin/${normalized}`;
@@ -487,6 +516,9 @@ export async function checkoutResolvedBranch(
   const { cwd, resolution } = input;
 
   switch (resolution.kind) {
+    case BranchCheckoutKind.Remote:
+      await runGitCommand(["checkout", "--detach", resolution.remoteRef], { cwd });
+      return { source: "remote" };
     case "local": {
       const { stdout } = await runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
       const current = stdout.trim();

@@ -31,6 +31,7 @@ import {
   getPullRequestStatus,
   getCheckoutStatus,
   checkoutResolvedBranch,
+  BranchCheckoutKind,
   listBranchSuggestions,
   mergeToBase,
   mergeFromBase,
@@ -2401,7 +2402,55 @@ const x = 1;
     });
   });
 
-  it("resolves branch checkout targets with local precedence and origin normalization", async () => {
+  it.each(["origin/main", "refs/remotes/origin/main"])(
+    "checks out explicit remote ref %s when the local branch belongs to another worktree",
+    async (ref) => {
+      setupRemoteTrackingMain(repoDir, tempDir);
+      const remoteSha = execFileSync("git", ["rev-parse", "refs/remotes/origin/main"], {
+        cwd: repoDir,
+      })
+        .toString()
+        .trim();
+      commitFile(repoDir, "local.txt", "local\n", "local main ahead of origin");
+      const worktreeDir = join(tempDir, "worktree");
+      execFileSync("git", ["worktree", "add", "-b", "feature", worktreeDir], { cwd: repoDir });
+      execFileSync("git", ["branch", "origin/main", "main"], { cwd: repoDir });
+
+      const resolution = await resolveBranchCheckout(worktreeDir, ref);
+      await expect(checkoutResolvedBranch({ cwd: worktreeDir, resolution })).resolves.toEqual({
+        source: "remote",
+      });
+      expect(
+        execFileSync("git", ["rev-parse", "HEAD"], { cwd: worktreeDir }).toString().trim(),
+      ).toBe(remoteSha);
+      expect(spawnSync("git", ["symbolic-ref", "-q", "HEAD"], { cwd: worktreeDir }).status).toBe(1);
+      expect(
+        execFileSync("git", ["branch", "--show-current"], { cwd: repoDir }).toString().trim(),
+      ).toBe("main");
+    },
+  );
+
+  it("does not substitute another branch for an explicit ref", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    execFileSync("git", ["branch", "local-only"], { cwd: repoDir });
+    execFileSync("git", ["branch", "origin/main"], { cwd: repoDir });
+    execFileSync("git", ["update-ref", "refs/remotes/origin/remote-only", "HEAD"], {
+      cwd: repoDir,
+    });
+
+    await expect(resolveBranchCheckout(repoDir, "origin/local-only")).resolves.toEqual({
+      kind: "not-found",
+    });
+    await expect(resolveBranchCheckout(repoDir, "refs/heads/remote-only")).resolves.toEqual({
+      kind: "not-found",
+    });
+    await expect(resolveBranchCheckout(repoDir, "refs/heads/origin/main")).resolves.toEqual({
+      kind: "local",
+      name: "origin/main",
+    });
+  });
+
+  it("resolves bare branch names with local precedence and preserves explicit remote refs", async () => {
     const remoteDir = join(tempDir, "remote.git");
     execFileSync("git", ["init", "--bare", "-b", "main", remoteDir]);
     execFileSync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
@@ -2441,9 +2490,8 @@ const x = 1;
       remoteRef: "origin/feature/remote-only",
     });
     await expect(resolveBranchCheckout(repoDir, "origin/feature/remote-only")).resolves.toEqual({
-      kind: "remote-only",
-      name: "feature/remote-only",
-      remoteRef: "origin/feature/remote-only",
+      kind: BranchCheckoutKind.Remote,
+      remoteRef: "refs/remotes/origin/feature/remote-only",
     });
     await expect(resolveBranchCheckout(repoDir, "feature/shared")).resolves.toEqual({
       kind: "local",
@@ -2501,7 +2549,7 @@ const x = 1;
     ).toBe("origin/feature/remote-only");
   });
 
-  it("normalizes explicit origin input when checking out a remote-only branch", async () => {
+  it("checks out explicit origin input as detached HEAD for a remote-only branch", async () => {
     const remoteDir = join(tempDir, "remote.git");
     execFileSync("git", ["init", "--bare", "-b", "main", remoteDir]);
     execFileSync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
@@ -2525,17 +2573,14 @@ const x = 1;
       source: "remote",
     });
 
-    expect(
-      execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd: repoDir }).toString().trim(),
-    ).toBe("feature/remote-only");
-    execFileSync("git", ["symbolic-ref", "-q", "HEAD"], { cwd: repoDir });
-    expect(
-      execFileSync("git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], {
+    expect(spawnSync("git", ["symbolic-ref", "-q", "HEAD"], { cwd: repoDir }).status).toBe(1);
+    expect(execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir }).toString().trim()).toBe(
+      execFileSync("git", ["rev-parse", "refs/remotes/origin/feature/remote-only"], {
         cwd: repoDir,
       })
         .toString()
         .trim(),
-    ).toBe("origin/feature/remote-only");
+    );
   });
 
   it("checks out the local branch when local and remote branches share a name", async () => {

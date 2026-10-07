@@ -43,6 +43,7 @@ import type {
   SearchResult,
 } from "../../../services/forge-service.js";
 import {
+  BranchCheckoutKind,
   commitChanges,
   createPullRequest,
   discardChanges,
@@ -367,6 +368,7 @@ export class CheckoutSession {
           });
           return;
         case "remote-only":
+        case BranchCheckoutKind.Remote:
           this.host.emit({
             type: "validate_branch_response",
             payload: {

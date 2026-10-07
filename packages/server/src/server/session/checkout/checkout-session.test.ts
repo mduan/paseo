@@ -28,6 +28,7 @@ import {
   createNoopWorkspaceGitService,
 } from "../../test-utils/workspace-git-service-stub.js";
 import { createWorktree, deletePaseoWorktree } from "../../../utils/worktree.js";
+import { BranchCheckoutKind } from "../../../utils/checkout-git.js";
 import { expandTilde } from "../../../utils/path.js";
 import type { GitMetadataGenerator } from "./git-metadata-generator.js";
 
@@ -302,6 +303,35 @@ describe("CheckoutSession", () => {
             isRemote: false,
             error: null,
             requestId: "r3",
+          },
+        },
+      ]);
+    });
+
+    it("validates an explicit remote ref without substituting the local branch", async () => {
+      const remoteRef = "refs/remotes/origin/main";
+      const { checkout, emitted } = makeCheckoutSession({
+        git: {
+          validateBranchRef: async () => ({ kind: BranchCheckoutKind.Remote, remoteRef }),
+        },
+      });
+
+      await checkout.handleValidateBranchRequest({
+        type: "validate_branch_request",
+        cwd: "/repo",
+        branchName: remoteRef,
+        requestId: "remote-ref",
+      });
+
+      expect(emitted).toEqual([
+        {
+          type: "validate_branch_response",
+          payload: {
+            exists: true,
+            resolvedRef: remoteRef,
+            isRemote: true,
+            error: null,
+            requestId: "remote-ref",
           },
         },
       ]);
