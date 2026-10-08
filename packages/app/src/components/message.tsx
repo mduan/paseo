@@ -72,6 +72,8 @@ import { splitMarkdownBlocks } from "@/utils/split-markdown-blocks";
 import { useRevealedText } from "@/hooks/use-revealed-text";
 import { colorMarkdownLinkChildren } from "@/components/markdown/link-children";
 import { createAssistantMarkdownParser } from "@/utils/assistant-markdown-parser";
+import { splitPlainTextLinks } from "@/utils/plain-text-links";
+import { openExternalUrl } from "@/utils/open-external-url";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
 import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-default-environment";
@@ -360,6 +362,10 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
         }
       : {}),
   },
+  link: {
+    color: theme.colors.accentBright,
+    textDecorationLine: "underline",
+  },
   imagePreviewContainer: {
     flexDirection: "row",
     gap: theme.spacing[2],
@@ -419,6 +425,33 @@ function UserMessageImagePill({ image, onOpen, accessibilityLabel }: UserMessage
 
 const MESSAGE_TEXT_DATASET = { messageText: "true" };
 
+// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
+type UserMessageLinkProps = {
+  href: string;
+  text: string;
+};
+
+function UserMessageLink({ href, text }: UserMessageLinkProps) {
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      event.preventDefault();
+      void openExternalUrl(href).catch(console.error);
+    },
+    [href],
+  );
+
+  return (
+    <Text
+      accessibilityRole="link"
+      style={userMessageStylesheet.link}
+      {...(isWeb ? { href } : {})}
+      onPress={handlePress}
+    >
+      {text}
+    </Text>
+  );
+}
+
 export const UserMessage = memo(function UserMessage({
   serverId,
   agentId,
@@ -452,6 +485,7 @@ export const UserMessage = memo(function UserMessage({
     [allAttachments],
   );
   const hasText = message.trim().length > 0;
+  const textParts = useMemo(() => splitPlainTextLinks(message), [message]);
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
   const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
@@ -549,7 +583,10 @@ export const UserMessage = memo(function UserMessage({
           ) : null}
           {hasText ? (
             <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
-              {message}
+              {textParts.map((part) => {
+                if (!part.href) return part.text;
+                return <UserMessageLink key={part.start} href={part.href} text={part.text} />;
+              })}
             </Text>
           ) : null}
         </View>
