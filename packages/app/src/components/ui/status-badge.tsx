@@ -1,5 +1,5 @@
 import React, { useMemo, type ReactNode } from "react";
-import { View, Text } from "react-native";
+import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export type StatusBadgeVariant = "success" | "warning" | "error" | "muted";
@@ -10,9 +10,16 @@ interface StatusBadgeProps {
   leading?: ReactNode;
   /** `xs` fits beside a line of `sm` text: the same label on tighter padding. */
   size?: "sm" | "xs";
+  style?: StyleProp<ViewStyle>;
 }
 
-export function StatusBadge({ label, variant = "muted", leading, size = "sm" }: StatusBadgeProps) {
+export function StatusBadge({
+  label,
+  variant = "muted",
+  leading,
+  size = "sm",
+  style,
+}: StatusBadgeProps) {
   const pillStyle = useMemo(
     () => [
       styles.pill,
@@ -20,8 +27,9 @@ export function StatusBadge({ label, variant = "muted", leading, size = "sm" }: 
       variant === "success" && styles.pillSuccess,
       variant === "warning" && styles.pillWarning,
       variant === "error" && styles.pillError,
+      style,
     ],
-    [size, variant],
+    [size, variant, style],
   );
   const textStyle = useMemo(
     () => [
