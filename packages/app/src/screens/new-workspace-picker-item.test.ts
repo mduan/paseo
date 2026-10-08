@@ -313,9 +313,9 @@ const mainRow: BranchPickerDetail = {
 
 describe("buildPickerOptionData", () => {
   it.each(["main", "master", "develop"])(
-    "places origin/%s immediately after the local default branch",
+    "pins the default %s pair below the current branch ahead of newer branches",
     (name) => {
-      const current = currentBranchPickerItem({ currentBranch: null, headSha: "0123456789abcdef" });
+      const current = currentBranchPickerItem({ currentBranch: "current" });
       const data = buildPickerOptionData({
         branchDetails: [
           { name, committerDate: 1, hasLocal: true, hasRemote: true, isDefault: true },
@@ -326,16 +326,16 @@ describe("buildPickerOptionData", () => {
         currentItem: current,
       });
       expect(data.options.map((option) => option.label)).toEqual([
-        "0123456",
-        "feature",
+        "current",
         name,
         `origin/${name}`,
+        "feature",
         "origin/feature",
       ]);
     },
   );
 
-  it("pins the base, then local, origin, and PRs, each newest first", () => {
+  it("pins the selected base, then the default branch, before newer local branches", () => {
     const baseItem: PickerItem = {
       kind: "branch",
       name: "origin/main",
@@ -361,8 +361,8 @@ describe("buildPickerOptionData", () => {
 
     expect(data.options.map((option) => option.label)).toEqual([
       "origin/main",
-      "new",
       "main",
+      "new",
       "old",
       "origin/old",
       "#42 Add picker",
