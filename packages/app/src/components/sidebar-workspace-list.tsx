@@ -957,14 +957,14 @@ function ProjectHeaderRow({
         />
 
         <View style={styles.projectTitleGroup}>
-          <Text style={styles.projectTitle} numberOfLines={1}>
-            {displayName}
-          </Text>
           <StatusBadge
             label={String(project.workspaces.length)}
             size="xs"
             style={styles.projectWorkspaceCount}
           />
+          <Text style={styles.projectTitle} numberOfLines={1}>
+            {displayName}
+          </Text>
         </View>
       </View>
       <ProjectRowTrailingActions
@@ -2587,7 +2587,7 @@ const styles = StyleSheet.create((theme) => ({
   projectTitleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[1],
+    gap: theme.spacing[2],
     flex: 1,
     minWidth: 0,
   },
@@ -2600,7 +2600,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   projectWorkspaceCount: {
     borderRadius: projectIconRadius(theme.iconSize.md),
-    marginLeft: theme.spacing[1],
     // Optical alignment for the smaller count beside the project name.
     transform: [{ translateY: 1 }],
   },
