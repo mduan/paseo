@@ -87,6 +87,8 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { ProjectLeadingVisual } from "@/components/sidebar/project-leading-visual";
+import { projectIconRadius } from "@/components/project-icon-view";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/contexts/toast-context";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import { toWorktreeArchiveRisk } from "@/git/worktree-archive-warning";
@@ -414,6 +416,7 @@ const prBadgeStyles = StyleSheet.create((theme) => ({
 
 function ProjectRowTrailingActions({
   projectViewKey,
+  workspaceCount,
   displayName,
   worktreeTarget,
   settingsTarget,
@@ -421,11 +424,13 @@ function ProjectRowTrailingActions({
   isHovered,
   isMobileBreakpoint,
   isProjectActive,
+  onMenuOpen,
   onBeginWorkspaceSetup,
   onRemoveProject,
   removeProjectStatus,
 }: {
   projectViewKey: string;
+  workspaceCount: number;
   displayName: string;
   worktreeTarget: SidebarProjectHostTarget | null;
   settingsTarget: { serverId: string; projectId: string } | null;
@@ -433,13 +438,37 @@ function ProjectRowTrailingActions({
   isHovered: boolean;
   isMobileBreakpoint: boolean;
   isProjectActive: boolean;
+  onMenuOpen: () => void;
   onBeginWorkspaceSetup: () => void;
   onRemoveProject?: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
 }) {
-  const actionsVisible = isHovered || platformIsNative || isMobileBreakpoint;
+  const { showKebab: actionsVisible, menuProps } = useOpenKebabMenuVisibility(
+    isHovered || platformIsNative || isMobileBreakpoint,
+  );
+  const handleMenuOpenChange = useCallback(
+    (open: boolean) => {
+      menuProps.onOpenChange(open);
+      if (open) onMenuOpen();
+    },
+    [menuProps, onMenuOpen],
+  );
   return (
     <View style={styles.projectTrailingActions}>
+      <View
+        style={[
+          styles.projectWorkspaceCountOverlay,
+          actionsVisible && styles.projectKebabButtonHidden,
+        ]}
+        pointerEvents="none"
+        testID={`sidebar-project-workspace-count-${projectViewKey}`}
+      >
+        <StatusBadge
+          label={String(workspaceCount)}
+          size="xs"
+          style={styles.projectWorkspaceCount}
+        />
+      </View>
       {worktreeTarget ? (
         <NewWorktreeButton
           displayName={displayName}
@@ -455,6 +484,8 @@ function ProjectRowTrailingActions({
           pointerEvents={actionsVisible ? "auto" : "none"}
         >
           <ProjectKebabMenu
+            {...menuProps}
+            onOpenChange={handleMenuOpenChange}
             projectViewKey={projectViewKey}
             settingsTarget={settingsTarget}
             projectPath={projectPath}
@@ -483,12 +514,16 @@ function renderKebabTriggerIcon({ hovered }: { hovered?: boolean }) {
 }
 
 function ProjectKebabMenu({
+  open,
+  onOpenChange,
   projectViewKey,
   settingsTarget,
   projectPath,
   onRemoveProject,
   removeProjectStatus,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   projectViewKey: string;
   settingsTarget: { serverId: string; projectId: string } | null;
   projectPath: string;
@@ -497,7 +532,7 @@ function ProjectKebabMenu({
 }) {
   const { t } = useTranslation();
   return (
-    <DropdownMenu compactMode="sheet">
+    <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
         hitSlop={8}
         style={projectKebabStyle}
@@ -962,6 +997,7 @@ function ProjectHeaderRow({
       </View>
       <ProjectRowTrailingActions
         projectViewKey={project.viewKey}
+        workspaceCount={project.workspaces.length}
         displayName={displayName}
         worktreeTarget={worktreeTarget}
         settingsTarget={settingsTarget}
@@ -969,6 +1005,7 @@ function ProjectHeaderRow({
         isHovered={isHovered}
         isMobileBreakpoint={isMobileBreakpoint}
         isProjectActive={isProjectActive}
+        onMenuOpen={handlePointerLeave}
         onBeginWorkspaceSetup={handleBeginWorkspaceSetup}
         onRemoveProject={onRemoveProject}
         removeProjectStatus={removeProjectStatus}
@@ -2590,6 +2627,18 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: "400",
     minWidth: 0,
     flexShrink: 1,
+  },
+  projectWorkspaceCount: {
+    borderRadius: projectIconRadius(theme.iconSize.md),
+    // Optical alignment for the smaller count beside the project name.
+    transform: [{ translateY: 1 }],
+  },
+  projectWorkspaceCountOverlay: {
+    position: "absolute",
+    right: theme.spacing[1.5],
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
   },
   projectActionButton: {
     flexDirection: "row",

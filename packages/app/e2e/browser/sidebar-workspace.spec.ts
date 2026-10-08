@@ -13,7 +13,10 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 import { expectWorkspaceHeader } from "../support/helpers/workspace-ui";
 import { getServerId } from "../support/helpers/server-id";
 import { getE2EDaemonPort } from "../support/helpers/daemon-port";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
+import {
+  projectEquivalenceViewKey,
+  projectPlacementViewKey,
+} from "../support/helpers/project-view-key";
 import { escapeRegex } from "../support/helpers/regex";
 import { openFilesPanel } from "../support/helpers/workspace-tabs";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
@@ -330,6 +333,40 @@ test.describe("Sidebar workspace list", () => {
 
       await expect(projectRow).toBeVisible({ timeout: 30_000 });
       await expect(projectRow).not.toContainText("test-owner/test-repo");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  test("project workspace count swaps with actions without moving the title", async ({ page }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "sidebar-project-count-" });
+    try {
+      await gotoAppShell(page);
+      const projectViewKey = projectPlacementViewKey(getServerId(), workspace.projectId);
+      const row = page.getByTestId(`sidebar-project-row-${projectViewKey}`);
+      const count = page.getByTestId(`sidebar-project-workspace-count-${projectViewKey}`);
+      const title = row.getByText(path.basename(workspace.repoPath), { exact: true });
+      await expect(row).toBeVisible();
+      await page.mouse.move(900, 500);
+      await expect(count).toHaveText("1");
+      await expect(count).toHaveCSS("opacity", "1");
+      const titleBounds = await title.boundingBox();
+      const countBounds = await count.boundingBox();
+      if (!titleBounds || !countBounds) throw new Error("Project title or count is missing");
+      expect(countBounds.x).toBeGreaterThan(titleBounds.x + titleBounds.width);
+
+      await row.hover();
+      await expect(count).toHaveCSS("opacity", "0");
+      expect(await title.boundingBox()).toEqual(titleBounds);
+      await page.getByTestId(`sidebar-project-kebab-${projectViewKey}`).click();
+      await page.mouse.move(900, 500);
+      await expect(
+        page.getByTestId(`sidebar-project-menu-open-settings-${projectViewKey}`),
+      ).toBeVisible();
+      await expect(count).toHaveCSS("opacity", "0");
+      await page.keyboard.press("Escape");
+      await expect(count).toHaveCSS("opacity", "1");
+      expect(await title.boundingBox()).toEqual(titleBounds);
     } finally {
       await workspace.cleanup();
     }
