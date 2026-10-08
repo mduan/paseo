@@ -87,6 +87,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { ProjectLeadingVisual } from "@/components/sidebar/project-leading-visual";
+import { projectIconRadius } from "@/components/project-icon-view";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/contexts/toast-context";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
@@ -2598,7 +2599,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
   },
   projectWorkspaceCount: {
-    borderRadius: theme.borderRadius.sm,
+    borderRadius: projectIconRadius(theme.iconSize.md),
     marginLeft: theme.spacing[1],
     // Optical alignment for the smaller count beside the project name.
     transform: [{ translateY: 1 }],
