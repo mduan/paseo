@@ -162,6 +162,7 @@ export const fr: TranslationResources = {
       dropImagesHere: "Déposez des images ici",
       dropFilesHere: "Drop files here",
       editQueuedMessage: "Modifier le message en file d'attente",
+      moveQueuedMessageToFront: "Déplacer le message en tête de la file d’attente",
       sendQueuedMessageNow: "Envoyer le message en file d'attente maintenant",
       openImage: "Ouvrir la pièce jointe de l'image",
       removeImage: "Supprimer l'image jointe",

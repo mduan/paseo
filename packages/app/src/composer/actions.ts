@@ -290,6 +290,27 @@ export function editQueuedComposerMessage(
   };
 }
 
+export type MoveQueuedComposerMessageToFrontInput = Pick<
+  SendQueuedComposerMessageNowInput,
+  "agentId" | "messageId" | "queue"
+>;
+
+export function moveQueuedComposerMessageToFront(
+  input: MoveQueuedComposerMessageToFrontInput,
+): void {
+  input.queue.write((prev) => {
+    const messages = prev.get(input.agentId) ?? [];
+    const index = messages.findIndex((item) => item.id === input.messageId);
+    if (index <= 0) return prev;
+    const reordered = [...messages];
+    const [item] = reordered.splice(index, 1);
+    reordered.unshift(item);
+    const next = new Map(prev);
+    next.set(input.agentId, reordered);
+    return next;
+  });
+}
+
 export interface SendQueuedComposerMessageNowInput {
   agentId: string;
   messageId: string;

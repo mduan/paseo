@@ -30,6 +30,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useShallow } from "zustand/shallow";
 import {
   ArrowUp,
+  ArrowUpToLine,
   Square,
   Pencil,
   AudioLines,
@@ -70,6 +71,7 @@ import {
   editQueuedComposerMessage,
   findForgeItemByOption,
   isAttachmentSelectedForForgeItem,
+  moveQueuedComposerMessageToFront,
   openComposerAttachment,
   pickAndPersistImages,
   queueComposerMessage,
@@ -423,24 +425,35 @@ function renderAttachmentTray(args: RenderAttachmentTrayArgs): ReactElement | nu
 interface RenderQueueTrackArgs {
   queuedMessages: readonly QueuedMessage[];
   handleEditQueuedMessage: (id: string) => void;
+  handleMoveQueuedMessageToFront: (id: string) => void;
   handleSendQueuedNow: (id: string) => Promise<void>;
   editLabel: string;
+  moveToFrontLabel: string;
   sendNowLabel: string;
 }
 
 function renderQueueTrack(args: RenderQueueTrackArgs): ReactElement | null {
-  const { queuedMessages, handleEditQueuedMessage, handleSendQueuedNow, editLabel, sendNowLabel } =
-    args;
+  const {
+    queuedMessages,
+    handleEditQueuedMessage,
+    handleMoveQueuedMessageToFront,
+    handleSendQueuedNow,
+    editLabel,
+    moveToFrontLabel,
+    sendNowLabel,
+  } = args;
   if (queuedMessages.length === 0) return null;
   return (
     <View style={styles.queueTrack}>
-      {queuedMessages.map((item) => (
+      {queuedMessages.map((item, index) => (
         <QueuedMessageRow
           key={item.id}
           item={item}
           onEdit={handleEditQueuedMessage}
+          onMoveToFront={index > 0 ? handleMoveQueuedMessageToFront : undefined}
           onSendNow={handleSendQueuedNow}
           editLabel={editLabel}
+          moveToFrontLabel={moveToFrontLabel}
           sendNowLabel={sendNowLabel}
         />
       ))}
@@ -711,21 +724,28 @@ function resolveMessageInputPassthroughAction(
 interface QueuedMessageRowProps {
   item: QueuedMessage;
   onEdit: (id: string) => void;
+  onMoveToFront?: (id: string) => void;
   onSendNow: (id: string) => void;
   editLabel: string;
+  moveToFrontLabel: string;
   sendNowLabel: string;
 }
 
 function QueuedMessageRow({
   item,
   onEdit,
+  onMoveToFront,
   onSendNow,
   editLabel,
+  moveToFrontLabel,
   sendNowLabel,
 }: QueuedMessageRowProps) {
   const handleEdit = useCallback(() => {
     onEdit(item.id);
   }, [onEdit, item.id]);
+  const handleMoveToFront = useCallback(() => {
+    onMoveToFront?.(item.id);
+  }, [onMoveToFront, item.id]);
   const handleSendNow = useCallback(() => {
     onSendNow(item.id);
   }, [onSendNow, item.id]);
@@ -743,6 +763,16 @@ function QueuedMessageRow({
         >
           <ThemedPencil size={ICON_SIZE.sm} uniProps={iconForegroundMapping} />
         </Pressable>
+        {onMoveToFront && (
+          <Pressable
+            onPress={handleMoveToFront}
+            style={styles.queueActionButton}
+            accessibilityLabel={moveToFrontLabel}
+            accessibilityRole="button"
+          >
+            <ThemedArrowUpToLine size={ICON_SIZE.sm} uniProps={iconForegroundMapping} />
+          </Pressable>
+        )}
         <Pressable
           onPress={handleSendNow}
           style={[styles.queueActionButton, styles.queueSendButton]}
@@ -1970,6 +2000,13 @@ function ComposerContentImpl({
     [agentId, queueWriter, replaceUserInput, setSelectedAttachments],
   );
 
+  const handleMoveQueuedMessageToFront = useCallback(
+    (id: string) => {
+      moveQueuedComposerMessageToFront({ agentId, messageId: id, queue: queueWriter });
+    },
+    [agentId, queueWriter],
+  );
+
   const handleSendQueuedNow = useCallback(
     async (id: string) => {
       if (!sendAgentMessageRef.current && !onSubmitMessageRef.current) return;
@@ -2372,11 +2409,19 @@ function ComposerContentImpl({
       renderQueueTrack({
         queuedMessages,
         handleEditQueuedMessage,
+        handleMoveQueuedMessageToFront,
         handleSendQueuedNow,
         editLabel: t("composer.attachments.editQueuedMessage"),
+        moveToFrontLabel: t("composer.attachments.moveQueuedMessageToFront"),
         sendNowLabel: t("composer.attachments.sendQueuedMessageNow"),
       }),
-    [handleEditQueuedMessage, handleSendQueuedNow, queuedMessages, t],
+    [
+      handleEditQueuedMessage,
+      handleMoveQueuedMessageToFront,
+      handleSendQueuedNow,
+      queuedMessages,
+      t,
+    ],
   );
 
   const autocompleteConfiguration = useMemo(
@@ -2690,6 +2735,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
 const ThemedAttachmentSpinner = withUnistyles(LoadingSpinner);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedArrowUp = withUnistyles(ArrowUp);
+const ThemedArrowUpToLine = withUnistyles(ArrowUpToLine);
 const ThemedGitPullRequest = withUnistyles(GitPullRequest);
 const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedAudioLines = withUnistyles(AudioLines);

@@ -24,6 +24,7 @@ import {
   editQueuedComposerMessage,
   findForgeItemByOption,
   isAttachmentSelectedForForgeItem,
+  moveQueuedComposerMessageToFront,
   openComposerAttachment,
   pickAndPersistImages,
   queueComposerMessage,
@@ -787,6 +788,52 @@ describe("editQueuedComposerMessage", () => {
       attachments: [{ kind: "image", metadata: image }],
     });
     expect(queue.state.get("agent")).toEqual([]);
+  });
+});
+
+describe("moveQueuedComposerMessageToFront", () => {
+  it("moves the selected message with its attachments, preserving the other queues and order", () => {
+    const first = { id: "first", text: "first", attachments: [] };
+    const second = { id: "second", text: "second", attachments: [] };
+    const selected: QueuedComposerMessage = {
+      id: "selected",
+      text: "selected",
+      attachments: [
+        { kind: "image", metadata: imageMetadata },
+        reviewWorkspaceAttachment("Queued snapshot."),
+      ],
+    };
+    const last = { id: "last", text: "last", attachments: [] };
+    const otherQueue = [{ id: "other", text: "other agent", attachments: [] }];
+    const queue = createFakeQueue(
+      new Map([
+        ["agent", [first, second, selected, last]],
+        ["other-agent", otherQueue],
+      ]),
+    );
+    const original = queue.state;
+
+    moveQueuedComposerMessageToFront({ agentId: "agent", messageId: selected.id, queue });
+
+    expect(queue.state.get("agent")).toEqual([selected, first, second, last]);
+    expect(queue.state.get("agent")?.[0]).toBe(selected);
+    expect(queue.state.get("other-agent")).toBe(otherQueue);
+    expect(original.get("agent")).toEqual([first, second, selected, last]);
+  });
+
+  it.each([
+    { agentId: "agent", messageId: "first" },
+    { agentId: "agent", messageId: "missing" },
+    { agentId: "missing-agent", messageId: "first" },
+  ])("leaves the queue unchanged for $agentId/$messageId", ({ agentId, messageId }) => {
+    const queue = createFakeQueue(
+      new Map([["agent", [{ id: "first", text: "first", attachments: [] }]]]),
+    );
+    const original = queue.state;
+
+    moveQueuedComposerMessageToFront({ agentId, messageId, queue });
+
+    expect(queue.state).toBe(original);
   });
 });
 
