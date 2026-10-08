@@ -71,7 +71,9 @@ import type { MarkdownPhase } from "@/components/markdown/fence/types";
 import { splitMarkdownBlocks } from "@/utils/split-markdown-blocks";
 import { useRevealedText } from "@/hooks/use-revealed-text";
 import { colorMarkdownLinkChildren } from "@/components/markdown/link-children";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
 import { createAssistantMarkdownParser } from "@/utils/assistant-markdown-parser";
+import { splitPlainTextLinks } from "@/utils/plain-text-links";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
 import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-default-environment";
@@ -360,6 +362,9 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
         }
       : {}),
   },
+  link: {
+    color: theme.colors.accentBright,
+  },
   imagePreviewContainer: {
     flexDirection: "row",
     gap: theme.spacing[2],
@@ -452,6 +457,7 @@ export const UserMessage = memo(function UserMessage({
     [allAttachments],
   );
   const hasText = message.trim().length > 0;
+  const textParts = useMemo(() => splitPlainTextLinks(message), [message]);
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
   const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
@@ -549,7 +555,18 @@ export const UserMessage = memo(function UserMessage({
           ) : null}
           {hasText ? (
             <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
-              {message}
+              {textParts.map((part) => {
+                if (!part.href) return part.text;
+                return (
+                  <MarkdownLinkText
+                    key={part.start}
+                    href={part.href}
+                    style={userMessageStylesheet.link}
+                  >
+                    {part.text}
+                  </MarkdownLinkText>
+                );
+              })}
             </Text>
           ) : null}
         </View>
