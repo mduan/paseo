@@ -13,31 +13,39 @@ import { MarkdownLinkText } from "./link-text";
 vi.stubGlobal("React", React);
 
 vi.mock("react-native", () => ({
-  Pressable: ({
+  Platform: { OS: "web" },
+  Text: ({
     accessibilityRole,
     children,
-    onHoverIn,
-    onHoverOut,
+    href,
+    style,
+    onMouseEnter,
+    onMouseLeave,
+    onKeyDown,
     onPress,
   }: {
     accessibilityRole?: string;
     children?: ReactNode;
-    onHoverIn?(): void;
-    onHoverOut?(): void;
+    href?: string;
+    style?: StyleProp<TextStyle>;
+    onMouseEnter?(): void;
+    onMouseLeave?(): void;
+    onKeyDown?(event: React.KeyboardEvent): void;
     onPress?(): void;
   }) =>
     createElement(
-      "div",
+      href ? "a" : "span",
       {
         role: accessibilityRole,
+        href,
+        style: flattenStyle(style),
         onClick: onPress,
-        onMouseEnter: onHoverIn,
-        onMouseLeave: onHoverOut,
+        onMouseEnter,
+        onMouseLeave,
+        onKeyDown,
       },
       children,
     ),
-  Text: ({ children, style }: { children?: ReactNode; style?: StyleProp<TextStyle> }) =>
-    createElement("span", { style: flattenStyle(style) }, children),
 }));
 
 function flattenStyle(style: StyleProp<TextStyle>): TextStyle {
@@ -82,7 +90,7 @@ describe("shared Markdown links", () => {
       createElement(MarkdownLinkText, { style: { color: "rgb(0, 122, 255)" }, onPress }, children),
     );
     const link = view.getByRole("link");
-    const linkText = link.firstElementChild as HTMLElement;
+    const linkText = link;
 
     expect((view.getByText("Paseo") as HTMLElement).style.color).toBe("rgb(0, 122, 255)");
     expect(linkText.style.textDecorationLine).toBe("");
@@ -93,7 +101,9 @@ describe("shared Markdown links", () => {
     fireEvent.mouseLeave(link);
     expect(linkText.style.textDecorationLine).toBe("");
 
-    fireEvent.click(link);
+    expect(fireEvent.click(link)).toBe(false);
     expect(onPress).toHaveBeenCalledOnce();
+    fireEvent.keyDown(link, { key: "Enter" });
+    expect(onPress).toHaveBeenCalledTimes(2);
   });
 });
