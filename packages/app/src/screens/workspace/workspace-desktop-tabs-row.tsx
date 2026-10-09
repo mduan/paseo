@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -29,6 +28,7 @@ import {
 } from "@/components/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMiddleClickClose } from "@/hooks/use-middle-click-close";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { WORKSPACE_SECONDARY_HEADER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
@@ -569,28 +569,6 @@ function getFallbackTabLabel(
     return labels.pullRequest;
   }
   return labels.agent;
-}
-
-function useMiddleClickClose(onClose: () => void) {
-  const ref = useRef<View>(null);
-
-  useEffect(() => {
-    if (isNative) return;
-    const node = ref.current as unknown as HTMLElement | null;
-    if (!node) return;
-
-    function handleAuxClick(event: MouseEvent) {
-      if (event.button === 1) {
-        event.preventDefault();
-        onClose();
-      }
-    }
-
-    node.addEventListener("auxclick", handleAuxClick);
-    return () => node.removeEventListener("auxclick", handleAuxClick);
-  }, [onClose]);
-
-  return ref;
 }
 
 /** The chip fill the running-status ring has to knock out of. Mirrors `styles.tab*` exactly. */

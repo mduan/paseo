@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { WORKSPACE_SECONDARY_HEADER_HEIGHT } from "@/constants/layout";
 import { iconButtonChromeGlyphSize } from "@/components/ui/icon-button-chrome";
 import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
+import { useMiddleClickClose } from "@/hooks/use-middle-click-close";
 import { isNative } from "@/constants/platform";
 import {
   WorkspaceTabIcon,
@@ -100,12 +101,14 @@ function ExplorerSidebarTab({
   );
   const handleHoverIn = useCallback(() => setHovered(true), []);
   const handleHoverOut = useCallback(() => setHovered(false), []);
+  const showCloseButton = item.tab.kind !== "files" && item.tab.kind !== "changes_tree";
   const showCloseControl = hovered || isNative;
   const chipBackdrop: SurfaceBackdrop =
     hovered || item.isActive ? "surfaceSidebarHover" : "surfaceSidebar";
   const handleClose = useCallback(() => {
     void onCloseTab(item.tab.tabId);
   }, [item.tab.tabId, onCloseTab]);
+  const middleClickRef = useMiddleClickClose(showCloseButton ? handleClose : undefined);
   const handleMoveToMain = useCallback(
     () => onMoveTabToMain(item.tab.tabId),
     [item.tab.tabId, onMoveTabToMain],
@@ -120,6 +123,7 @@ function ExplorerSidebarTab({
   const renderPresentation = useCallback(
     (presentation: WorkspaceTabPresentation) => (
       <View
+        ref={middleClickRef}
         style={styles.tabHoverFrame}
         onPointerEnter={handleHoverIn}
         onPointerLeave={handleHoverOut}
@@ -164,26 +168,28 @@ function ExplorerSidebarTab({
               <Text style={styles.tooltipText}>{presentation.tooltip}</Text>
             </TooltipContent>
           </Tooltip>
-          <View
-            pointerEvents={showCloseControl ? "box-none" : "none"}
-            style={[styles.tabTrailingOverlay, showCloseControl ? null : styles.tabCloseHidden]}
-          >
-            <TrailingActionScrim backdrop={chipBackdrop} />
-            <Pressable
-              testID={`explorer-sidebar-tab-close-${item.tab.tabId}`}
-              accessibilityRole="button"
-              accessibilityLabel={t("workspace.tabs.menu.close")}
-              onPress={handleClose}
-              style={styles.tabCloseButton}
+          {showCloseButton ? (
+            <View
+              pointerEvents={showCloseControl ? "box-none" : "none"}
+              style={[styles.tabTrailingOverlay, showCloseControl ? null : styles.tabCloseHidden]}
             >
-              {({ hovered: closeHovered, pressed }) => (
-                <ThemedX
-                  size={12}
-                  uniProps={closeHovered || pressed ? foregroundColorMapping : mutedColorMapping}
-                />
-              )}
-            </Pressable>
-          </View>
+              <TrailingActionScrim backdrop={chipBackdrop} />
+              <Pressable
+                testID={`explorer-sidebar-tab-close-${item.tab.tabId}`}
+                accessibilityRole="button"
+                accessibilityLabel={t("workspace.tabs.menu.close")}
+                onPress={handleClose}
+                style={styles.tabCloseButton}
+              >
+                {({ hovered: closeHovered, pressed }) => (
+                  <ThemedX
+                    size={12}
+                    uniProps={closeHovered || pressed ? foregroundColorMapping : mutedColorMapping}
+                  />
+                )}
+              </Pressable>
+            </View>
+          ) : null}
           <ContextMenuContent align="start" minWidth={180}>
             {canMoveToMain ? (
               <ContextMenuItem leading={moveToMainLeading} onSelect={handleMoveToMain}>
@@ -209,6 +215,8 @@ function ExplorerSidebarTab({
       hovered,
       isDragging,
       showCloseControl,
+      showCloseButton,
+      middleClickRef,
       item,
       canMoveToMain,
       chipBackdrop,
