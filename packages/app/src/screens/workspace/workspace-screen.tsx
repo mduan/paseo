@@ -2261,74 +2261,6 @@ function WorkspaceScreenContent({
     normalizedWorkspaceId,
   ]);
 
-  const handleOpenFileFromChat = useCallback(
-    (location: WorkspaceFileLocation, parentTabId?: string | null) => {
-      const normalizedLocation = normalizeWorkspaceFileLocation(location);
-      if (!normalizedLocation) {
-        return;
-      }
-      if (isMobile) {
-        showMobileAgent();
-      }
-      if (!persistenceKey) {
-        return;
-      }
-      const target = createWorkspaceFileTabTarget(normalizedLocation);
-      const tabId = parentTabId
-        ? revealWorkspaceChildTab(persistenceKey, target, parentTabId, FOCUSED_PANE_PLACEMENT)
-        : openWorkspaceTabFocused(persistenceKey, target, FOCUSED_PANE_PLACEMENT);
-      if (tabId) {
-        requestFileNavigation(tabId);
-        navigateToTabId(tabId);
-      }
-    },
-    [
-      isMobile,
-      navigateToTabId,
-      openWorkspaceTabFocused,
-      revealWorkspaceChildTab,
-      persistenceKey,
-      requestFileNavigation,
-      showMobileAgent,
-    ],
-  );
-
-  const handleOpenPreferredAssistantFile = useCallback(
-    (input: { location: WorkspaceFileLocation; parentTabId?: string | null }) => {
-      const location = normalizeWorkspaceFileLocation(input.location);
-      if (!location) {
-        return;
-      }
-      if (isMobile) {
-        showMobileAgent();
-      }
-      if (!persistenceKey) {
-        return;
-      }
-
-      const tabId = openPreferredWorkspaceTarget({
-        isCompact: isMobile,
-        workspaceKey: persistenceKey,
-        target: createWorkspaceFileTabTarget(location),
-        source: "chatFiles",
-        preferences: openInSidePane,
-        parentTabId: input.parentTabId,
-      });
-      if (tabId) {
-        requestFileNavigation(tabId);
-        navigateToTabId(tabId);
-      }
-    },
-    [
-      isMobile,
-      navigateToTabId,
-      openInSidePane,
-      persistenceKey,
-      requestFileNavigation,
-      showMobileAgent,
-    ],
-  );
-
   const handleOpenWorkspaceFileFromPane = useStableEvent(function handleOpenWorkspaceFileFromPane({
     request,
     paneId,
@@ -2343,8 +2275,11 @@ function WorkspaceScreenContent({
     if (focusPaneBeforeOpen && paneId && persistenceKey) {
       focusWorkspacePane(persistenceKey, paneId);
     }
-    if (request.paneAxis && canRenderDesktopPaneSplits && persistenceKey) {
-      const location = normalizeWorkspaceFileLocation(request.location);
+    const location = normalizeWorkspaceFileLocation(request.location);
+    if (!location || !persistenceKey) return;
+    const target = createWorkspaceFileTabTarget(location);
+    let tabId: string | null;
+    if (request.paneAxis && canRenderDesktopPaneSplits) {
       const store = useWorkspaceLayoutStore.getState();
       const placement = resolveFilePanePlacement({
         layout: store.layoutByWorkspace[persistenceKey],
@@ -2352,7 +2287,7 @@ function WorkspaceScreenContent({
         explorerPaneId: store.explorerSidebarPaneIdByWorkspace[persistenceKey],
         axis: request.paneAxis,
       });
-      if (!location || !placement) return;
+      if (!placement) return;
       const destinationPaneId =
         placement.paneId ??
         store.splitPaneEmpty(persistenceKey, {
@@ -2360,40 +2295,36 @@ function WorkspaceScreenContent({
           position: placement.position,
         });
       if (!destinationPaneId) return;
-      const tabId = revealWorkspaceChildTab(
-        persistenceKey,
-        createWorkspaceFileTabTarget(location),
-        parentTabId,
-        { mode: "pane", paneId: destinationPaneId },
-      );
-      if (tabId) {
-        requestFileNavigation(tabId);
-        navigateToTabId(tabId);
-      }
-      return;
-    }
-    if (request.disposition === "side") {
-      const location = normalizeWorkspaceFileLocation(request.location);
-      if (!location || !persistenceKey) return;
-      const tabId = openWorkspaceTargetBeside({
-        workspaceKey: persistenceKey,
-        target: createWorkspaceFileTabTarget(location),
-        parentTabId,
+      tabId = revealWorkspaceChildTab(persistenceKey, target, parentTabId, {
+        mode: "pane",
+        paneId: destinationPaneId,
       });
-      if (tabId) {
-        requestFileNavigation(tabId);
-        navigateToTabId(tabId);
+    } else if (request.disposition === "side") {
+      tabId = openWorkspaceTargetBeside({ workspaceKey: persistenceKey, target, parentTabId });
+    } else {
+      if (isMobile) showMobileAgent();
+      if (request.disposition === "preferred") {
+        tabId = openPreferredWorkspaceTarget({
+          isCompact: isMobile,
+          workspaceKey: persistenceKey,
+          target,
+          source: "chatFiles",
+          preferences: openInSidePane,
+          parentTabId,
+        });
+      } else {
+        tabId = revealWorkspaceChildTab(
+          persistenceKey,
+          target,
+          parentTabId,
+          FOCUSED_PANE_PLACEMENT,
+        );
       }
-      return;
     }
-    if (request.disposition === "preferred") {
-      handleOpenPreferredAssistantFile({
-        location: request.location,
-        parentTabId,
-      });
-      return;
+    if (tabId) {
+      requestFileNavigation(tabId);
+      navigateToTabId(tabId);
     }
-    handleOpenFileFromChat(request.location, parentTabId);
   });
 
   const [hoveredCloseTabKey, setHoveredCloseTabKey] = useState<string | null>(null);
