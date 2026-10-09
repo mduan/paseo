@@ -123,7 +123,7 @@ export async function pickAndPersistImages(input: {
 }
 
 export async function uploadFileAttachments(input: {
-  client: ComposerSendClient;
+  client: Pick<ComposerSendClient, "uploadFile">;
   files: SelectedFile[];
 }): Promise<Extract<ComposerAttachment, { kind: "file" }>[]> {
   const result: Extract<ComposerAttachment, { kind: "file" }>[] = [];

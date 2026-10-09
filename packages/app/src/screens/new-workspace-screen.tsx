@@ -25,6 +25,7 @@ import {
 } from "lucide-react-native";
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
+import { ComposerInputMode } from "@/composer/input-mode";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import {
   resolveComposerAttachmentSubmitFormat,
@@ -2584,7 +2585,7 @@ export function NewWorkspaceScreen({
   const composer = isTerminalLaunch ? (
     <Composer
       key="terminal"
-      inputMode="terminal"
+      inputMode={ComposerInputMode.Terminal}
       readOnly={!terminalTakesPrompt}
       placeholder={terminalPlaceholder}
       submitLabel={terminalSubmitLabel}

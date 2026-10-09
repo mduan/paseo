@@ -1,5 +1,5 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useState, useCallback, useMemo, useRef, type RefObject } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { View, Text, Pressable, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -7,16 +7,18 @@ import { Check, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { PendingPermission } from "@/types/shared";
 import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
-import { isWeb } from "@/constants/platform";
-import { EditingTextInput as TextInput } from "@/components/ui/text-input";
-import type { EditingTextInputHandle } from "@/components/ui/text-input/types";
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { UserComposerAttachment } from "@/attachments/types";
+import { getAttachmentStore } from "@/attachments/store";
+import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
+import { buildQuestionAttachmentAnswer } from "@/composer/question-answer";
+import { QuestionAnswerInput } from "@/composer/question-answer-input";
 import {
-  areQuestionsAnswered,
   buildQuestionFormAnswers,
   isQuestionAnswered,
   parseQuestionFormQuestions,
-  questionShowsTextInput,
   resolveDismissLabel,
+  resolveQuestionFormState,
   shouldSubmitEmptyOnDismiss,
   type QuestionFormQuestion,
   type QuestionOption,
@@ -24,11 +26,15 @@ import {
 
 interface QuestionFormCardProps {
   permission: PendingPermission;
-  onRespond: (response: AgentPermissionResponse) => void;
+  onRespond: (response: AgentPermissionResponse) => void | Promise<unknown>;
+  serverId: string;
+  workspaceId?: string;
+  cwd: string;
+  client: DaemonClient | null;
   isResponding: boolean;
 }
 
-const IS_WEB = isWeb;
+const EMPTY_ATTACHMENTS: UserComposerAttachment[] = [];
 
 function getQuestionInputPlaceholder({
   question,
@@ -257,71 +263,15 @@ function QuestionNav({
   );
 }
 
-interface QuestionOtherInputProps {
-  qIndex: number;
-  inputRef: RefObject<EditingTextInputHandle | null>;
-  accessibilityLabel: string;
-  value: string;
-  placeholder: string;
-  isResponding: boolean;
-  onChange: (qIndex: number, text: string) => void;
-  onSubmit: () => void;
-}
-
-function QuestionOtherInput({
-  qIndex,
-  inputRef,
-  accessibilityLabel,
-  value,
-  placeholder,
+export function QuestionFormCard({
+  permission,
+  onRespond,
   isResponding,
-  onChange,
-  onSubmit,
-}: QuestionOtherInputProps) {
-  const { theme } = useUnistyles();
-  const handleChange = useCallback(
-    (text: string) => {
-      onChange(qIndex, text);
-    },
-    [onChange, qIndex],
-  );
-  const otherInputStyle = useMemo(
-    () =>
-      [
-        styles.otherInput,
-        {
-          borderColor: value.length > 0 ? theme.colors.borderAccent : theme.colors.border,
-          color: theme.colors.foreground,
-          backgroundColor: theme.colors.surface2,
-        },
-        IS_WEB ? { outlineStyle: "none", outlineWidth: 0, outlineColor: "transparent" } : null,
-      ] as const,
-    [
-      value.length,
-      theme.colors.borderAccent,
-      theme.colors.border,
-      theme.colors.foreground,
-      theme.colors.surface2,
-    ],
-  );
-  return (
-    <TextInput
-      ref={inputRef}
-      // @ts-expect-error - outlineStyle is web-only
-      style={otherInputStyle}
-      accessibilityLabel={accessibilityLabel}
-      placeholder={placeholder}
-      placeholderTextColor={theme.colors.foregroundMuted}
-      initialValue={value}
-      onChangeText={handleChange}
-      onSubmitEditing={onSubmit}
-      editable={!isResponding}
-      blurOnSubmit={false}
-    />
-  );
-}
-
-export function QuestionFormCard({ permission, onRespond, isResponding }: QuestionFormCardProps) {
+  serverId,
+  workspaceId,
+  cwd,
+  client,
+}: QuestionFormCardProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
@@ -332,7 +282,20 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
 
   const [selections, setSelections] = useState<Record<number, Set<number>>>({});
   const [otherTexts, setOtherTexts] = useState<Record<number, string>>({});
-  const otherInputRef = useRef<EditingTextInputHandle | null>(null);
+  const [attachments, setAttachments] = useState<Record<number, UserComposerAttachment[]>>({});
+  const [replacementVersion, setReplacementVersion] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInputBusy, setIsInputBusy] = useState(false);
+  const [responseError, setError] = useState<string>();
+  const isLocked = isResponding || isSubmitting || isInputBusy;
+  useEffect(() => {
+    const releases = Object.values(attachments).flatMap((items) =>
+      items.flatMap((item) =>
+        item.kind === "image" ? [retainAttachmentForGarbageCollection(item.metadata.id)] : [],
+      ),
+    );
+    return () => releases.forEach((release) => release());
+  }, [attachments]);
   const [respondingAction, setRespondingAction] = useState<"submit" | "dismiss" | null>(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
@@ -365,7 +328,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
           delete nextTexts[qIndex];
           return nextTexts;
         });
-        otherInputRef.current?.replaceText("");
+        setReplacementVersion((version) => version + 1);
       }
 
       if (!multiSelect && next.size > 0 && qIndex === activeQuestionIndex && questions) {
@@ -389,54 +352,114 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
     [questions],
   );
 
-  const allAnswered = areQuestionsAnswered(questions, selections, otherTexts);
-  const resolvedActiveQuestionIndex = questions
-    ? Math.min(activeQuestionIndex, questions.length - 1)
-    : 0;
-  const activeQuestion = questions?.[resolvedActiveQuestionIndex];
-  const activeQuestionAnswered = activeQuestion
-    ? isQuestionAnswered(activeQuestion, resolvedActiveQuestionIndex, selections, otherTexts)
-    : false;
-  const isLastQuestion = questions ? resolvedActiveQuestionIndex === questions.length - 1 : true;
+  const {
+    allAnswered,
+    resolvedActiveQuestionIndex,
+    activeQuestion,
+    activeQuestionAnswered,
+    isLastQuestion,
+    showTextInput,
+    primaryAnswered,
+  } = resolveQuestionFormState({
+    questions,
+    selections,
+    otherTexts,
+    attachments,
+    activeQuestionIndex,
+  });
+  const activeAttachments = attachments[resolvedActiveQuestionIndex] ?? EMPTY_ATTACHMENTS;
+  const handleChangeAttachments = useCallback(
+    (
+      updater:
+        | UserComposerAttachment[]
+        | ((previous: UserComposerAttachment[]) => UserComposerAttachment[]),
+    ) => {
+      setAttachments((previous) => ({
+        ...previous,
+        [resolvedActiveQuestionIndex]:
+          typeof updater === "function"
+            ? updater(previous[resolvedActiveQuestionIndex] ?? EMPTY_ATTACHMENTS)
+            : updater,
+      }));
+    },
+    [resolvedActiveQuestionIndex],
+  );
+  const handleChangeText = useCallback(
+    (text: string) => setOtherText(resolvedActiveQuestionIndex, text),
+    [resolvedActiveQuestionIndex, setOtherText],
+  );
 
-  const handleSubmit = useCallback(() => {
-    if (!questions || !allAnswered || isResponding) return;
+  const handleSubmit = useCallback(async () => {
+    if (!questions || !allAnswered || isLocked) return;
+    setIsSubmitting(true);
     setRespondingAction("submit");
-    onRespond({
-      behavior: "allow",
-      updatedInput: {
-        ...permission.request.input,
-        answers: buildQuestionFormAnswers(questions, selections, otherTexts),
-      },
-    });
+    setError(undefined);
+    try {
+      const answers = buildQuestionFormAnswers(questions, selections, otherTexts);
+      for (const [index, question] of questions.entries()) {
+        const items = attachments[index];
+        if (!items?.length) continue;
+        if (!client) throw new Error(t("common.errors.daemonClientUnavailable"));
+        answers[question.header] = await buildQuestionAttachmentAnswer({
+          text: answers[question.header] ?? "",
+          attachments: items,
+          client,
+          store: await getAttachmentStore(),
+        });
+      }
+      await onRespond({
+        behavior: "allow",
+        updatedInput: { ...permission.request.input, answers },
+      });
+    } catch (error) {
+      if (!showTextInput) setError(error instanceof Error ? error.message : String(error));
+      setRespondingAction(null);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [
     questions,
     allAnswered,
-    isResponding,
+    isLocked,
     selections,
     otherTexts,
+    attachments,
+    client,
+    t,
     onRespond,
     permission.request.input,
+    showTextInput,
   ]);
 
   const handleDeny = useCallback(() => {
-    if (!questions) return;
+    if (!questions || isLocked) return;
     setRespondingAction("dismiss");
     if (shouldSubmitEmptyOnDismiss(questions)) {
-      onRespond({
-        behavior: "allow",
-        updatedInput: {
-          ...permission.request.input,
-          answers: buildQuestionFormAnswers(questions, selections, otherTexts),
-        },
+      void Promise.resolve(
+        onRespond({
+          behavior: "allow",
+          updatedInput: {
+            ...permission.request.input,
+            answers: buildQuestionFormAnswers(questions, selections, otherTexts),
+          },
+        }),
+      ).catch((error) => {
+        setError(String(error));
+        setRespondingAction(null);
       });
       return;
     }
-    onRespond({
-      behavior: "deny",
-      message: "Dismissed by user",
+    void Promise.resolve(
+      onRespond({
+        behavior: "deny",
+        message: "Dismissed by user",
+      }),
+    ).catch((error) => {
+      setError(String(error));
+      setRespondingAction(null);
     });
-  }, [questions, onRespond, otherTexts, permission.request.input, selections]);
+  }, [questions, isLocked, onRespond, otherTexts, permission.request.input, selections]);
 
   const handleSelectQuestion = useCallback((index: number) => {
     setActiveQuestionIndex(index);
@@ -444,18 +467,24 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
 
   const navIsAnswered = useCallback(
     (qIndex: number) =>
-      questions ? isQuestionAnswered(questions[qIndex], qIndex, selections, otherTexts) : false,
-    [questions, selections, otherTexts],
+      questions
+        ? isQuestionAnswered(questions[qIndex], qIndex, selections, otherTexts, attachments)
+        : false,
+    [questions, selections, otherTexts, attachments],
   );
 
-  const handlePrimaryAction = useCallback(() => {
+  const handlePrimaryAction = useCallback(async () => {
     if (!isLastQuestion) {
-      if (!activeQuestionAnswered || isResponding) return;
+      if (!activeQuestionAnswered || isLocked) return;
       setActiveQuestionIndex((index) => Math.min(index + 1, (questions?.length ?? 1) - 1));
       return;
     }
-    handleSubmit();
-  }, [activeQuestionAnswered, handleSubmit, isLastQuestion, isResponding, questions?.length]);
+    await handleSubmit();
+  }, [activeQuestionAnswered, handleSubmit, isLastQuestion, isLocked, questions?.length]);
+
+  const handlePrimaryPress = useCallback(() => {
+    void handlePrimaryAction().catch(() => {});
+  }, [handlePrimaryAction]);
 
   const dismissButtonStyle = useCallback(
     ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -469,7 +498,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
     [theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
   );
 
-  const primaryDisabled = isResponding || (isLastQuestion ? !allAnswered : !activeQuestionAnswered);
+  const primaryDisabled = isLocked || !primaryAnswered;
   const primaryActionLabel = isLastQuestion
     ? t("message.question.submit")
     : t("message.question.next");
@@ -532,7 +561,6 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   const dismissLabel = resolveDismissLabel(questions, t("common.actions.dismiss"));
   const selected = selections[resolvedActiveQuestionIndex] ?? new Set<number>();
   const otherText = otherTexts[resolvedActiveQuestionIndex] ?? "";
-  const showTextInput = activeQuestion ? questionShowsTextInput(activeQuestion) : false;
 
   return (
     <View style={containerStyle} testID="question-form-card">
@@ -540,7 +568,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
         questions={questions}
         activeIndex={resolvedActiveQuestionIndex}
         isAnswered={navIsAnswered}
-        isResponding={isResponding}
+        isResponding={isLocked}
         onSelect={handleSelectQuestion}
       />
       <View style={styles.questionHeader}>
@@ -561,25 +589,35 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
                   option={opt}
                   isSelected={selected.has(optIndex)}
                   multiSelect={activeQuestion.multiSelect}
-                  isResponding={isResponding}
+                  isResponding={isLocked}
                   onToggle={toggleOption}
                 />
               ))}
             </View>
           ) : null}
           {showTextInput ? (
-            <QuestionOtherInput
-              qIndex={resolvedActiveQuestionIndex}
-              inputRef={otherInputRef}
+            <QuestionAnswerInput
+              key={resolvedActiveQuestionIndex}
+              serverId={serverId}
+              agentId={permission.agentId}
+              workspaceId={workspaceId}
+              cwd={cwd}
               accessibilityLabel={activeQuestion.question}
               value={otherText}
+              replacementKey={String(replacementVersion)}
+              attachments={activeAttachments}
+              onChange={handleChangeText}
+              onChangeAttachments={handleChangeAttachments}
               placeholder={getQuestionInputPlaceholder({
                 question: activeQuestion,
                 answerPlaceholder: t("message.question.answerPlaceholder"),
                 otherPlaceholder: t("message.question.otherPlaceholder"),
               })}
-              isResponding={isResponding}
-              onChange={setOtherText}
+              isResponding={isResponding || isSubmitting}
+              isSubmitDisabled={!primaryAnswered}
+              hasAnswer={activeQuestionAnswered}
+              submitLabel={primaryActionLabel}
+              onBusyChange={setIsInputBusy}
               onSubmit={handlePrimaryAction}
             />
           ) : null}
@@ -590,7 +628,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
         <Pressable
           style={dismissButtonStyle}
           onPress={handleDeny}
-          disabled={isResponding}
+          disabled={isLocked}
           accessibilityRole="button"
           accessibilityLabel={dismissLabel}
           testID="question-form-dismiss"
@@ -605,24 +643,31 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
           )}
         </Pressable>
 
-        <Pressable
-          style={submitButtonStyle}
-          onPress={handlePrimaryAction}
-          disabled={primaryDisabled}
-          accessibilityRole="button"
-          accessibilityLabel={primaryActionLabel}
-          testID="question-form-primary-action"
-        >
-          {respondingAction === "submit" ? (
-            <LoadingSpinner size="small" color={theme.colors.accentForeground} />
-          ) : (
-            <View style={styles.actionContent}>
-              <Check size={14} color={submitActionTextColor} />
-              <Text style={submitActionTextStyle}>{primaryActionLabel}</Text>
-            </View>
-          )}
-        </Pressable>
+        {!showTextInput ? (
+          <Pressable
+            style={submitButtonStyle}
+            onPress={handlePrimaryPress}
+            disabled={primaryDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={primaryActionLabel}
+            testID="question-form-primary-action"
+          >
+            {respondingAction === "submit" ? (
+              <LoadingSpinner size="small" color={theme.colors.accentForeground} />
+            ) : (
+              <View style={styles.actionContent}>
+                <Check size={14} color={submitActionTextColor} />
+                <Text style={submitActionTextStyle}>{primaryActionLabel}</Text>
+              </View>
+            )}
+          </Pressable>
+        ) : null}
       </View>
+      {responseError ? (
+        <Text accessibilityRole="alert" style={styles.errorText}>
+          {responseError}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -723,12 +768,8 @@ const styles = StyleSheet.create((theme) => ({
     height: 8,
     borderRadius: 999,
   },
-  otherInput: {
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.lg,
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[3],
-    fontSize: theme.fontSize.base,
+  errorText: {
+    color: theme.colors.destructive,
   },
   actionsContainer: {
     gap: theme.spacing[2],

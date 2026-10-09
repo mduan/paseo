@@ -9,6 +9,17 @@ import {
 } from "./question-form-card-core";
 
 describe("question form card core", () => {
+  test("accepts an attachment-only answer without answering other questions", () => {
+    const questions = parseQuestionFormQuestions({
+      questions: [
+        { question: "Show the issue", header: "Issue", options: [] },
+        { question: "Show the result", header: "Result", options: [] },
+      ],
+    });
+    expect(areQuestionsAnswered(questions, {}, {}, { 0: [{}] })).toBe(false);
+    expect(areQuestionsAnswered(questions, {}, {}, { 0: [{}], 1: [{}] })).toBe(true);
+  });
+
   test("treats optional input prompts as skippable empty answers", () => {
     const questions = parseQuestionFormQuestions({
       questions: [

@@ -71,6 +71,7 @@ export function isQuestionAnswered(
   qIndex: number,
   selections: QuestionSelections,
   otherTexts: QuestionOtherTexts,
+  attachments: Record<number, readonly unknown[]> = {},
 ): boolean {
   const selected = selections[qIndex];
   if (selected && selected.size > 0) {
@@ -80,6 +81,8 @@ export function isQuestionAnswered(
   if (!questionShowsTextInput(question)) {
     return false;
   }
+
+  if (attachments[qIndex]?.length) return true;
 
   const otherText = otherTexts[qIndex]?.trim();
   if (otherText && otherText.length > 0) {
@@ -93,10 +96,11 @@ export function areQuestionsAnswered(
   questions: QuestionFormQuestion[] | null,
   selections: QuestionSelections,
   otherTexts: QuestionOtherTexts,
+  attachments: Record<number, readonly unknown[]> = {},
 ): boolean {
   return (
     questions?.every((question, qIndex) =>
-      isQuestionAnswered(question, qIndex, selections, otherTexts),
+      isQuestionAnswered(question, qIndex, selections, otherTexts, attachments),
     ) ?? false
   );
 }
@@ -145,4 +149,43 @@ export function resolveDismissLabel(
   fallbackLabel = "Dismiss",
 ): string {
   return questions.find((question) => question.dismissLabel)?.dismissLabel ?? fallbackLabel;
+}
+
+export function resolveQuestionFormState({
+  questions,
+  selections,
+  otherTexts,
+  attachments,
+  activeQuestionIndex,
+}: {
+  questions: QuestionFormQuestion[] | null;
+  selections: QuestionSelections;
+  otherTexts: QuestionOtherTexts;
+  attachments: Record<number, readonly unknown[]>;
+  activeQuestionIndex: number;
+}) {
+  const resolvedActiveQuestionIndex = questions
+    ? Math.min(activeQuestionIndex, questions.length - 1)
+    : 0;
+  const activeQuestion = questions?.[resolvedActiveQuestionIndex];
+  const activeQuestionAnswered = activeQuestion
+    ? isQuestionAnswered(
+        activeQuestion,
+        resolvedActiveQuestionIndex,
+        selections,
+        otherTexts,
+        attachments,
+      )
+    : false;
+  const allAnswered = areQuestionsAnswered(questions, selections, otherTexts, attachments);
+  const isLastQuestion = questions ? resolvedActiveQuestionIndex === questions.length - 1 : true;
+  return {
+    resolvedActiveQuestionIndex,
+    activeQuestion,
+    activeQuestionAnswered,
+    allAnswered,
+    isLastQuestion,
+    primaryAnswered: isLastQuestion ? allAnswered : activeQuestionAnswered,
+    showTextInput: activeQuestion ? questionShowsTextInput(activeQuestion) : false,
+  };
 }

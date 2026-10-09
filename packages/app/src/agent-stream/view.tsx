@@ -159,6 +159,8 @@ function BottomOverlayInset({ height }: { height: number }) {
 
 function renderPendingPermissionsNode(input: {
   pendingPermissions: PendingPermission[];
+  serverId: string;
+  context: AgentScreenAgent;
   client: DaemonClient | null;
 }): ReactNode {
   if (input.pendingPermissions.length === 0) {
@@ -167,7 +169,13 @@ function renderPendingPermissionsNode(input: {
   return (
     <View style={stylesheet.permissionsContainer}>
       {input.pendingPermissions.map((permission) => (
-        <PermissionRequestCard key={permission.key} permission={permission} client={input.client} />
+        <PermissionRequestCard
+          key={permission.key}
+          permission={permission}
+          client={input.client}
+          serverId={input.serverId}
+          context={input.context}
+        />
       ))}
     </View>
   );
@@ -1008,8 +1016,10 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         renderPendingPermissionsNode({
           pendingPermissions: pendingPermissionItems,
           client,
+          serverId: resolvedServerId,
+          context,
         }),
-      [client, pendingPermissionItems],
+      [client, pendingPermissionItems, resolvedServerId, context],
     );
     const turnFooterNode = useMemo(
       () =>
@@ -1494,9 +1504,13 @@ function PermissionActionButton({
 function PermissionRequestCard({
   permission,
   client,
+  serverId,
+  context,
 }: {
   permission: PendingPermission;
   client: DaemonClient | null;
+  serverId: string;
+  context: AgentScreenAgent;
 }) {
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
@@ -1589,12 +1603,13 @@ function PermissionRequestCard({
   }, [permission.request.id, resetPermissionMutation]);
   const handleResponse = useCallback(
     (response: AgentPermissionResponse) => {
-      respondToPermission({
+      return respondToPermission({
         agentId: permission.agentId,
         requestId: permission.request.id,
         response,
       }).catch((error) => {
         console.error("[PermissionRequestCard] Failed to respond to permission:", error);
+        throw error;
       });
     },
     [permission.agentId, permission.request.id, respondToPermission],
@@ -1603,17 +1618,17 @@ function PermissionRequestCard({
     (action: AgentPermissionAction) => {
       setRespondingActionId(action.id);
       if (action.behavior === "allow") {
-        handleResponse({
+        void handleResponse({
           behavior: "allow",
           selectedActionId: action.id,
-        });
+        }).catch(() => {});
         return;
       }
-      handleResponse({
+      void handleResponse({
         behavior: "deny",
         selectedActionId: action.id,
         message: "Denied by user",
-      });
+      }).catch(() => {});
     },
     [handleResponse],
   );
@@ -1630,6 +1645,10 @@ function PermissionRequestCard({
     return (
       <QuestionFormCard
         permission={permission}
+        serverId={serverId}
+        workspaceId={context.workspaceId ?? undefined}
+        cwd={context.cwd}
+        client={client}
         onRespond={handleResponse}
         isResponding={isResponding}
       />

@@ -108,7 +108,7 @@ import {
   persistAttachmentFromFileUri,
 } from "@/attachments/service";
 import { resolveAgentControlsMode } from "@/composer/agent-controls/mode";
-import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
+import { resolveComposerInputMode, ComposerInputMode } from "@/composer/input-mode";
 import { resolveActiveSendBehavior } from "./input/state";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
@@ -227,7 +227,7 @@ function resolveMessagePlaceholder(
   if (override !== undefined) {
     return override;
   }
-  if (inputMode === "terminal") {
+  if (inputMode === ComposerInputMode.Terminal) {
     return t("composer.placeholders.terminal");
   }
   return isDesktopWebBreakpoint
@@ -1011,6 +1011,9 @@ interface ComposerProps {
   submitIcon?: "arrow" | "return";
   /** Externally controlled loading state. When true, disables the submit button. */
   isSubmitLoading?: boolean;
+  isSubmitDisabled?: boolean;
+  inputAccessibilityLabel?: string;
+  onBusyChange?: (busy: boolean) => void;
   /** When true, waits for pasted forge links to resolve before enabling submit. */
   waitForForgeAutoAttachOnSubmit?: boolean;
   submitBehavior?: "clear" | "preserve-and-lock";
@@ -1307,6 +1310,9 @@ function ComposerContentImpl({
   submitButtonTestID,
   submitIcon = "arrow",
   isSubmitLoading = false,
+  isSubmitDisabled: isSubmitDisabledOverride = false,
+  inputAccessibilityLabel,
+  onBusyChange,
   waitForForgeAutoAttachOnSubmit = false,
   submitBehavior = "clear",
   blurOnSubmit = false,
@@ -1332,7 +1338,7 @@ function ComposerContentImpl({
   agentControls,
   inputWrapperStyle,
   isCompactLayout: isCompactLayoutOverride,
-  inputMode = "chat",
+  inputMode = ComposerInputMode.Chat,
   readOnly = false,
   submitLabel,
   placeholder,
@@ -1657,7 +1663,7 @@ function ComposerContentImpl({
   const isCancellingAgent = useSessionStore(
     (state) => selectAgentTurnPresentation(state.sessions[serverId], agentId).isCancelling,
   );
-  const isAgentRunning = hasActiveTurn;
+  const isAgentRunning = inputMode !== ComposerInputMode.Question && hasActiveTurn;
   // Queueing behind a permission prompt would strand the message: the turn is
   // parked until the request is answered.
   const hasPendingPermission = useSessionStore((state) => {
@@ -1773,7 +1779,11 @@ function ComposerContentImpl({
         text: payload.text,
         hasAttachments: outgoingAttachments.length > 0,
       });
-      if (clientSlashCommand && runClientSlashCommand(clientSlashCommand)) {
+      if (
+        inputMode !== ComposerInputMode.Question &&
+        clientSlashCommand &&
+        runClientSlashCommand(clientSlashCommand)
+      ) {
         return;
       }
       const pluginSlashCommand = resolvePluginClientSlashCommand({
@@ -1781,7 +1791,12 @@ function ComposerContentImpl({
         hasAttachments: outgoingAttachments.length > 0,
         commands: pluginClientSlashCommands,
       });
-      if (pluginSlashCommand && runPluginClientSlashCommand(pluginSlashCommand)) return;
+      if (
+        inputMode !== ComposerInputMode.Question &&
+        pluginSlashCommand &&
+        runPluginClientSlashCommand(pluginSlashCommand)
+      )
+        return;
 
       if (blurOnSubmit) {
         messageInputRef.current?.blur();
@@ -1795,6 +1810,7 @@ function ComposerContentImpl({
       runClientSlashCommand,
       pluginClientSlashCommands,
       runPluginClientSlashCommand,
+      inputMode,
       sendMessageWithContent,
     ],
   );
@@ -2033,7 +2049,11 @@ function ComposerContentImpl({
         text: payload.text,
         hasAttachments: outgoingAttachments.length > 0,
       });
-      if (clientSlashCommand && runClientSlashCommand(clientSlashCommand)) {
+      if (
+        inputMode !== ComposerInputMode.Question &&
+        clientSlashCommand &&
+        runClientSlashCommand(clientSlashCommand)
+      ) {
         return;
       }
       const pluginSlashCommand = resolvePluginClientSlashCommand({
@@ -2041,7 +2061,12 @@ function ComposerContentImpl({
         hasAttachments: outgoingAttachments.length > 0,
         commands: pluginClientSlashCommands,
       });
-      if (pluginSlashCommand && runPluginClientSlashCommand(pluginSlashCommand)) return;
+      if (
+        inputMode !== ComposerInputMode.Question &&
+        pluginSlashCommand &&
+        runPluginClientSlashCommand(pluginSlashCommand)
+      )
+        return;
       queueMessage(payload.text, outgoingAttachments);
     },
     [
@@ -2049,6 +2074,7 @@ function ComposerContentImpl({
       buildOutgoingAttachments,
       pluginClientSlashCommands,
       queueMessage,
+      inputMode,
       runClientSlashCommand,
       runPluginClientSlashCommand,
     ],
@@ -2173,8 +2199,11 @@ function ComposerContentImpl({
     ],
   );
   const beforeVoiceContent = useMemo(
-    () => <>{resolveContextWindowPlacement(contextWindowMeter, hasAgent)}</>,
-    [contextWindowMeter, hasAgent],
+    () =>
+      mode.showAgentControls ? (
+        <>{resolveContextWindowPlacement(contextWindowMeter, hasAgent)}</>
+      ) : null,
+    [contextWindowMeter, hasAgent, mode.showAgentControls],
   );
 
   const hasGithubAttachment = useMemo(
@@ -2450,7 +2479,15 @@ function ComposerContentImpl({
   const isSubmitLoadingVisible =
     isProcessing || isSubmitLoading || isUploadingFile || pendingNativeImagePastes > 0;
   const isSubmitDisabled =
-    isSubmitLoadingVisible || (waitForForgeAutoAttachOnSubmit && isForgeResolving);
+    isSubmitDisabledOverride ||
+    isSubmitLoadingVisible ||
+    (waitForForgeAutoAttachOnSubmit && isForgeResolving);
+
+  const isBusy = isProcessing || isUploadingFile || pendingNativeImagePastes > 0;
+  useEffect(() => {
+    onBusyChange?.(isBusy);
+    return () => onBusyChange?.(false);
+  }, [isBusy, onBusyChange]);
 
   // Disable drops while submitting/uploading: the submit path clears and restores attachments,
   // so a drop in that window would be lost or land on a locked draft. `disabled` hides the
@@ -2496,7 +2533,7 @@ function ComposerContentImpl({
         {/* Input area */}
         <View style={inputAreaContainerStyle}>
           <View style={styles.inputAreaContent}>
-            {queueList}
+            {inputMode !== ComposerInputMode.Question ? queueList : null}
             {sendErrorNode}
 
             <View ref={messageInputContainerRef} style={styles.messageInputContainer}>
@@ -2521,6 +2558,7 @@ function ComposerContentImpl({
                 <StableMessageInput
                   ref={messageInputRef}
                   value={textSource.getSnapshot()}
+                  inputAccessibilityLabel={inputAccessibilityLabel}
                   onChangeText={setUserInput}
                   onSubmit={handleSubmit}
                   hasExternalContent={hasExternalContent}
@@ -2551,7 +2589,7 @@ function ComposerContentImpl({
                   voiceAgentId={agentId}
                   isAgentRunning={isAgentRunning}
                   defaultSendBehavior={activeSendBehavior}
-                  onQueue={handleQueue}
+                  onQueue={inputMode === ComposerInputMode.Question ? undefined : handleQueue}
                   onSubmitLoadingPress={submitLoadingPressHandler}
                   onKeyPress={handleCommandKeyPress}
                   onSelectionChange={handleSelectionChange}

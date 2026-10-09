@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { buildQuestionAttachmentAnswer } from "./question-answer";
 import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
@@ -1103,7 +1104,6 @@ describe("file upload preparation", () => {
     const sent: string[] = [];
     const upload = uploadFileAttachments({
       client: {
-        sendAgentMessage: async () => {},
         uploadFile: async (file) => {
           sent.push(file.fileName);
           expect(file.bytes).toEqual(new Uint8Array([1, 2]));
@@ -1143,7 +1143,6 @@ describe("file upload preparation", () => {
       await expect(
         uploadFileAttachments({
           client: {
-            sendAgentMessage: async () => {},
             uploadFile: async () => {
               sends++;
               throw new Error("unexpected send");
@@ -1167,6 +1166,104 @@ describe("file upload preparation", () => {
         }),
       ).rejects.toThrow(failure === "unreadable" ? "read failed" : "too large");
       expect(sends).toBe(0);
+    },
+  );
+});
+
+describe("question attachment answers", () => {
+  it("uploads image bytes and includes files, workspace excerpts, issues and plugin snapshots", async () => {
+    const uploaded: string[] = [];
+    const answer = await buildQuestionAttachmentAnswer({
+      text: " See this example ",
+      attachments: [
+        { kind: "image", metadata: imageMetadata },
+        {
+          kind: "file",
+          attachment: {
+            type: "uploaded_file",
+            id: "file-1",
+            fileName: "report.pdf",
+            mimeType: "application/pdf",
+            size: 3,
+            path: "/uploads/report.pdf",
+          },
+        },
+        {
+          kind: "workspace_file",
+          path: "src/example.ts",
+          selection: { kind: "line_range", startLine: 3, endLine: 5 },
+        },
+        { kind: "forge_issue", item: issueItem },
+        {
+          kind: "plugin_resource",
+          pluginId: "linear",
+          sourceId: "issues",
+          sourceTitle: "Linear",
+          sourceIcon: "CircleDot",
+          item: {
+            id: "issue-1",
+            identifier: "ENG-123",
+            title: "Details",
+            url: "https://linear.app/issue/ENG-123",
+            resourceType: "issue",
+            text: "Plugin issue snapshot",
+          },
+        },
+      ],
+      store: {
+        encodeBase64: async ({ attachment }) => {
+          expect(attachment.id).toBe("img-1");
+          return "AQID";
+        },
+      },
+      client: {
+        uploadFile: async (file) => {
+          uploaded.push(file.fileName);
+          expect(Array.from(file.bytes)).toEqual([1, 2, 3]);
+          return {
+            requestId: "upload-1",
+            error: null,
+            file: {
+              type: "uploaded_file",
+              id: "image-1",
+              fileName: file.fileName,
+              mimeType: file.mimeType,
+              size: file.bytes.length,
+              path: "/uploads/image.png",
+            },
+          };
+        },
+      },
+    });
+    expect(uploaded).toEqual(["img-1.png"]);
+    expect(answer).toContain(
+      "See this example\n\nUploaded file: img-1.png\nPath: /uploads/image.png",
+    );
+    expect(answer).toContain("Path: /uploads/report.pdf");
+    expect(answer).toContain("Workspace file: src/example.ts\nLines: 3-5");
+    expect(answer).toContain(issueItem.url);
+    expect(answer).toContain("Issue body");
+    expect(answer).toContain("Plugin issue snapshot");
+  });
+
+  it.each(["encode", "upload"])(
+    "rejects %s failures instead of submitting an answer without its image",
+    async (failure) => {
+      await expect(
+        buildQuestionAttachmentAnswer({
+          text: "",
+          attachments: [{ kind: "image", metadata: imageMetadata }],
+          store: {
+            encodeBase64: async () => {
+              if (failure === "encode") throw new Error("image unavailable");
+              return "AQID";
+            },
+          },
+          client: {
+            uploadFile: async () => ({ requestId: "failed", file: null, error: "upload failed" }),
+          },
+        }),
+      ).rejects.toThrow(failure === "encode" ? "image unavailable" : "upload failed");
     },
   );
 });

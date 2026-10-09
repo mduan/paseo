@@ -1,13 +1,17 @@
 /**
  * What a composer is being used for. `Composer` and `MessageInput` are one
- * component with two jobs, not two components: a terminal prompt still wants
+ * component with several jobs: a terminal prompt still wants
  * the same bordered surface, grow-on-newline, submit button, focus handling,
  * and keyboard shift that a chat message gets.
  *
  * Callers pick a mode and nothing else. What a mode implies lives here, so the
  * two presentations cannot drift apart one prop at a time.
  */
-export type ComposerInputMode = "chat" | "terminal";
+export enum ComposerInputMode {
+  Chat = "chat",
+  Terminal = "terminal",
+  Question = "question",
+}
 
 export interface ComposerInputModePresentation {
   /** Attachments, dictation/voice, slash-and-@ autocomplete, and the model/mode
@@ -23,7 +27,7 @@ export interface ComposerInputModePresentation {
 }
 
 const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentation> = {
-  chat: {
+  [ComposerInputMode.Chat]: {
     showAttachments: true,
     showVoice: true,
     showAutocomplete: true,
@@ -31,7 +35,15 @@ const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentat
     isMonospace: false,
     accessibilityLabelKey: "composer.input.accessibilityLabel",
   },
-  terminal: {
+  [ComposerInputMode.Question]: {
+    showAttachments: true,
+    showVoice: false,
+    showAutocomplete: false,
+    showAgentControls: false,
+    isMonospace: false,
+    accessibilityLabelKey: "composer.input.accessibilityLabel",
+  },
+  [ComposerInputMode.Terminal]: {
     showAttachments: false,
     showVoice: false,
     showAutocomplete: false,

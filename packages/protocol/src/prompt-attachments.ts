@@ -1,0 +1,222 @@
+import { getForgeDefinitionOrNeutral } from "./forge-manifest.js";
+import type { AgentAttachment } from "./messages.js";
+
+const REVIEW_LINE_MARKERS = { add: "+", remove: "-", context: " " } as const;
+
+export function renderPromptAttachmentAsText(attachment: AgentAttachment): string {
+  switch (attachment.type) {
+    case "forge_change_request": {
+      return renderChangeRequestAttachment({
+        forge: attachment.forge,
+        number: attachment.number,
+        title: attachment.title,
+        url: attachment.url,
+        body: attachment.body,
+        projectPath: attachment.projectPath,
+        baseRefName: attachment.baseRefName,
+        headRefName: attachment.headRefName,
+      });
+    }
+    // COMPAT(githubAttachmentKinds): render legacy wire attachments until
+    // 2027-01-17, when supported client and daemon floors are >= v0.2.0.
+    case "github_pr": {
+      return renderChangeRequestAttachment({
+        forge: "github",
+        number: attachment.number,
+        title: attachment.title,
+        url: attachment.url,
+        body: attachment.body,
+        baseRefName: attachment.baseRefName,
+        headRefName: attachment.headRefName,
+      });
+    }
+    case "forge_issue": {
+      return renderIssueAttachment({
+        forge: attachment.forge,
+        number: attachment.number,
+        title: attachment.title,
+        url: attachment.url,
+        body: attachment.body,
+        projectPath: attachment.projectPath,
+      });
+    }
+    // COMPAT(githubAttachmentKinds): render legacy wire attachments until
+    // 2027-01-17, when supported client and daemon floors are >= v0.2.0.
+    case "github_issue": {
+      return renderIssueAttachment({
+        forge: "github",
+        number: attachment.number,
+        title: attachment.title,
+        url: attachment.url,
+        body: attachment.body,
+      });
+    }
+    case "text": {
+      return attachment.text;
+    }
+    case "review": {
+      const mode = attachment.includeUncommitted ? "committed + uncommitted" : attachment.mode;
+      const hasTurnComments = attachment.comments.some((comment) => comment.snapshot);
+      const header = hasTurnComments
+        ? "Paseo review attachment"
+        : `Paseo review attachment (${mode})`;
+      const lines = [header, `CWD: ${attachment.cwd}`];
+      if (!hasTurnComments && attachment.baseRef) {
+        lines.push(`Base: ${attachment.baseRef}`);
+      }
+      attachment.comments.forEach((comment, index) => {
+        const end: ReviewLineRef = { side: comment.side, lineNumber: comment.lineNumber };
+        const start: ReviewLineRef =
+          comment.startLineNumber === undefined
+            ? end
+            : { side: comment.startSide ?? comment.side, lineNumber: comment.startLineNumber };
+        const isSingleLine = start.side === end.side && start.lineNumber === end.lineNumber;
+        const isFileView = comment.source === "file";
+        const location = isFileView
+          ? `${comment.filePath} ${isSingleLine ? `line ${end.lineNumber}` : `lines ${start.lineNumber}-${end.lineNumber}`} (file view)`
+          : `${comment.filePath}:${isSingleLine ? formatReviewLine(end) : `${formatReviewLine(start)}-${formatReviewLine(end)}`}`;
+        lines.push("", `Comment ${index + 1}: ${location}`, comment.body);
+        if (comment.snapshot) {
+          lines.push(
+            `Turn snapshot: ${comment.snapshot.cwd}`,
+            `Old tree: ${comment.snapshot.fromTree}`,
+            `New tree: ${comment.snapshot.toTree}`,
+            "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
+          );
+        } else if (hasTurnComments) {
+          lines.push(`Checkout comparison: ${mode}`);
+          if (attachment.baseRef) {
+            lines.push(`Base: ${attachment.baseRef}`);
+          }
+        }
+        if (!isFileView && comment.context.hunkHeader) {
+          lines.push(comment.context.hunkHeader);
+        }
+        const contextLines = comment.context.lines;
+        const startIndex = contextLines.findIndex((line) => isReviewLine(line, start));
+        const endIndex = contextLines.findIndex((line) => isReviewLine(line, end));
+        // The client caps context, so a long range can end past the last context line.
+        const lastMarkedIndex = endIndex === -1 ? contextLines.length - 1 : endIndex;
+        // File view excerpts are whole-file lines, so they carry no diff columns or markers.
+        const numberWidth = Math.max(
+          0,
+          ...contextLines.map((line) => String(line.newLineNumber ?? "").length),
+        );
+        contextLines.forEach((line, lineIndex) => {
+          const isMarked =
+            startIndex !== -1 && lineIndex >= startIndex && lineIndex <= lastMarkedIndex;
+          const prefix = isMarked ? "> " : "  ";
+          if (isFileView) {
+            const lineNumber = String(line.newLineNumber ?? "").padStart(numberWidth);
+            lines.push(`${prefix}${lineNumber} | ${line.content}`);
+            return;
+          }
+          const oldLn = padLineNumber(line.oldLineNumber);
+          const newLn = padLineNumber(line.newLineNumber);
+          lines.push(`${prefix}${oldLn} ${newLn} ${REVIEW_LINE_MARKERS[line.type]}${line.content}`);
+        });
+        if (startIndex !== -1 && endIndex === -1) {
+          const instruction = comment.snapshot
+            ? "Inspect the full diff between the snapshot trees above"
+            : `Read ${comment.filePath}`;
+          lines.push(`  (Range truncated. ${instruction} for the rest.)`);
+        }
+      });
+      return lines.join("\n");
+    }
+    case "uploaded_file": {
+      return [
+        `Uploaded file: ${attachment.fileName}`,
+        `Path: ${attachment.path}`,
+        `MIME: ${attachment.mimeType}`,
+        `Size: ${attachment.size} bytes`,
+      ].join("\n");
+    }
+    default:
+      throw new Error("unreachable");
+  }
+}
+
+function renderChangeRequestAttachment(input: {
+  forge: string;
+  number: number;
+  title: string;
+  url: string;
+  body?: string | null;
+  projectPath?: string;
+  baseRefName?: string | null;
+  headRefName?: string | null;
+}): string {
+  const lines = [
+    `${formatForgeLabel(input.forge)} ${formatChangeRequestAbbrev(input.forge)} ${formatChangeRequestNumber(input.forge, input.number)}: ${input.title}`,
+    input.url,
+  ];
+  if (input.projectPath) {
+    lines.push(`Project: ${input.projectPath}`);
+  }
+  if (input.baseRefName) {
+    lines.push(`Base: ${input.baseRefName}`);
+  }
+  if (input.headRefName) {
+    lines.push(`Head: ${input.headRefName}`);
+  }
+  if (input.body) {
+    lines.push("", input.body);
+  }
+  return lines.join("\n");
+}
+
+function renderIssueAttachment(input: {
+  forge: string;
+  number: number;
+  title: string;
+  url: string;
+  body?: string | null;
+  projectPath?: string;
+}): string {
+  const lines = [
+    `${formatForgeLabel(input.forge)} Issue ${formatIssueNumber(input.forge, input.number)}: ${input.title}`,
+    input.url,
+  ];
+  if (input.projectPath) {
+    lines.push(`Project: ${input.projectPath}`);
+  }
+  if (input.body) {
+    lines.push("", input.body);
+  }
+  return lines.join("\n");
+}
+
+function formatForgeLabel(forge: string): string {
+  return getForgeDefinitionOrNeutral(forge).displayName;
+}
+
+function formatChangeRequestAbbrev(forge: string): string {
+  return getForgeDefinitionOrNeutral(forge).changeRequestAbbrev;
+}
+
+function formatChangeRequestNumber(forge: string, number: number): string {
+  return `${getForgeDefinitionOrNeutral(forge).changeRequestNumberPrefix}${number}`;
+}
+
+function formatIssueNumber(forge: string, number: number): string {
+  return `${getForgeDefinitionOrNeutral(forge).issueNumberPrefix}${number}`;
+}
+
+type ReviewComment = Extract<AgentAttachment, { type: "review" }>["comments"][number];
+type ReviewLineRef = Pick<ReviewComment, "side" | "lineNumber">;
+
+function formatReviewLine(ref: ReviewLineRef): string {
+  return `${ref.side === "old" ? "L" : "R"}${ref.lineNumber}`;
+}
+
+function isReviewLine(
+  line: ReviewComment["context"]["lines"][number],
+  ref: ReviewLineRef,
+): boolean {
+  return (ref.side === "old" ? line.oldLineNumber : line.newLineNumber) === ref.lineNumber;
+}
+
+function padLineNumber(lineNumber: number | null): string {
+  return (lineNumber?.toString() ?? "-").padStart(2);
+}

@@ -56,7 +56,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useComposerHeight } from "./height";
-import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
+import { resolveComposerInputMode, ComposerInputMode } from "@/composer/input-mode";
 import type { NativePastedFile } from "@/composer/native-pasted-image";
 import {
   EditingTextInput,
@@ -132,6 +132,7 @@ export interface MessageInputProps {
   /** Dictation start gate from host runtime (socket connected + directory ready). */
   isReadyForDictation?: boolean;
   placeholder?: string;
+  inputAccessibilityLabel?: string;
   autoFocus?: boolean;
   autoFocusKey?: string;
   disabled?: boolean;
@@ -1060,6 +1061,7 @@ interface ResolvedMessageInputProps {
   client: DaemonClient | null;
   isReadyForDictation: boolean | undefined;
   placeholder: string | undefined;
+  inputAccessibilityLabel: string | undefined;
   autoFocus: boolean;
   autoFocusKey: string | undefined;
   disabled: boolean;
@@ -1085,6 +1087,10 @@ interface ResolvedMessageInputProps {
   submitLabel: string | undefined;
 }
 
+function getInputAccessibilityLabel(override: string | undefined, fallback: string): string {
+  return override ?? fallback;
+}
+
 function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInputProps {
   return {
     value: props.value,
@@ -1107,6 +1113,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     client: props.client,
     isReadyForDictation: props.isReadyForDictation,
     placeholder: props.placeholder,
+    inputAccessibilityLabel: props.inputAccessibilityLabel,
     autoFocus: props.autoFocus ?? false,
     autoFocusKey: props.autoFocusKey,
     disabled: props.disabled ?? false,
@@ -1126,7 +1133,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     onHeightChange: props.onHeightChange,
     inputWrapperStyle: props.inputWrapperStyle,
     attachmentSlot: props.attachmentSlot,
-    inputMode: props.inputMode ?? "chat",
+    inputMode: props.inputMode ?? ComposerInputMode.Chat,
     readOnly: props.readOnly ?? false,
     textReplacement: props.textReplacement,
     submitLabel: props.submitLabel,
@@ -1162,6 +1169,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       client,
       isReadyForDictation,
       placeholder,
+      inputAccessibilityLabel,
       autoFocus,
       autoFocusKey,
       disabled,
@@ -1188,6 +1196,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     } = resolveMessageInputProps(props);
     const mode = resolveComposerInputMode(inputMode);
     const { t } = useTranslation();
+    const resolvedInputAccessibilityLabel = getInputAccessibilityLabel(
+      inputAccessibilityLabel,
+      t(mode.accessibilityLabelKey),
+    );
     const isCompact = useIsCompactFormFactor();
     const { height: windowHeight } = useWindowDimensions();
     const maxInputHeight = resolveMaxInputHeight(windowHeight);
@@ -1808,7 +1820,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               textInputStyle={textInputStyle}
               readOnlyTextStyle={readOnlyTextStyle}
               placeholder={placeholder ?? t("composer.placeholders.fallback")}
-              accessibilityLabel={t(mode.accessibilityLabelKey)}
+              accessibilityLabel={resolvedInputAccessibilityLabel}
               onChangeText={handleInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}

@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { loadSessionMessageReaders } from "./new-workspace";
 
 export async function waitForQuestionPrompt(page: Page, timeout = 30_000): Promise<void> {
   await expect(page.getByTestId("question-form-card").first()).toBeVisible({ timeout });
@@ -100,4 +101,60 @@ export async function continueToNextQuestion(page: Page): Promise<void> {
     .first()
     .getByRole("button", { name: "Next" })
     .click();
+}
+
+export async function observeQuestionAnswers(page: Page) {
+  const frames = await loadSessionMessageReaders();
+  let answers: unknown;
+  page.on("websocket", (socket) => {
+    socket.on("framesent", ({ payload }) => {
+      const request = frames.client(payload);
+      if (request?.type === "agent_permission_response" && request.response.behavior === "allow") {
+        answers = request.response.updatedInput?.answers;
+      }
+    });
+  });
+  return () => answers;
+}
+
+export async function pasteQuestionImage(
+  page: Page,
+  input: { question: string; base64: string },
+): Promise<void> {
+  await page
+    .getByTestId("question-form-card")
+    .getByRole("textbox", { name: input.question })
+    .evaluate((element, base64) => {
+      const transfer = new DataTransfer();
+      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      transfer.items.add(new File([bytes], "pasted.png", { type: "image/png" }));
+      element.dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, clipboardData: transfer }),
+      );
+    }, input.base64);
+}
+
+export async function clearQuestionImageBytes(page: Page): Promise<void> {
+  const database = await page.evaluateHandle(
+    () =>
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open("paseo-attachment-bytes", 1);
+        request.addEventListener("success", () => resolve(request.result), { once: true });
+        request.addEventListener("error", () => reject(request.error), { once: true });
+      }),
+  );
+  try {
+    await database.evaluate(
+      (db) =>
+        new Promise<void>((resolve, reject) => {
+          const transaction = db.transaction("attachments", "readwrite");
+          transaction.objectStore("attachments").clear();
+          transaction.addEventListener("complete", () => resolve(), { once: true });
+          transaction.addEventListener("error", () => reject(transaction.error), { once: true });
+        }),
+    );
+  } finally {
+    await database.evaluate((db) => db.close());
+    await database.dispose();
+  }
 }

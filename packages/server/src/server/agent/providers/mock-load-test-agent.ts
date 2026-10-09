@@ -277,6 +277,23 @@ function parseMockQuestionPrompt(prompt: AgentPromptInput): MockQuestionPromptRe
     return null;
   }
 
+  if (/fruits|provider/i.test(text)) {
+    const fruits = /fruits/i.test(text);
+    return {
+      questions: [
+        {
+          question: fruits ? "Which fruits do you like?" : "Which provider?",
+          header: fruits ? "Fruits" : "Provider",
+          options: (fruits ? ["Apple", "Banana", "Cherry"] : ["Claude Code", "Codex"]).map(
+            (label) => ({ label }),
+          ),
+          multiSelect: fruits,
+          allowOther: true,
+        },
+      ],
+    };
+  }
+
   if (/free[-\s]?write|freeform|text[-\s]?only/i.test(text)) {
     return {
       questions: [

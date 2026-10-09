@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
 
-import {
-  buildAgentBranchNameSeed,
-  buildAgentPrompt,
-  renderPromptAttachmentAsText,
-} from "./prompt-attachments.js";
+import { buildAgentBranchNameSeed, buildAgentPrompt } from "./prompt-attachments.js";
 
 describe("prompt attachments", () => {
   it.each(["old", "new"] as const)(
