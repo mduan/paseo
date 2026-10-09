@@ -433,80 +433,77 @@ describe("buildWorkspaceTabMenuEntries", () => {
     expect(onRenameTab).toHaveBeenCalledWith(terminalTab);
   });
 
-  it.each([undefined, "Finder", "File Explorer"])(
-    "includes file actions with file manager %s",
-    (targetName) => {
-      const reveal = vi.fn(async () => {});
-      const fileManager = targetName ? { targetName, reveal } : undefined;
-      const onCopyFilePath = vi.fn();
-      const onRevealFileInExplorer = vi.fn();
-      const fileTab: WorkspaceTabDescriptor = {
-        key: "file_abc",
-        tabId: "file_abc",
-        kind: "file",
-        target: { kind: "file", path: "/some/path.ts", lineStart: 1, lineEnd: 10 },
-      };
-      const { menuEntries: entries } = buildWorkspaceDesktopTabActions({
-        tab: fileTab,
-        index: 0,
-        tabCount: 1,
-        onCopyResumeCommand: vi.fn(),
-        onCopyAgentId: vi.fn(),
-        onCopyTerminalId: vi.fn(),
-        onCopyFilePath,
-        onRevealFileInExplorer,
-        fileManager,
-        onReloadAgent: vi.fn(),
-        onRenameTab: vi.fn(),
-        onCloseTab: vi.fn(),
-        onCloseTabsToLeft: vi.fn(),
-        onCloseTabsToRight: vi.fn(),
-        onCloseOtherTabs: vi.fn(),
-      });
+  it.each([undefined, "Finder", "File Explorer"])("file actions with %s", (targetName) => {
+    const reveal = vi.fn(async () => {});
+    const fileManager = targetName ? { targetName, reveal } : undefined;
+    const onCopyFilePath = vi.fn();
+    const onRevealFileInExplorer = vi.fn();
+    const fileTab: WorkspaceTabDescriptor = {
+      key: "file_abc",
+      tabId: "file_abc",
+      kind: "file",
+      target: { kind: "file", path: "/some/path.ts", lineStart: 1, lineEnd: 10 },
+    };
+    const { menuEntries: entries } = buildWorkspaceDesktopTabActions({
+      tab: fileTab,
+      index: 0,
+      tabCount: 1,
+      onCopyResumeCommand: vi.fn(),
+      onCopyAgentId: vi.fn(),
+      onCopyTerminalId: vi.fn(),
+      onCopyFilePath,
+      onRevealFileInExplorer,
+      fileManager,
+      onReloadAgent: vi.fn(),
+      onRenameTab: vi.fn(),
+      onCloseTab: vi.fn(),
+      onCloseTabsToLeft: vi.fn(),
+      onCloseTabsToRight: vi.fn(),
+      onCloseOtherTabs: vi.fn(),
+    });
 
-      const labels = entries.filter((entry) => entry.kind === "item").map((entry) => entry.label);
-      expect(labels.slice(0, 2)).toEqual(["Copy file path", "Reveal in file explorer"]);
-      expect(labels).not.toContain("Copy resume command");
-      expect(labels).not.toContain("Copy agent id");
-      expect(labels).not.toContain("Rename");
-      expect(labels).not.toContain("Reload agent");
+    const labels = entries.filter((entry) => entry.kind === "item").map((entry) => entry.label);
+    expect(labels.slice(0, 2)).toEqual(["Copy file path", "Reveal in file explorer"]);
+    expect(labels).not.toContain("Copy resume command");
+    expect(labels).not.toContain("Copy agent id");
+    expect(labels).not.toContain("Rename");
+    expect(labels).not.toContain("Reload agent");
 
-      const copyFilePathEntry = entries.find(
-        (entry) => entry.kind === "item" && entry.key === "copy-file-path",
-      );
-      if (!copyFilePathEntry || copyFilePathEntry.kind !== "item") {
-        throw new Error("Copy file path entry missing");
-      }
-      copyFilePathEntry.onSelect();
-      expect(onCopyFilePath).toHaveBeenCalledWith("/some/path.ts");
+    const copyFilePathEntry = entries.find(
+      (entry) => entry.kind === "item" && entry.key === "copy-file-path",
+    );
+    if (!copyFilePathEntry || copyFilePathEntry.kind !== "item") {
+      throw new Error("Copy file path entry missing");
+    }
+    copyFilePathEntry.onSelect();
+    expect(onCopyFilePath).toHaveBeenCalledWith("/some/path.ts");
 
-      const revealEntry = entries.find(
-        (entry) => entry.kind === "item" && entry.key === "reveal-in-explorer",
-      );
-      if (!revealEntry || revealEntry.kind !== "item") {
-        throw new Error("Reveal in explorer entry missing");
+    const revealEntry = entries.find(
+      (entry) => entry.kind === "item" && entry.key === "reveal-in-explorer",
+    );
+    if (!revealEntry || revealEntry.kind !== "item") {
+      throw new Error("Reveal in explorer entry missing");
+    }
+    revealEntry.onSelect();
+    expect(onRevealFileInExplorer).toHaveBeenCalledWith("/some/path.ts");
+    const fileManagerEntry = entries.find(
+      (entry) => entry.kind === "item" && entry.key === "reveal-in-file-manager",
+    );
+    if (targetName) {
+      expect(labels.slice(0, 3)).toEqual([
+        "Copy file path",
+        "Reveal in file explorer",
+        `Reveal in ${targetName}`,
+      ]);
+      if (!fileManagerEntry || fileManagerEntry.kind !== "item") {
+        throw new Error("Reveal in file manager entry missing");
       }
-      revealEntry.onSelect();
-      expect(onRevealFileInExplorer).toHaveBeenCalledWith("/some/path.ts");
-      const fileManagerEntry = entries.find(
-        (entry) => entry.kind === "item" && entry.key === "reveal-in-file-manager",
-      );
-      if (targetName) {
-        expect(labels.slice(0, 3)).toEqual([
-          "Copy file path",
-          "Reveal in file explorer",
-          `Reveal in ${targetName}`,
-        ]);
-        if (!fileManagerEntry || fileManagerEntry.kind !== "item") {
-          throw new Error("Reveal in file manager entry missing");
-        }
-        fileManagerEntry.onSelect();
-        expect(reveal).toHaveBeenCalledWith("/some/path.ts");
-      } else {
-        expect(fileManagerEntry).toBeUndefined();
-      }
-    },
-  );
+      fileManagerEntry.onSelect();
+      expect(reveal).toHaveBeenCalledWith("/some/path.ts");
+    } else {
+      expect(fileManagerEntry).toBeUndefined();
+    }
+  });
 
   it("uses a Changes close id for the working diff tab", () => {
     const actions = buildWorkspaceDesktopTabActions({
