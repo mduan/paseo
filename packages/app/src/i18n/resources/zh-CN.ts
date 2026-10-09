@@ -435,6 +435,13 @@ export const zhCN: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "打开",
+      right: "在右侧窗格中打开",
+      left: "在左侧窗格中打开",
+      bottom: "在下方窗格中打开",
+      top: "在上方窗格中打开",
+    },
     pending: {
       creating: "正在创建 worktree...",
       elapsed: "已用 {{time}}",

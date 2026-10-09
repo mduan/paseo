@@ -435,6 +435,13 @@ export const ar: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "فتح",
+      right: "فتح في اللوحة اليمنى",
+      left: "فتح في اللوحة اليسرى",
+      bottom: "فتح في اللوحة السفلية",
+      top: "فتح في اللوحة العلوية",
+    },
     pending: {
       creating: "جارٍ إنشاء شجرة العمل...",
       elapsed: "انقضى {{time}}",

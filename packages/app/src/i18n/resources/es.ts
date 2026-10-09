@@ -440,6 +440,13 @@ export const es: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "Abrir",
+      right: "Abrir en el panel derecho",
+      left: "Abrir en el panel izquierdo",
+      bottom: "Abrir en el panel inferior",
+      top: "Abrir en el panel superior",
+    },
     pending: {
       creating: "Creando árbol de trabajo...",
       elapsed: "{{time}} transcurridos",

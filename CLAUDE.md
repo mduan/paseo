@@ -130,6 +130,7 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
   - Never re-run a test suite that another agent already ran and reported green — trust the result.
   - For full suite verification, push to CI and check GitHub Actions instead.
 - Add tests to existing suites and reuse their npm scripts and CI jobs instead of creating feature-specific ones.
+- **After every implementation, review changes and related callers before final verification and commit.** Reuse helpers or consolidate duplicate logic only when this simplifies code and preserves behavior.
 - **Always run typecheck and lint after every change.**
 - **Build workspace packages before diagnosing cross-package type errors.** This repo consumes generated declarations across workspaces. If typecheck fails in a package that depends on another workspace, rebuild the owning stack first so `dist` declarations are current:
   - `npm run build:client` — rebuild protocol and client declarations.

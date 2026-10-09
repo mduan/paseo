@@ -18,6 +18,8 @@ import {
 
 export interface UseFileLinkResult {
   target: InlinePathTarget | null;
+  isFileLink: boolean;
+  resolutionFailed: boolean;
   onHoverIn: () => void;
   onPress: () => void;
   open: (source: AssistantFileLinkSource, disposition: OpenFileDisposition) => void;
@@ -127,7 +129,12 @@ export function useFileLink(source: AssistantFileLinkSource): UseFileLinkResult 
     return query.data ? { ...resolution.target, path: query.data.path } : null;
   }, [query.data, resolution]);
 
-  return useMemo(() => ({ target, onHoverIn, onPress, open }), [target, onHoverIn, onPress, open]);
+  const isFileLink = resolution.kind === "needsLookup" || resolution.value.kind === "file";
+  const resolutionFailed = query.isError;
+  return useMemo(
+    () => ({ target, isFileLink, resolutionFailed, onHoverIn, onPress, open }),
+    [target, isFileLink, resolutionFailed, onHoverIn, onPress, open],
+  );
 }
 
 export function useAssistantFileLinkActions(): AssistantFileLinkActions {

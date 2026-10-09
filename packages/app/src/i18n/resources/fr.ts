@@ -441,6 +441,13 @@ export const fr: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "Ouvrir",
+      right: "Ouvrir dans le volet droit",
+      left: "Ouvrir dans le volet gauche",
+      bottom: "Ouvrir dans le volet inférieur",
+      top: "Ouvrir dans le volet supérieur",
+    },
     pending: {
       creating: "Création de l'arbre de travail...",
       elapsed: "{{time}} écoulé",

@@ -440,6 +440,13 @@ export const ja: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "開く",
+      right: "右のペインで開く",
+      left: "左のペインで開く",
+      bottom: "下のペインで開く",
+      top: "上のペインで開く",
+    },
     pending: {
       creating: "ワークツリーを作成中...",
       elapsed: "{{time}} 経過",

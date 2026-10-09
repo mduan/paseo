@@ -35,6 +35,10 @@ function editor(page: Page) {
   return page.getByTestId("file-source-editor").filter({ visible: true }).locator(".cm-content");
 }
 
+function readClipboardText(): Promise<string> {
+  return navigator.clipboard.readText();
+}
+
 function hasHorizontalOverflow(element: HTMLElement): boolean {
   return element.scrollWidth > element.clientWidth;
 }
@@ -96,6 +100,93 @@ async function seedAgentWithFileLink(input: LinkedFile) {
 }
 
 test.describe("CodeMirror workspace file editing", () => {
+  for (const split of [
+    { axis: "horizontal", forward: "right", backward: "left", moveKey: "ArrowRight" },
+    { axis: "vertical", forward: "bottom", backward: "top", moveKey: "ArrowDown" },
+  ]) {
+    test(`opens chat file links in current and ${split.axis} panes through the context menu`, async ({
+      page,
+      context,
+    }) => {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
+      });
+      const target = "target.ts:42";
+      const session = await seedAgentWithFileLink({
+        target,
+        fileName: "target.ts",
+        content: Array.from(
+          { length: 80 },
+          (_, index) => `export const line${index + 1} = ${index + 1};`,
+        ).join("\n"),
+      });
+      try {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await openAgentRoute(page, session);
+        const fileLink = page.getByText(target, { exact: true });
+        const agentTab = page
+          .getByTestId(`workspace-tab-agent_${session.agentId}`)
+          .filter({ visible: true });
+        const menu = page.getByTestId("assistant-file-link-menu");
+        const splitAction = page.getByTestId(`assistant-file-link-open-${split.axis}`);
+        const tabRows = page.getByTestId("workspace-tabs-row").filter({ visible: true });
+        const sourcePane = page.getByTestId("workspace-pane-main");
+        const fileTabId = "workspace-tab-file_target.ts";
+        const destinationPane = page
+          .locator('[data-testid^="workspace-pane-"]')
+          .filter({ has: page.getByTestId(fileTabId) });
+        // Keep a tab in the source pane so moving the chat does not collapse the split.
+        await sourcePane.getByTestId("workspace-new-tab-button").click();
+        await page.getByTestId("workspace-new-tab-menu-agent").click();
+        await agentTab.click();
+        await expect(fileLink).toBeVisible({ timeout: 15_000 });
+        await fileLink.click({ button: "right" });
+        await expect(menu).toBeVisible();
+        await expect(menu.getByRole("menuitem")).toHaveCount(5);
+        await expect(splitAction).toHaveText(`Open in ${split.forward} pane`);
+        await page.getByTestId("assistant-file-link-open").click();
+        await expect(tabRows).toHaveCount(1);
+        await expect(page.getByLabel("Line 42, column 1")).toBeVisible();
+
+        await agentTab.click();
+        await fileLink.click({ button: "right" });
+        await page.getByTestId("assistant-file-link-copy-path").click();
+        await expect.poll(() => page.evaluate(readClipboardText)).toBe("target.ts");
+        await fileLink.click({ button: "right" });
+        await page.getByTestId("assistant-file-link-reveal").click();
+        const tree = page.getByTestId("file-explorer-tree-scroll");
+        await expect(tree).toBeVisible();
+        await expect(tree.getByText("target.ts", { exact: true })).toBeVisible();
+
+        await fileLink.click({ button: "right" });
+        await splitAction.click();
+        await expect(tabRows).toHaveCount(2);
+        await expect(destinationPane).not.toHaveAttribute("data-testid", "workspace-pane-main");
+        await expect(page.getByLabel("Line 42, column 1")).toBeVisible();
+        await expect(fileLink).toBeVisible();
+        await fileLink.click({ button: "right" });
+        await splitAction.click();
+        await expect(tabRows).toHaveCount(2);
+
+        await agentTab.click();
+        await page.keyboard.press(`Meta+Shift+Alt+${split.moveKey}`);
+        await expect(
+          destinationPane.getByTestId(`workspace-tab-agent_${session.agentId}`),
+        ).toBeVisible();
+        await expect(fileLink).toBeVisible();
+        await fileLink.click({ button: "right" });
+        await expect(splitAction).toHaveText(`Open in ${split.backward} pane`);
+        await splitAction.click();
+        await expect(tabRows).toHaveCount(2);
+        await expect(sourcePane.getByTestId(fileTabId)).toBeVisible();
+        await expect(page.getByLabel("Line 42, column 1")).toBeVisible();
+      } finally {
+        await session.cleanup();
+      }
+    });
+  }
+
   test("shows an absolute POSIX assistant file link relative to the workspace on hover", async ({
     page,
   }) => {

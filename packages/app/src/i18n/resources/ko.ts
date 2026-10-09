@@ -436,6 +436,13 @@ export const ko: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "열기",
+      right: "오른쪽 창에서 열기",
+      left: "왼쪽 창에서 열기",
+      bottom: "아래쪽 창에서 열기",
+      top: "위쪽 창에서 열기",
+    },
     pending: {
       creating: "워크트리를 생성하는 중...",
       elapsed: "{{time}} 경과",

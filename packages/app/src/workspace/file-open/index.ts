@@ -1,4 +1,5 @@
 import { isAbsolutePath } from "@/utils/path";
+import type { FilePaneAxis } from "./pane";
 
 export type OpenFileDisposition = "main" | "preferred" | "side";
 
@@ -13,6 +14,7 @@ export type WorkspaceFileTabTarget = { kind: "file" } & WorkspaceFileLocation;
 export interface WorkspaceFileOpenRequest {
   location: WorkspaceFileLocation;
   disposition: OpenFileDisposition;
+  paneAxis?: FilePaneAxis;
 }
 
 export function normalizeWorkspaceFileLocation(
