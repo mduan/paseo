@@ -23,6 +23,8 @@ import {
   useIsCompactFormFactor,
 } from "@/constants/layout";
 import { ChangesSurface } from "@/git/diff-pane";
+import { requestExplorerReveal } from "@/file-explorer/reveal";
+import { buildWorkspaceExplorerStateKey } from "@/hooks/use-file-explorer-actions";
 import { changesStateSchema, defaultChangesState, type ChangesState } from "@/panels/changes/state";
 import { FileExplorerPane } from "./file-explorer-pane";
 import { useKeyboardShiftStyle } from "@/keyboard/shift";
@@ -422,6 +424,7 @@ function ExplorerSidebarContent({
         {mountedTabIds.has("changes") ? (
           <RetainedPanel active={resolvedTab === "changes"}>
             <ChangedFilesPane
+              onTabPress={onTabPress}
               serverId={serverId}
               workspaceId={workspaceId}
               workspaceRoot={workspaceRoot}
@@ -461,11 +464,21 @@ function ChangedFilesPane({
   workspaceRoot,
   isOpen,
   onOpenFile,
+  onTabPress,
 }: Pick<
   SidebarContentProps,
-  "serverId" | "workspaceId" | "workspaceRoot" | "isOpen" | "onOpenFile"
+  "serverId" | "workspaceId" | "workspaceRoot" | "isOpen" | "onOpenFile" | "onTabPress"
 >) {
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
+  const revealInExplorer = useCallback(
+    (path: string) => {
+      const workspaceStateKey = buildWorkspaceExplorerStateKey({ workspaceId, workspaceRoot });
+      if (!workspaceStateKey) return;
+      onTabPress("files");
+      requestExplorerReveal({ workspaceStateKey, path });
+    },
+    [onTabPress, workspaceId, workspaceRoot],
+  );
   const [changesState, setChangesState] = useState<ChangesState>(() =>
     changesStateSchema.parse(defaultChangesState),
   );
@@ -477,6 +490,7 @@ function ChangedFilesPane({
       enabled={isOpen}
       onOpenFile={onOpenFile}
       onAddToChat={canAddToChat ? addFile : undefined}
+      onRevealInExplorer={revealInExplorer}
       state={changesState}
       onStateChange={setChangesState}
     />

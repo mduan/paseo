@@ -192,6 +192,7 @@ interface ChangesSurfaceProps {
   onOpenToSide?: (path: string) => void;
   onSelectDiffFile?: (path: string) => void;
   onAddToChat?: (path: string) => void;
+  onRevealInExplorer?: (path: string) => void;
   state?: ChangesState;
   onStateChange?: (state: ChangesState) => void;
 }
@@ -1502,6 +1503,7 @@ export function ChangesSurface({
   onOpenToSide,
   onSelectDiffFile,
   onAddToChat,
+  onRevealInExplorer,
   state: changesState,
   onStateChange,
 }: ChangesSurfaceProps) {
@@ -1755,6 +1757,7 @@ export function ChangesSurface({
       onCopyPath: handleCopyPath,
       onCopyRelativePath: handleCopyRelativePath,
       onReveal: fileManagerTarget ? handleRevealPath : undefined,
+      onRevealInExplorer,
       revealTargetName: fileManagerTarget?.label,
       onDownload: handleDownloadPath,
       onDuplicate: fsEntryDuplicateEnabled ? handleDuplicatePath : undefined,
@@ -1769,6 +1772,7 @@ export function ChangesSurface({
       onOpenFile,
       onOpenToSide,
       onAddToChat,
+      onRevealInExplorer,
       handleCopyPath,
       handleCopyRelativePath,
       handleDownloadPath,

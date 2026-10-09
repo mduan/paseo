@@ -336,8 +336,10 @@ test("Changes comparison controls the working diff and tree selection focuses it
 });
 
 test("changes file actions open below the right-click without a reserved kebab", async ({
+  context,
   page,
 }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const workspace = await createWorkspaceWithMountedTabDiff({ includeDeletedFile: true });
   await useUnwrappedDiffLines(page);
   await openWorkspaceChanges(page, workspace);
@@ -348,9 +350,9 @@ test("changes file actions open below the right-click without a reserved kebab",
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
   await expect(page.getByTestId(/diff-file-\d+-actions/)).toHaveCount(0);
   await page.getByTestId("diff-file-1-toggle").click({ button: "right" });
-  await expect(page.getByText("Copy path")).toBeVisible();
-  await page.getByText("Copy path", { exact: true }).click({ button: "right" });
-  await expect(page.getByText("Copy path")).toBeVisible();
+  await expect(page.getByText("Copy file path", { exact: true })).toBeVisible();
+  await page.getByText("Copy file path", { exact: true }).click({ button: "right" });
+  await expect(page.getByText("Copy file path", { exact: true })).toBeVisible();
   await expect(page.getByTestId("diff-file-1-open-file")).toHaveCount(0);
   await page.keyboard.press("Escape");
 
@@ -367,6 +369,21 @@ test("changes file actions open below the right-click without a reserved kebab",
 
   await expect(page.getByTestId("workspace-file-pane")).toBeVisible();
   await expect(page.getByTestId("workspace-tab-file_src/use-mounted-tab-set.ts")).toBeVisible();
+
+  await page.getByTestId("workspace-tab-working_diff").click();
+  await page.getByTestId("diff-file-0-toggle").click({ button: "right" });
+  await page.getByText("Copy file path", { exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(path.join(workspace.repoPath, "src/use-mounted-tab-set.ts"));
+  await page.getByTestId("diff-file-0-toggle").click({ button: "right" });
+  await page.getByText("Reveal in file explorer", { exact: true }).click();
+  const filesTree = page.getByTestId("file-explorer-tree-scroll");
+  await expect(filesTree).toBeVisible();
+  const revealedRow = filesTree
+    .getByText("use-mounted-tab-set.ts", { exact: true })
+    .locator("xpath=ancestor::*[starts-with(@data-testid, 'file-explorer-row-')][1]");
+  await expect(revealedRow).toHaveAttribute("aria-selected", "true");
 });
 
 test("canvas file headers select without toggling for context menu and long press", async ({
@@ -381,7 +398,7 @@ test("canvas file headers select without toggling for context menu and long pres
   await deletedFile.click({ button: "right" });
   await expect(deletedFile).toHaveAttribute("aria-selected", "true");
   await expect(deletedFile).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByText("Copy path")).toBeVisible();
+  await expect(page.getByText("Copy file path", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
 
   await longPressFileHeader(page, firstFile);

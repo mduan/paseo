@@ -13,6 +13,7 @@ import {
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  FolderSearch,
   MessageSquarePlus,
   Pencil,
   Trash2,
@@ -58,8 +59,10 @@ interface FileActionsContextMenuContentProps {
   editorTargetName?: string;
   onOpenToSide?: () => void;
   onCopyPath?: () => void;
+  copyPathLabel?: string;
   onCopyRelativePath?: () => void;
   onReveal?: () => void;
+  onRevealInExplorer?: () => void;
   revealTargetName?: string;
   onDownload?: () => void;
   onAddToChat?: () => void;
@@ -87,8 +90,10 @@ export function FileActionsContextMenuContent({
   editorTargetName,
   onOpenToSide,
   onCopyPath,
+  copyPathLabel,
   onCopyRelativePath,
   onReveal,
+  onRevealInExplorer,
   revealTargetName,
   onDownload,
   onAddToChat,
@@ -178,7 +183,7 @@ export function FileActionsContextMenuContent({
         ? {
             key: "copy-path",
             group: "reference",
-            label: t("workspace.fileActions.copyPath"),
+            label: copyPathLabel ?? t("workspace.fileActions.copyPath"),
             icon: Copy,
             onSelect: onCopyPath,
           }
@@ -201,6 +206,12 @@ export function FileActionsContextMenuContent({
             onSelect: onReveal,
           }
         : null,
+      optionalFileAction(true, onRevealInExplorer, {
+        key: "reveal-in-explorer",
+        group: "reference",
+        label: t("workspace.tabs.menu.revealInExplorer"),
+        icon: FolderSearch,
+      }),
       openInEditorAction,
       availableFile && onDownload
         ? {
@@ -267,6 +278,7 @@ export function FileActionsContextMenuContent({
       }),
     );
   }, [
+    copyPathLabel,
     fileExists,
     fileKind,
     onAddToChat,
@@ -285,6 +297,7 @@ export function FileActionsContextMenuContent({
     onOpenToSide,
     onRename,
     onReveal,
+    onRevealInExplorer,
     onRevert,
     revealTargetName,
     t,

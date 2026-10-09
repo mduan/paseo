@@ -46,6 +46,7 @@ import { usePanelState } from "@/panels/use-panel-state";
 import { RenderProfile } from "@/utils/render-profiler";
 import type { Theme } from "@/styles/theme";
 import { useAgentTurnDiff, useAgentTurnDiffs } from "@/turn-diffs/queries";
+import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
 
 const ThemedFileDiff = withUnistyles(FileDiff);
 const ThemedGitCommitHorizontal = withUnistyles(GitCommitHorizontal);
@@ -114,8 +115,15 @@ function resolveChangesPresentation(
 
 function ChangesPanel() {
   const { t } = useTranslation();
-  const { serverId, workspaceId, tabId, target, openPreferredTarget, openTargetToSide } =
-    usePaneContext();
+  const {
+    serverId,
+    workspaceId,
+    tabId,
+    target,
+    openPreferredTarget,
+    openTargetToSide,
+    revealFileInExplorer,
+  } = usePaneContext();
   const [changesState, setChangesState] = usePanelState(changesStateSchema, defaultChangesState);
   const { preferences } = useChangesPreferences();
   const cwd = useWorkspaceDirectory(serverId, workspaceId);
@@ -169,6 +177,7 @@ function ChangesPanel() {
           onOpenFile={handleOpenFile}
           onOpenToSide={isTree && openTargetToSide ? handleOpenDiffToSide : undefined}
           onAddToChat={canAddToChat ? addFile : undefined}
+          onRevealInExplorer={revealFileInExplorer}
           state={changesState}
           onStateChange={setChangesState}
         />
@@ -257,7 +266,16 @@ function CommitDiffPanel() {
 
 function TurnDiffPanel() {
   const { t } = useTranslation();
-  const { serverId, workspaceId, host, tabId, target, openPreferredTarget } = usePaneContext();
+  const {
+    serverId,
+    workspaceId,
+    host,
+    tabId,
+    target,
+    openPreferredTarget,
+    copyFilePath,
+    revealFileInExplorer,
+  } = usePaneContext();
   const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
   const isInSidePane = useWorkspaceLayoutStore((state) => {
     const layout = workspaceKey ? state.layoutByWorkspace[workspaceKey] : undefined;
@@ -295,6 +313,14 @@ function TurnDiffPanel() {
   );
 
   const payload = query.data;
+  const handleCopyPath = useCallback(
+    (path: string) => {
+      void copyFilePath(
+        buildAbsoluteExplorerPath({ workspaceRoot: payload?.cwd ?? cwd ?? "", entryPath: path }),
+      );
+    },
+    [copyFilePath, cwd, payload?.cwd],
+  );
   const files = payload?.files ?? EMPTY_FILES;
   const diffOptions = useMemo<ChangesToolbarDiffOptions>(
     () => ({
@@ -342,11 +368,15 @@ function TurnDiffPanel() {
       focusRequestId: target.focusRequestId,
       onOpenFile: handleOpenFile,
       onAddToChat: canAddToChat ? addFile : undefined,
+      onCopyPath: handleCopyPath,
+      onRevealInExplorer: revealFileInExplorer,
     }),
     [
       addFile,
       canAddToChat,
       handleOpenFile,
+      handleCopyPath,
+      revealFileInExplorer,
       payload?.snapshot,
       reviewActions,
       target.focusPath,

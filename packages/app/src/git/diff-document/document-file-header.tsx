@@ -46,6 +46,7 @@ export const DocumentFileHeader = memo(function DocumentFileHeader({
       onCopyPath={working?.onCopyPath}
       onCopyRelativePath={working?.onCopyRelativePath}
       onReveal={working?.onReveal}
+      onRevealInExplorer={working?.onRevealInExplorer}
       revealTargetName={working?.revealTargetName}
       onDownload={working?.onDownload}
       onDuplicate={working?.onDuplicate}
@@ -72,6 +73,7 @@ function documentFileHeaderPropsEqual(
     previous.mode.onCopyPath === next.mode.onCopyPath &&
     previous.mode.onCopyRelativePath === next.mode.onCopyRelativePath &&
     previous.mode.onReveal === next.mode.onReveal &&
+    previous.mode.onRevealInExplorer === next.mode.onRevealInExplorer &&
     previous.mode.revealTargetName === next.mode.revealTargetName &&
     previous.mode.onDownload === next.mode.onDownload &&
     previous.mode.onDuplicate === next.mode.onDuplicate &&
