@@ -662,6 +662,10 @@ export const es: TranslationResources = {
         closeLeft: "Cerrar pestañas a la izquierda",
         closeRight: "Cerrar pestañas a la derecha",
         closeOthers: "Cerrar otras pestañas",
+        moveLeft: "Mover al panel izquierdo",
+        moveRight: "Mover al panel derecho",
+        moveTop: "Mover al panel superior",
+        moveBottom: "Mover al panel inferior",
         moveToMain: "Mover al panel principal",
         reloadAgent: "Recargar agente",
         reloadAgentTooltip:

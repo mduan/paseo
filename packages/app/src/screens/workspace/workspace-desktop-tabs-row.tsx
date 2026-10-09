@@ -47,6 +47,7 @@ import {
   type WorkspaceDesktopTabActions,
   type WorkspaceTabMenuEntry,
   type WorkspaceTabMenuLabels,
+  type WorkspaceTabPaneMoves,
 } from "@/screens/workspace/workspace-tab-menu";
 import { useWorkspaceTabMenuItemAdornments } from "@/screens/workspace/workspace-tab-menu-item";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
@@ -71,6 +72,11 @@ import {
   useHorizontalScrollBoundary,
 } from "@/components/ui/horizontal-scroll-boundary";
 import { useSessionStore } from "@/stores/session-store";
+import {
+  selectExplorerSidebarPaneId,
+  useWorkspaceLayoutStore,
+} from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 
 const DROPDOWN_WIDTH = 220;
 const DEFAULT_INLINE_ADD_BUTTON_RESERVED_WIDTH = 36;
@@ -980,6 +986,31 @@ function ResolvedWorkspaceDesktopTabsRow({
   onExitFocusMode,
 }: ResolvedWorkspaceDesktopTabsRowProps) {
   const { t } = useTranslation();
+  const workspaceKey = buildWorkspaceTabPersistenceKey({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+  });
+  const workspaceLayout = useWorkspaceLayoutStore((state) =>
+    workspaceKey ? state.layoutByWorkspace[workspaceKey] : undefined,
+  );
+  const explorerSidebarPaneId = useWorkspaceLayoutStore((state) =>
+    workspaceKey ? selectExplorerSidebarPaneId(state, workspaceKey) : null,
+  );
+  const moveTabToPane = useWorkspaceLayoutStore((state) => state.moveTabToPane);
+  const splitPane = useWorkspaceLayoutStore((state) => state.splitPane);
+  const paneMoves = useMemo<WorkspaceTabPaneMoves | undefined>(() => {
+    if (!workspaceKey || !workspaceLayout) return undefined;
+    return {
+      root: workspaceLayout.root,
+      explorerSidebarPaneId,
+      onMoveTabToPane: ({ tabId, toPaneId }) => {
+        moveTabToPane(workspaceKey, tabId, toPaneId, { preserveSourcePane: true });
+      },
+      onSplitPane: (input) => {
+        splitPane(workspaceKey, input);
+      },
+    };
+  }, [workspaceLayout, explorerSidebarPaneId, moveTabToPane, splitPane, workspaceKey]);
   const newTabKeys = useShortcutKeys("workspace-tab-new");
   const [tabsContainerWidth, setTabsContainerWidth] = useState<number>(0);
   const [exitFocusModeWidth, setExitFocusModeWidth] = useState<number>(0);
@@ -1040,6 +1071,10 @@ function ResolvedWorkspaceDesktopTabsRow({
       copyFilePath: t("workspace.tabs.menu.copyFilePath"),
       revealInExplorer: t("workspace.tabs.menu.revealInExplorer"),
       rename: t("workspace.tabs.menu.rename"),
+      moveLeft: t("workspace.tabs.menu.moveLeft"),
+      moveRight: t("workspace.tabs.menu.moveRight"),
+      moveTop: t("workspace.tabs.menu.moveTop"),
+      moveBottom: t("workspace.tabs.menu.moveBottom"),
       closeAbove: t("workspace.tabs.menu.closeAbove"),
       closeBelow: t("workspace.tabs.menu.closeBelow"),
       closeLeft: t("workspace.tabs.menu.closeLeft"),
@@ -1230,6 +1265,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           onNavigateTab={onNavigateTab}
           onCloseTab={onCloseTab}
           labels={tabMenuLabels}
+          paneMoves={paneMoves}
           dragHandleProps={dragHandleProps}
           showDropIndicatorBefore={showDropIndicatorBefore}
           showDropIndicatorAfter={showDropIndicatorAfter}
@@ -1256,6 +1292,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       onRenameTab,
       setHoveredCloseTabKey,
       tabMenuLabels,
+      paneMoves,
       tabDropPreviewIndex,
       displayedTabs.length,
     ],
@@ -1379,6 +1416,7 @@ function ResolvedDesktopTabChip({
   onNavigateTab,
   onCloseTab,
   labels,
+  paneMoves,
   dragHandleProps,
   showDropIndicatorBefore,
   showDropIndicatorAfter,
@@ -1406,6 +1444,7 @@ function ResolvedDesktopTabChip({
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   labels: WorkspaceTabMenuLabels;
+  paneMoves?: WorkspaceTabPaneMoves;
   dragHandleProps: DraggableListDragHandleProps | undefined;
   showDropIndicatorBefore: boolean;
   showDropIndicatorAfter: boolean;
@@ -1430,6 +1469,7 @@ function ResolvedDesktopTabChip({
         onCloseTabsToRight,
         onCloseOtherTabs,
         labels,
+        paneMoves,
       }),
     [
       index,
@@ -1444,6 +1484,7 @@ function ResolvedDesktopTabChip({
       onRevealFileInExplorer,
       onCopyResumeCommand,
       labels,
+      paneMoves,
       onReloadAgent,
       onRenameTab,
       tabCount,

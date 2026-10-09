@@ -662,6 +662,10 @@ export const fr: TranslationResources = {
         closeLeft: "Près de la gauche",
         closeRight: "Près de la droite",
         closeOthers: "Fermer les autres onglets",
+        moveLeft: "Déplacer vers le volet gauche",
+        moveRight: "Déplacer vers le volet droit",
+        moveTop: "Déplacer vers le volet supérieur",
+        moveBottom: "Déplacer vers le volet inférieur",
         moveToMain: "Déplacer vers le panneau principal",
         reloadAgent: "Agent de rechargement",
         reloadAgentTooltip:

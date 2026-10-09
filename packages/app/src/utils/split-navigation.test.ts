@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SplitNode } from "@/stores/workspace-layout-store";
-import { findAdjacentPane } from "./split-navigation";
+import { findAdjacentPane, PaneMovePosition, resolvePaneMove } from "./split-navigation";
 
 function createPaneNode(id: string, hidden = false): SplitNode {
   return {
@@ -91,5 +91,22 @@ describe("findAdjacentPane", () => {
 
     expect(findAdjacentPane(root, "left", "right")).toBe("right");
     expect(findAdjacentPane(root, "hidden", "right")).toBeNull();
+  });
+
+  it("reuses the closest visible right pane before considering a left pane", () => {
+    const root = createGroupNode({
+      direction: "horizontal",
+      sizes: [0.25, 0.25, 0.25, 0.25],
+      children: [
+        createPaneNode("left"),
+        createPaneNode("middle"),
+        createPaneNode("hidden", true),
+        createPaneNode("right"),
+      ],
+    });
+    expect(resolvePaneMove({ root, paneId: "middle", position: PaneMovePosition.Right })).toEqual({
+      position: PaneMovePosition.Right,
+      toPaneId: "right",
+    });
   });
 });

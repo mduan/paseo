@@ -662,6 +662,10 @@ export const ja: TranslationResources = {
         closeLeft: "左のタブを閉じる",
         closeRight: "右のタブを閉じる",
         closeOthers: "他のタブを閉じる",
+        moveLeft: "左のペインに移動",
+        moveRight: "右のペインに移動",
+        moveTop: "上のペインに移動",
+        moveBottom: "下のペインに移動",
         moveToMain: "メインパネルへ移動",
         reloadAgent: "エージェントを再読み込み",
         reloadAgentTooltip:
