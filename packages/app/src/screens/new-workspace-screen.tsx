@@ -1069,16 +1069,6 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
   const { payload, composerState, ensureWorkspace, serverId, clearDraft } = input;
   const clearConsumedDraft = captureWorkspaceDraftCleanup(input);
   const { text, attachments, cwd } = payload;
-  const tracker =
-    input.worktreeCreation &&
-    createWorktreeCreationTracker({
-      ...input.worktreeCreation,
-      serverId,
-      promptPreview: text.trim(),
-      isStillOnCreateScreen: input.isStillOnCreateScreen,
-      clearConsumedDraft,
-    });
-  const releaseDraft = tracker ? tracker.clearDraft : clearConsumedDraft;
   if (!composerState) {
     throw new Error(input.labels.composerStateRequired);
   }
@@ -1097,6 +1087,17 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     format: attachmentSubmitFormat,
   });
   const images = await encodeImages(wirePayload.images);
+  const tracker =
+    input.worktreeCreation &&
+    createWorktreeCreationTracker({
+      ...input.worktreeCreation,
+      serverId,
+      promptPreview: text.trim(),
+      isStillOnCreateScreen: input.isStillOnCreateScreen,
+      clearConsumedDraft,
+      imageAttachmentIds: wirePayload.images.map((image) => image.id),
+    });
+  const releaseDraft = tracker ? tracker.clearDraft : clearConsumedDraft;
   let handedOff = false;
   let outcome: SubmitOutcome = "background";
   const openWorkspace: SubmitDraftInput["openWorkspace"] = ({ workspaceId, target }) => {

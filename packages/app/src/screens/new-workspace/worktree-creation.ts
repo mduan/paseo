@@ -1,4 +1,5 @@
 import type { CreationSnapshot } from "@getpaseo/protocol/messages";
+import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 import { usePendingWorkspaceCreationStore } from "@/stores/pending-workspace-creation-store";
 import type { PrepareWorkspaceTabInput } from "@/utils/prepare-workspace-tab";
@@ -25,6 +26,7 @@ interface WorktreeCreationInput {
   isStillOnCreateScreen: () => boolean;
   /** Releases the consumed draft. Absent when the submission has no draft to release. */
   clearConsumedDraft?: () => void;
+  imageAttachmentIds?: readonly string[];
   ports: WorktreeCreationPorts;
 }
 
@@ -72,6 +74,8 @@ export function createWorktreeCreationTracker(
 ): WorktreeCreationTracker {
   const { serverId, ports } = input;
   const store = usePendingWorkspaceCreationStore.getState();
+  // The accepted event clears the source draft before the destination draft owns its images.
+  const releaseImages = input.imageAttachmentIds?.map(retainAttachmentForGarbageCollection) ?? [];
   let workspaceId: string | undefined;
   let workspaceReady = false;
   let navigated = false;
@@ -148,6 +152,8 @@ export function createWorktreeCreationTracker(
         }
       }
       throw error;
+    } finally {
+      for (const release of releaseImages) release();
     }
   }
 

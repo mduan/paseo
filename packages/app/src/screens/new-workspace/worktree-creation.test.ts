@@ -1,5 +1,15 @@
 import type { CreationSnapshot } from "@getpaseo/protocol/messages";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { collectRetainedAttachmentIds } from "@/attachments/gc-retention";
+import { createLocalFileAttachmentStore } from "@/attachments/local-file-attachment-store";
+import { garbageCollectAttachments } from "@/attachments/service";
+import { __setAttachmentStoreForTests } from "@/attachments/store";
+import { createTestAttachmentFileSystem } from "@/attachments/test-attachment-file-system";
+import {
+  applyClearDraftRecord,
+  collectReferencedAttachmentIdsFromState,
+  type DraftRecord,
+} from "@/stores/draft-store/state";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 import {
   PendingWorkspaceCreationStatus,
@@ -65,6 +75,7 @@ function createTracker(input: {
   ports: WorktreeCreationPorts;
   stillOnCreateScreen?: boolean;
   clearConsumedDraft?: () => void;
+  imageAttachmentIds?: readonly string[];
 }) {
   return createWorktreeCreationTracker({
     serverId: SERVER_ID,
@@ -74,6 +85,7 @@ function createTracker(input: {
     fallbackError: "Failed to create worktree",
     isStillOnCreateScreen: () => input.stillOnCreateScreen ?? true,
     clearConsumedDraft: input.clearConsumedDraft,
+    imageAttachmentIds: input.imageAttachmentIds,
     ports: input.ports,
   });
 }
@@ -86,7 +98,87 @@ beforeEach(() => {
   usePendingWorkspaceCreationStore.setState({ entriesByKey: {} });
 });
 
+afterEach(() => {
+  __setAttachmentStoreForTests(null);
+});
+
 describe("worktree creation tracker", () => {
+  it("keeps initial images readable when the accepted event clears the draft before handoff", async () => {
+    const store = createLocalFileAttachmentStore({
+      storageType: "native-file",
+      baseDirectoryName: "attachments",
+      fileSystem: createTestAttachmentFileSystem(),
+      resolvePreviewUrl: async (attachment) => `file://${attachment.storageKey}`,
+    });
+    __setAttachmentStoreForTests(store);
+    const images = await Promise.all(
+      ["origin-image-1", "origin-image-2"].map((id) =>
+        store.save({
+          id,
+          mimeType: "image/png",
+          source: { kind: "bytes", bytes: new Uint8Array([0, 1, 2, 3]) },
+        }),
+      ),
+    );
+    let draft: DraftRecord = {
+      input: {
+        text: "Origin prompt",
+        attachments: images.map((metadata) => ({ kind: "image", metadata })),
+      },
+      lifecycle: "active",
+      updatedAt: Date.now(),
+      version: 1,
+    };
+    const { ports } = createPorts({ activeSelection: null });
+    const tracker = createTracker({
+      ports,
+      imageAttachmentIds: images.map((image) => image.id),
+      clearConsumedDraft: () => {
+        draft = applyClearDraftRecord({ record: draft, lifecycle: "sent", nowMs: Date.now() })!;
+      },
+    });
+
+    try {
+      tracker.observe(snapshot({ phase: "accepted" }));
+      await garbageCollectAttachments({
+        referencedIds: collectReferencedAttachmentIdsFromState({
+          drafts: { original: draft },
+          createModalDraft: null,
+        }),
+      });
+      await expect(
+        Promise.all(images.map((attachment) => store.encodeBase64({ attachment }))),
+      ).resolves.toEqual(["AAECAw==", "AAECAw=="]);
+      tracker.observe(
+        snapshot({ phase: "workspace_ready", revision: 2, workspace: WORKSPACE_PAYLOAD }),
+      );
+    } finally {
+      await tracker.track(Promise.resolve("created"));
+    }
+
+    expect(collectRetainedAttachmentIds()).toEqual(new Set());
+    await garbageCollectAttachments({ referencedIds: new Set(images.map((image) => image.id)) });
+    await expect(
+      Promise.all(images.map((attachment) => store.encodeBase64({ attachment }))),
+    ).resolves.toEqual(["AAECAw==", "AAECAw=="]);
+  });
+
+  it("releases initial image protection when creation fails", async () => {
+    const { ports } = createPorts({ activeSelection: null });
+    const tracker = createTracker({ ports, imageAttachmentIds: ["failed-origin-image"] });
+    tracker.observe(snapshot({ phase: "accepted" }));
+
+    try {
+      expect(collectRetainedAttachmentIds()).toEqual(new Set(["failed-origin-image"]));
+    } finally {
+      await expect(tracker.track(Promise.reject(new Error("git failed")))).rejects.toThrow(
+        "git failed",
+      );
+    }
+
+    expect(collectRetainedAttachmentIds()).toEqual(new Set());
+  });
+
   it("adds the pending entry and leaves the New workspace screen when creation is accepted", () => {
     const { calls, ports } = createPorts({ activeSelection: null });
     let draftClears = 0;
