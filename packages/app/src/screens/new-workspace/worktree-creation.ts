@@ -126,6 +126,7 @@ export function createWorktreeCreationTracker(
     } else {
       ports.prepareWorkspaceTab(request);
     }
+    store.remove({ serverId, workspaceId: target.workspaceId });
     return userIsOnWorkspace;
   }
 

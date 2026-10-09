@@ -183,6 +183,31 @@ describe("worktree creation tracker", () => {
     ]);
   });
 
+  it.each([false, true])(
+    "keeps creation pending until the draft tab is prepared (foreground: %s)",
+    (foreground) => {
+      const { ports } = createPorts({
+        activeSelection: foreground ? { serverId: SERVER_ID, workspaceId: WORKSPACE_ID } : null,
+      });
+      const tracker = createTracker({
+        ports: {
+          ...ports,
+          navigateToWorkspace: () => expect(entries()).toHaveLength(1),
+          prepareWorkspaceTab: () => expect(entries()).toHaveLength(1),
+        },
+      });
+      tracker.observe(snapshot({ phase: "accepted" }));
+      tracker.observe(
+        snapshot({ phase: "workspace_ready", revision: 2, workspace: WORKSPACE_PAYLOAD }),
+      );
+      expect(entries()).toHaveLength(1);
+
+      tracker.openWorkspace({ workspaceId: WORKSPACE_ID, target: DRAFT_TARGET });
+
+      expect(entries()).toEqual([]);
+    },
+  );
+
   it("marks the entry failed on a workspace-stage failure and ignores later stages", () => {
     const { ports } = createPorts({ activeSelection: null });
     const tracker = createTracker({ ports });

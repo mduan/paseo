@@ -39,8 +39,8 @@ function useElapsed(input: { startedAt: number; ticking: boolean }): string {
 }
 
 /**
- * What a worktree workspace shows while its worktree is being built and the session store does not
- * have the workspace yet. It carries the sidebar toggle, so the user can leave while it waits.
+ * What a worktree workspace shows until creation hands off to its tab or settles.
+ * It carries the sidebar toggle, so the user can leave while it waits.
  */
 export function PendingWorkspacePane({
   entry,

@@ -42,8 +42,8 @@ function entryKey({ serverId, workspaceId }: WorkspaceIdentity): string {
 
 /**
  * In-memory only: a reload mid-creation drops the entry, and the workspace still appears once
- * the server finishes. Visibility is derived from the session store by the hooks below, so
- * whichever path delivers the workspace hides the pending UI without this store listening.
+ * the server finishes. The sidebar hides its pending row when the workspace arrives; the pane
+ * waits until the creation flow has prepared its tab or settled.
  */
 export const usePendingWorkspaceCreationStore = create<PendingWorkspaceCreationState>((set) => ({
   entriesByKey: {},
@@ -107,14 +107,8 @@ export function useVisiblePendingWorkspaceCreations(): PendingWorkspaceCreation[
   );
 }
 
-export function useVisiblePendingWorkspaceCreation(
+export function usePendingWorkspaceCreation(
   identity: WorkspaceIdentity,
 ): PendingWorkspaceCreation | undefined {
-  const entry = usePendingWorkspaceCreationStore((state) => state.entriesByKey[entryKey(identity)]);
-  const hasDescriptor = useStoreWithEqualityFn(
-    useSessionStore,
-    (state) => selectWorkspaceExists(state, identity.serverId, identity.workspaceId),
-    Object.is,
-  );
-  return hasDescriptor ? undefined : entry;
+  return usePendingWorkspaceCreationStore((state) => state.entriesByKey[entryKey(identity)]);
 }

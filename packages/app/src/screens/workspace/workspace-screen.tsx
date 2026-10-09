@@ -111,7 +111,7 @@ import {
 import { useWorkspace } from "@/stores/session-store-hooks";
 import {
   usePendingWorkspaceCreationStore,
-  useVisiblePendingWorkspaceCreation,
+  usePendingWorkspaceCreation,
 } from "@/stores/pending-workspace-creation-store";
 import { PendingWorkspacePane } from "@/screens/workspace/pending-workspace-pane";
 import { useWorkspaceTerminalSessionRetention } from "@/terminal/hooks/use-workspace-terminal-session-retention";
@@ -910,9 +910,8 @@ export const WorkspaceScreen = memo(function WorkspaceScreen({
     serverId,
     workspaceId,
   });
-  // Only while the session store lacks the workspace: withholding the body also skips its
-  // missing-workspace handling.
-  const pendingCreation = useVisiblePendingWorkspaceCreation({
+  // Keep the loading pane through descriptor arrival until the creation flow prepares its tab.
+  const pendingCreation = usePendingWorkspaceCreation({
     serverId: normalizedServerId,
     workspaceId: normalizedWorkspaceId,
   });

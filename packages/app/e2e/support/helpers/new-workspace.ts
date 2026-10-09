@@ -691,7 +691,8 @@ export async function delayBrowserWorkspaceCreatedResponse(
         (sessionMessage?.type === "workspace.create.response" &&
           createRequestIds.has(sessionMessage.payload.requestId)) ||
         (sessionMessage?.type === "workspace.create.update" &&
-          creationKeys.has(sessionMessage.payload.idempotencyKey));
+          creationKeys.has(sessionMessage.payload.idempotencyKey) &&
+          sessionMessage.payload.phase !== "accepted");
       if (isCreation && !releaseRequested) {
         delayedForwards.push(() => ws.send(message));
         return;
