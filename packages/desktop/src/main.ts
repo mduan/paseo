@@ -191,7 +191,7 @@ function showBrowserWebviewContextMenu(
   contents: Electron.WebContents,
   params: Electron.ContextMenuParams,
 ): void {
-  const menu = Menu.buildFromTemplate([
+  const items = [
     ...buildStandardContextMenuItems(contents, params),
     ...(app.isPackaged
       ? []
@@ -216,7 +216,9 @@ function showBrowserWebviewContextMenu(
             },
           },
         ]),
-  ]);
+  ];
+  if (!items.length) return;
+  const menu = Menu.buildFromTemplate(items);
   menu.popup({ window: win });
 }
 

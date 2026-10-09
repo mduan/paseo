@@ -4,7 +4,10 @@ import { EventEmitter } from "node:events";
 
 vi.mock("electron", () => ({
   BrowserWindow: class {
-    webContents = new EventEmitter();
+    webContents = Object.assign(new EventEmitter(), {
+      copyImageAt: vi.fn(),
+      downloadURL: vi.fn(),
+    });
   },
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
@@ -25,14 +28,65 @@ import {
 
 describe("window-manager", () => {
   describe("setupDefaultContextMenu", () => {
-    it("does not open a native menu outside editable fields, even with selected text", () => {
+    it("does not open a native menu outside inputs when no text is selected", () => {
       vi.mocked(Menu.buildFromTemplate).mockClear();
       const win = new BrowserWindow();
       setupDefaultContextMenu(win);
 
-      win.webContents.emit("context-menu", {}, { isEditable: false, selectionText: "Selected" });
+      win.webContents.emit("context-menu", {}, { isEditable: false, selectionText: "" });
 
       expect(Menu.buildFromTemplate).not.toHaveBeenCalled();
+    });
+
+    it("offers only native Copy for selected text", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit(
+        "context-menu",
+        {},
+        {
+          isEditable: false,
+          selectionText: "Selected",
+          linkURL: "https://example.com",
+        },
+      );
+
+      expect(Menu.buildFromTemplate).toHaveBeenCalledWith([{ role: "copy" }]);
+      const menu = vi.mocked(Menu.buildFromTemplate).mock.results[0]!.value;
+      expect(menu.popup).toHaveBeenCalledWith({ window: win });
+    });
+
+    it("offers only image actions, even for linked images with selected text", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+      const srcURL = "https://example.com/image.png";
+
+      win.webContents.emit(
+        "context-menu",
+        {},
+        {
+          isEditable: false,
+          hasImageContents: true,
+          srcURL,
+          linkURL: "https://example.com",
+          selectionText: "Selected",
+          x: 20,
+          y: 30,
+        },
+      );
+
+      expect(Menu.buildFromTemplate).toHaveBeenCalledWith([
+        { label: "Copy Image", click: expect.any(Function) },
+        { label: "Save Image As…", click: expect.any(Function) },
+      ]);
+      const items = vi.mocked(Menu.buildFromTemplate).mock.calls[0]![0];
+      Reflect.apply(items[0]!.click!, undefined, []);
+      Reflect.apply(items[1]!.click!, undefined, []);
+      expect(win.webContents.copyImageAt).toHaveBeenCalledWith(20, 30);
+      expect(win.webContents.downloadURL).toHaveBeenCalledWith(srcURL);
     });
 
     it("preserves the native editing menu for inputs", () => {

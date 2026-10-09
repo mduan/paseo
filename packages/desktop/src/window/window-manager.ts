@@ -324,6 +324,23 @@ export function buildStandardContextMenuItems(
   contents: WebContents,
   params: Electron.ContextMenuParams,
 ): MenuItemConstructorOptions[] {
+  if (params.hasImageContents && params.srcURL) {
+    return [
+      {
+        label: "Copy Image",
+        click: () => contents.copyImageAt(params.x, params.y),
+      },
+      {
+        label: "Save Image As…",
+        click: () => contents.downloadURL(params.srcURL),
+      },
+    ];
+  }
+
+  if (!params.isEditable) {
+    return params.selectionText ? [{ role: "copy" }] : [];
+  }
+
   const items: MenuItemConstructorOptions[] = [];
 
   if (params.misspelledWord) {
@@ -359,38 +376,20 @@ export function buildStandardContextMenuItems(
     items.push({ type: "separator" });
   }
 
-  if (params.hasImageContents && params.srcURL) {
-    items.push({
-      label: "Copy Image",
-      click: () => contents.copyImageAt(params.x, params.y),
-    });
-    items.push({
-      label: "Save Image As…",
-      click: () => contents.downloadURL(params.srcURL),
-    });
-    items.push({ type: "separator" });
-  }
-
-  if (params.isEditable) {
-    items.push({ role: "cut", enabled: params.editFlags.canCut });
-    items.push({ role: "copy", enabled: params.editFlags.canCopy });
-    items.push({ role: "paste", enabled: params.editFlags.canPaste });
-    items.push({ type: "separator" });
-    items.push({ role: "selectAll" });
-  } else {
-    items.push({ role: "copy", enabled: params.selectionText.length > 0 });
-    items.push({ role: "paste" });
-    items.push({ type: "separator" });
-    items.push({ role: "selectAll" });
-  }
+  items.push({ role: "cut", enabled: params.editFlags.canCut });
+  items.push({ role: "copy", enabled: params.editFlags.canCopy });
+  items.push({ role: "paste", enabled: params.editFlags.canPaste });
+  items.push({ type: "separator" });
+  items.push({ role: "selectAll" });
 
   return items;
 }
 
 export function setupDefaultContextMenu(win: BrowserWindow): void {
   win.webContents.on("context-menu", (_event, params) => {
-    if (!params.isEditable) return;
-    const menu = Menu.buildFromTemplate(buildStandardContextMenuItems(win.webContents, params));
+    const items = buildStandardContextMenuItems(win.webContents, params);
+    if (!items.length) return;
+    const menu = Menu.buildFromTemplate(items);
     menu.popup({ window: win });
   });
 }
