@@ -305,6 +305,50 @@ describe("useInlineReviewController", () => {
     expect(buildContext).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps snapshot comments separate from checkout comments and resets editors between snapshots", () => {
+    const reviewTarget = target();
+    const snapshot = { cwd: "/repo", fromTree: "before", toTree: "after" };
+    const otherSnapshot = { ...snapshot, toTree: "later" };
+    const initialProps: { snapshot?: ReviewDraftComment["snapshot"] } = { snapshot };
+    const { result, rerender } = renderHook(
+      (props: typeof initialProps) =>
+        useInlineReviewController({
+          reviewDraftKey: "review",
+          buildContext: noContext,
+          snapshot: props.snapshot,
+        }),
+      { initialProps },
+    );
+
+    act(() => result.current.onStartComment(reviewTarget));
+    act(() => result.current.onSaveEditor("turn note"));
+    const saved = useReviewDraftStore.getState().drafts.review![0]!;
+    expect(saved.snapshot).toEqual(snapshot);
+    expect(result.current.commentsByTarget.get(reviewTarget.key)).toEqual([saved]);
+
+    act(() => result.current.onEditComment(reviewTarget, saved));
+    act(() => result.current.onSaveEditor("edited turn note"));
+    expect(useReviewDraftStore.getState().drafts.review![0]?.snapshot).toEqual(snapshot);
+    act(() => result.current.onStartComment(reviewTarget));
+    rerender({ snapshot: otherSnapshot });
+    expect(result.current.editor).toBeNull();
+    expect(result.current.highlight).toBeUndefined();
+    expect(result.current.commentsByTarget.size).toBe(0);
+
+    rerender({ snapshot: undefined });
+    expect(result.current.commentsByTarget.size).toBe(0);
+    act(() => result.current.onStartComment(reviewTarget));
+    act(() => result.current.onSaveEditor("checkout note"));
+    expect(
+      result.current.commentsByTarget.get(reviewTarget.key)?.map((draft) => draft.body),
+    ).toEqual(["checkout note"]);
+
+    rerender({ snapshot });
+    expect(
+      result.current.commentsByTarget.get(reviewTarget.key)?.map((draft) => draft.body),
+    ).toEqual(["edited turn note"]);
+  });
+
   it("focuses the open editor instead of reopening the same range", () => {
     const reviewTarget = target();
     const { result } = renderHook(() =>

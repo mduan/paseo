@@ -1959,6 +1959,7 @@ export const en = {
       empty: "No changes",
       loadError: "Failed to load diff",
       capabilityMissing: "Update the host to view commit diffs.",
+      commentsCapabilityMissing: "Update the host to comment on turn diffs.",
     },
   },
   turnDiff: {

@@ -1987,6 +1987,7 @@ export const fr: TranslationResources = {
       empty: "Aucune modification",
       loadError: "Échec du chargement des différences",
       capabilityMissing: "Mettez à jour l'hôte pour voir les différences des commits.",
+      commentsCapabilityMissing: "Mettez à jour l’hôte pour commenter les différences des tours.",
     },
   },
   turnDiff: {

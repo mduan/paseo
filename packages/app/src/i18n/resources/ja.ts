@@ -1954,6 +1954,7 @@ export const ja: TranslationResources = {
       empty: "変更はありません",
       loadError: "差分の読み込みに失敗しました",
       capabilityMissing: "コミット差分を表示するにはホストを更新してください。",
+      commentsCapabilityMissing: "ターンの差分にコメントするにはホストを更新してください。",
     },
   },
   turnDiff: {

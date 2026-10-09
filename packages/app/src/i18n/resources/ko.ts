@@ -1944,6 +1944,7 @@ export const ko: TranslationResources = {
       empty: "변경사항 없음",
       loadError: "Diff를 불러오지 못했습니다.",
       capabilityMissing: "커밋 diff를 보려면 호스트를 업데이트하세요.",
+      commentsCapabilityMissing: "턴 diff에 댓글을 추가하려면 호스트를 업데이트하세요.",
     },
   },
   turnDiff: {

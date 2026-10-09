@@ -1982,6 +1982,7 @@ export const es: TranslationResources = {
       empty: "Sin cambios",
       loadError: "No se pudieron cargar las diferencias",
       capabilityMissing: "Actualiza el host para ver las diferencias de los commits.",
+      commentsCapabilityMissing: "Actualiza el host para comentar las diferencias de los turnos.",
     },
   },
   turnDiff: {

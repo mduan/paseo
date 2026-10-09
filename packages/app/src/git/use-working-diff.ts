@@ -24,6 +24,7 @@ import {
 } from "@/git/working-diff-comparison/state";
 import { useFocusedChatTarget } from "@/panels/use-add-file-to-chat";
 import { useAgentTurnDiff, useTurnDiffsEnabled } from "@/turn-diffs/queries";
+import { toErrorMessage } from "@/utils/error-messages";
 
 const LAST_TURN_TARGET = { kind: "last_turn" } as const;
 
@@ -47,15 +48,12 @@ export function useWorkingDiff({
   const {
     status,
     isLoading: isStatusLoading,
-    isError: isStatusError,
     error: statusError,
   } = useCheckoutStatusQuery({ serverId, cwd });
   const gitStatus = status && status.isGit ? status : null;
   const isGit = Boolean(gitStatus);
   const notGit = status !== null && !status.isGit && !status.error;
-  const statusErrorMessage =
-    status?.error?.message ??
-    (isStatusError && statusError instanceof Error ? statusError.message : null);
+  const statusErrorMessage = status?.error?.message ?? (statusError && toErrorMessage(statusError));
   const baseRef = gitStatus?.baseRef ?? undefined;
   const hasUncommittedChanges = Boolean(gitStatus?.isDirty);
   const currentBranchName =
@@ -98,7 +96,11 @@ export function useWorkingDiff({
     (range: ReviewLineRange) => buildDiffReviewContext({ range, diffFiles }),
     [diffFiles],
   );
-  const reviewActions = useInlineReviewController({ reviewDraftKey, buildContext });
+  const reviewActions = useInlineReviewController({
+    reviewDraftKey,
+    buildContext,
+    snapshot: turnDiff.snapshot,
+  });
 
   return {
     status,
@@ -112,6 +114,7 @@ export function useWorkingDiff({
     selectUncommitted,
     selectBase,
     turnModes,
+    commentsCapabilityMissing: turnDiff.commentsCapabilityMissing,
     ...(turnComparison
       ? {
           isTurnSnapshotMissing: turnDiff.isSnapshotMissing,
@@ -120,8 +123,7 @@ export function useWorkingDiff({
           diffPayloadError: turnDiff.payloadError,
           diffTooLarge: turnDiff.diffTooLarge,
           isDiffLoading: turnDiff.isLoading,
-          // Turn snapshots are frozen; reviews act on the live checkout only.
-          reviewActions: undefined,
+          reviewActions: turnDiff.snapshot ? reviewActions : undefined,
         }
       : {
           isTurnSnapshotMissing: false,
@@ -208,7 +210,7 @@ function useTurnComparisonDiff(input: {
     ignoreWhitespace: input.ignoreWhitespace,
     enabled: input.enabled && input.comparison !== null,
   });
-  const payload = query.data;
+  const payload = input.comparison ? query.data : undefined;
   const queryError = query.error
     ? { code: "UNKNOWN" as const, message: query.error.message }
     : null;
@@ -216,6 +218,8 @@ function useTurnComparisonDiff(input: {
     agentId,
     cwd: payload?.cwd ?? "",
     files: payload?.files ?? EMPTY_FILES,
+    snapshot: payload?.snapshot,
+    commentsCapabilityMissing: Boolean(payload?.files.length && !payload.snapshot),
     payloadError: payload?.error ?? queryError,
     diffTooLarge: payload?.diffTooLarge === true,
     isLoading: Boolean(agentId) && !payload && !query.error,

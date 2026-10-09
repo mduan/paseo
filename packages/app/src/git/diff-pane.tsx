@@ -1583,6 +1583,7 @@ export function ChangesSurface({
     diffTooLarge,
     isDiffLoading,
     reviewActions,
+    commentsCapabilityMissing,
     onExpandGap,
   } = useWorkingDiff({
     serverId,
@@ -1951,6 +1952,13 @@ export function ChangesSurface({
       ) : null}
 
       {prErrorMessage ? <Text style={styles.actionErrorText}>{prErrorMessage}</Text> : null}
+      {commentsCapabilityMissing ? (
+        <View style={styles.forgeSetupCallout} testID="last-turn-comments-capability-missing">
+          <Text style={styles.forgeSetupCalloutText}>
+            {t("panels.diff.commentsCapabilityMissing")}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.diffContainer}>
         {bodyContent}

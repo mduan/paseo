@@ -104,13 +104,19 @@ export function useInlineReviewController(input: {
   buildContext: (range: ReviewLineRange) => ReviewDraftCommentContext | undefined;
   /** Set on new comments; absent means the diff viewer. */
   source?: ReviewDraftComment["source"];
+  snapshot?: ReviewDraftComment["snapshot"];
 }): InlineReviewActions {
-  const { buildContext, source } = input;
+  const { buildContext, source, snapshot } = input;
   const reviewComments = useReviewDraftComments(input.reviewDraftKey);
-  const commentsByTarget = useMemo(
-    () => groupInlineReviewCommentsByTarget(reviewComments),
-    [reviewComments],
-  );
+  const commentsByTarget = useMemo(() => {
+    const comments = reviewComments.filter(
+      (comment) =>
+        comment.snapshot?.cwd === snapshot?.cwd &&
+        comment.snapshot?.fromTree === snapshot?.fromTree &&
+        comment.snapshot?.toTree === snapshot?.toTree,
+    );
+    return groupInlineReviewCommentsByTarget(comments);
+  }, [reviewComments, snapshot?.cwd, snapshot?.fromTree, snapshot?.toTree]);
   const [editor, setEditor] = useState<InlineReviewEditorState | null>(null);
   const [highlight, setHighlight] = useState<ReviewLineRange>();
   const [commentHeights, setCommentHeights] = useState<ReadonlyMap<string, number>>(
@@ -125,7 +131,7 @@ export function useInlineReviewController(input: {
   useEffect(() => {
     setEditor(null);
     setHighlight(undefined);
-  }, [input.reviewDraftKey]);
+  }, [input.reviewDraftKey, snapshot?.cwd, snapshot?.fromTree, snapshot?.toTree]);
 
   const saveEditorBody = useCallback(
     (current: InlineReviewEditorState, body: string) => {
@@ -152,13 +158,14 @@ export function useInlineReviewController(input: {
             content: current.target.content,
             context: buildContext(editorLineRange(current)),
             source,
+            snapshot,
             body: trimmedBody,
           },
         });
       }
       return true;
     },
-    [addComment, buildContext, input.reviewDraftKey, source, updateComment],
+    [addComment, buildContext, input.reviewDraftKey, source, snapshot, updateComment],
   );
 
   const openEditor = useCallback(
