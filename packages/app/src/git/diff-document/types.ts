@@ -30,6 +30,7 @@ export interface WorkingDiffMode {
   onCopyPath?: (path: string) => void;
   onCopyRelativePath?: (path: string) => void;
   onReveal?: (path: string) => void;
+  onRevealInExplorer?: (path: string) => void;
   revealTargetName?: string;
   onDownload?: (path: string) => void;
   onDuplicate?: (path: string) => void;

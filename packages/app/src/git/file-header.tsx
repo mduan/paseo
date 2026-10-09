@@ -6,6 +6,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
 import { useWorkspaceFileDragSource } from "@/attachments/use-workspace-file-drag-source";
 import { DiffStat } from "@/components/diff-stat";
 import { FileActionsContextMenuContent } from "@/components/file-actions-menu";
@@ -48,6 +49,7 @@ export interface FileHeaderProps {
   onCopyPath?: (path: string) => void;
   onCopyRelativePath?: (path: string) => void;
   onReveal?: (path: string) => void;
+  onRevealInExplorer?: (path: string) => void;
   revealTargetName?: string;
   onDownload?: (path: string) => void;
   onDuplicate?: (path: string) => void;
@@ -136,18 +138,21 @@ function fileChange(file: ParsedDiffFile): "added" | "deleted" | "modified" {
 
 function FileHeaderMenu({
   file,
+  showsBodyState,
   onOpenFile,
   onOpenToSide,
   onAddToChat,
   onCopyPath,
   onCopyRelativePath,
   onReveal,
+  onRevealInExplorer,
   revealTargetName,
   onDownload,
   onDuplicate,
   onRevert,
   testID,
 }: FileHeaderProps) {
+  const { t } = useTranslation();
   const openFile = useCallback(() => onOpenFile?.(file.path), [file.path, onOpenFile]);
   const openToSide = useCallback(() => onOpenToSide?.(file.path), [file.path, onOpenToSide]);
   const addToChat = useCallback(() => onAddToChat?.(file.path), [file.path, onAddToChat]);
@@ -157,6 +162,10 @@ function FileHeaderMenu({
     [file.path, onCopyRelativePath],
   );
   const reveal = useCallback(() => onReveal?.(file.path), [file.path, onReveal]);
+  const revealInExplorer = useCallback(
+    () => onRevealInExplorer?.(file.path),
+    [file.path, onRevealInExplorer],
+  );
   const download = useCallback(() => onDownload?.(file.path), [file.path, onDownload]);
   const duplicate = useCallback(() => onDuplicate?.(file.path), [file.path, onDuplicate]);
   const revert = useCallback(
@@ -170,8 +179,10 @@ function FileHeaderMenu({
       onOpenFile={onOpenFile ? openFile : undefined}
       onOpenToSide={onOpenToSide ? openToSide : undefined}
       onCopyPath={onCopyPath ? copyPath : undefined}
+      copyPathLabel={showsBodyState ? t("workspace.tabs.menu.copyFilePath") : undefined}
       onCopyRelativePath={onCopyRelativePath ? copyRelativePath : undefined}
       onReveal={onReveal ? reveal : undefined}
+      onRevealInExplorer={onRevealInExplorer ? revealInExplorer : undefined}
       revealTargetName={revealTargetName}
       onDownload={onDownload ? download : undefined}
       onAddToChat={onAddToChat ? addToChat : undefined}
@@ -352,7 +363,13 @@ export const FileHeader = memo(function FileHeader({
           </TooltipContent>
         </Tooltip>
         {interactive ? (
-          <FileHeaderMenu file={file} testID={testID} {...actions} bodyVisible={bodyVisible} />
+          <FileHeaderMenu
+            file={file}
+            testID={testID}
+            {...actions}
+            bodyVisible={bodyVisible}
+            showsBodyState={showsBodyState}
+          />
         ) : null}
       </ContextMenu>
     </View>
