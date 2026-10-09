@@ -4,7 +4,8 @@ import { gotoAppShell } from "../support/helpers/app";
 import {
   connectNewWorkspaceDaemonClient,
   delayBrowserWorkspaceCreatedResponse,
-  openNewWorkspaceComposer,
+  openGlobalNewWorkspaceComposer,
+  expectNewWorkspaceProjectSelected,
   openProjectViaDaemon,
   selectWorkspaceIsolation,
   submitNewWorkspacePrompt,
@@ -37,7 +38,8 @@ test.describe("Delayed workspace creation", () => {
         serverId: getServerId(),
         workspaceId: project.workspaceId,
       });
-      await openNewWorkspaceComposer(page, project);
+      await openGlobalNewWorkspaceComposer(page);
+      await expectNewWorkspaceProjectSelected(page, project.projectDisplayName);
       await selectWorkspaceIsolation(page, "worktree");
       await submitNewWorkspacePrompt(page, prompt);
       await delay.waitForCreateRequest();
