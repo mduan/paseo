@@ -69,8 +69,14 @@ export async function writeMarkdownToRichClipboard(
   markdown: string,
   environment: MarkdownClipboardEnvironment,
 ): Promise<void> {
+  await writeRichClipboardContent(createMarkdownClipboardContent(markdown), environment);
+}
+
+export async function writeRichClipboardContent(
+  content: MarkdownClipboardContent,
+  environment: MarkdownClipboardEnvironment,
+): Promise<void> {
   if (environment.richWriter?.supportsHtml()) {
-    const content = createMarkdownClipboardContent(markdown);
     try {
       await environment.richWriter.write({
         "text/plain": new Blob([content.plainText], { type: "text/plain" }),
@@ -83,5 +89,5 @@ export async function writeMarkdownToRichClipboard(
     }
   }
 
-  await environment.writePlainText(markdown);
+  await environment.writePlainText(content.plainText);
 }

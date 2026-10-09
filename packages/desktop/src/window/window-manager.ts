@@ -389,6 +389,7 @@ export function buildStandardContextMenuItems(
 
 export function setupDefaultContextMenu(win: BrowserWindow): void {
   win.webContents.on("context-menu", (_event, params) => {
+    if (!params.isEditable) return;
     const menu = Menu.buildFromTemplate(buildStandardContextMenuItems(win.webContents, params));
     menu.popup({ window: win });
   });

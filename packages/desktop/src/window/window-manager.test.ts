@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+import { BrowserWindow, Menu } from "electron";
+import { EventEmitter } from "node:events";
+
+vi.mock("electron", () => ({
+  BrowserWindow: class {
+    webContents = new EventEmitter();
+  },
+  Menu: {
+    buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
+  },
+}));
 
 import {
   applyMacWindowControlsUpdate,
@@ -9,9 +20,47 @@ import {
   readWindowChromeUpdate,
   readWindowTheme,
   resolveWindowBounds,
+  setupDefaultContextMenu,
 } from "./window-manager";
 
 describe("window-manager", () => {
+  describe("setupDefaultContextMenu", () => {
+    it("does not open a native menu outside editable fields, even with selected text", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit("context-menu", {}, { isEditable: false, selectionText: "Selected" });
+
+      expect(Menu.buildFromTemplate).not.toHaveBeenCalled();
+    });
+
+    it("preserves the native editing menu for inputs", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit(
+        "context-menu",
+        {},
+        {
+          isEditable: true,
+          editFlags: { canCut: true, canCopy: true, canPaste: true },
+        },
+      );
+
+      expect(Menu.buildFromTemplate).toHaveBeenCalledWith([
+        { role: "cut", enabled: true },
+        { role: "copy", enabled: true },
+        { role: "paste", enabled: true },
+        { type: "separator" },
+        { role: "selectAll" },
+      ]);
+      const menu = vi.mocked(Menu.buildFromTemplate).mock.results[0]!.value;
+      expect(menu.popup).toHaveBeenCalledWith({ window: win });
+    });
+  });
+
   describe("readBadgeCount", () => {
     it("returns valid non-negative integers", () => {
       expect(readBadgeCount(0)).toBe(0);

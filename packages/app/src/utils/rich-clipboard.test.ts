@@ -5,6 +5,7 @@ import {
   type MarkdownClipboardEnvironment,
   type RichClipboardWriter,
   writeMarkdownToRichClipboard,
+  writeRichClipboardContent,
 } from "./rich-clipboard";
 
 interface RecordingClipboard {
@@ -148,5 +149,27 @@ describe("writeMarkdownToRichClipboard", () => {
 
     expect(clipboard.plainTexts).toEqual(["**bold**"]);
     expect(clipboard.richWrites).toEqual([]);
+  });
+});
+
+describe("writeRichClipboardContent", () => {
+  it("preserves an already serialized code selection", async () => {
+    const clipboard = createRecordingClipboard();
+    const content = createCodeClipboardContent("first\n  second", { block: true });
+
+    await writeRichClipboardContent(content, clipboard.environment);
+
+    const written = clipboard.richWrites[0]!;
+    await expect(written["text/plain"].text()).resolves.toBe(content.plainText);
+    await expect(written["text/html"].text()).resolves.toBe(content.html);
+  });
+
+  it("uses the selection's plain text when the rich write fails", async () => {
+    const clipboard = createRecordingClipboard({ richWriteFails: true });
+    const content = createCodeClipboardContent("first\n  second", { block: true });
+
+    await writeRichClipboardContent(content, clipboard.environment);
+
+    expect(clipboard.plainTexts).toEqual(["first\n  second"]);
   });
 });
