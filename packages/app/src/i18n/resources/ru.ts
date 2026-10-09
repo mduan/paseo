@@ -439,6 +439,13 @@ export const ru: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "Открыть",
+      right: "Открыть в правой панели",
+      left: "Открыть в левой панели",
+      bottom: "Открыть в нижней панели",
+      top: "Открыть в верхней панели",
+    },
     pending: {
       creating: "Создание worktree...",
       elapsed: "Прошло {{time}}",

@@ -12,6 +12,7 @@ import { useAssistantFileLinkResolverContext } from "./provider";
 import type { AssistantFileLinkSource } from "./resolver";
 import { formatFileLinkTooltipPath } from "./tooltip-path";
 import { useFileLink } from "./use-file-link";
+import { FileLinkContextMenu } from "./context-menu";
 
 interface AssistantMarkdownLinkProps {
   source: AssistantFileLinkSource;
@@ -31,7 +32,7 @@ export function AssistantMarkdownLink({
   monoSurface,
   children,
 }: AssistantMarkdownLinkProps) {
-  const { target, onHoverIn, onPress } = useFileLink(source);
+  const { target, isFileLink, resolutionFailed, onHoverIn, onPress } = useFileLink(source);
   const { configRef } = useAssistantFileLinkResolverContext();
   const workspaceRoot = configRef.current.workspaceRoot;
   const tooltipPath = useMemo(
@@ -99,7 +100,19 @@ export function AssistantMarkdownLink({
     </a>
   );
 
-  return <FileLinkHoverTooltip filePath={tooltipPath}>{anchor}</FileLinkHoverTooltip>;
+  const link = <FileLinkHoverTooltip filePath={tooltipPath}>{anchor}</FileLinkHoverTooltip>;
+  if (!isFileLink) return link;
+  return (
+    <FileLinkContextMenu
+      source={source}
+      target={target}
+      resolutionFailed={resolutionFailed}
+      onResolve={onHoverIn}
+      onOpen={onPress}
+    >
+      {link}
+    </FileLinkContextMenu>
+  );
 }
 
 interface AssistantMarkdownCodeLinkProps {

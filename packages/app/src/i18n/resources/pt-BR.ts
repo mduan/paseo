@@ -439,6 +439,13 @@ export const ptBR: TranslationResources = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "Abrir",
+      right: "Abrir no painel direito",
+      left: "Abrir no painel esquerdo",
+      bottom: "Abrir no painel inferior",
+      top: "Abrir no painel superior",
+    },
     pending: {
       creating: "Criando worktree...",
       elapsed: "{{time}} decorridos",

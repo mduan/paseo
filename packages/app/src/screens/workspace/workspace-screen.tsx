@@ -172,6 +172,7 @@ import {
   workspaceAgentVisibilityEqual,
 } from "@/workspace-tabs/agent-visibility";
 import { deriveWorkspacePaneState } from "@/screens/workspace/workspace-pane-state";
+import { resolveFilePanePlacement } from "@/workspace/file-open/pane";
 import {
   buildWorkspacePaneContentModel,
   WorkspacePaneContent,
@@ -2342,6 +2343,35 @@ function WorkspaceScreenContent({
     if (focusPaneBeforeOpen && paneId && persistenceKey) {
       focusWorkspacePane(persistenceKey, paneId);
     }
+    if (request.paneAxis && canRenderDesktopPaneSplits && persistenceKey) {
+      const location = normalizeWorkspaceFileLocation(request.location);
+      const store = useWorkspaceLayoutStore.getState();
+      const placement = resolveFilePanePlacement({
+        layout: store.layoutByWorkspace[persistenceKey],
+        sourceTabId: parentTabId,
+        explorerPaneId: store.explorerSidebarPaneIdByWorkspace[persistenceKey],
+        axis: request.paneAxis,
+      });
+      if (!location || !placement) return;
+      const destinationPaneId =
+        placement.paneId ??
+        store.splitPaneEmpty(persistenceKey, {
+          targetPaneId: placement.sourcePaneId,
+          position: placement.position,
+        });
+      if (!destinationPaneId) return;
+      const tabId = revealWorkspaceChildTab(
+        persistenceKey,
+        createWorkspaceFileTabTarget(location),
+        parentTabId,
+        { mode: "pane", paneId: destinationPaneId },
+      );
+      if (tabId) {
+        requestFileNavigation(tabId);
+        navigateToTabId(tabId);
+      }
+      return;
+    }
     if (request.disposition === "side") {
       const location = normalizeWorkspaceFileLocation(request.location);
       if (!location || !persistenceKey) return;
@@ -3751,11 +3781,15 @@ function WorkspaceScreenContent({
           });
         },
         onOpenImportSheet: openImportSheet,
+        onCopyFilePath: handleCopyFilePath,
+        onRevealFileInExplorer: handleRevealFileInExplorer,
       }),
     [
       handleCloseTabById,
       fileNavigationRevisionByTabId,
       handleOpenWorkspaceFileFromPane,
+      handleCopyFilePath,
+      handleRevealFileInExplorer,
       navigateToTabId,
       normalizedServerId,
       normalizedWorkspaceId,

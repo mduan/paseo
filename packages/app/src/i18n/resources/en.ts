@@ -432,6 +432,13 @@ export const en = {
     },
   },
   workspace: {
+    chatFileMenu: {
+      open: "Open",
+      right: "Open in right pane",
+      left: "Open in left pane",
+      bottom: "Open in bottom pane",
+      top: "Open in top pane",
+    },
     pending: {
       creating: "Creating worktree...",
       elapsed: "{{time}} elapsed",

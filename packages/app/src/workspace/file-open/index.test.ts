@@ -1,10 +1,120 @@
 import { describe, expect, it } from "vitest";
+import type { SplitNode, WorkspaceLayout } from "@/stores/workspace-layout-store";
+import { FilePaneAxis, FilePanePosition, resolveFilePanePlacement } from "./pane";
 import {
   createWorkspaceFileTabTarget,
   normalizeWorkspaceFileLocation,
   resolveWorkspaceFilePaths,
   workspaceFileLocationsEqual,
 } from ".";
+
+function paneNode(id: string): SplitNode {
+  return { kind: "pane", pane: { id, tabIds: [`chat-${id}`], focusedTabId: `chat-${id}` } };
+}
+
+describe.each([
+  {
+    axis: FilePaneAxis.Horizontal,
+    forward: FilePanePosition.Right,
+    backward: FilePanePosition.Left,
+  },
+  { axis: FilePaneAxis.Vertical, forward: FilePanePosition.Bottom, backward: FilePanePosition.Top },
+])("file opens in $axis panes", ({ axis, forward, backward }) => {
+  it("creates the forward split when there is one pane", () => {
+    expect(
+      resolveFilePanePlacement({
+        layout: { root: paneNode("main"), focusedPaneId: "main" },
+        sourceTabId: "chat-main",
+        axis,
+      }),
+    ).toEqual({ sourcePaneId: "main", position: forward });
+  });
+
+  it("reuses adjacent panes and reverses direction at the far edge", () => {
+    const layout: WorkspaceLayout = {
+      root: {
+        kind: "group",
+        group: {
+          id: "split",
+          direction: axis,
+          sizes: [0.5, 0.5],
+          children: [paneNode("first"), paneNode("second")],
+        },
+      },
+      focusedPaneId: "second",
+    };
+    expect(resolveFilePanePlacement({ layout, sourceTabId: "chat-first", axis })).toEqual({
+      sourcePaneId: "first",
+      paneId: "second",
+      position: forward,
+    });
+    expect(resolveFilePanePlacement({ layout, sourceTabId: "chat-second", axis })).toEqual({
+      sourcePaneId: "second",
+      paneId: "first",
+      position: backward,
+    });
+  });
+
+  it("ignores the Explorer dock when choosing or creating a split", () => {
+    const layout: WorkspaceLayout = {
+      root: {
+        kind: "group",
+        group: {
+          id: "dock",
+          direction: "horizontal",
+          sizes: [0.2, 0.8],
+          children: [paneNode("explorer"), paneNode("main")],
+        },
+      },
+      focusedPaneId: "explorer",
+    };
+    expect(
+      resolveFilePanePlacement({
+        layout,
+        sourceTabId: "chat-main",
+        explorerPaneId: "explorer",
+        axis,
+      }),
+    ).toEqual({
+      sourcePaneId: "main",
+      position: forward,
+    });
+  });
+
+  it("chooses the nearest matching pane in a nested split", () => {
+    const layout: WorkspaceLayout = {
+      root: {
+        kind: "group",
+        group: {
+          id: "columns",
+          direction: "horizontal",
+          sizes: [0.5, 0.5],
+          children: [
+            paneNode("left"),
+            {
+              kind: "group",
+              group: {
+                id: "rows",
+                direction: "vertical",
+                sizes: [0.5, 0.5],
+                children: [paneNode("top-right"), paneNode("bottom-right")],
+              },
+            },
+          ],
+        },
+      },
+      focusedPaneId: "left",
+    };
+    const expectedPane = axis === FilePaneAxis.Horizontal ? "left" : "bottom-right";
+    const expectedPosition =
+      axis === FilePaneAxis.Horizontal ? FilePanePosition.Left : FilePanePosition.Bottom;
+    expect(resolveFilePanePlacement({ layout, sourceTabId: "chat-top-right", axis })).toEqual({
+      sourcePaneId: "top-right",
+      paneId: expectedPane,
+      position: expectedPosition,
+    });
+  });
+});
 
 describe("normalizeWorkspaceFileLocation", () => {
   it("normalizes paths and valid line ranges", () => {
