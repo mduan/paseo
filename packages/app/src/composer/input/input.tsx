@@ -56,7 +56,11 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useComposerHeight } from "./height";
-import { resolveComposerInputMode, ComposerInputMode } from "@/composer/input-mode";
+import {
+  resolveComposerInputMode,
+  ComposerInputMode,
+  MIN_INPUT_HEIGHT,
+} from "@/composer/input-mode";
 import type { NativePastedFile } from "@/composer/native-pasted-image";
 import {
   EditingTextInput,
@@ -190,11 +194,8 @@ export interface MessageInputRef {
   getNativeElement?: () => HTMLElement | null;
 }
 
-const MIN_INPUT_HEIGHT_MOBILE = 30;
-const MIN_INPUT_HEIGHT_DESKTOP = 46;
 const DEFAULT_MAX_INPUT_HEIGHT = 160;
 const MAX_INPUT_VIEWPORT_RATIO = 0.5;
-const MIN_INPUT_HEIGHT = isWeb ? MIN_INPUT_HEIGHT_DESKTOP : MIN_INPUT_HEIGHT_MOBILE;
 type WebTextInputKeyPressEvent = NativeSyntheticEvent<
   TextInputKeyPressEventData & {
     metaKey?: boolean;
@@ -1227,7 +1228,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const composerHeight = useComposerHeight({
       getText: getLiveText,
       textareaRef: webTextareaRef,
-      minHeight: MIN_INPUT_HEIGHT,
+      minHeight: mode.minInputHeight,
       maxHeight: maxInputHeight,
     });
     const { style: composerHeightStyle, scrollEnabled: isComposerScrollEnabled } = composerHeight;

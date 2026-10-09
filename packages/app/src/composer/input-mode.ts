@@ -7,6 +7,10 @@
  * Callers pick a mode and nothing else. What a mode implies lives here, so the
  * two presentations cannot drift apart one prop at a time.
  */
+import { isWeb } from "@/constants/platform";
+
+export const MIN_INPUT_HEIGHT = isWeb ? 46 : 30;
+
 export enum ComposerInputMode {
   Chat = "chat",
   Terminal = "terminal",
@@ -20,6 +24,7 @@ export interface ComposerInputModePresentation {
   showVoice: boolean;
   showAutocomplete: boolean;
   showAgentControls: boolean;
+  minInputHeight: number;
   /** Argv is read character by character, so it gets the terminal's own font. */
   isMonospace: boolean;
   /** i18n key for the text input's accessible name. */
@@ -32,6 +37,7 @@ const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentat
     showVoice: true,
     showAutocomplete: true,
     showAgentControls: true,
+    minInputHeight: MIN_INPUT_HEIGHT,
     isMonospace: false,
     accessibilityLabelKey: "composer.input.accessibilityLabel",
   },
@@ -40,6 +46,7 @@ const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentat
     showVoice: false,
     showAutocomplete: false,
     showAgentControls: false,
+    minInputHeight: 0,
     isMonospace: false,
     accessibilityLabelKey: "composer.input.accessibilityLabel",
   },
@@ -48,6 +55,7 @@ const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentat
     showVoice: false,
     showAutocomplete: false,
     showAgentControls: false,
+    minInputHeight: MIN_INPUT_HEIGHT,
     isMonospace: true,
     accessibilityLabelKey: "composer.input.terminalAccessibilityLabel",
   },

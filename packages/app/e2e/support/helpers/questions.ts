@@ -69,6 +69,27 @@ export async function fillQuestionAnswer(
     .fill(input.answer);
 }
 
+export async function expectQuestionInputRows(
+  page: Page,
+  input: { question: string; rows: number },
+): Promise<void> {
+  const textbox = page
+    .getByTestId("question-form-card")
+    .getByRole("textbox", { name: input.question });
+  await expect
+    .poll(() =>
+      textbox.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const padding =
+          Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+        return Math.round(
+          (element.getBoundingClientRect().height - padding) / Number.parseFloat(style.lineHeight),
+        );
+      }),
+    )
+    .toBe(input.rows);
+}
+
 export async function submitQuestionAnswers(page: Page): Promise<void> {
   await page.getByTestId("question-form-primary-action").click();
   await expect(page.getByTestId("question-form-card")).toHaveCount(0, { timeout: 30_000 });

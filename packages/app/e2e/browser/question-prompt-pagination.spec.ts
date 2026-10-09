@@ -17,6 +17,7 @@ import {
   expectQuestionOptionSelected,
   expectQuestionPrimaryActionDisabled,
   expectQuestionPrimaryActionEnabled,
+  expectQuestionInputRows,
   fillQuestionAnswer,
   openQuestion,
   observeQuestionAnswers,
@@ -115,6 +116,19 @@ test.describe("Question prompt pagination", () => {
         total: 2,
         question: REPO_URL_QUESTION,
       });
+
+      await expectQuestionInputRows(page, { question: REPO_URL_QUESTION, rows: 1 });
+      await expect(page.getByRole("textbox", { name: "Message agent..." })).toHaveCSS(
+        "min-height",
+        "46px",
+      );
+      await fillQuestionAnswer(page, {
+        question: REPO_URL_QUESTION,
+        answer: "First line\nSecond line",
+      });
+      await expectQuestionInputRows(page, { question: REPO_URL_QUESTION, rows: 2 });
+      await fillQuestionAnswer(page, { question: REPO_URL_QUESTION, answer: "" });
+      await expectQuestionInputRows(page, { question: REPO_URL_QUESTION, rows: 1 });
 
       await fillQuestionAnswer(page, {
         question: REPO_URL_QUESTION,
