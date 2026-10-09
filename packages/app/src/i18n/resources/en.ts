@@ -1357,6 +1357,13 @@ export const en = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "Open Link in Browser",
+      copyLinkAddress: "Copy Link Address",
+      copyImage: "Copy Image",
+      saveImage: "Save Image As…",
+      actionFailed: "Unable to complete this action. Try again.",
+    },
     windowControls: {
       minimize: "Minimize window",
       maximize: "Maximize window",

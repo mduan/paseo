@@ -1,4 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
+import { BrowserWindow, Menu, ipcMain } from "electron";
+import { EventEmitter } from "node:events";
+
+vi.mock("electron", () => ({
+  BrowserWindow: class {
+    webContents = Object.assign(new EventEmitter(), {
+      copyImageAt: vi.fn(),
+      downloadURL: vi.fn(),
+      send: vi.fn(),
+    });
+  },
+  Menu: {
+    buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
+  },
+  ipcMain: { handle: vi.fn() },
+}));
 
 import {
   applyMacWindowControlsUpdate,
@@ -9,9 +25,139 @@ import {
   readWindowChromeUpdate,
   readWindowTheme,
   resolveWindowBounds,
+  setupDefaultContextMenu,
+  registerWindowManager,
 } from "./window-manager";
 
 describe("window-manager", () => {
+  describe("setupDefaultContextMenu", () => {
+    it("does not open a native menu outside inputs when no text is selected", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit("context-menu", {}, { isEditable: false, selectionText: "" });
+
+      expect(Menu.buildFromTemplate).not.toHaveBeenCalled();
+    });
+
+    it("routes non-editable content to the app menu without a native popup", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+      const params = {
+        isEditable: false,
+        x: 20,
+        y: 30,
+        selectionText: "Selected",
+        linkURL: "https://example.com",
+        srcURL: "",
+        hasImageContents: false,
+      };
+
+      win.webContents.emit("context-menu", {}, params);
+
+      expect(Menu.buildFromTemplate).not.toHaveBeenCalled();
+      expect(win.webContents.send).toHaveBeenCalledWith("paseo:event:content-context-menu", {
+        x: 20,
+        y: 30,
+        selectionText: "Selected",
+        linkURL: "https://example.com",
+        srcURL: "",
+        hasImageContents: false,
+      });
+    });
+
+    it("preserves the native editing menu for inputs", () => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit(
+        "context-menu",
+        {},
+        {
+          isEditable: true,
+          editFlags: { canCut: true, canCopy: true, canPaste: true },
+        },
+      );
+
+      expect(Menu.buildFromTemplate).toHaveBeenCalledWith([
+        { role: "cut", enabled: true },
+        { role: "copy", enabled: true },
+        { role: "paste", enabled: true },
+        { type: "separator" },
+        { role: "selectAll" },
+      ]);
+      const menu = vi.mocked(Menu.buildFromTemplate).mock.results[0]!.value;
+      expect(menu.popup).toHaveBeenCalledWith({ window: win });
+    });
+
+    it.each(["input-text", "text-area"])("keeps read-only %s inputs native", (formControlType) => {
+      vi.mocked(Menu.buildFromTemplate).mockClear();
+      const win = new BrowserWindow();
+      setupDefaultContextMenu(win);
+
+      win.webContents.emit(
+        "context-menu",
+        {},
+        { isEditable: false, formControlType, selectionText: "Selected" },
+      );
+
+      expect(Menu.buildFromTemplate).toHaveBeenCalledWith([{ role: "copy" }]);
+      expect(win.webContents.send).not.toHaveBeenCalled();
+    });
+  });
+
+  it("copies and saves only the requesting window's context-menu image", () => {
+    vi.mocked(ipcMain.handle).mockClear();
+    registerWindowManager({ mode: "native-mac" });
+    const win = new BrowserWindow();
+    const otherWin = new BrowserWindow();
+    setupDefaultContextMenu(win);
+    setupDefaultContextMenu(otherWin);
+    win.webContents.emit(
+      "context-menu",
+      {},
+      {
+        isEditable: false,
+        hasImageContents: true,
+        srcURL: "https://example.com/image.png",
+        x: 20,
+        y: 30,
+      },
+    );
+    otherWin.webContents.emit(
+      "context-menu",
+      {},
+      {
+        isEditable: false,
+        hasImageContents: true,
+        srcURL: "https://example.com/other.png",
+        x: 80,
+        y: 90,
+      },
+    );
+    const copyImage = vi
+      .mocked(ipcMain.handle)
+      .mock.calls.find(([channel]) => channel === "paseo:menu:copyImage")![1];
+    const saveImage = vi
+      .mocked(ipcMain.handle)
+      .mock.calls.find(([channel]) => channel === "paseo:menu:saveImage")![1];
+
+    Reflect.apply(copyImage, undefined, [{ sender: win.webContents }]);
+    Reflect.apply(saveImage, undefined, [{ sender: win.webContents }]);
+
+    expect(win.webContents.copyImageAt).toHaveBeenCalledWith(20, 30);
+    expect(win.webContents.downloadURL).toHaveBeenCalledWith("https://example.com/image.png");
+    expect(otherWin.webContents.copyImageAt).not.toHaveBeenCalled();
+    expect(otherWin.webContents.downloadURL).not.toHaveBeenCalled();
+    const unrelated = new BrowserWindow();
+    expect(() => Reflect.apply(copyImage, undefined, [{ sender: unrelated.webContents }])).toThrow(
+      "The context menu does not contain an image.",
+    );
+  });
+
   describe("readBadgeCount", () => {
     it("returns valid non-negative integers", () => {
       expect(readBadgeCount(0)).toBe(0);

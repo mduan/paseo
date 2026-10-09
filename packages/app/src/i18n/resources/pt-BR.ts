@@ -1375,6 +1375,13 @@ export const ptBR: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "Abrir link no navegador",
+      copyLinkAddress: "Copiar endereço do link",
+      copyImage: "Copiar imagem",
+      saveImage: "Salvar imagem como…",
+      actionFailed: "Não foi possível concluir esta ação. Tente novamente.",
+    },
     windowControls: {
       minimize: "Minimizar janela",
       maximize: "Maximizar janela",

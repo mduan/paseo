@@ -108,6 +108,8 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
   },
   menu: {
+    copyImage: () => ipcRenderer.invoke("paseo:menu:copyImage"),
+    saveImage: () => ipcRenderer.invoke("paseo:menu:saveImage"),
     showContextMenu: (input?: Record<string, unknown>) =>
       ipcRenderer.invoke("paseo:menu:showContextMenu", input),
     setCapturingShortcut: (capturing: boolean) =>

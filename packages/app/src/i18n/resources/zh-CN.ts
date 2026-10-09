@@ -1338,6 +1338,13 @@ export const zhCN: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "在浏览器中打开链接",
+      copyLinkAddress: "复制链接地址",
+      copyImage: "复制图片",
+      saveImage: "图片另存为…",
+      actionFailed: "无法完成此操作。请重试。",
+    },
     windowControls: {
       minimize: "最小化窗口",
       maximize: "最大化窗口",

@@ -16,6 +16,25 @@ import type { DesktopWindowChromeMode } from "./chrome.js";
 const WINDOW_STATE_SAVE_DEBOUNCE_MS = 400;
 const MAC_TRAFFIC_LIGHT_POSITION = { x: 16, y: 14 } as const;
 const MAX_TRAFFIC_LIGHT_OFFSET_Y = 10;
+const contentContextMenus = new WeakMap<WebContents, Electron.ContextMenuParams>();
+const TEXT_INPUT_TYPES = new Set<Electron.ContextMenuParams["formControlType"]>([
+  "input-text",
+  "input-search",
+  "input-email",
+  "input-password",
+  "input-telephone",
+  "input-url",
+  "input-number",
+  "text-area",
+]);
+
+function getContextMenuImage(contents: WebContents): Electron.ContextMenuParams {
+  const params = contentContextMenus.get(contents);
+  if (!params?.hasImageContents || !params.srcURL) {
+    throw new Error("The context menu does not contain an image.");
+  }
+  return params;
+}
 
 export function readBadgeCount(input: unknown): number {
   if (typeof input !== "number" || !Number.isSafeInteger(input) || input < 0) {
@@ -146,6 +165,13 @@ export function applyMacWindowControlsUpdate(input: {
 }
 
 export function registerWindowManager(input: { mode: DesktopWindowChromeMode }): void {
+  ipcMain.handle("paseo:menu:copyImage", (event) => {
+    const params = getContextMenuImage(event.sender);
+    event.sender.copyImageAt(params.x, params.y);
+  });
+  ipcMain.handle("paseo:menu:saveImage", (event) => {
+    event.sender.downloadURL(getContextMenuImage(event.sender).srcURL);
+  });
   ipcMain.handle("paseo:window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
@@ -324,6 +350,42 @@ export function buildStandardContextMenuItems(
   contents: WebContents,
   params: Electron.ContextMenuParams,
 ): MenuItemConstructorOptions[] {
+  if (params.hasImageContents && params.srcURL) {
+    return [
+      {
+        label: "Copy Image",
+        click: () => contents.copyImageAt(params.x, params.y),
+      },
+      {
+        label: "Save Image As…",
+        click: () => contents.downloadURL(params.srcURL),
+      },
+    ];
+  }
+
+  if (params.linkURL && /^https?:/i.test(params.linkURL)) {
+    const items: MenuItemConstructorOptions[] = [
+      {
+        label: "Open Link in Browser",
+        click: () => {
+          void shell.openExternal(params.linkURL);
+        },
+      },
+      {
+        label: "Copy Link Address",
+        click: () => clipboard.writeText(params.linkURL),
+      },
+    ];
+    if (params.selectionText) {
+      items.push({ type: "separator" }, { role: "copy" });
+    }
+    return items;
+  }
+
+  if (!params.isEditable) {
+    return params.selectionText ? [{ role: "copy" }] : [];
+  }
+
   const items: MenuItemConstructorOptions[] = [];
 
   if (params.misspelledWord) {
@@ -345,51 +407,33 @@ export function buildStandardContextMenuItems(
     items.push({ type: "separator" });
   }
 
-  if (params.linkURL && /^https?:/i.test(params.linkURL)) {
-    items.push({
-      label: "Open Link in Browser",
-      click: () => {
-        void shell.openExternal(params.linkURL);
-      },
-    });
-    items.push({
-      label: "Copy Link Address",
-      click: () => clipboard.writeText(params.linkURL),
-    });
-    items.push({ type: "separator" });
-  }
-
-  if (params.hasImageContents && params.srcURL) {
-    items.push({
-      label: "Copy Image",
-      click: () => contents.copyImageAt(params.x, params.y),
-    });
-    items.push({
-      label: "Save Image As…",
-      click: () => contents.downloadURL(params.srcURL),
-    });
-    items.push({ type: "separator" });
-  }
-
-  if (params.isEditable) {
-    items.push({ role: "cut", enabled: params.editFlags.canCut });
-    items.push({ role: "copy", enabled: params.editFlags.canCopy });
-    items.push({ role: "paste", enabled: params.editFlags.canPaste });
-    items.push({ type: "separator" });
-    items.push({ role: "selectAll" });
-  } else {
-    items.push({ role: "copy", enabled: params.selectionText.length > 0 });
-    items.push({ role: "paste" });
-    items.push({ type: "separator" });
-    items.push({ role: "selectAll" });
-  }
+  items.push({ role: "cut", enabled: params.editFlags.canCut });
+  items.push({ role: "copy", enabled: params.editFlags.canCopy });
+  items.push({ role: "paste", enabled: params.editFlags.canPaste });
+  items.push({ type: "separator" });
+  items.push({ role: "selectAll" });
 
   return items;
 }
 
 export function setupDefaultContextMenu(win: BrowserWindow): void {
   win.webContents.on("context-menu", (_event, params) => {
-    const menu = Menu.buildFromTemplate(buildStandardContextMenuItems(win.webContents, params));
+    const isInput = params.isEditable || TEXT_INPUT_TYPES.has(params.formControlType);
+    if (!isInput) {
+      contentContextMenus.set(win.webContents, params);
+      win.webContents.send("paseo:event:content-context-menu", {
+        x: params.x,
+        y: params.y,
+        selectionText: params.selectionText,
+        linkURL: params.linkURL,
+        srcURL: params.srcURL,
+        hasImageContents: params.hasImageContents,
+      });
+      return;
+    }
+    const items = buildStandardContextMenuItems(win.webContents, params);
+    if (!items.length) return;
+    const menu = Menu.buildFromTemplate(items);
     menu.popup({ window: win });
   });
 }

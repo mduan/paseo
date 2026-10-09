@@ -191,8 +191,17 @@ function showBrowserWebviewContextMenu(
   contents: Electron.WebContents,
   params: Electron.ContextMenuParams,
 ): void {
-  const menu = Menu.buildFromTemplate([
-    ...buildStandardContextMenuItems(contents, params),
+  const standardItems = buildStandardContextMenuItems(contents, params);
+  if (!standardItems.length) {
+    standardItems.push(
+      { role: "copy", enabled: false },
+      { role: "paste" },
+      { type: "separator" },
+      { role: "selectAll" },
+    );
+  }
+  const items = [
+    ...standardItems,
     ...(app.isPackaged
       ? []
       : [
@@ -216,7 +225,8 @@ function showBrowserWebviewContextMenu(
             },
           },
         ]),
-  ]);
+  ];
+  const menu = Menu.buildFromTemplate(items);
   menu.popup({ window: win });
 }
 
