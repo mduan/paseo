@@ -89,8 +89,12 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
       return attachment.text;
     }
     case "review": {
-      const lines = [`Paseo review attachment (${attachment.mode})`, `CWD: ${attachment.cwd}`];
-      if (attachment.baseRef) {
+      const hasTurnComments = attachment.comments.some((comment) => comment.snapshot);
+      const header = hasTurnComments
+        ? "Paseo review attachment"
+        : `Paseo review attachment (${attachment.mode})`;
+      const lines = [header, `CWD: ${attachment.cwd}`];
+      if (!hasTurnComments && attachment.baseRef) {
         lines.push(`Base: ${attachment.baseRef}`);
       }
       attachment.comments.forEach((comment, index) => {
@@ -112,6 +116,11 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
             `New tree: ${comment.snapshot.toTree}`,
             "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
           );
+        } else if (hasTurnComments) {
+          lines.push(`Checkout comparison: ${attachment.mode}`);
+          if (attachment.baseRef) {
+            lines.push(`Base: ${attachment.baseRef}`);
+          }
         }
         if (!isFileView && comment.context.hunkHeader) {
           lines.push(comment.context.hunkHeader);

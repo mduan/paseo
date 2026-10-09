@@ -22,6 +22,7 @@ describe("prompt attachments", () => {
         mimeType: "application/paseo-review",
         cwd: "/tmp/repo/subdir",
         mode: "uncommitted",
+        baseRef: "main",
         comments: [
           {
             filePath: "src/a.ts",
@@ -41,7 +42,7 @@ describe("prompt attachments", () => {
       const column = side === "old" ? "L" : "R";
       expect(text).toEqual(
         [
-          "Paseo review attachment (uncommitted)",
+          "Paseo review attachment",
           "CWD: /tmp/repo/subdir",
           "",
           `Comment 1: src/a.ts:${column}3-${column}100`,
@@ -52,6 +53,55 @@ describe("prompt attachments", () => {
           "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
           ">  3  3  value",
           "  (Range truncated. Inspect the full diff between the snapshot trees above for the rest.)",
+        ].join("\n"),
+      );
+    },
+  );
+
+  it.each(["uncommitted", "base"] as const)(
+    "associates the %s checkout comparison only with normal comments in mixed reviews",
+    (mode) => {
+      const line = {
+        oldLineNumber: null,
+        newLineNumber: 42,
+        type: "add" as const,
+        content: "value",
+      };
+      const comment = {
+        filePath: "src/a.ts",
+        side: "new" as const,
+        lineNumber: 42,
+        body: "Fix this",
+        context: { hunkHeader: "", targetLine: line, lines: [line] },
+      };
+      const snapshot = { cwd: "/tmp/repo", fromTree: "before", toTree: "after" };
+      expect(
+        renderPromptAttachmentAsText({
+          type: "review",
+          mimeType: "application/paseo-review",
+          cwd: "/tmp/repo",
+          mode,
+          baseRef: "main",
+          comments: [comment, { ...comment, snapshot }],
+        }),
+      ).toEqual(
+        [
+          "Paseo review attachment",
+          "CWD: /tmp/repo",
+          "",
+          "Comment 1: src/a.ts:R42",
+          "Fix this",
+          `Checkout comparison: ${mode}`,
+          "Base: main",
+          ">  - 42 +value",
+          "",
+          "Comment 2: src/a.ts:R42",
+          "Fix this",
+          "Turn snapshot: /tmp/repo",
+          "Old tree: before",
+          "New tree: after",
+          "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
+          ">  - 42 +value",
         ].join("\n"),
       );
     },
