@@ -1003,12 +1003,9 @@ function ResolvedWorkspaceDesktopTabsRow({
     return {
       root: workspaceLayout.root,
       explorerSidebarPaneId,
-      onMoveTabToPane: ({ tabId, toPaneId }) => {
-        moveTabToPane(workspaceKey, tabId, toPaneId, { preserveSourcePane: true });
-      },
-      onSplitPane: (input) => {
-        splitPane(workspaceKey, input);
-      },
+      workspaceKey,
+      moveTabToPane,
+      splitPane,
     };
   }, [workspaceLayout, explorerSidebarPaneId, moveTabToPane, splitPane, workspaceKey]);
   const newTabKeys = useShortcutKeys("workspace-tab-new");

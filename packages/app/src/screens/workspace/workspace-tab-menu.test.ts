@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildWorkspaceDesktopTabActions,
   buildWorkspaceTabMenuEntries,
+  PaneMovePosition,
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import {
@@ -12,7 +13,6 @@ import {
   findPaneContainingTab,
   selectExplorerSidebarPaneId,
 } from "@/stores/workspace-layout-store";
-import { PaneMovePosition } from "@/utils/split-navigation";
 
 function createAgentTab(): WorkspaceTabDescriptor {
   return {
@@ -60,12 +60,9 @@ function createPaneMoveFixture() {
       paneMoves: {
         root: layout.root,
         explorerSidebarPaneId: selectExplorerSidebarPaneId(state, workspaceKey),
-        onMoveTabToPane: ({ tabId: movingTabId, toPaneId }) => {
-          state.moveTabToPane(workspaceKey, movingTabId, toPaneId, { preserveSourcePane: true });
-        },
-        onSplitPane: (input) => {
-          state.splitPane(workspaceKey, input);
-        },
+        workspaceKey,
+        moveTabToPane: state.moveTabToPane,
+        splitPane: state.splitPane,
       },
     }).menuEntries;
   }
@@ -156,10 +153,16 @@ describe("workspace tab pane moves", () => {
         targetPaneId: sourcePaneId,
         position,
       });
+      const oppositePosition =
+        position === PaneMovePosition.Right ? PaneMovePosition.Left : PaneMovePosition.Top;
+      state.splitPaneEmpty(workspaceKey, {
+        targetPaneId: sourcePaneId,
+        position: oppositePosition,
+      });
 
       selectMove(position);
       const layout = store.getState().layoutByWorkspace[workspaceKey];
-      expect(collectAllPanes(layout.root)).toHaveLength(2);
+      expect(collectAllPanes(layout.root)).toHaveLength(3);
       expect(findPaneById(layout.root, destinationPaneId)?.tabIds).toEqual([otherTabId, tab.tabId]);
       expect(findPaneById(layout.root, sourcePaneId)?.tabIds).toEqual([remainingTabId]);
     },

@@ -4,55 +4,6 @@ const ROOT_MIN = 0;
 const ROOT_MAX = 1;
 const FLOAT_TOLERANCE = 0.000001;
 
-export enum PaneMovePosition {
-  Left = "left",
-  Right = "right",
-  Top = "top",
-  Bottom = "bottom",
-}
-
-const paneMoveDirections = {
-  [PaneMovePosition.Left]: "left",
-  [PaneMovePosition.Right]: "right",
-  [PaneMovePosition.Top]: "up",
-  [PaneMovePosition.Bottom]: "down",
-} as const;
-
-const oppositePaneMovePositions = {
-  [PaneMovePosition.Left]: PaneMovePosition.Right,
-  [PaneMovePosition.Right]: PaneMovePosition.Left,
-  [PaneMovePosition.Top]: PaneMovePosition.Bottom,
-  [PaneMovePosition.Bottom]: PaneMovePosition.Top,
-};
-
-// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
-type ResolvePaneMoveInput = {
-  root: SplitNode;
-  paneId: string;
-  position: PaneMovePosition;
-  excludedPaneId?: string | null;
-};
-
-// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
-type PaneMove = { position: PaneMovePosition; toPaneId: string | null };
-
-export function resolvePaneMove(input: ResolvePaneMoveInput): PaneMove {
-  const toPaneId = findAdjacentPane(input.root, input.paneId, paneMoveDirections[input.position], {
-    excludedPaneId: input.excludedPaneId,
-  });
-  if (toPaneId) return { position: input.position, toPaneId };
-
-  const oppositePosition = oppositePaneMovePositions[input.position];
-  const oppositePaneId = findAdjacentPane(
-    input.root,
-    input.paneId,
-    paneMoveDirections[oppositePosition],
-    { excludedPaneId: input.excludedPaneId },
-  );
-  if (oppositePaneId) return { position: oppositePosition, toPaneId: oppositePaneId };
-  return { position: input.position, toPaneId: null };
-}
-
 export interface PaneBounds {
   paneId: string;
   left: number;

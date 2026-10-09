@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SplitNode } from "@/stores/workspace-layout-store";
-import { findAdjacentPane, PaneMovePosition, resolvePaneMove } from "./split-navigation";
+import { findAdjacentPane } from "./split-navigation";
 
 function createPaneNode(id: string, hidden = false): SplitNode {
   return {
@@ -93,7 +93,7 @@ describe("findAdjacentPane", () => {
     expect(findAdjacentPane(root, "hidden", "right")).toBeNull();
   });
 
-  it("reuses the closest visible right pane before considering a left pane", () => {
+  it("finds the nearest visible neighbor across a hidden pane", () => {
     const root = createGroupNode({
       direction: "horizontal",
       sizes: [0.25, 0.25, 0.25, 0.25],
@@ -104,9 +104,6 @@ describe("findAdjacentPane", () => {
         createPaneNode("right"),
       ],
     });
-    expect(resolvePaneMove({ root, paneId: "middle", position: PaneMovePosition.Right })).toEqual({
-      position: PaneMovePosition.Right,
-      toPaneId: "right",
-    });
+    expect(findAdjacentPane(root, "middle", "right")).toBe("right");
   });
 });

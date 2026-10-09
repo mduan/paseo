@@ -3121,14 +3121,9 @@ function WorkspaceScreenContent({
         paneMoves: {
           root,
           explorerSidebarPaneId,
-          onMoveTabToPane: ({ tabId: movingTabId, toPaneId }) => {
-            moveWorkspaceTabToPane(persistenceKey, movingTabId, toPaneId, {
-              preserveSourcePane: true,
-            });
-          },
-          onSplitPane: (input) => {
-            splitWorkspacePane(persistenceKey, input);
-          },
+          workspaceKey: persistenceKey,
+          moveTabToPane: moveWorkspaceTabToPane,
+          splitPane: splitWorkspacePane,
         },
       }).menuEntries;
     });

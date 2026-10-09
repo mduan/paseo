@@ -3,7 +3,15 @@ import { i18n } from "@/i18n/i18next";
 import { encodeFilePathForPathSegment, encodeWorkspaceIdForPathSegment } from "@/utils/host-routes";
 import { buildDeterministicWorkspaceTabId } from "@/workspace-tabs/identity";
 import { findPaneContainingTab, type SplitNode } from "@/stores/workspace-layout-actions";
-import { PaneMovePosition, resolvePaneMove } from "@/utils/split-navigation";
+import { findAdjacentPane } from "@/utils/split-navigation";
+import type { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+
+export enum PaneMovePosition {
+  Left = "left",
+  Right = "right",
+  Top = "top",
+  Bottom = "bottom",
+}
 
 export type WorkspaceTabMenuSurface = "desktop" | "mobile";
 
@@ -79,12 +87,13 @@ export type WorkspaceTabMenuEntry =
       key: string;
     };
 
-// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
-export type WorkspaceTabPaneMoves = {
+export type WorkspaceTabPaneMoves = Pick<
+  ReturnType<typeof useWorkspaceLayoutStore.getState>,
+  "moveTabToPane" | "splitPane"
+> & {
+  workspaceKey: string;
   root: SplitNode;
   explorerSidebarPaneId: string | null;
-  onMoveTabToPane: (input: { tabId: string; toPaneId: string }) => void;
-  onSplitPane: (input: { tabId: string; targetPaneId: string; position: PaneMovePosition }) => void;
 };
 
 interface BuildWorkspaceTabMenuEntriesInput {
@@ -318,13 +327,28 @@ export function buildWorkspaceTabMenuEntries(
       [PaneMovePosition.Top]: "arrow-up",
       [PaneMovePosition.Bottom]: "arrow-down",
     } as const;
-    for (const preferredPosition of [PaneMovePosition.Right, PaneMovePosition.Bottom]) {
-      const { position, toPaneId } = resolvePaneMove({
-        root: paneMoves.root,
-        paneId: sourcePane.id,
-        position: preferredPosition,
-        excludedPaneId: paneMoves.explorerSidebarPaneId,
-      });
+    const moves = [
+      {
+        position: PaneMovePosition.Right,
+        direction: "right",
+        oppositePosition: PaneMovePosition.Left,
+        oppositeDirection: "left",
+      },
+      {
+        position: PaneMovePosition.Bottom,
+        direction: "down",
+        oppositePosition: PaneMovePosition.Top,
+        oppositeDirection: "up",
+      },
+    ] as const;
+    for (const move of moves) {
+      let position: PaneMovePosition = move.position;
+      const options = { excludedPaneId: paneMoves.explorerSidebarPaneId };
+      let toPaneId = findAdjacentPane(paneMoves.root, sourcePane.id, move.direction, options);
+      if (!toPaneId) {
+        toPaneId = findAdjacentPane(paneMoves.root, sourcePane.id, move.oppositeDirection, options);
+        if (toPaneId) position = move.oppositePosition;
+      }
       entries.push({
         kind: "item",
         key: `move-${position}`,
@@ -333,9 +357,15 @@ export function buildWorkspaceTabMenuEntries(
         testID: `${menuTestIDBase}-move-${position}`,
         onSelect: () => {
           if (toPaneId) {
-            paneMoves.onMoveTabToPane({ tabId: tab.tabId, toPaneId });
+            paneMoves.moveTabToPane(paneMoves.workspaceKey, tab.tabId, toPaneId, {
+              preserveSourcePane: true,
+            });
           } else {
-            paneMoves.onSplitPane({ tabId: tab.tabId, targetPaneId: sourcePane.id, position });
+            paneMoves.splitPane(paneMoves.workspaceKey, {
+              tabId: tab.tabId,
+              targetPaneId: sourcePane.id,
+              position,
+            });
           }
         },
       });
