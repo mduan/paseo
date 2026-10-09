@@ -51,7 +51,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import * as Clipboard from "expo-clipboard";
 import { useFileDownload } from "@/hooks/use-file-download";
-import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { GitActionsSplitButton } from "@/git/actions-split-button";
@@ -93,7 +92,7 @@ import { isWeb } from "@/constants/platform";
 import { useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { DiffTooLargeState } from "@/git/diff-too-large-state";
-import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
+import { useRevealInFileManager } from "@/workspace/open-in-file-manager/reveal";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
@@ -1550,11 +1549,7 @@ export function ChangesSurface({
   const codeFontSize = appSettings.codeFontSize;
 
   const toast = useToast();
-  const isLocalDaemon = useIsLocalDaemon(serverId);
-  const { targets: desktopOpenTargets } = useDesktopOpenTargets({
-    isLocalExecution: isLocalDaemon,
-  });
-  const fileManagerTarget = desktopOpenTargets.find((target) => target.kind === "file-manager");
+  const fileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
   const {
     openDiff: handleOpenDiff,
     openCommit: handleCommitPress,
@@ -1676,25 +1671,6 @@ export function ChangesSurface({
   const handleCopyRelativePath = useCallback((path: string) => {
     void Clipboard.setStringAsync(path);
   }, []);
-  const handleRevealPath = useCallback(
-    async (path: string) => {
-      if (!fileManagerTarget) {
-        return;
-      }
-      try {
-        await openDesktopTarget({
-          editorId: fileManagerTarget.id,
-          workspacePath: cwd,
-          filePath: buildAbsoluteExplorerPath({ workspaceRoot: cwd, entryPath: path }),
-        });
-      } catch (cause) {
-        toast.error(
-          cause instanceof Error ? cause.message : t("workspace.fileExplorer.errors.revealFailed"),
-        );
-      }
-    },
-    [cwd, fileManagerTarget, t, toast],
-  );
   const handleDownloadPath = useCallback(
     (path: string) => {
       downloadFile({ fileName: path.split("/").pop() ?? path, path });
@@ -1756,9 +1732,9 @@ export function ChangesSurface({
       onAddToChat,
       onCopyPath: handleCopyPath,
       onCopyRelativePath: handleCopyRelativePath,
-      onReveal: fileManagerTarget ? handleRevealPath : undefined,
+      onReveal: fileManager?.reveal,
       onRevealInExplorer,
-      revealTargetName: fileManagerTarget?.label,
+      revealTargetName: fileManager?.targetName,
       onDownload: handleDownloadPath,
       onDuplicate: fsEntryDuplicateEnabled ? handleDuplicatePath : undefined,
       onRevert: onRevertPath,
@@ -1777,8 +1753,7 @@ export function ChangesSurface({
       handleCopyRelativePath,
       handleDownloadPath,
       handleDuplicatePath,
-      handleRevealPath,
-      fileManagerTarget,
+      fileManager,
       fsEntryDuplicateEnabled,
       onRevertPath,
     ],

@@ -11,6 +11,7 @@ import {
   Copy,
   CopyX,
   FolderSearch,
+  FolderOpen,
   Pencil,
   RotateCw,
   X,
@@ -27,6 +28,7 @@ const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
 const ThemedArrowRightToLine = withUnistyles(ArrowRightToLine);
 const ThemedCopyX = withUnistyles(CopyX);
+const ThemedFolderOpen = withUnistyles(FolderOpen);
 const ThemedFolderSearch = withUnistyles(FolderSearch);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedX = withUnistyles(X);
@@ -56,6 +58,8 @@ export function useWorkspaceTabMenuItemAdornments(
         return <ThemedArrowRightToLine size={16} uniProps={mutedColorMapping} />;
       case "copy-x":
         return <ThemedCopyX size={16} uniProps={mutedColorMapping} />;
+      case "folder-open":
+        return <ThemedFolderOpen size={16} uniProps={mutedColorMapping} />;
       case "folder-search":
         return <ThemedFolderSearch size={16} uniProps={mutedColorMapping} />;
       case "pencil":

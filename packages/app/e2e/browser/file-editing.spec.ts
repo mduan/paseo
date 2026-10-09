@@ -144,6 +144,8 @@ test.describe("CodeMirror workspace file editing", () => {
         await fileLink.click({ button: "right" });
         await expect(menu).toBeVisible();
         await expect(menu.getByRole("menuitem")).toHaveCount(5);
+        await expect(page.getByTestId("assistant-file-link-open-separator")).toBeVisible();
+        await expect(page.getByTestId("assistant-file-link-reveal-in-file-manager")).toHaveCount(0);
         await expect(splitAction).toHaveText(`Open in ${split.forward} pane`);
         await page.getByTestId("assistant-file-link-open").click();
         await expect(tabRows).toHaveCount(1);

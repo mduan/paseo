@@ -1,3 +1,4 @@
+import type { RevealInFileManagerAction } from "@/workspace/open-in-file-manager/reveal";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import { i18n } from "@/i18n/i18next";
 import { encodeFilePathForPathSegment, encodeWorkspaceIdForPathSegment } from "@/utils/host-routes";
@@ -65,6 +66,7 @@ export type WorkspaceTabMenuEntry =
       icon?:
         | "copy"
         | "folder-search"
+        | "folder-open"
         | "rotate-cw"
         | "arrow-left-to-line"
         | "arrow-right-to-line"
@@ -115,6 +117,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
+  fileManager?: RevealInFileManagerAction;
 }
 
 interface BuildWorkspaceDesktopTabActionsInput {
@@ -134,6 +137,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
+  fileManager?: RevealInFileManagerAction;
 }
 
 export interface WorkspaceDesktopTabActions {
@@ -293,6 +297,19 @@ export function buildWorkspaceTabMenuEntries(
         onRevealFileInExplorer(filePath);
       },
     });
+    if (input.fileManager) {
+      const { targetName, reveal } = input.fileManager;
+      entries.push({
+        kind: "item",
+        key: "reveal-in-file-manager",
+        label: i18n.t("workspace.fileActions.revealIn", { target: targetName }),
+        icon: "folder-open",
+        testID: `${menuTestIDBase}-reveal-in-file-manager`,
+        onSelect: () => {
+          void reveal(filePath);
+        },
+      });
+    }
   }
 
   if (tab.target.kind === "agent" || tab.target.kind === "terminal") {
@@ -459,6 +476,7 @@ export function buildWorkspaceDesktopTabActions(
       onCloseOtherTabs: input.onCloseOtherTabs,
       labels: input.labels,
       paneMoves: input.paneMoves,
+      fileManager: input.fileManager,
     }),
     closeButtonTestId: getCloseButtonTestId(input.tab),
   };

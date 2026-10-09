@@ -1,13 +1,14 @@
 import { useState, type PropsWithChildren } from "react";
 import type { ViewStyle } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
-import { Columns2, Copy, File, FolderSearch, Rows2 } from "lucide-react-native";
+import { Columns2, Copy, File, FolderOpen, FolderSearch, Rows2 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { usePaneContext } from "@/panels/pane-context";
@@ -19,12 +20,14 @@ import type { Theme } from "@/styles/theme";
 import { normalizeInlinePathTarget, type InlinePathTarget } from "./parse";
 import { useAssistantFileLinkResolverContext } from "./provider";
 import type { AssistantFileLinkSource } from "./resolver";
+import { useRevealInFileManager } from "@/workspace/open-in-file-manager/reveal";
 import { useStableEvent } from "@/hooks/use-stable-event";
 
 const ThemedFile = withUnistyles(File);
 const ThemedColumns = withUnistyles(Columns2);
 const ThemedRows = withUnistyles(Rows2);
 const ThemedCopy = withUnistyles(Copy);
+const ThemedFolderOpen = withUnistyles(FolderOpen);
 const ThemedFolderSearch = withUnistyles(FolderSearch);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const triggerStyle: ViewStyle = { display: "contents" as ViewStyle["display"] };
@@ -32,6 +35,7 @@ const openIcon = <ThemedFile size={16} uniProps={mutedColorMapping} />;
 const horizontalIcon = <ThemedColumns size={16} uniProps={mutedColorMapping} />;
 const verticalIcon = <ThemedRows size={16} uniProps={mutedColorMapping} />;
 const copyIcon = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
+const fileManagerIcon = <ThemedFolderOpen size={16} uniProps={mutedColorMapping} />;
 const revealIcon = <ThemedFolderSearch size={16} uniProps={mutedColorMapping} />;
 
 type FileLinkContextMenuProps = PropsWithChildren<{
@@ -65,6 +69,10 @@ function FileLinkMenuContent({
   const isCompact = useIsCompactFormFactor();
   const { configRef } = useAssistantFileLinkResolverContext();
   const workspaceRoot = configRef.current.workspaceRoot;
+  const fileManager = useRevealInFileManager({
+    serverId: pane.serverId,
+    workspaceRoot: workspaceRoot ?? "",
+  });
   const path = target ? normalizeInlinePathTarget(target.path, workspaceRoot)?.file : undefined;
   const workspaceKey = buildWorkspaceTabPersistenceKey({
     serverId: pane.serverId,
@@ -104,6 +112,9 @@ function FileLinkMenuContent({
   const revealFile = useStableEvent(() => {
     if (path) pane.revealFileInExplorer(path);
   });
+  const revealInFileManager = useStableEvent(() => {
+    if (path) void fileManager?.reveal(path);
+  });
   return (
     <ContextMenuContent minWidth={230} testID="assistant-file-link-menu">
       <ContextMenuItem leading={openIcon} onSelect={onOpen} testID="assistant-file-link-open">
@@ -129,6 +140,7 @@ function FileLinkMenuContent({
           </ContextMenuItem>
         </>
       ) : null}
+      <ContextMenuSeparator testID="assistant-file-link-open-separator" />
       <ContextMenuItem
         leading={copyIcon}
         disabled={!path}
@@ -145,6 +157,16 @@ function FileLinkMenuContent({
       >
         {t("workspace.tabs.menu.revealInExplorer")}
       </ContextMenuItem>
+      {fileManager ? (
+        <ContextMenuItem
+          leading={fileManagerIcon}
+          disabled={!path}
+          onSelect={revealInFileManager}
+          testID="assistant-file-link-reveal-in-file-manager"
+        >
+          {t("workspace.fileActions.revealIn", { target: fileManager.targetName })}
+        </ContextMenuItem>
+      ) : null}
       {!target ? (
         <ContextMenuLabel>
           {resolutionFailed

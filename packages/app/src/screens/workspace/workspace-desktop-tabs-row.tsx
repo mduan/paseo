@@ -50,6 +50,11 @@ import {
   type WorkspaceTabPaneMoves,
 } from "@/screens/workspace/workspace-tab-menu";
 import { useWorkspaceTabMenuItemAdornments } from "@/screens/workspace/workspace-tab-menu-item";
+import { useWorkspace } from "@/stores/session-store-hooks";
+import {
+  useRevealInFileManager,
+  type RevealInFileManagerAction,
+} from "@/workspace/open-in-file-manager/reveal";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import type { Theme } from "@/styles/theme";
@@ -964,6 +969,11 @@ function ResolvedWorkspaceDesktopTabsRow({
   onExitFocusMode,
 }: ResolvedWorkspaceDesktopTabsRowProps) {
   const { t } = useTranslation();
+  const workspace = useWorkspace(normalizedServerId, normalizedWorkspaceId);
+  const fileManager = useRevealInFileManager({
+    serverId: normalizedServerId,
+    workspaceRoot: workspace?.workspaceDirectory ?? "",
+  });
   const workspaceKey = buildWorkspaceTabPersistenceKey({
     serverId: normalizedServerId,
     workspaceId: normalizedWorkspaceId,
@@ -1241,6 +1251,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           onCloseTab={onCloseTab}
           labels={tabMenuLabels}
           paneMoves={paneMoves}
+          fileManager={fileManager}
           dragHandleProps={dragHandleProps}
           showDropIndicatorBefore={showDropIndicatorBefore}
           showDropIndicatorAfter={showDropIndicatorAfter}
@@ -1268,6 +1279,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       setHoveredCloseTabKey,
       tabMenuLabels,
       paneMoves,
+      fileManager,
       tabDropPreviewIndex,
       displayedTabs.length,
     ],
@@ -1392,6 +1404,7 @@ function ResolvedDesktopTabChip({
   onCloseTab,
   labels,
   paneMoves,
+  fileManager,
   dragHandleProps,
   showDropIndicatorBefore,
   showDropIndicatorAfter,
@@ -1420,6 +1433,7 @@ function ResolvedDesktopTabChip({
   onCloseTab: (tabId: string) => Promise<void> | void;
   labels: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
+  fileManager?: RevealInFileManagerAction;
   dragHandleProps: DraggableListDragHandleProps | undefined;
   showDropIndicatorBefore: boolean;
   showDropIndicatorAfter: boolean;
@@ -1445,6 +1459,7 @@ function ResolvedDesktopTabChip({
         onCloseOtherTabs,
         labels,
         paneMoves,
+        fileManager,
       }),
     [
       index,
@@ -1460,6 +1475,7 @@ function ResolvedDesktopTabChip({
       onCopyResumeCommand,
       labels,
       paneMoves,
+      fileManager,
       onReloadAgent,
       onRenameTab,
       tabCount,
