@@ -163,22 +163,6 @@ describe("worktree creation tracker", () => {
     ).resolves.toEqual(["AAECAw==", "AAECAw=="]);
   });
 
-  it("releases initial image protection when creation fails", async () => {
-    const { ports } = createPorts({ activeSelection: null });
-    const tracker = createTracker({ ports, imageAttachmentIds: ["failed-origin-image"] });
-    tracker.observe(snapshot({ phase: "accepted" }));
-
-    try {
-      expect(collectRetainedAttachmentIds()).toEqual(new Set(["failed-origin-image"]));
-    } finally {
-      await expect(tracker.track(Promise.reject(new Error("git failed")))).rejects.toThrow(
-        "git failed",
-      );
-    }
-
-    expect(collectRetainedAttachmentIds()).toEqual(new Set());
-  });
-
   it("adds the pending entry and leaves the New workspace screen when creation is accepted", () => {
     const { calls, ports } = createPorts({ activeSelection: null });
     let draftClears = 0;
@@ -339,13 +323,14 @@ describe("worktree creation tracker", () => {
 
   it("fails the entry when the create call rejects before the workspace exists", async () => {
     const { ports } = createPorts({ activeSelection: null });
-    const tracker = createTracker({ ports });
+    const tracker = createTracker({ ports, imageAttachmentIds: ["failed-origin-image"] });
     tracker.observe(snapshot({ phase: "accepted" }));
 
     await expect(tracker.track(Promise.reject(new Error("git failed")))).rejects.toThrow(
       "git failed",
     );
 
+    expect(collectRetainedAttachmentIds()).toEqual(new Set());
     expect(entries()).toEqual([
       expect.objectContaining({
         status: PendingWorkspaceCreationStatus.Failed,

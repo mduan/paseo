@@ -1079,13 +1079,10 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
   const attachmentSubmitFormat = resolveComposerAttachmentSubmitFormat({
     supportsForgeAttachments: input.supportsForgeSearch,
   });
-  const { attachments: reviewAttachments } = splitComposerAttachmentsForSubmit(attachments, {
-    format: attachmentSubmitFormat,
-  });
-  const workspaceNamingAttachments = getWorkspaceNamingAttachments(reviewAttachments);
   const wirePayload = splitComposerAttachmentsForSubmit(attachments, {
     format: attachmentSubmitFormat,
   });
+  const workspaceNamingAttachments = getWorkspaceNamingAttachments(wirePayload.attachments);
   const images = await encodeImages(wirePayload.images);
   const tracker =
     input.worktreeCreation &&
