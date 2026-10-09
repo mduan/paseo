@@ -1,13 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   cloneGithubProjectDirectly,
   getOpenProjectFailureReason,
   openProjectDirectly,
+  registerProjectDescriptor,
 } from "@/hooks/open-project";
 import type { ProjectDescriptor } from "@/stores/session-store";
+import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { createProjectViewKey } from "@/projects/workspace-structure";
 
 const SERVER_ID = "server-1";
 const PROJECT_PATH = "/repo/project";
+const PROJECT_VIEW_KEY = createProjectViewKey({ serverId: SERVER_ID, projectId: "project-1" });
+const OTHER_PROJECT_VIEW_KEY = createProjectViewKey({
+  serverId: "other-server",
+  projectId: "project-1",
+});
+
+beforeEach(() => {
+  useSidebarViewStore.setState({ projectFilters: [] });
+});
 
 function buildProjectPayload() {
   return {
@@ -70,6 +82,7 @@ describe("openProjectDirectly", () => {
   it("adds the project and marks workspaces hydrated without opening a workspace", async () => {
     const session = createFakeSession();
     const projectPayload = buildProjectPayload();
+    useSidebarViewStore.setState({ projectFilters: [OTHER_PROJECT_VIEW_KEY] });
 
     const result = await openProjectDirectly({
       serverId: SERVER_ID,
@@ -103,6 +116,10 @@ describe("openProjectDirectly", () => {
       },
     ]);
     expect(session.hydrated).toEqual([{ serverId: SERVER_ID, hydrated: true }]);
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([
+      OTHER_PROJECT_VIEW_KEY,
+      PROJECT_VIEW_KEY,
+    ]);
   });
 
   it("fails before sending when the host does not support adding projects without workspaces", async () => {
@@ -134,6 +151,7 @@ describe("openProjectDirectly", () => {
 
   it("does not add a project when addProject fails", async () => {
     const session = createFakeSession();
+    useSidebarViewStore.setState({ projectFilters: [OTHER_PROJECT_VIEW_KEY] });
 
     const result = await openProjectDirectly({
       serverId: SERVER_ID,
@@ -159,6 +177,7 @@ describe("openProjectDirectly", () => {
     });
     expect(session.projects).toEqual([]);
     expect(session.hydrated).toEqual([]);
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([OTHER_PROJECT_VIEW_KEY]);
   });
 });
 
@@ -167,6 +186,7 @@ describe("cloneGithubProjectDirectly", () => {
     const session = createFakeSession();
     const projectPayload = buildProjectPayload();
     const github = createFakeGithubCloneClient(projectPayload);
+    useSidebarViewStore.setState({ projectFilters: [OTHER_PROJECT_VIEW_KEY] });
 
     const result = await cloneGithubProjectDirectly({
       serverId: SERVER_ID,
@@ -199,11 +219,16 @@ describe("cloneGithubProjectDirectly", () => {
       },
     ]);
     expect(session.hydrated).toEqual([{ serverId: SERVER_ID, hydrated: true }]);
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([
+      OTHER_PROJECT_VIEW_KEY,
+      PROJECT_VIEW_KEY,
+    ]);
   });
 
   it("does not register a project when cloning fails", async () => {
     const session = createFakeSession();
     const github = createFakeGithubCloneClient(null);
+    useSidebarViewStore.setState({ projectFilters: [OTHER_PROJECT_VIEW_KEY] });
 
     const result = await cloneGithubProjectDirectly({
       serverId: SERVER_ID,
@@ -223,6 +248,43 @@ describe("cloneGithubProjectDirectly", () => {
     });
     expect(session.projects).toEqual([]);
     expect(session.hydrated).toEqual([]);
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([OTHER_PROJECT_VIEW_KEY]);
+  });
+});
+
+describe("registerProjectDescriptor", () => {
+  it("selects a newly created directory project only once", () => {
+    const session = createFakeSession();
+    useSidebarViewStore.setState({ projectFilters: [OTHER_PROJECT_VIEW_KEY] });
+    const input = {
+      serverId: ` ${SERVER_ID} `,
+      project: { ...buildProjectPayload(), projectKind: "directory" as const },
+      upsertProject: session.upsertProject,
+      setHasHydratedWorkspaces: session.setHasHydratedWorkspaces,
+    };
+
+    expect(registerProjectDescriptor(input)).toBe(true);
+    expect(registerProjectDescriptor(input)).toBe(true);
+
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([
+      OTHER_PROJECT_VIEW_KEY,
+      PROJECT_VIEW_KEY,
+    ]);
+  });
+
+  it("keeps All projects selected when adding a project", () => {
+    const session = createFakeSession();
+
+    expect(
+      registerProjectDescriptor({
+        serverId: SERVER_ID,
+        project: buildProjectPayload(),
+        upsertProject: session.upsertProject,
+        setHasHydratedWorkspaces: session.setHasHydratedWorkspaces,
+      }),
+    ).toBe(true);
+
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([]);
   });
 });
 

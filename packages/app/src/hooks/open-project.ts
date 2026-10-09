@@ -5,6 +5,8 @@ import type {
   WorkspaceProjectDescriptorPayload,
 } from "@getpaseo/protocol/messages";
 import { normalizeProjectDescriptor, type ProjectDescriptor } from "@/stores/session-store";
+import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { createProjectViewKey } from "@/projects/workspace-structure";
 
 type OpenProjectPayload = ProjectAddResponse["payload"];
 type OpenProjectErrorCode = NonNullable<OpenProjectPayload["errorCode"]>;
@@ -67,6 +69,11 @@ export function registerProjectDescriptor(input: RegisterProjectDescriptorInput)
   if (!serverId) return false;
   input.upsertProject(serverId, normalizeProjectDescriptor(input.project));
   input.setHasHydratedWorkspaces(serverId, true);
+  const { projectFilters, toggleProjectFilter } = useSidebarViewStore.getState();
+  const viewKey = createProjectViewKey({ serverId, projectId: input.project.projectId });
+  if (projectFilters.length > 0 && !projectFilters.includes(viewKey)) {
+    toggleProjectFilter(viewKey);
+  }
   return true;
 }
 
