@@ -59,9 +59,12 @@ describe("window-manager", () => {
       expect(menu.popup).toHaveBeenCalledWith({ window: win });
     });
 
-    it.each(["", "Selected"])(
-      "offers only link actions when selected text is %j",
-      (selectionText) => {
+    it.each([
+      { selectionText: "", selectionItems: [] },
+      { selectionText: "Selected", selectionItems: [{ type: "separator" }, { role: "copy" }] },
+    ])(
+      "offers link actions and selection actions for '$selectionText'",
+      ({ selectionText, selectionItems }) => {
         vi.mocked(Menu.buildFromTemplate).mockClear();
         vi.mocked(clipboard.writeText).mockClear();
         vi.mocked(shell.openExternal).mockClear();
@@ -74,6 +77,7 @@ describe("window-manager", () => {
         expect(Menu.buildFromTemplate).toHaveBeenCalledWith([
           { label: "Open Link in Browser", click: expect.any(Function) },
           { label: "Copy Link Address", click: expect.any(Function) },
+          ...selectionItems,
         ]);
         const items = vi.mocked(Menu.buildFromTemplate).mock.calls[0]![0];
         Reflect.apply(items[0]!.click!, undefined, []);

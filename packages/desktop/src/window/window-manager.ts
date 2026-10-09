@@ -338,7 +338,7 @@ export function buildStandardContextMenuItems(
   }
 
   if (params.linkURL && /^https?:/i.test(params.linkURL)) {
-    return [
+    const items: MenuItemConstructorOptions[] = [
       {
         label: "Open Link in Browser",
         click: () => {
@@ -350,6 +350,10 @@ export function buildStandardContextMenuItems(
         click: () => clipboard.writeText(params.linkURL),
       },
     ];
+    if (params.selectionText) {
+      items.push({ type: "separator" }, { role: "copy" });
+    }
+    return items;
   }
 
   if (!params.isEditable) {
