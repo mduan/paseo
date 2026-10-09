@@ -999,6 +999,7 @@ export const fr: TranslationResources = {
         diffMode: "Mode différentiel",
         uncommitted: "Non engagé",
         committed: "Engagé",
+        allChanges: "Toutes les modifications",
         lastTurn: "Dernier tour",
         noLastTurnChanges: "Aucun changement au dernier tour",
         noTurnSnapshot: "Aucun instantané pour ce tour",

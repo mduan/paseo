@@ -69,13 +69,14 @@ describe("prompt attachments", () => {
     ).toContain("GitLab MR !123: Fix race in worktree setup");
   });
 
-  it("renders review attachments with compact file, line, comment, and context details", () => {
+  it.each([false, true])("renders reviews (combined=%s)", (includeUncommitted) => {
     expect(
       renderPromptAttachmentAsText({
         type: "review",
         mimeType: "application/paseo-review",
         cwd: "/tmp/repo",
         mode: "base",
+        includeUncommitted,
         baseRef: "main",
         comments: [
           {
@@ -111,7 +112,7 @@ describe("prompt attachments", () => {
       }),
     ).toBe(
       [
-        "Paseo review attachment (base)",
+        `Paseo review attachment (${includeUncommitted ? "committed + uncommitted" : "base"})`,
         "CWD: /tmp/repo",
         "Base: main",
         "",

@@ -314,12 +314,14 @@ describe("server data push router", () => {
       });
   });
 
-  it("subscribes active checkout diff queries and writes matching diff events", () => {
+  it.each([false, true])("routes checkout diffs (combined=%s)", (includeUncommitted) => {
     const queryClient = new QueryClient();
     const fake = createFakeClient();
     const serverId = "server-1";
     const cwd = "/repo";
-    const queryKey = checkoutDiffQueryKey(serverId, cwd, "base", "main", true);
+    const queryKey = checkoutDiffQueryKey(serverId, cwd, "base", "main", true, {
+      includeUncommitted,
+    });
     const subscriptionId = `checkoutDiff:${JSON.stringify(queryKey)}`;
     const observer = new QueryObserver(queryClient, {
       queryKey,
@@ -332,7 +334,7 @@ describe("server data push router", () => {
         serverId,
         subscriptionId,
         cwd,
-        compare: { mode: "base", baseRef: "main", ignoreWhitespace: true },
+        compare: { mode: "base", baseRef: "main", ignoreWhitespace: true, includeUncommitted },
       }),
     });
     const unsubscribeObserver = observer.subscribe(() => undefined);
@@ -342,7 +344,7 @@ describe("server data push router", () => {
     expect(fake.subscribeCheckoutDiffCalls).toEqual([
       {
         cwd,
-        compare: { mode: "base", baseRef: "main", ignoreWhitespace: true },
+        compare: { mode: "base", baseRef: "main", ignoreWhitespace: true, includeUncommitted },
         subscriptionId: serverSubscriptionId,
       },
     ]);

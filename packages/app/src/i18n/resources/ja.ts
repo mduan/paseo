@@ -980,6 +980,7 @@ export const ja: TranslationResources = {
         diffMode: "差分モード",
         uncommitted: "未コミット",
         committed: "コミット済み",
+        allChanges: "すべての変更",
         lastTurn: "前回のターン",
         noLastTurnChanges: "前回のターンに変更はありません",
         noTurnSnapshot: "このターンのスナップショットはありません",

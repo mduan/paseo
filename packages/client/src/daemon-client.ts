@@ -46,6 +46,7 @@ import type {
   AgentForkContextResponseMessage,
   GitSetupOptions,
   CheckoutStatusResponse,
+  SubscribeCheckoutDiffRequest,
   CheckoutCommit,
   ParsedDiffFile,
   CheckoutCommitResponse,
@@ -4166,30 +4167,26 @@ export class DaemonClient {
     return responsePromise;
   }
 
-  private normalizeCheckoutDiffCompare(compare: {
-    mode: "uncommitted" | "base";
-    baseRef?: string;
-    ignoreWhitespace?: boolean;
-  }): { mode: "uncommitted" | "base"; baseRef?: string; ignoreWhitespace?: boolean } {
+  private normalizeCheckoutDiffCompare(
+    compare: SubscribeCheckoutDiffRequest["compare"],
+  ): SubscribeCheckoutDiffRequest["compare"] {
     if (compare.mode === "uncommitted") {
       return compare.ignoreWhitespace === true
         ? { mode: "uncommitted", ignoreWhitespace: true }
         : { mode: "uncommitted" };
     }
-    const trimmedBaseRef = compare.baseRef?.trim();
-    if (!trimmedBaseRef) {
-      return compare.ignoreWhitespace === true
-        ? { mode: "base", ignoreWhitespace: true }
-        : { mode: "base" };
-    }
-    return compare.ignoreWhitespace === true
-      ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace: true }
-      : { mode: "base", baseRef: trimmedBaseRef };
+    const baseRef = compare.baseRef?.trim();
+    return {
+      mode: "base",
+      ...(baseRef ? { baseRef } : {}),
+      ...(compare.ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+      ...(compare.includeUncommitted ? { includeUncommitted: true } : {}),
+    };
   }
 
   async getCheckoutDiff(
     cwd: string,
-    compare: { mode: "uncommitted" | "base"; baseRef?: string; ignoreWhitespace?: boolean },
+    compare: SubscribeCheckoutDiffRequest["compare"],
     requestId?: string,
   ): Promise<CheckoutDiffPayload> {
     return this.sendCorrelatedSessionRequest({
@@ -4205,7 +4202,7 @@ export class DaemonClient {
 
   observeCheckoutDiff(
     cwd: string,
-    compare: { mode: "uncommitted" | "base"; baseRef?: string; ignoreWhitespace?: boolean },
+    compare: SubscribeCheckoutDiffRequest["compare"],
     options?: { requestId?: string; signal?: AbortSignal },
   ): OwnedSubscription<SubscribeCheckoutDiffPayload> {
     return this.observe(

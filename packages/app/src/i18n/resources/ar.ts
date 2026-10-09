@@ -967,6 +967,7 @@ export const ar: TranslationResources = {
         diffMode: "وضع الفرق",
         uncommitted: "غير ملتزم",
         committed: "ملتزم",
+        allChanges: "كل التغييرات",
         lastTurn: "آخر دور",
         noLastTurnChanges: "لا تغييرات في الدور الأخير",
         noTurnSnapshot: "لا توجد لقطة لهذا الدور",

@@ -174,10 +174,11 @@ export class CheckoutDiffManager {
     if (compare.mode === "uncommitted") {
       return { mode: "uncommitted", ignoreWhitespace };
     }
+    const combined = compare.includeUncommitted ? { includeUncommitted: true } : {};
     const trimmedBaseRef = compare.baseRef?.trim();
     return trimmedBaseRef
-      ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace }
-      : { mode: "base", ignoreWhitespace };
+      ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace, ...combined }
+      : { mode: "base", ignoreWhitespace, ...combined };
   }
 
   private buildTargetKey(cwd: string, compare: CheckoutDiffCompareInput): string {
@@ -186,6 +187,7 @@ export class CheckoutDiffManager {
       compare.mode,
       compare.mode === "base" ? (compare.baseRef ?? "") : "",
       compare.ignoreWhitespace === true,
+      compare.includeUncommitted === true,
     ]);
   }
 
@@ -279,6 +281,7 @@ export class CheckoutDiffManager {
         diffCwd,
         {
           mode: compare.mode,
+          ...(compare.includeUncommitted ? { includeUncommitted: true } : {}),
           baseRef: compare.baseRef,
           ignoreWhitespace: compare.ignoreWhitespace,
           includeStructured: true,
@@ -402,7 +405,7 @@ export class CheckoutDiffManager {
         return;
       }
       target.workspaceGitUnsubscribe = workspaceSubscription.unsubscribe;
-      return;
+      if (!target.compare.includeUncommitted) return;
     }
 
     const { repoRoot, unsubscribe } = await this.workspaceGitService.requestWorkingTreeWatch(

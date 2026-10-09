@@ -12,6 +12,7 @@ interface UseCheckoutDiffQueryOptions {
   serverId: string;
   cwd: string;
   mode: "uncommitted" | "base";
+  includeUncommitted?: boolean;
   baseRef?: string;
   ignoreWhitespace?: boolean;
   enabled?: boolean;
@@ -28,23 +29,31 @@ export type HighlightToken = NonNullable<DiffLine["tokens"]>[number];
 
 function normalizeCheckoutDiffCompare(compare: {
   mode: "uncommitted" | "base";
+  includeUncommitted?: boolean;
   baseRef?: string;
   ignoreWhitespace?: boolean;
-}): { mode: "uncommitted" | "base"; baseRef?: string; ignoreWhitespace?: boolean } {
+}): {
+  mode: "uncommitted" | "base";
+  baseRef?: string;
+  ignoreWhitespace?: boolean;
+  includeUncommitted?: boolean;
+} {
   const ignoreWhitespace = compare.ignoreWhitespace === true;
   if (compare.mode === "uncommitted") {
     return { mode: "uncommitted", ignoreWhitespace };
   }
+  const includeUncommitted = compare.includeUncommitted === true;
   const trimmedBaseRef = compare.baseRef?.trim();
   return trimmedBaseRef
-    ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace }
-    : { mode: "base", ignoreWhitespace };
+    ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace, includeUncommitted }
+    : { mode: "base", ignoreWhitespace, includeUncommitted };
 }
 
 export function useCheckoutDiffQuery({
   serverId,
   cwd,
   mode,
+  includeUncommitted,
   baseRef,
   ignoreWhitespace,
   enabled = true,
@@ -55,10 +64,11 @@ export function useCheckoutDiffQuery({
   const isConnected = useHostRuntimeIsConnected(serverId);
   const isSwitchingCheckout = usePendingCheckoutSwitch(serverId, cwd) !== undefined;
   const normalizedCompare = useMemo(
-    () => normalizeCheckoutDiffCompare({ mode, baseRef, ignoreWhitespace }),
-    [mode, baseRef, ignoreWhitespace],
+    () => normalizeCheckoutDiffCompare({ mode, baseRef, ignoreWhitespace, includeUncommitted }),
+    [mode, baseRef, ignoreWhitespace, includeUncommitted],
   );
   const compareMode = normalizedCompare.mode;
+  const compareIncludeUncommitted = normalizedCompare.includeUncommitted;
   const compareBaseRef = normalizedCompare.baseRef;
   const compareIgnoreWhitespace = normalizedCompare.ignoreWhitespace;
   const queryKey = useMemo(() => {
@@ -68,10 +78,19 @@ export function useCheckoutDiffQuery({
       compareMode,
       compareBaseRef,
       compareIgnoreWhitespace,
+      { includeUncommitted: compareIncludeUncommitted },
     );
     const normalizedScope = queryScope?.trim();
     return normalizedScope ? [...comparisonKey, "scope", normalizedScope] : comparisonKey;
-  }, [serverId, cwd, compareMode, compareBaseRef, compareIgnoreWhitespace, queryScope]);
+  }, [
+    serverId,
+    cwd,
+    compareMode,
+    compareBaseRef,
+    compareIgnoreWhitespace,
+    compareIncludeUncommitted,
+    queryScope,
+  ]);
   const subscriptionId = useMemo(() => `checkoutDiff:${JSON.stringify(queryKey)}`, [queryKey]);
   const routeEnabled = Boolean(queryEnabled && isConnected && cwd);
 
@@ -87,6 +106,7 @@ export function useCheckoutDiffQuery({
       cwd,
       compare: {
         mode: compareMode,
+        includeUncommitted: compareIncludeUncommitted,
         ...(compareBaseRef ? { baseRef: compareBaseRef } : {}),
         ignoreWhitespace: compareIgnoreWhitespace,
       },

@@ -984,6 +984,7 @@ export const ru: TranslationResources = {
         diffMode: "Режим диффа",
         uncommitted: "Незафиксированные изменения",
         committed: "Зафиксированные изменения",
+        allChanges: "Все изменения",
         lastTurn: "Последний ход",
         noLastTurnChanges: "Нет изменений в последнем ходе",
         noTurnSnapshot: "Нет снимка для этого хода",

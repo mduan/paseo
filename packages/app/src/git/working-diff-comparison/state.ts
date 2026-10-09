@@ -1,7 +1,14 @@
+export enum LiveDiffComparison {
+  All = "all",
+}
+
 export type CheckoutDiffComparison = "uncommitted" | "base";
 /** Frozen snapshots of the focused agent's turns; they don't follow the dirty state. */
 export type TurnDiffComparison = "last_turn";
-export type WorkingDiffComparison = CheckoutDiffComparison | TurnDiffComparison;
+export type WorkingDiffComparison =
+  | CheckoutDiffComparison
+  | LiveDiffComparison
+  | TurnDiffComparison;
 
 export function isTurnDiffComparison(
   comparison: WorkingDiffComparison,
@@ -68,7 +75,9 @@ export function resolveWorkingDiffComparisonFromState(
   // selection under any ordering of the two updates.
   if (
     override &&
-    (isTurnDiffComparison(override.comparison) || override.isDirtyAtSelection === input.isDirty)
+    (isTurnDiffComparison(override.comparison) ||
+      override.comparison === LiveDiffComparison.All ||
+      override.isDirtyAtSelection === input.isDirty)
   ) {
     return override.comparison;
   }
@@ -87,6 +96,7 @@ export function expireWorkingDiffComparisonsInState(
         override.serverId === input.serverId.trim() &&
         override.cwd === normalizeCwd(input.cwd) &&
         !isTurnDiffComparison(override.comparison) &&
+        override.comparison !== LiveDiffComparison.All &&
         override.isDirtyAtSelection !== input.isDirty,
     )
     .map(([key]) => key);

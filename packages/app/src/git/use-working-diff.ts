@@ -17,11 +17,13 @@ import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { useWorkingDiffComparison } from "@/git/working-diff-comparison";
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import {
+  LiveDiffComparison,
   isTurnDiffComparison,
   type CheckoutDiffComparison,
   type TurnDiffComparison,
   type WorkingDiffComparison,
 } from "@/git/working-diff-comparison/state";
+import { useHostFeature } from "@/runtime/host-features";
 import { useFocusedChatTarget } from "@/panels/use-add-file-to-chat";
 import { useAgentTurnDiff, useTurnDiffsEnabled } from "@/turn-diffs/queries";
 
@@ -61,13 +63,22 @@ export function useWorkingDiff({
   const currentBranchName =
     gitStatus?.currentBranch && gitStatus.currentBranch !== "HEAD" ? gitStatus.currentBranch : null;
 
-  const { diffMode, checkoutMode, turnComparison, selectUncommitted, selectBase, turnModes } =
-    useResolvedDiffComparison({ serverId, workspaceId, cwd, isDirty: hasUncommittedChanges });
+  const {
+    diffMode,
+    checkoutMode,
+    includeUncommitted,
+    turnComparison,
+    selectUncommitted,
+    selectBase,
+    selectAll,
+    turnModes,
+  } = useResolvedDiffComparison({ serverId, workspaceId, cwd, isDirty: hasUncommittedChanges });
 
   const checkoutDiff = useCheckoutDiffQuery({
     serverId,
     cwd,
     mode: checkoutMode,
+    includeUncommitted,
     baseRef,
     ignoreWhitespace,
     enabled: enabled && isGit && !turnComparison,
@@ -87,6 +98,7 @@ export function useWorkingDiff({
     ignoreWhitespace,
     reviewDraftKey,
     checkoutMode,
+    includeUncommitted,
     baseRef,
     turnComparison,
     turnDiff,
@@ -111,6 +123,7 @@ export function useWorkingDiff({
     diffMode,
     selectUncommitted,
     selectBase,
+    selectAll,
     turnModes,
     ...(turnComparison
       ? {
@@ -147,6 +160,14 @@ function useResolvedDiffComparison(input: {
 }) {
   const { comparison, selectComparison } = useWorkingDiffComparison(input);
   const turnDiffsEnabled = useTurnDiffsEnabled(input.serverId);
+  // COMPAT(checkoutCombinedDiff): added in v0.11.0-fork.6, remove after 2027-04-08.
+  const combinedDiffSupported = useHostFeature(input.serverId, "checkoutCombinedDiff");
+  const selectAllChanges = useCallback(
+    () => selectComparison(LiveDiffComparison.All),
+    [selectComparison],
+  );
+  const selectAll = combinedDiffSupported ? selectAllChanges : undefined;
+  const includeUncommitted = comparison === LiveDiffComparison.All;
   const selectUncommitted = useCallback(() => selectComparison("uncommitted"), [selectComparison]);
   const selectBase = useCallback(() => selectComparison("base"), [selectComparison]);
   const turnModes = useMemo(
@@ -156,9 +177,19 @@ function useResolvedDiffComparison(input: {
   const isTurn = isTurnDiffComparison(comparison);
   const defaultCheckoutMode: CheckoutDiffComparison = input.isDirty ? "uncommitted" : "base";
   const checkoutMode = isTurn ? defaultCheckoutMode : comparison;
+  const resolvedCheckoutMode = checkoutMode === LiveDiffComparison.All ? "base" : checkoutMode;
   const turnComparison = turnDiffsEnabled && isTurn ? comparison : null;
   const diffMode: WorkingDiffComparison = turnComparison ?? checkoutMode;
-  return { diffMode, checkoutMode, turnComparison, selectUncommitted, selectBase, turnModes };
+  return {
+    diffMode,
+    checkoutMode: resolvedCheckoutMode,
+    includeUncommitted,
+    turnComparison,
+    selectUncommitted,
+    selectBase,
+    selectAll,
+    turnModes,
+  };
 }
 
 const EMPTY_FILES: ParsedDiffFile[] = [];
@@ -169,6 +200,7 @@ function useWorkingDiffExpansion(input: {
   ignoreWhitespace: boolean;
   reviewDraftKey: string;
   checkoutMode: CheckoutDiffComparison;
+  includeUncommitted: boolean;
   baseRef?: string;
   turnComparison: TurnDiffComparison | null;
   turnDiff: { cwd: string; agentId: string | null; files: ParsedDiffFile[] };
@@ -186,7 +218,7 @@ function useWorkingDiffExpansion(input: {
       : {
           cwd: input.cwd,
           // Expanded gaps belong to one checkout comparison.
-          scopeKey: `${input.reviewDraftKey}:mode=${input.checkoutMode}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
+          scopeKey: `${input.reviewDraftKey}:mode=${input.checkoutMode}:includeUncommitted=${input.includeUncommitted}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
           files: input.checkoutFiles,
         }),
   });
@@ -227,6 +259,7 @@ export interface ReviewDraftScope {
   reviewDraftKey: string;
   isGit: boolean;
   mode: ReviewDraftMode;
+  includeUncommitted: boolean;
   baseRef?: string;
 }
 
@@ -246,7 +279,7 @@ export function useReviewDraftScope({
   const { status } = useCheckoutStatusQuery({ serverId, cwd });
   const gitStatus = status && status.isGit ? status : null;
   const baseRef = gitStatus?.baseRef ?? undefined;
-  const { checkoutMode } = useResolvedDiffComparison({
+  const { checkoutMode, includeUncommitted } = useResolvedDiffComparison({
     serverId,
     workspaceId,
     cwd,
@@ -256,7 +289,13 @@ export function useReviewDraftScope({
     () => buildReviewDraftKey({ serverId, workspaceId, cwd }),
     [cwd, serverId, workspaceId],
   );
-  return { reviewDraftKey, isGit: Boolean(gitStatus), mode: checkoutMode, baseRef };
+  return {
+    reviewDraftKey,
+    isGit: Boolean(gitStatus),
+    mode: checkoutMode,
+    includeUncommitted,
+    baseRef,
+  };
 }
 
 /** Publishes the workspace's review comments as one composer attachment. Mount once per workspace. */
@@ -274,6 +313,7 @@ export function usePublishReviewAttachment({
     key: scope.reviewDraftKey,
     cwd,
     mode: scope.mode,
+    includeUncommitted: scope.includeUncommitted,
     baseRef: scope.baseRef,
   });
   const scopeKey = useMemo(
