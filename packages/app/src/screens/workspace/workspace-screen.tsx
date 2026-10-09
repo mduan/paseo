@@ -581,6 +581,10 @@ function MobileWorkspaceTabOption({
       copyFilePath: t("workspace.tabs.menu.copyFilePath"),
       revealInExplorer: t("workspace.tabs.menu.revealInExplorer"),
       rename: t("workspace.tabs.menu.rename"),
+      moveLeft: t("workspace.tabs.menu.moveLeft"),
+      moveRight: t("workspace.tabs.menu.moveRight"),
+      moveTop: t("workspace.tabs.menu.moveTop"),
+      moveBottom: t("workspace.tabs.menu.moveBottom"),
       closeAbove: t("workspace.tabs.menu.closeAbove"),
       closeBelow: t("workspace.tabs.menu.closeBelow"),
       closeLeft: t("workspace.tabs.menu.closeLeft"),
@@ -3075,6 +3079,13 @@ function WorkspaceScreenContent({
         onCloseTabsToLeft: (id) => handleCloseTabsToLeftInPane(id, paneTabs),
         onCloseTabsToRight: (id) => handleCloseTabsToRightInPane(id, paneTabs),
         onCloseOtherTabs: (id) => handleCloseOtherTabsInPane(id, paneTabs),
+        paneMoves: {
+          root,
+          explorerSidebarPaneId,
+          workspaceKey: persistenceKey,
+          moveTabToPane: moveWorkspaceTabToPane,
+          splitPane: splitWorkspacePane,
+        },
       }).menuEntries;
     });
   }, [
@@ -3094,6 +3105,9 @@ function WorkspaceScreenContent({
     normalizedWorkspaceId,
     persistenceKey,
     workspaceLayout,
+    explorerSidebarPaneId,
+    moveWorkspaceTabToPane,
+    splitWorkspacePane,
   ]);
 
   const handleClosePane = useCallback(

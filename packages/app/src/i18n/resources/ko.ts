@@ -664,6 +664,10 @@ export const ko: TranslationResources = {
         closeLeft: "왼쪽 탭 닫기",
         closeRight: "오른쪽 탭 닫기",
         closeOthers: "다른 탭 닫기",
+        moveLeft: "왼쪽 창으로 이동",
+        moveRight: "오른쪽 창으로 이동",
+        moveTop: "위쪽 창으로 이동",
+        moveBottom: "아래쪽 창으로 이동",
         moveToMain: "기본 패널로 이동",
         reloadAgent: "에이전트 다시 로드",
         reloadAgentTooltip:

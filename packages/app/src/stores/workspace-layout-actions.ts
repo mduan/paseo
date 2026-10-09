@@ -231,6 +231,7 @@ interface MoveTabToPaneInLayoutInput {
   tabId: string;
   toPaneId: string;
   explorerSidebarPaneId?: string | null;
+  preserveSourcePane?: boolean;
 }
 
 interface FocusTabInLayoutInput {
@@ -2040,7 +2041,11 @@ export function moveTabToPaneInLayout(input: MoveTabToPaneInLayoutInput): Worksp
     sourcePane.id !== input.toPaneId &&
     sourcePane.tabIds.length === 1 &&
     sourceTab?.target.kind === "new_tab";
-  if (isMovingSoleNewTab && input.toPaneId !== input.explorerSidebarPaneId) {
+  if (
+    isMovingSoleNewTab &&
+    !input.preserveSourcePane &&
+    input.toPaneId !== input.explorerSidebarPaneId
+  ) {
     return sourcePane.id === input.explorerSidebarPaneId
       ? setPaneHiddenInLayout({ layout, paneId: sourcePane.id, hidden: true })
       : closePaneInLayout({
@@ -2054,6 +2059,7 @@ export function moveTabToPaneInLayout(input: MoveTabToPaneInLayoutInput): Worksp
     tabId: input.tabId,
     // Crossing into or out of Explorer cannot remove either host shell.
     preserveEmptyPaneId:
+      input.preserveSourcePane ||
       sourcePane.id === input.toPaneId ||
       sourcePane.id === input.explorerSidebarPaneId ||
       input.toPaneId === input.explorerSidebarPaneId

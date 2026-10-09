@@ -26,6 +26,7 @@ export function findAdjacentPane(
   root: SplitNode,
   focusedPaneId: string,
   direction: "left" | "right" | "up" | "down",
+  options?: { excludedPaneId?: string | null },
 ): string | null {
   const panes = collectPaneBounds(root, {
     left: ROOT_MIN,
@@ -39,7 +40,7 @@ export function findAdjacentPane(
   }
 
   const candidates = panes
-    .filter((pane) => pane.paneId !== focusedPaneId)
+    .filter((pane) => pane.paneId !== focusedPaneId && pane.paneId !== options?.excludedPaneId)
     .map((pane) => buildCandidate({ pane, focusedPane, direction }))
     .filter((candidate): candidate is PaneCandidate => candidate !== null)
     .sort(compareCandidates);

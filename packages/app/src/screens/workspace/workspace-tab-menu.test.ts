@@ -2,8 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildWorkspaceDesktopTabActions,
   buildWorkspaceTabMenuEntries,
+  PaneMovePosition,
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import {
+  collectAllPanes,
+  collectAllTabs,
+  createWorkspaceLayoutStore,
+  findPaneById,
+  findPaneContainingTab,
+  selectExplorerSidebarPaneId,
+} from "@/stores/workspace-layout-store";
 
 function createAgentTab(): WorkspaceTabDescriptor {
   return {
@@ -13,6 +22,193 @@ function createAgentTab(): WorkspaceTabDescriptor {
     target: { kind: "agent", agentId: "agent-123" },
   };
 }
+
+function createPaneMoveFixture() {
+  let nextId = 0;
+  const store = createWorkspaceLayoutStore({
+    createNodeId: (prefix) => `${prefix}_${++nextId}`,
+    createFocusRestorationToken: () => `focus_${++nextId}`,
+  });
+  store.setState({ layoutByWorkspace: {} });
+  const workspaceKey = "server-1:workspace-pane-moves";
+  const tab = createAgentTab();
+  const tabId = store.getState().openTab({ workspaceKey, target: tab.target, intent: "reveal" });
+  if (!tabId) throw new Error("Expected agent tab");
+  tab.tabId = tabId;
+  tab.key = tabId;
+
+  function buildMenu() {
+    const state = store.getState();
+    const layout = state.layoutByWorkspace[workspaceKey];
+    const pane = findPaneContainingTab(layout.root, tab.tabId);
+    if (!pane) throw new Error("Expected source pane");
+    return buildWorkspaceDesktopTabActions({
+      tab,
+      index: pane.tabIds.indexOf(tab.tabId),
+      tabCount: pane.tabIds.length,
+      onCopyResumeCommand: vi.fn(),
+      onCopyAgentId: vi.fn(),
+      onCopyTerminalId: vi.fn(),
+      onCopyFilePath: vi.fn(),
+      onRevealFileInExplorer: vi.fn(),
+      onReloadAgent: vi.fn(),
+      onRenameTab: vi.fn(),
+      onCloseTab: vi.fn(),
+      onCloseTabsToLeft: vi.fn(),
+      onCloseTabsToRight: vi.fn(),
+      onCloseOtherTabs: vi.fn(),
+      paneMoves: {
+        root: layout.root,
+        explorerSidebarPaneId: selectExplorerSidebarPaneId(state, workspaceKey),
+        workspaceKey,
+        moveTabToPane: state.moveTabToPane,
+        splitPane: state.splitPane,
+      },
+    }).menuEntries;
+  }
+
+  function selectMove(position: PaneMovePosition) {
+    const entry = buildMenu().find((item) => item.key === `move-${position}`);
+    if (!entry || entry.kind !== "item") throw new Error(`Missing move to ${position}`);
+    entry.onSelect();
+  }
+
+  return { store, workspaceKey, tab, buildMenu, selectMove };
+}
+
+describe("workspace tab pane moves", () => {
+  it.each([
+    [PaneMovePosition.Right, PaneMovePosition.Left, "Move to left pane"],
+    [PaneMovePosition.Bottom, PaneMovePosition.Top, "Move to top pane"],
+  ])(
+    "creates and reuses a %s split without closing the empty source",
+    (position, opposite, label) => {
+      const { store, workspaceKey, tab, buildMenu, selectMove } = createPaneMoveFixture();
+      const initialLayout = store.getState().layoutByWorkspace[workspaceKey];
+      const sourcePaneId = findPaneContainingTab(initialLayout.root, tab.tabId)?.id;
+      if (!sourcePaneId) throw new Error("Expected source pane");
+      const initialTabs = collectAllTabs(initialLayout.root);
+
+      const menuKeys = buildMenu().map((entry) => entry.key);
+      expect(menuKeys.slice(menuKeys.indexOf("rename"), menuKeys.indexOf("close-before"))).toEqual([
+        "rename",
+        "rename-separator",
+        "move-right",
+        "move-bottom",
+        "move-separator",
+      ]);
+      selectMove(position);
+
+      const splitLayout = store.getState().layoutByWorkspace[workspaceKey];
+      const destinationPaneId = findPaneContainingTab(splitLayout.root, tab.tabId)?.id;
+      if (!destinationPaneId) throw new Error("Expected destination pane");
+      expect(destinationPaneId).not.toBe(sourcePaneId);
+      expect(collectAllPanes(splitLayout.root)).toHaveLength(2);
+      expect(splitLayout.focusedPaneId).toBe(destinationPaneId);
+      const placeholderId = findPaneById(splitLayout.root, sourcePaneId)?.focusedTabId;
+      expect(
+        collectAllTabs(splitLayout.root).find((item) => item.tabId === placeholderId)?.target,
+      ).toEqual({ kind: "new_tab" });
+      expect(buildMenu()).toContainEqual(
+        expect.objectContaining({ key: `move-${opposite}`, label }),
+      );
+
+      selectMove(opposite);
+      const returnedLayout = store.getState().layoutByWorkspace[workspaceKey];
+      expect(collectAllPanes(returnedLayout.root)).toHaveLength(2);
+      expect(findPaneById(returnedLayout.root, sourcePaneId)?.tabIds).toEqual([tab.tabId]);
+      expect(returnedLayout.focusedPaneId).toBe(sourcePaneId);
+      expect(collectAllTabs(returnedLayout.root).find((item) => item.tabId === tab.tabId)).toEqual(
+        initialTabs.find((item) => item.tabId === tab.tabId),
+      );
+      expect(collectAllTabs(returnedLayout.root).some((item) => item.tabId === placeholderId)).toBe(
+        false,
+      );
+    },
+  );
+
+  it.each([PaneMovePosition.Right, PaneMovePosition.Bottom])(
+    "moves into an existing %s pane and keeps the other tabs",
+    (position) => {
+      const { store, workspaceKey, tab, selectMove } = createPaneMoveFixture();
+      const state = store.getState();
+      const otherTabId = state.openTab({
+        workspaceKey,
+        target: { kind: "terminal", terminalId: "terminal-1" },
+        intent: "reveal",
+      });
+      const remainingTabId = state.openTab({
+        workspaceKey,
+        target: { kind: "file", path: "/repo/a.ts" },
+        intent: "reveal",
+      });
+      if (!otherTabId || !remainingTabId) throw new Error("Expected other tabs");
+      const sourcePaneId = findPaneContainingTab(
+        store.getState().layoutByWorkspace[workspaceKey].root,
+        tab.tabId,
+      )?.id;
+      if (!sourcePaneId) throw new Error("Expected source pane");
+      const destinationPaneId = state.splitPane(workspaceKey, {
+        tabId: otherTabId,
+        targetPaneId: sourcePaneId,
+        position,
+      });
+      const oppositePosition =
+        position === PaneMovePosition.Right ? PaneMovePosition.Left : PaneMovePosition.Top;
+      state.splitPaneEmpty(workspaceKey, {
+        targetPaneId: sourcePaneId,
+        position: oppositePosition,
+      });
+
+      selectMove(position);
+      const layout = store.getState().layoutByWorkspace[workspaceKey];
+      expect(collectAllPanes(layout.root)).toHaveLength(3);
+      expect(findPaneById(layout.root, destinationPaneId)?.tabIds).toEqual([otherTabId, tab.tabId]);
+      expect(findPaneById(layout.root, sourcePaneId)?.tabIds).toEqual([remainingTabId]);
+    },
+  );
+
+  it("creates an ordinary split instead of moving into the Explorer sidebar", () => {
+    const { store, workspaceKey, buildMenu, selectMove } = createPaneMoveFixture();
+    const explorerPaneId = store.getState().showExplorerSidebar(workspaceKey);
+    const before = findPaneById(
+      store.getState().layoutByWorkspace[workspaceKey].root,
+      explorerPaneId,
+    );
+    expect(buildMenu()).toContainEqual(
+      expect.objectContaining({ key: "move-right", label: "Move to right pane" }),
+    );
+    expect(buildMenu().some((item) => item.key === "move-left")).toBe(false);
+
+    selectMove(PaneMovePosition.Right);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(collectAllPanes(layout.root)).toHaveLength(3);
+    expect(findPaneById(layout.root, explorerPaneId)).toEqual(before);
+  });
+
+  it("moves a sole New tab without removing its source pane", () => {
+    const { store, workspaceKey, tab, selectMove } = createPaneMoveFixture();
+    selectMove(PaneMovePosition.Right);
+    const before = store.getState().layoutByWorkspace[workspaceKey];
+    const placeholder = collectAllTabs(before.root).find((item) => item.target.kind === "new_tab");
+    if (!placeholder) throw new Error("Expected New tab placeholder");
+    const sourcePaneId = findPaneContainingTab(before.root, placeholder.tabId)?.id;
+    tab.tabId = placeholder.tabId;
+    tab.key = placeholder.tabId;
+    tab.kind = "new_tab";
+    tab.target = placeholder.target;
+
+    selectMove(PaneMovePosition.Right);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(collectAllPanes(layout.root)).toHaveLength(2);
+    expect(findPaneContainingTab(layout.root, placeholder.tabId)?.id).not.toBe(sourcePaneId);
+    const replacementId = findPaneById(layout.root, sourcePaneId)?.focusedTabId;
+    expect(replacementId).not.toBe(placeholder.tabId);
+    expect(
+      collectAllTabs(layout.root).find((item) => item.tabId === replacementId)?.target,
+    ).toEqual({ kind: "new_tab" });
+  });
+});
 
 describe("buildWorkspaceTabMenuEntries", () => {
   it("uses desktop tab ordering labels for desktop menus", () => {

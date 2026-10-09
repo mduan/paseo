@@ -92,4 +92,18 @@ describe("findAdjacentPane", () => {
     expect(findAdjacentPane(root, "left", "right")).toBe("right");
     expect(findAdjacentPane(root, "hidden", "right")).toBeNull();
   });
+
+  it("finds the nearest visible neighbor across a hidden pane", () => {
+    const root = createGroupNode({
+      direction: "horizontal",
+      sizes: [0.25, 0.25, 0.25, 0.25],
+      children: [
+        createPaneNode("left"),
+        createPaneNode("middle"),
+        createPaneNode("hidden", true),
+        createPaneNode("right"),
+      ],
+    });
+    expect(findAdjacentPane(root, "middle", "right")).toBe("right");
+  });
 });

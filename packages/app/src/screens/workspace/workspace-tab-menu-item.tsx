@@ -2,6 +2,10 @@ import { useMemo, type ReactElement } from "react";
 import { Text } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
   ArrowLeftToLine,
   ArrowRightToLine,
   Copy,
@@ -14,6 +18,10 @@ import {
 import type { WorkspaceTabMenuEntry } from "@/screens/workspace/workspace-tab-menu";
 import type { Theme } from "@/styles/theme";
 
+const ThemedArrowLeft = withUnistyles(ArrowLeft);
+const ThemedArrowRight = withUnistyles(ArrowRight);
+const ThemedArrowUp = withUnistyles(ArrowUp);
+const ThemedArrowDown = withUnistyles(ArrowDown);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
@@ -30,6 +38,14 @@ export function useWorkspaceTabMenuItemAdornments(
 ): { leading: ReactElement | undefined; trailing: ReactElement | undefined } {
   const leading = useMemo(() => {
     switch (entry.icon) {
+      case "arrow-left":
+        return <ThemedArrowLeft size={16} uniProps={mutedColorMapping} />;
+      case "arrow-right":
+        return <ThemedArrowRight size={16} uniProps={mutedColorMapping} />;
+      case "arrow-up":
+        return <ThemedArrowUp size={16} uniProps={mutedColorMapping} />;
+      case "arrow-down":
+        return <ThemedArrowDown size={16} uniProps={mutedColorMapping} />;
       case "copy":
         return <ThemedCopy size={16} uniProps={mutedColorMapping} />;
       case "rotate-cw":

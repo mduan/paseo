@@ -2,6 +2,16 @@ import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-
 import { i18n } from "@/i18n/i18next";
 import { encodeFilePathForPathSegment, encodeWorkspaceIdForPathSegment } from "@/utils/host-routes";
 import { buildDeterministicWorkspaceTabId } from "@/workspace-tabs/identity";
+import { findPaneContainingTab, type SplitNode } from "@/stores/workspace-layout-actions";
+import { findAdjacentPane } from "@/utils/split-navigation";
+import type { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+
+export enum PaneMovePosition {
+  Left = "left",
+  Right = "right",
+  Top = "top",
+  Bottom = "bottom",
+}
 
 export type WorkspaceTabMenuSurface = "desktop" | "mobile";
 
@@ -12,6 +22,10 @@ export interface WorkspaceTabMenuLabels {
   copyFilePath: string;
   revealInExplorer: string;
   rename: string;
+  moveLeft: string;
+  moveRight: string;
+  moveTop: string;
+  moveBottom: string;
   closeAbove: string;
   closeBelow: string;
   closeLeft: string;
@@ -29,6 +43,10 @@ export const DEFAULT_WORKSPACE_TAB_MENU_LABELS: WorkspaceTabMenuLabels = {
   copyFilePath: i18n.t("workspace.tabs.menu.copyFilePath"),
   revealInExplorer: i18n.t("workspace.tabs.menu.revealInExplorer"),
   rename: i18n.t("workspace.tabs.menu.rename"),
+  moveLeft: i18n.t("workspace.tabs.menu.moveLeft"),
+  moveRight: i18n.t("workspace.tabs.menu.moveRight"),
+  moveTop: i18n.t("workspace.tabs.menu.moveTop"),
+  moveBottom: i18n.t("workspace.tabs.menu.moveBottom"),
   closeAbove: i18n.t("workspace.tabs.menu.closeAbove"),
   closeBelow: i18n.t("workspace.tabs.menu.closeBelow"),
   closeLeft: i18n.t("workspace.tabs.menu.closeLeft"),
@@ -52,6 +70,10 @@ export type WorkspaceTabMenuEntry =
         | "arrow-right-to-line"
         | "copy-x"
         | "pencil"
+        | "arrow-left"
+        | "arrow-right"
+        | "arrow-up"
+        | "arrow-down"
         | "x";
       hint?: string;
       tooltip?: string;
@@ -64,6 +86,15 @@ export type WorkspaceTabMenuEntry =
       kind: "separator";
       key: string;
     };
+
+export type WorkspaceTabPaneMoves = Pick<
+  ReturnType<typeof useWorkspaceLayoutStore.getState>,
+  "moveTabToPane" | "splitPane"
+> & {
+  workspaceKey: string;
+  root: SplitNode;
+  explorerSidebarPaneId: string | null;
+};
 
 interface BuildWorkspaceTabMenuEntriesInput {
   surface: WorkspaceTabMenuSurface;
@@ -83,6 +114,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCloseTabsAfter: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
+  paneMoves?: WorkspaceTabPaneMoves;
 }
 
 interface BuildWorkspaceDesktopTabActionsInput {
@@ -101,6 +133,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
+  paneMoves?: WorkspaceTabPaneMoves;
 }
 
 export interface WorkspaceDesktopTabActions {
@@ -279,6 +312,67 @@ export function buildWorkspaceTabMenuEntries(
     });
   }
 
+  const paneMoves = input.paneMoves;
+  const sourcePane = paneMoves && findPaneContainingTab(paneMoves.root, tab.tabId);
+  if (paneMoves && sourcePane && sourcePane.id !== paneMoves.explorerSidebarPaneId) {
+    const moveLabels = {
+      [PaneMovePosition.Left]: labels.moveLeft,
+      [PaneMovePosition.Right]: labels.moveRight,
+      [PaneMovePosition.Top]: labels.moveTop,
+      [PaneMovePosition.Bottom]: labels.moveBottom,
+    };
+    const moveIcons = {
+      [PaneMovePosition.Left]: "arrow-left",
+      [PaneMovePosition.Right]: "arrow-right",
+      [PaneMovePosition.Top]: "arrow-up",
+      [PaneMovePosition.Bottom]: "arrow-down",
+    } as const;
+    const moves = [
+      {
+        position: PaneMovePosition.Right,
+        direction: "right",
+        oppositePosition: PaneMovePosition.Left,
+        oppositeDirection: "left",
+      },
+      {
+        position: PaneMovePosition.Bottom,
+        direction: "down",
+        oppositePosition: PaneMovePosition.Top,
+        oppositeDirection: "up",
+      },
+    ] as const;
+    for (const move of moves) {
+      let position: PaneMovePosition = move.position;
+      const options = { excludedPaneId: paneMoves.explorerSidebarPaneId };
+      let toPaneId = findAdjacentPane(paneMoves.root, sourcePane.id, move.direction, options);
+      if (!toPaneId) {
+        toPaneId = findAdjacentPane(paneMoves.root, sourcePane.id, move.oppositeDirection, options);
+        if (toPaneId) position = move.oppositePosition;
+      }
+      entries.push({
+        kind: "item",
+        key: `move-${position}`,
+        label: moveLabels[position],
+        icon: moveIcons[position],
+        testID: `${menuTestIDBase}-move-${position}`,
+        onSelect: () => {
+          if (toPaneId) {
+            paneMoves.moveTabToPane(paneMoves.workspaceKey, tab.tabId, toPaneId, {
+              preserveSourcePane: true,
+            });
+          } else {
+            paneMoves.splitPane(paneMoves.workspaceKey, {
+              tabId: tab.tabId,
+              targetPaneId: sourcePane.id,
+              position,
+            });
+          }
+        },
+      });
+    }
+    entries.push({ kind: "separator", key: "move-separator" });
+  }
+
   entries.push({
     kind: "item",
     key: "close-before",
@@ -364,6 +458,7 @@ export function buildWorkspaceDesktopTabActions(
       onCloseTabsAfter: input.onCloseTabsToRight,
       onCloseOtherTabs: input.onCloseOtherTabs,
       labels: input.labels,
+      paneMoves: input.paneMoves,
     }),
     closeButtonTestId: getCloseButtonTestId(input.tab),
   };

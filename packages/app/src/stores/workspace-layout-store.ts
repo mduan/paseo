@@ -156,7 +156,12 @@ interface WorkspaceLayoutStore {
       position: "left" | "right" | "top" | "bottom";
     },
   ) => string | null;
-  moveTabToPane: (workspaceKey: string, tabId: string, toPaneId: string) => void;
+  moveTabToPane: (
+    workspaceKey: string,
+    tabId: string,
+    toPaneId: string,
+    options?: { preserveSourcePane: boolean },
+  ) => void;
   /**
    * Dismisses the pane along with whatever it still holds. The Explorer hides so the
    * user can bring it back; every ordinary pane is removed. Callers own tab teardown
@@ -1286,7 +1291,7 @@ export function createWorkspaceLayoutStore(
 
           return result.paneId;
         },
-        moveTabToPane: (workspaceKey, tabId, toPaneId) => {
+        moveTabToPane: (workspaceKey, tabId, toPaneId, options) => {
           const normalizedWorkspaceKey = trimNonEmpty(workspaceKey);
           const normalizedTabId = trimNonEmpty(tabId);
           const normalizedToPaneId = trimNonEmpty(toPaneId);
@@ -1320,6 +1325,7 @@ export function createWorkspaceLayoutStore(
               tabId: normalizedTabId,
               toPaneId: normalizedToPaneId,
               explorerSidebarPaneId,
+              preserveSourcePane: options?.preserveSourcePane,
             });
             if (!nextLayout) {
               return state;
