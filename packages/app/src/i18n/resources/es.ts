@@ -1385,6 +1385,13 @@ export const es: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "Abrir enlace en el navegador",
+      copyLinkAddress: "Copiar dirección del enlace",
+      copyImage: "Copiar imagen",
+      saveImage: "Guardar imagen como…",
+      actionFailed: "No se pudo completar esta acción. Inténtalo de nuevo.",
+    },
     windowControls: {
       minimize: "Minimizar ventana",
       maximize: "Maximizar ventana",

@@ -1349,6 +1349,13 @@ export const ar: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "فتح الرابط في المتصفح",
+      copyLinkAddress: "نسخ عنوان الرابط",
+      copyImage: "نسخ الصورة",
+      saveImage: "حفظ الصورة باسم…",
+      actionFailed: "تعذر إكمال هذا الإجراء. حاول مرة أخرى.",
+    },
     windowControls: {
       minimize: "تصغير النافذة",
       maximize: "تكبير النافذة",

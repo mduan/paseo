@@ -1368,6 +1368,13 @@ export const ru: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "Открыть ссылку в браузере",
+      copyLinkAddress: "Копировать адрес ссылки",
+      copyImage: "Копировать изображение",
+      saveImage: "Сохранить изображение как…",
+      actionFailed: "Не удалось выполнить это действие. Повторите попытку.",
+    },
     windowControls: {
       minimize: "Свернуть окно",
       maximize: "Развернуть окно",

@@ -1363,6 +1363,13 @@ export const ja: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "ブラウザーでリンクを開く",
+      copyLinkAddress: "リンクのアドレスをコピー",
+      copyImage: "画像をコピー",
+      saveImage: "名前を付けて画像を保存…",
+      actionFailed: "この操作を完了できませんでした。もう一度お試しください。",
+    },
     windowControls: {
       minimize: "ウィンドウを最小化",
       maximize: "ウィンドウを最大化",

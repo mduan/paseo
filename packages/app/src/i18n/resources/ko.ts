@@ -1356,6 +1356,13 @@ export const ko: TranslationResources = {
     },
   },
   desktop: {
+    contextMenu: {
+      openLink: "브라우저에서 링크 열기",
+      copyLinkAddress: "링크 주소 복사",
+      copyImage: "이미지 복사",
+      saveImage: "이미지를 다른 이름으로 저장…",
+      actionFailed: "이 작업을 완료할 수 없습니다. 다시 시도하세요.",
+    },
     windowControls: {
       minimize: "창 최소화",
       maximize: "창 최대화",

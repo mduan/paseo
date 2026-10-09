@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { getElectronHost } from "@/desktop/electron/host";
 import type { BrowserKeyboardPolicy } from "@/desktop/browser/shortcuts";
+import type { ContextMenuParams } from "electron";
 import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/protocol/messages";
 
 type BrowserAutomationExecuteRequest = Extract<
@@ -89,9 +90,16 @@ export interface DesktopWebUtilsBridge {
 }
 
 export interface DesktopMenuBridge {
+  copyImage?: () => Promise<void>;
+  saveImage?: () => Promise<void>;
   showContextMenu?: (input?: { kind?: "terminal"; hasSelection?: boolean }) => Promise<void>;
   setCapturingShortcut?: (capturing: boolean) => Promise<void>;
 }
+
+export type DesktopContentContextMenu = Pick<
+  ContextMenuParams,
+  "x" | "y" | "selectionText" | "linkURL" | "srcURL" | "hasImageContents"
+>;
 
 export interface DesktopWindowChromeUpdate {
   backgroundColor?: string;
