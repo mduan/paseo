@@ -1979,6 +1979,7 @@ export const ptBR: TranslationResources = {
       empty: "Nenhuma alteração",
       loadError: "Falha ao carregar diff",
       capabilityMissing: "Atualize o host para ver diffs de commits.",
+      commentsCapabilityMissing: "Atualize o host para comentar os diffs dos turnos.",
     },
   },
   turnDiff: {

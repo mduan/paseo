@@ -1145,6 +1145,12 @@ export const ReviewAttachmentContextLineSchema = z.object({
 
 export const ReviewCommentSourceSchema = z.enum(["diff", "file"]);
 
+export const ReviewCommentSnapshotSchema = z.object({
+  cwd: z.string(),
+  fromTree: z.string(),
+  toTree: z.string(),
+});
+
 export const ReviewAttachmentCommentSchema = z.object({
   filePath: z.string(),
   side: z.enum(["old", "new"]),
@@ -1155,6 +1161,7 @@ export const ReviewAttachmentCommentSchema = z.object({
   body: z.string(),
   // Where the comment was made; absent means "diff". "file" context lines are whole-file excerpts.
   source: ReviewCommentSourceSchema.optional(),
+  snapshot: ReviewCommentSnapshotSchema.optional(),
   context: z.object({
     hunkHeader: z.string(),
     targetLine: ReviewAttachmentContextLineSchema,
@@ -5551,6 +5558,7 @@ export const AgentTurnDiffsGetDiffResponseMessageSchema = z.object({
     // false when the daemon has no snapshot for the target (non-git folder, timed-out snapshot,
     // or a turn that predates turn diffs).
     available: z.boolean(),
+    snapshot: ReviewCommentSnapshotSchema.optional(),
   }),
 });
 

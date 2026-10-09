@@ -7948,6 +7948,7 @@ export class Session {
             ...base,
             cwd: range.repoRoot,
             files,
+            snapshot: { cwd: range.repoRoot, fromTree: range.fromTree, toTree: range.toTree },
             error: result.diffTooLarge
               ? toCheckoutError(new Error("Diff too large to display"))
               : null,

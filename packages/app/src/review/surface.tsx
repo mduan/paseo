@@ -104,13 +104,19 @@ export function useInlineReviewController(input: {
   buildContext: (range: ReviewLineRange) => ReviewDraftCommentContext | undefined;
   /** Set on new comments; absent means the diff viewer. */
   source?: ReviewDraftComment["source"];
+  snapshot?: ReviewDraftComment["snapshot"];
 }): InlineReviewActions {
-  const { buildContext, source } = input;
+  const { buildContext, source, snapshot } = input;
   const reviewComments = useReviewDraftComments(input.reviewDraftKey);
-  const commentsByTarget = useMemo(
-    () => groupInlineReviewCommentsByTarget(reviewComments),
-    [reviewComments],
-  );
+  const commentsByTarget = useMemo(() => {
+    const comments = reviewComments.filter(
+      (comment) =>
+        comment.snapshot?.cwd === snapshot?.cwd &&
+        comment.snapshot?.fromTree === snapshot?.fromTree &&
+        comment.snapshot?.toTree === snapshot?.toTree,
+    );
+    return groupInlineReviewCommentsByTarget(comments);
+  }, [reviewComments, snapshot?.cwd, snapshot?.fromTree, snapshot?.toTree]);
   const [editor, setEditor] = useState<InlineReviewEditorState | null>(null);
   const [highlight, setHighlight] = useState<ReviewLineRange>();
   const [commentHeights, setCommentHeights] = useState<ReadonlyMap<string, number>>(
@@ -125,7 +131,7 @@ export function useInlineReviewController(input: {
   useEffect(() => {
     setEditor(null);
     setHighlight(undefined);
-  }, [input.reviewDraftKey]);
+  }, [input.reviewDraftKey, snapshot?.cwd, snapshot?.fromTree, snapshot?.toTree]);
 
   const saveEditorBody = useCallback(
     (current: InlineReviewEditorState, body: string) => {
@@ -152,13 +158,14 @@ export function useInlineReviewController(input: {
             content: current.target.content,
             context: buildContext(editorLineRange(current)),
             source,
+            snapshot,
             body: trimmedBody,
           },
         });
       }
       return true;
     },
-    [addComment, buildContext, input.reviewDraftKey, source, updateComment],
+    [addComment, buildContext, input.reviewDraftKey, source, snapshot, updateComment],
   );
 
   const openEditor = useCallback(
@@ -786,11 +793,14 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing[3],
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: theme.spacing[2],
   },
   commentBody: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 160,
     minWidth: 0,
     color: theme.colors.foreground,
     fontSize: theme.fontSize.content,
@@ -800,7 +810,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
-    flexShrink: 0,
+    flexShrink: 1,
   },
   linesLabel: {
     color: theme.colors.foregroundMuted,

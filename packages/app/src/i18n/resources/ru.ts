@@ -1979,6 +1979,7 @@ export const ru: TranslationResources = {
       empty: "Нет изменений",
       loadError: "Не удалось загрузить список изменений",
       capabilityMissing: "Обновите хост, чтобы просматривать изменения в коммитах.",
+      commentsCapabilityMissing: "Обновите хост, чтобы комментировать изменения ходов.",
     },
   },
   turnDiff: {

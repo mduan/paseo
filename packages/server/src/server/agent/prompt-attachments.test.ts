@@ -7,6 +7,111 @@ import {
 } from "./prompt-attachments.js";
 
 describe("prompt attachments", () => {
+  it.each(["old", "new"] as const)(
+    "renders frozen turn trees and reads truncated %s ranges from the snapshot",
+    (side) => {
+      const line = {
+        oldLineNumber: 3,
+        newLineNumber: 3,
+        type: "context" as const,
+        content: "value",
+      };
+      const snapshot = { cwd: "/tmp/repo", fromTree: "before", toTree: "after" };
+      const text = renderPromptAttachmentAsText({
+        type: "review",
+        mimeType: "application/paseo-review",
+        cwd: "/tmp/repo/subdir",
+        mode: "uncommitted",
+        baseRef: "main",
+        comments: [
+          {
+            filePath: "src/a.ts",
+            side,
+            startLineNumber: 3,
+            lineNumber: 100,
+            body: "Fix this range",
+            snapshot,
+            context: {
+              hunkHeader: "",
+              targetLine: { ...line, oldLineNumber: 100, newLineNumber: 100 },
+              lines: [line],
+            },
+          },
+        ],
+      });
+      const column = side === "old" ? "L" : "R";
+      expect(text).toEqual(
+        [
+          "Paseo review attachment",
+          "CWD: /tmp/repo/subdir",
+          "",
+          `Comment 1: src/a.ts:${column}3-${column}100`,
+          "Fix this range",
+          "Turn snapshot: /tmp/repo",
+          "Old tree: before",
+          "New tree: after",
+          "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
+          ">  3  3  value",
+          "  (Range truncated. Inspect the full diff between the snapshot trees above for the rest.)",
+        ].join("\n"),
+      );
+    },
+  );
+
+  it.each([
+    { mode: "uncommitted", includeUncommitted: false, comparison: "uncommitted" },
+    { mode: "base", includeUncommitted: false, comparison: "base" },
+    { mode: "base", includeUncommitted: true, comparison: "committed + uncommitted" },
+  ] as const)(
+    "associates the $comparison checkout comparison only with normal comments in mixed reviews",
+    ({ mode, includeUncommitted, comparison }) => {
+      const line = {
+        oldLineNumber: null,
+        newLineNumber: 42,
+        type: "add" as const,
+        content: "value",
+      };
+      const comment = {
+        filePath: "src/a.ts",
+        side: "new" as const,
+        lineNumber: 42,
+        body: "Fix this",
+        context: { hunkHeader: "", targetLine: line, lines: [line] },
+      };
+      const snapshot = { cwd: "/tmp/repo", fromTree: "before", toTree: "after" };
+      expect(
+        renderPromptAttachmentAsText({
+          type: "review",
+          mimeType: "application/paseo-review",
+          cwd: "/tmp/repo",
+          mode,
+          includeUncommitted,
+          baseRef: "main",
+          comments: [comment, { ...comment, snapshot }],
+        }),
+      ).toEqual(
+        [
+          "Paseo review attachment",
+          "CWD: /tmp/repo",
+          "",
+          "Comment 1: src/a.ts:R42",
+          "Fix this",
+          `Checkout comparison: ${comparison}`,
+          "Base: main",
+          ">  - 42 +value",
+          "",
+          "Comment 2: src/a.ts:R42",
+          "Fix this",
+          "Turn snapshot: /tmp/repo",
+          "Old tree: before",
+          "New tree: after",
+          "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
+          ">  - 42 +value",
+        ].join("\n"),
+      );
+    },
+  );
+
   it("places fork history before the new user prompt", () => {
     const chatHistory = {
       type: "text" as const,

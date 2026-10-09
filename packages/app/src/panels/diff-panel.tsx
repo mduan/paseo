@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/pane-content-toolbar";
 import { isWeb } from "@/constants/platform";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
+import { useReviewDraftScope } from "@/git/use-working-diff";
+import { useInlineReviewController } from "@/review";
+import { buildDiffReviewContext } from "@/review/context";
+import type { ReviewLineRange } from "@/review/range";
 import { DiffDocument } from "@/git/diff-document";
 import {
   ChangesDiffToolbar,
@@ -267,6 +271,8 @@ function TurnDiffPanel() {
     if (workspaceKey) moveWorkspaceTabToMain({ workspaceKey, tabId });
   }, [tabId, workspaceKey]);
   const isActive = useRetainedPanelActive();
+  const cwd = useWorkspaceDirectory(serverId, workspaceId);
+  const { reviewDraftKey } = useReviewDraftScope({ serverId, workspaceId, cwd: cwd ?? "" });
   const panelPreferences = useDiffPanelPreferences();
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
   const [collapsedFilePaths, setCollapsedFilePaths] = useState<string[]>([]);
@@ -282,16 +288,6 @@ function TurnDiffPanel() {
   const handleOpenFile = useCallback(
     (path: string) => openPreferredTarget({ kind: "file", path }, "diffs"),
     [openPreferredTarget],
-  );
-  const mode = useMemo(
-    () => ({
-      kind: "working" as const,
-      focusPath: target.focusPath,
-      focusRequestId: target.focusRequestId,
-      onOpenFile: handleOpenFile,
-      onAddToChat: canAddToChat ? addFile : undefined,
-    }),
-    [addFile, canAddToChat, handleOpenFile, target.focusPath, target.focusRequestId],
   );
   const collapseState = useMemo(
     () => ({ paths: collapsedFilePaths, onChange: setCollapsedFilePaths }),
@@ -329,6 +325,34 @@ function TurnDiffPanel() {
     scopeKey: `turn:${serverId}:${target.agentId}:${target.turnId}:${panelPreferences.preferences.hideWhitespace}`,
     files,
   });
+  const buildContext = useCallback(
+    (range: ReviewLineRange) => buildDiffReviewContext({ range, diffFiles: expansion.files }),
+    [expansion.files],
+  );
+  const reviewActions = useInlineReviewController({
+    reviewDraftKey,
+    buildContext,
+    snapshot: payload?.snapshot,
+  });
+  const mode = useMemo(
+    () => ({
+      kind: "working" as const,
+      reviewActions: payload?.snapshot ? reviewActions : undefined,
+      focusPath: target.focusPath,
+      focusRequestId: target.focusRequestId,
+      onOpenFile: handleOpenFile,
+      onAddToChat: canAddToChat ? addFile : undefined,
+    }),
+    [
+      addFile,
+      canAddToChat,
+      handleOpenFile,
+      payload?.snapshot,
+      reviewActions,
+      target.focusPath,
+      target.focusRequestId,
+    ],
+  );
   let body: ReactNode;
   if (query.error) {
     body = <PanelState message={t("panels.diff.loadError")} tone="error" />;
@@ -352,6 +376,7 @@ function TurnDiffPanel() {
     );
   }
 
+  const commentsCapabilityMissing = payload?.available && !payload.snapshot && files.length > 0;
   return (
     <View style={styles.container} testID="turn-diff-panel">
       <PaneContentToolbar
@@ -373,6 +398,11 @@ function TurnDiffPanel() {
           ) : null}
         </View>
       </PaneContentToolbar>
+      {commentsCapabilityMissing ? (
+        <Text style={styles.mutedText} testID="turn-diff-comments-capability-missing">
+          {t("panels.diff.commentsCapabilityMissing")}
+        </Text>
+      ) : null}
       <View style={styles.body}>{body}</View>
     </View>
   );

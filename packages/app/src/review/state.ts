@@ -24,6 +24,7 @@ export interface ReviewDraftComment {
   context?: ReviewDraftCommentContext;
   /** Absent for diff comments; "file" when made in the file viewer. */
   source?: z.infer<typeof ReviewCommentSourceSchema>;
+  snapshot?: z.infer<typeof ReviewAttachmentCommentSchema>["snapshot"];
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +50,7 @@ export const ReviewDraftCommentSchema: z.ZodType<ReviewDraftComment> = z.strictO
   content: z.string().optional(),
   context: ReviewDraftCommentContextSchema.optional(),
   source: ReviewCommentSourceSchema.optional(),
+  snapshot: ReviewAttachmentCommentSchema.shape.snapshot,
   body: z.string(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,

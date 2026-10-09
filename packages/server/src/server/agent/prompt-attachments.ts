@@ -90,8 +90,12 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
     }
     case "review": {
       const mode = attachment.includeUncommitted ? "committed + uncommitted" : attachment.mode;
-      const lines = [`Paseo review attachment (${mode})`, `CWD: ${attachment.cwd}`];
-      if (attachment.baseRef) {
+      const hasTurnComments = attachment.comments.some((comment) => comment.snapshot);
+      const header = hasTurnComments
+        ? "Paseo review attachment"
+        : `Paseo review attachment (${mode})`;
+      const lines = [header, `CWD: ${attachment.cwd}`];
+      if (!hasTurnComments && attachment.baseRef) {
         lines.push(`Base: ${attachment.baseRef}`);
       }
       attachment.comments.forEach((comment, index) => {
@@ -106,6 +110,19 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
           ? `${comment.filePath} ${isSingleLine ? `line ${end.lineNumber}` : `lines ${start.lineNumber}-${end.lineNumber}`} (file view)`
           : `${comment.filePath}:${isSingleLine ? formatReviewLine(end) : `${formatReviewLine(start)}-${formatReviewLine(end)}`}`;
         lines.push("", `Comment ${index + 1}: ${location}`, comment.body);
+        if (comment.snapshot) {
+          lines.push(
+            `Turn snapshot: ${comment.snapshot.cwd}`,
+            `Old tree: ${comment.snapshot.fromTree}`,
+            `New tree: ${comment.snapshot.toTree}`,
+            "Line numbers refer to these snapshot trees, which may differ from the current checkout.",
+          );
+        } else if (hasTurnComments) {
+          lines.push(`Checkout comparison: ${mode}`);
+          if (attachment.baseRef) {
+            lines.push(`Base: ${attachment.baseRef}`);
+          }
+        }
         if (!isFileView && comment.context.hunkHeader) {
           lines.push(comment.context.hunkHeader);
         }
@@ -133,7 +150,10 @@ export function renderPromptAttachmentAsText(attachment: AgentAttachment): strin
           lines.push(`${prefix}${oldLn} ${newLn} ${REVIEW_LINE_MARKERS[line.type]}${line.content}`);
         });
         if (startIndex !== -1 && endIndex === -1) {
-          lines.push(`  (Range truncated. Read ${comment.filePath} for the rest.)`);
+          const instruction = comment.snapshot
+            ? "Inspect the full diff between the snapshot trees above"
+            : `Read ${comment.filePath}`;
+          lines.push(`  (Range truncated. ${instruction} for the rest.)`);
         }
       });
       return lines.join("\n");

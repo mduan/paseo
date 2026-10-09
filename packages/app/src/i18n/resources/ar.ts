@@ -1946,6 +1946,7 @@ export const ar: TranslationResources = {
       empty: "لا توجد تغييرات",
       loadError: "فشل تحميل الفروقات",
       capabilityMissing: "حدّث المضيف لعرض فروقات الالتزامات.",
+      commentsCapabilityMissing: "حدّث المضيف لإضافة تعليقات على فروقات الأدوار.",
     },
   },
   turnDiff: {

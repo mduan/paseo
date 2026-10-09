@@ -37,6 +37,7 @@ export function getAttachmentKey(attachment: WorkspaceComposerAttachment): strin
       side: comment.side,
       lineNumber: comment.lineNumber,
       body: comment.body,
+      snapshot: comment.snapshot,
     })),
   });
 }

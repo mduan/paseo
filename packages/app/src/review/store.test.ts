@@ -329,6 +329,33 @@ describe("buildReviewAttachmentSnapshot", () => {
     expect(snapshot?.attachment.comments[1]).not.toHaveProperty("source");
   });
 
+  it("retains each turn's snapshot through persistence and the shared chat attachment", () => {
+    const firstSnapshot = { cwd: "/repo", fromTree: "before", toTree: "after" };
+    const secondSnapshot = { ...firstSnapshot, fromTree: "after", toTree: "later" };
+    const comments = [
+      makeComment({ context: storedContext, snapshot: firstSnapshot }),
+      makeComment({ id: "second", context: storedContext, snapshot: secondSnapshot }),
+      makeComment({ id: "checkout", context: storedContext }),
+    ];
+    const persisted = JSON.parse(
+      JSON.stringify(serializeReviewDraftState({ drafts: { k: comments } })),
+    );
+    const restored = normalizePersistedState(persisted);
+    expect(restored.drafts.k).toEqual(comments);
+    const attachment = buildReviewAttachmentSnapshot({
+      reviewDraftKey: "k",
+      cwd: "/repo/subdir",
+      mode: "uncommitted",
+      comments: restored.drafts.k!,
+    });
+    expect(attachment?.commentCount).toBe(3);
+    expect(attachment?.attachment.comments.map((comment) => comment.snapshot)).toEqual([
+      firstSnapshot,
+      secondSnapshot,
+      undefined,
+    ]);
+  });
+
   it("falls back to the stored line for a comment saved without context", () => {
     const snapshot = buildReviewAttachmentSnapshot({
       reviewDraftKey: "review:key",

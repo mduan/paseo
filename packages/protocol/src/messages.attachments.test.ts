@@ -3,12 +3,64 @@ import { describe, expect, it } from "vitest";
 import {
   AgentForkContextRequestMessageSchema,
   AgentForkContextResponseMessageSchema,
+  AgentTurnDiffsGetDiffResponseMessageSchema,
   CreateAgentRequestMessageSchema,
   CreatePaseoWorktreeRequestSchema,
   SendAgentMessageRequestSchema,
 } from "./messages.js";
 
 describe("shared messages attachments", () => {
+  it("preserves turn snapshot references in diff responses and review messages", () => {
+    const snapshot = { cwd: "/tmp/repo", fromTree: "before", toTree: "after" };
+    const payload = {
+      requestId: "diff-1",
+      agentId: "agent-1",
+      cwd: "/tmp/repo",
+      files: [],
+      error: null,
+      available: true,
+    };
+    expect(
+      AgentTurnDiffsGetDiffResponseMessageSchema.parse({
+        type: "agent.turn_diffs.get_diff.response",
+        payload,
+      }).payload,
+    ).toEqual(payload);
+    expect(
+      AgentTurnDiffsGetDiffResponseMessageSchema.parse({
+        type: "agent.turn_diffs.get_diff.response",
+        payload: { ...payload, snapshot },
+      }).payload.snapshot,
+    ).toEqual(snapshot);
+
+    const line = { oldLineNumber: null, newLineNumber: 1, type: "add", content: "value" };
+    const attachment = {
+      type: "review",
+      mimeType: "application/paseo-review",
+      cwd: "/tmp/repo",
+      mode: "uncommitted",
+      comments: [
+        {
+          filePath: "a.ts",
+          side: "new",
+          lineNumber: 1,
+          body: "Fix this",
+          snapshot,
+          context: { hunkHeader: "", targetLine: line, lines: [line] },
+        },
+      ],
+    };
+    expect(
+      SendAgentMessageRequestSchema.parse({
+        type: "send_agent_message_request",
+        requestId: "review-1",
+        agentId: "agent-1",
+        text: "Review",
+        attachments: [attachment],
+      }).attachments,
+    ).toEqual([attachment]);
+  });
+
   it("preserves an optional timeline cursor on fork-context messages", () => {
     const boundaryCursor = { epoch: "timeline-1", seq: 42 };
     const request = AgentForkContextRequestMessageSchema.parse({

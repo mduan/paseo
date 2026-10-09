@@ -1924,6 +1924,7 @@ export const zhCN: TranslationResources = {
       empty: "没有更改",
       loadError: "加载差异失败",
       capabilityMissing: "请更新主机以查看提交差异。",
+      commentsCapabilityMissing: "请更新主机以评论轮次差异。",
     },
   },
   turnDiff: {
