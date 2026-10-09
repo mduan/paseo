@@ -337,6 +337,21 @@ export function buildStandardContextMenuItems(
     ];
   }
 
+  if (params.linkURL && /^https?:/i.test(params.linkURL)) {
+    return [
+      {
+        label: "Open Link in Browser",
+        click: () => {
+          void shell.openExternal(params.linkURL);
+        },
+      },
+      {
+        label: "Copy Link Address",
+        click: () => clipboard.writeText(params.linkURL),
+      },
+    ];
+  }
+
   if (!params.isEditable) {
     return params.selectionText ? [{ role: "copy" }] : [];
   }
@@ -358,20 +373,6 @@ export function buildStandardContextMenuItems(
     items.push({
       label: "Add to Dictionary",
       click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord),
-    });
-    items.push({ type: "separator" });
-  }
-
-  if (params.linkURL && /^https?:/i.test(params.linkURL)) {
-    items.push({
-      label: "Open Link in Browser",
-      click: () => {
-        void shell.openExternal(params.linkURL);
-      },
-    });
-    items.push({
-      label: "Copy Link Address",
-      click: () => clipboard.writeText(params.linkURL),
     });
     items.push({ type: "separator" });
   }

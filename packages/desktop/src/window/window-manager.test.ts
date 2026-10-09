@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BrowserWindow, Menu } from "electron";
+import { BrowserWindow, Menu, clipboard, shell } from "electron";
 import { EventEmitter } from "node:events";
 
 vi.mock("electron", () => ({
@@ -12,6 +12,8 @@ vi.mock("electron", () => ({
   Menu: {
     buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })),
   },
+  clipboard: { writeText: vi.fn() },
+  shell: { openExternal: vi.fn().mockResolvedValue(undefined) },
 }));
 
 import {
@@ -49,7 +51,6 @@ describe("window-manager", () => {
         {
           isEditable: false,
           selectionText: "Selected",
-          linkURL: "https://example.com",
         },
       );
 
@@ -57,6 +58,30 @@ describe("window-manager", () => {
       const menu = vi.mocked(Menu.buildFromTemplate).mock.results[0]!.value;
       expect(menu.popup).toHaveBeenCalledWith({ window: win });
     });
+
+    it.each(["", "Selected"])(
+      "offers only link actions when selected text is %j",
+      (selectionText) => {
+        vi.mocked(Menu.buildFromTemplate).mockClear();
+        vi.mocked(clipboard.writeText).mockClear();
+        vi.mocked(shell.openExternal).mockClear();
+        const win = new BrowserWindow();
+        setupDefaultContextMenu(win);
+        const linkURL = "https://example.com";
+
+        win.webContents.emit("context-menu", {}, { isEditable: false, linkURL, selectionText });
+
+        expect(Menu.buildFromTemplate).toHaveBeenCalledWith([
+          { label: "Open Link in Browser", click: expect.any(Function) },
+          { label: "Copy Link Address", click: expect.any(Function) },
+        ]);
+        const items = vi.mocked(Menu.buildFromTemplate).mock.calls[0]![0];
+        Reflect.apply(items[0]!.click!, undefined, []);
+        Reflect.apply(items[1]!.click!, undefined, []);
+        expect(shell.openExternal).toHaveBeenCalledWith(linkURL);
+        expect(clipboard.writeText).toHaveBeenCalledWith(linkURL);
+      },
+    );
 
     it("offers only image actions, even for linked images with selected text", () => {
       vi.mocked(Menu.buildFromTemplate).mockClear();
