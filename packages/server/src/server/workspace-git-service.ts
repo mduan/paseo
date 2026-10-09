@@ -818,6 +818,9 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   private normalizeCheckoutDiffOptions(options: CheckoutDiffCompare): CheckoutDiffCompare {
     return {
       mode: options.mode,
+      ...(options.mode === "base" && options.includeUncommitted
+        ? { includeUncommitted: true }
+        : {}),
       ...(options.mode === "base" && options.baseRef !== undefined
         ? { baseRef: options.baseRef }
         : {}),

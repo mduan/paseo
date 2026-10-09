@@ -4073,7 +4073,7 @@ test("subscribes to checkout diff updates via RPC handshake", async () => {
   });
 });
 
-test("getCheckoutDiff reads a snapshot without creating a subscription", async () => {
+test.each([false, true])("reads checkout diff (combined=%s)", async (includeUncommitted) => {
   const logger = createMockLogger();
   const mock = createMockTransport();
 
@@ -4090,7 +4090,11 @@ test("getCheckoutDiff reads a snapshot without creating a subscription", async (
   mock.triggerOpen();
   await connectPromise;
 
-  const promise = client.getCheckoutDiff("/tmp/project", { mode: "base", baseRef: "main" });
+  const promise = client.getCheckoutDiff("/tmp/project", {
+    mode: "base",
+    baseRef: "main",
+    includeUncommitted,
+  });
 
   expect(mock.sent).toHaveLength(1);
   const subscribeRequest = parseSentFrame(mock.sent[0]);
@@ -4099,6 +4103,7 @@ test("getCheckoutDiff reads a snapshot without creating a subscription", async (
   expect(subscribeRequest.compare).toEqual({
     mode: "base",
     baseRef: "main",
+    ...(includeUncommitted ? { includeUncommitted: true } : {}),
   });
 
   mock.triggerMessage(

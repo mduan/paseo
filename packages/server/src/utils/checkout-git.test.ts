@@ -1428,6 +1428,51 @@ const x = 1;
     expect(diff.diff).toContain("feature.txt");
   });
 
+  it("combines branch commits, staged and unstaged edits, and untracked files against the merge base", async () => {
+    execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+    writeFileSync(join(repoDir, "file.txt"), "committed\n");
+    writeFileSync(join(repoDir, "feature.txt"), "feature\n");
+    execFileSync("git", ["add", "."], { cwd: repoDir });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "feature"], {
+      cwd: repoDir,
+    });
+
+    writeFileSync(join(repoDir, "file.txt"), "staged\n");
+    writeFileSync(join(repoDir, "staged.txt"), "staged file\n");
+    execFileSync("git", ["add", "."], { cwd: repoDir });
+    writeFileSync(join(repoDir, "file.txt"), "working\n");
+    writeFileSync(join(repoDir, "untracked.txt"), "untracked\n");
+
+    const diff = await getCheckoutDiff(repoDir, {
+      mode: "base",
+      baseRef: "main",
+      includeUncommitted: true,
+      includeStructured: true,
+    });
+    expect(diff.structured?.map((file) => file.path)).toEqual([
+      "feature.txt",
+      "file.txt",
+      "staged.txt",
+      "untracked.txt",
+    ]);
+    expect(diff.diff).toContain("-hello\n+working");
+    expect(diff.diff).not.toContain("+committed");
+    expect(diff.diff).not.toContain("+staged\n");
+
+    writeFileSync(join(repoDir, "file.txt"), "hello\n");
+    const reverted = await getCheckoutDiff(repoDir, {
+      mode: "base",
+      baseRef: "main",
+      includeUncommitted: true,
+      includeStructured: true,
+    });
+    expect(reverted.structured?.map((file) => file.path)).toEqual([
+      "feature.txt",
+      "staged.txt",
+      "untracked.txt",
+    ]);
+  });
+
   it("does not include dirty working tree changes in base mode", async () => {
     writeFileSync(join(repoDir, "file.txt"), "dirty\n");
     writeFileSync(join(repoDir, "untracked.txt"), "untracked\n");

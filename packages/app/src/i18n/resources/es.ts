@@ -1000,6 +1000,7 @@ export const es: TranslationResources = {
         diffMode: "modo diferencial",
         uncommitted: "No comprometido",
         committed: "Comprometido",
+        allChanges: "Todos los cambios",
         lastTurn: "Último turno",
         noLastTurnChanges: "Sin cambios en el último turno",
         noTurnSnapshot: "No hay instantánea de este turno",

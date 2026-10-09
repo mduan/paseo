@@ -1,3 +1,4 @@
+import { CheckoutDiffCompareSchema } from "@getpaseo/protocol/messages";
 import type { OwnedSubscription } from "@getpaseo/client";
 import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanstack/react-query";
 import type {
@@ -36,6 +37,7 @@ interface CheckoutDiffCompare {
   mode: "uncommitted" | "base";
   baseRef?: string;
   ignoreWhitespace?: boolean;
+  includeUncommitted?: boolean;
 }
 
 interface CheckoutDiffRoute {
@@ -641,26 +643,8 @@ function readServerDataRoute(value: Record<string, unknown>): ServerDataRoute | 
 }
 
 function readCheckoutDiffCompare(value: unknown): CheckoutDiffCompare | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const mode = value.mode;
-  const baseRef = value.baseRef;
-  const ignoreWhitespace = value.ignoreWhitespace;
-  if (mode !== "uncommitted" && mode !== "base") {
-    return null;
-  }
-  if (baseRef !== undefined && typeof baseRef !== "string") {
-    return null;
-  }
-  if (ignoreWhitespace !== undefined && typeof ignoreWhitespace !== "boolean") {
-    return null;
-  }
-  return {
-    mode,
-    ...(baseRef ? { baseRef } : {}),
-    ...(ignoreWhitespace !== undefined ? { ignoreWhitespace } : {}),
-  };
+  const result = CheckoutDiffCompareSchema.safeParse(value);
+  return result.success ? result.data : null;
 }
 
 function areCheckoutDiffRoutesEqual(
@@ -673,7 +657,8 @@ function areCheckoutDiffRoutesEqual(
     left.cwd === right.cwd &&
     left.compare.mode === right.compare.mode &&
     left.compare.baseRef === right.compare.baseRef &&
-    left.compare.ignoreWhitespace === right.compare.ignoreWhitespace
+    left.compare.ignoreWhitespace === right.compare.ignoreWhitespace &&
+    left.compare.includeUncommitted === right.compare.includeUncommitted
   );
 }
 
@@ -684,7 +669,8 @@ function isCheckoutDiffQueryKeyForRoute(queryKey: QueryKey, route: CheckoutDiffR
     queryKey[2] === route.cwd &&
     queryKey[3] === route.compare.mode &&
     queryKey[4] === (route.compare.baseRef ?? "") &&
-    queryKey[5] === (route.compare.ignoreWhitespace === true)
+    queryKey[5] === (route.compare.ignoreWhitespace === true) &&
+    (queryKey[6] === true) === (route.compare.includeUncommitted === true)
   );
 }
 

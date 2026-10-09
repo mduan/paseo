@@ -277,11 +277,12 @@ describe("buildReviewAttachmentSnapshot", () => {
     ],
   };
 
-  it("builds the attachment from stored context and skips comments without any", () => {
+  it.each([false, true])("builds review attachments (combined=%s)", (includeUncommitted) => {
     const snapshot = buildReviewAttachmentSnapshot({
       reviewDraftKey: "review:key",
       cwd: "/repo",
       mode: "base",
+      includeUncommitted,
       baseRef: "main",
       comments: [
         makeComment({ context: storedContext }),
@@ -298,6 +299,7 @@ describe("buildReviewAttachmentSnapshot", () => {
         mimeType: "application/paseo-review",
         cwd: "/repo",
         mode: "base",
+        ...(includeUncommitted ? { includeUncommitted: true } : {}),
         baseRef: "main",
         comments: [
           {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LiveDiffComparison,
   expireWorkingDiffComparisonsInState,
   resolveWorkingDiffComparisonFromState,
   selectWorkingDiffComparisonInState,
@@ -100,6 +101,19 @@ describe("working diff comparison", () => {
         isDirty: true,
       }),
     ).toBe(state);
+  });
+
+  it("keeps All Changes selected across dirty-state changes", () => {
+    const selected = selectWorkingDiffComparisonInState(emptyState(), {
+      ...checkout,
+      comparison: LiveDiffComparison.All,
+      isDirty: false,
+    });
+    const expired = expireWorkingDiffComparisonsInState(selected, { ...checkout, isDirty: true });
+    expect(expired).toBe(selected);
+    expect(resolveWorkingDiffComparisonFromState(expired, { ...checkout, isDirty: true })).toBe(
+      LiveDiffComparison.All,
+    );
   });
 
   it("keeps a turn comparison across dirty-state changes", () => {

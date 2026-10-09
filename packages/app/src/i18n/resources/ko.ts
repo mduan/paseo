@@ -974,6 +974,7 @@ export const ko: TranslationResources = {
         diffMode: "Diff 모드",
         uncommitted: "커밋되지 않음",
         committed: "커밋됨",
+        allChanges: "모든 변경 사항",
         lastTurn: "마지막 턴",
         noLastTurnChanges: "마지막 턴에 변경 사항 없음",
         noTurnSnapshot: "이 턴의 스냅샷 없음",

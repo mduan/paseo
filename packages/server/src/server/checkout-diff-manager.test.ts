@@ -432,6 +432,39 @@ describe("CheckoutDiffManager", () => {
     expect(mockRequestWorkingTreeWatch).not.toHaveBeenCalled();
   });
 
+  test("combined diffs refresh on edits and base changes and release both observations", async () => {
+    const {
+      manager,
+      workspaceGitService,
+      getOnChange,
+      getOnWorkspaceSnapshot,
+      unsubscribe,
+      workspaceUnsubscribe,
+    } = createManager();
+    const subscription = await manager.subscribe(
+      { cwd: "/tmp/repo", compare: { mode: "base", baseRef: "main", includeUncommitted: true } },
+      () => {},
+    );
+    expect(workspaceGitService.registerWorkspace).toHaveBeenCalledTimes(1);
+    expect(workspaceGitService.requestWorkingTreeWatch).toHaveBeenCalledTimes(1);
+    expect(workspaceGitService.getCheckoutDiff.mock.calls[0]?.[1]).toEqual({
+      mode: "base",
+      baseRef: "main",
+      includeUncommitted: true,
+      ignoreWhitespace: false,
+      includeStructured: true,
+    });
+    getOnChange()?.();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(workspaceGitService.getCheckoutDiff).toHaveBeenCalledTimes(2);
+    getOnWorkspaceSnapshot()?.(createWorkspaceSnapshot({ baseRef: "next" }));
+    await vi.advanceTimersByTimeAsync(150);
+    expect(workspaceGitService.getCheckoutDiff).toHaveBeenCalledTimes(3);
+    subscription.unsubscribe();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(workspaceUnsubscribe).toHaveBeenCalledTimes(1);
+  });
+
   test("base diff subscriptions ignore worktree-only workspace snapshot updates", async () => {
     const getCheckoutDiff = vi.fn(async () => ({ diff: "", structured: [] }));
     const { manager, getOnWorkspaceSnapshot } = createManager({

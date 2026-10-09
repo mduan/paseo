@@ -99,6 +99,7 @@ import { openExternalUrl } from "@/utils/open-external-url";
 import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
 import type { PullRequestOpenLocation } from "@/hooks/use-settings";
 import {
+  LiveDiffComparison,
   isTurnDiffComparison,
   type WorkingDiffComparison,
 } from "@/git/working-diff-comparison/state";
@@ -291,6 +292,7 @@ interface DiffModeMenuProps {
   testIDPrefix?: string;
   onSelectUncommitted: () => void;
   onSelectBase: () => void;
+  onSelectAll?: () => void;
   turnModes?: TurnDiffModes | null;
 }
 
@@ -298,6 +300,7 @@ const DIFF_MODE_LABEL_KEYS = {
   uncommitted: "workspace.git.diff.uncommitted",
   base: "workspace.git.diff.committed",
   last_turn: "workspace.git.diff.lastTurn",
+  [LiveDiffComparison.All]: "workspace.git.diff.allChanges",
 } as const satisfies Record<WorkingDiffComparison, string>;
 
 export function DiffModeMenu({
@@ -305,6 +308,7 @@ export function DiffModeMenu({
   testIDPrefix = "changes-diff",
   onSelectUncommitted,
   onSelectBase,
+  onSelectAll,
   turnModes,
 }: DiffModeMenuProps) {
   const { t } = useTranslation();
@@ -346,6 +350,18 @@ export function DiffModeMenu({
         >
           {t(DIFF_MODE_LABEL_KEYS.base)}
         </DropdownMenuItem>
+        {onSelectAll ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              testID={`${testIDPrefix}-mode-all`}
+              selected={diffMode === LiveDiffComparison.All}
+              onSelect={onSelectAll}
+            >
+              {t(DIFF_MODE_LABEL_KEYS[LiveDiffComparison.All])}
+            </DropdownMenuItem>
+          </>
+        ) : null}
         {turnModes ? (
           <>
             <DropdownMenuSeparator />
@@ -495,6 +511,7 @@ interface ChangesComparisonToolbarModel {
   mode: ChangesToolbarMode;
   selectedDiffStat: { additions: number; deletions: number } | null;
   onSelectBase: () => void;
+  onSelectAll?: () => void;
   onSelectUncommitted: () => void;
 }
 
@@ -516,6 +533,7 @@ interface BuildChangesHeaderModelInput {
   mode: ChangesToolbarMode;
   onOpenPullRequest: () => void;
   onSelectBase: () => void;
+  onSelectAll?: () => void;
   onSelectUncommitted: () => void;
   pullRequest: PrHint | null;
   selectedDiffStat: { additions: number; deletions: number } | null;
@@ -546,6 +564,7 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       mode: input.mode,
       selectedDiffStat: input.selectedDiffStat,
       onSelectBase: input.onSelectBase,
+      onSelectAll: input.onSelectAll,
       onSelectUncommitted: input.onSelectUncommitted,
     },
   };
@@ -769,6 +788,7 @@ function ChangesComparisonToolbar({
           diffMode={model.diffMode}
           onSelectUncommitted={model.onSelectUncommitted}
           onSelectBase={model.onSelectBase}
+          onSelectAll={model.onSelectAll}
           turnModes={model.turnModes}
         />
         {model.selectedDiffStat ? (
@@ -1576,6 +1596,7 @@ export function ChangesSurface({
     diffMode,
     selectUncommitted: handleSelectUncommitted,
     selectBase: handleSelectBase,
+    selectAll: handleSelectAll,
     turnModes,
     isTurnSnapshotMissing,
     files,
@@ -1902,6 +1923,7 @@ export function ChangesSurface({
         mode: toolbarMode,
         onOpenPullRequest: handleOpenPullRequest,
         onSelectBase: handleSelectBase,
+        onSelectAll: handleSelectAll,
         onSelectUncommitted: handleSelectUncommitted,
         pullRequest: selectPrHintFromStatus(pullRequestStatus, forge),
         selectedDiffStat,
@@ -1917,6 +1939,7 @@ export function ChangesSurface({
       gitActions,
       handleOpenPullRequest,
       handleSelectBase,
+      handleSelectAll,
       handleSelectUncommitted,
       isMobile,
       forge,

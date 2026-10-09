@@ -114,3 +114,20 @@ test("active reads survive completed-payload eviction and failed reads can retry
     }),
   ).toEqual({ diff: "retry" });
 });
+
+test("combined diffs have their own cache and expire on both worktree and base changes", async () => {
+  const cache = new CheckoutDiffCache(() => 0);
+  const committed = { mode: "base", baseRef: "main" } as const;
+  const combined = { ...committed, includeUncommitted: true };
+  const read = (compare: typeof committed & { includeUncommitted?: boolean }, diff: string) =>
+    cache.read({ cwd: "repo", compare, load: async () => ({ diff }) });
+
+  expect(await read(committed, "committed")).toEqual({ diff: "committed" });
+  expect(await read(combined, "combined")).toEqual({ diff: "combined" });
+  cache.invalidate("repo", "uncommitted");
+  expect(await read(committed, "unused")).toEqual({ diff: "committed" });
+  expect(await read(combined, "edited")).toEqual({ diff: "edited" });
+  cache.invalidate("repo", "base");
+  expect(await read(committed, "new commit")).toEqual({ diff: "new commit" });
+  expect(await read(combined, "new base")).toEqual({ diff: "new base" });
+});

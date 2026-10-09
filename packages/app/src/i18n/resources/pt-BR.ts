@@ -990,6 +990,7 @@ export const ptBR: TranslationResources = {
         diffMode: "Modo de diff",
         uncommitted: "Sem commit",
         committed: "Com commit",
+        allChanges: "Todas as alterações",
         lastTurn: "Último turno",
         noLastTurnChanges: "Nenhuma alteração no último turno",
         noTurnSnapshot: "Nenhum snapshot deste turno",

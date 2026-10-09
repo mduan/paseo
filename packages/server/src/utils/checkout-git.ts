@@ -949,6 +949,7 @@ export type CheckoutDiffResult =
 
 export interface CheckoutDiffCompare {
   mode: "uncommitted" | "base";
+  includeUncommitted?: boolean;
   baseRef?: string;
   ignoreWhitespace?: boolean;
   includeStructured?: boolean;
@@ -3538,6 +3539,12 @@ async function resolveCheckoutDiffRefs(
     return null;
   }
   const bestBaseRef = await resolveBestComparisonBaseRef(cwd, baseRef);
+  if (compare.includeUncommitted) {
+    return {
+      baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
+      includeUntracked: true,
+    };
+  }
   return {
     baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
     // Pin HEAD so expanding context later reads the commit that was diffed.

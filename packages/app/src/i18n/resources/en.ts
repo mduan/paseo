@@ -975,6 +975,7 @@ export const en = {
         diffMode: "Diff mode",
         uncommitted: "Uncommitted",
         committed: "Committed",
+        allChanges: "All Changes",
         lastTurn: "Last Turn",
         noLastTurnChanges: "No changes in the last turn",
         noTurnSnapshot: "No snapshot for this turn",

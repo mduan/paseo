@@ -40,6 +40,7 @@ export interface BuildReviewAttachmentSnapshotInput {
   reviewDraftKey: string;
   cwd: string;
   mode: ReviewDraftMode;
+  includeUncommitted?: boolean;
   baseRef?: string | null;
   comments: readonly ReviewDraftComment[];
 }
@@ -187,6 +188,7 @@ export function buildReviewAttachmentSnapshot(
     mimeType: "application/paseo-review",
     cwd: input.cwd,
     mode: input.mode,
+    ...(input.includeUncommitted ? { includeUncommitted: true } : {}),
     baseRef: normalizeBaseRef(input.baseRef) || null,
     comments,
   };
@@ -241,6 +243,7 @@ export function useReviewAttachmentSnapshot(input: {
   key: string;
   cwd: string;
   mode: ReviewDraftMode;
+  includeUncommitted?: boolean;
   baseRef?: string | null;
 }): ReviewComposerAttachment | null {
   const comments = useReviewDraftComments(input.key);
@@ -250,9 +253,10 @@ export function useReviewAttachmentSnapshot(input: {
         reviewDraftKey: input.key,
         cwd: input.cwd,
         mode: input.mode,
+        includeUncommitted: input.includeUncommitted,
         baseRef: input.baseRef,
         comments,
       }),
-    [comments, input.key, input.cwd, input.mode, input.baseRef],
+    [comments, input.key, input.cwd, input.mode, input.baseRef, input.includeUncommitted],
   );
 }

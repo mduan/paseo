@@ -959,6 +959,7 @@ export const zhCN: TranslationResources = {
         diffMode: "Diff 模式",
         uncommitted: "未 commit",
         committed: "已 commit",
+        allChanges: "所有更改",
         lastTurn: "上一轮",
         noLastTurnChanges: "上一轮没有更改",
         noTurnSnapshot: "这一轮没有快照",
