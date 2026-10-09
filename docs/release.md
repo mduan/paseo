@@ -19,6 +19,8 @@ npm publish dist/fork-cli/mduan-paseo-cli-0.11.0-fork.2.tgz --access public --ta
 
 `npm run release:fork:cli -- --publish` packs and publishes in one step. `--skip-build` repacks the current build output.
 
+For conditional daemon publication followed by a local Mac build and opening the DMG in Finder, use the project's [release-fork skill](../.agents/skills/release-fork/SKILL.md).
+
 The rest of this document covers upstream `@getpaseo/*` releases.
 
 ## Two steps
