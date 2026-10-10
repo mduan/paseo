@@ -2268,6 +2268,16 @@ test("turn diff card remembers pane-relative opens across projects and reloads",
       .filter({ has: diffTab });
     await expect(card).toBeVisible();
 
+    const viewChanges = card.getByTestId("turn-diff-view-changes");
+    await page.mouse.move(1, 1);
+    const idleButtonColor = await viewChanges.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await viewChanges.hover();
+    await expect(viewChanges).not.toHaveCSS("background-color", idleButtonColor);
+    await page.mouse.move(1, 1);
+    await expect(viewChanges).toHaveCSS("background-color", idleButtonColor);
+
     await card.getByTestId("turn-diff-view-changes").click();
     await expect(diffPane).toHaveAttribute("data-testid", "workspace-explorer-sidebar");
     await agentTab.click();
