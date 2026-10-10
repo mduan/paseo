@@ -1,4 +1,12 @@
-import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename, useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -12,6 +20,7 @@ import {
   Pin,
   PinOff,
   Tag,
+  Sparkles,
 } from "lucide-react-native";
 import { isWeb } from "@/constants/platform";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
@@ -58,9 +67,11 @@ const ThemedPencil = withUnistyles(Pencil);
 const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedPin = withUnistyles(Pin);
 const ThemedPinOff = withUnistyles(PinOff);
+const ThemedSparkles = withUnistyles(Sparkles);
 const ThemedTag = withUnistyles(Tag);
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
+const aiRenameLeadingIcon = <ThemedSparkles size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
 const markAsReadLeadingIcon = (
   <ThemedCircleCheck size={14} uniProps={foregroundMutedColorMapping} />
@@ -147,6 +158,16 @@ function SidebarWorkspaceMenuItems({
   openInFileManagerPath,
 }: SidebarWorkspaceMenuItemsProps & { surface: MenuSurface }): ReactNode {
   const { t } = useTranslation();
+  const aiRename = useAiRename(serverId, ConversationTitleTarget.Workspace);
+  const aiRenamePending = useAiRenamePending({
+    serverId,
+    target: ConversationTitleTarget.Workspace,
+    id: workspaceId,
+  });
+  const renameWithAi = aiRename.rename;
+  const handleAiRename = useCallback(() => {
+    if (workspaceId) renameWithAi(workspaceId);
+  }, [renameWithAi, workspaceId]);
   const archiveTrailing = useMemo(
     () => (archiveShortcutKeys ? <Shortcut chord={archiveShortcutKeys} /> : null),
     [archiveShortcutKeys],
@@ -186,6 +207,17 @@ function SidebarWorkspaceMenuItems({
           onSelect={onRename}
         >
           {t("sidebar.workspace.actions.rename")}
+        </WorkspaceMenuItem>
+      ) : null}
+      {onRename && aiRename.supported && workspaceId ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-rename-ai-${workspaceKey}`}
+          leading={aiRenameLeadingIcon}
+          disabled={aiRenamePending}
+          onSelect={handleAiRename}
+        >
+          {t("sidebar.workspace.actions.renameWithAi")}
         </WorkspaceMenuItem>
       ) : null}
       {onMarkAsRead ? (

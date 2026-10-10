@@ -664,6 +664,8 @@ export const fr: TranslationResources = {
         copyFilePath: "Copy file path",
         revealInExplorer: "Afficher dans l'explorateur de fichiers",
         rename: "Rebaptiser",
+        renameWithAi: "Renommer avec l’IA",
+        renameWithAiChanged: "Le nom a changé pendant la génération par l’IA. Réessayez.",
         closeAbove: "Fermer les onglets ci-dessus",
         closeBelow: "Fermer les onglets ci-dessous",
         closeLeft: "Près de la gauche",
@@ -1304,6 +1306,7 @@ export const fr: TranslationResources = {
         copyPath: "Copier le chemin",
         copyBranchName: "Copier le nom de la branche",
         rename: "Renommer l'espace de travail",
+        renameWithAi: "Renommer l’espace de travail avec l’IA",
         pin: "Épingler en haut",
         unpin: "Désépingler",
         archive: "Archive",
@@ -2159,7 +2162,7 @@ export const fr: TranslationResources = {
     metadataGeneration: {
       title: "Génération de métadonnées",
       description:
-        "Choisissez le modèle utilisé par Paseo pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",
+        "Choisissez le modèle utilisé par Paseo pour les titres d’espaces de travail et de conversations, les noms de branches, les messages de commit et les brouillons de pull request",
       selection: "Sélection du modèle",
       automatic: "Automatique",
       preferred: "Manuel",

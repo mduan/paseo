@@ -1,3 +1,5 @@
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
   useCallback,
@@ -1439,6 +1441,7 @@ function ResolvedDesktopTabChip({
   showDropIndicatorAfter: boolean;
 }) {
   const { t } = useTranslation();
+  const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
   const presentation = item.presentation;
   const resolvedTab = useMemo(
     () =>
@@ -1453,6 +1456,8 @@ function ResolvedDesktopTabChip({
         onRevealFileInExplorer,
         onReloadAgent,
         onRenameTab,
+        onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        renameWithAiPending: aiRename.isPending,
         onCloseTab,
         onCloseTabsToLeft,
         onCloseTabsToRight,
@@ -1478,6 +1483,9 @@ function ResolvedDesktopTabChip({
       fileManager,
       onReloadAgent,
       onRenameTab,
+      aiRename.supported,
+      aiRename.rename,
+      aiRename.isPending,
       tabCount,
     ],
   );

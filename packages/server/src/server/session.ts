@@ -1,3 +1,4 @@
+import { createConversationTitleGenerator } from "./agent/conversation-title.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { BrowserAutomationHostCapabilitySchema } from "@getpaseo/protocol/browser-automation/capabilities";
@@ -731,6 +732,7 @@ export class Session {
   private readonly agentStorage: AgentStorage;
   private readonly projectRegistry: ProjectRegistry;
   private readonly workspaceRegistry: WorkspaceRegistry;
+  private readonly generateConversationTitle: ReturnType<typeof createConversationTitleGenerator>;
   private readonly directorySync: DirectorySyncService;
   private readonly filesystem: SessionFileSystem;
   private readonly github: ForgeService;
@@ -932,6 +934,19 @@ export class Session {
         await this.workspaceProvisioning.ensureWorkspaceRecordUnarchived(workspace);
       },
     });
+    const metadataGeneration = createAgentStructuredTextGeneration({
+      agentManager: this.agentManager,
+      providerSnapshotManager,
+      readDaemonConfig: () => this.readStructuredGenerationDaemonConfig(),
+      getFocusedSelection: (cwd) => this.getFocusedAgentSelectionForCwd(cwd),
+    });
+    this.generateConversationTitle = createConversationTitleGenerator({
+      agentManager: this.agentManager,
+      agentStorage: this.agentStorage,
+      generation: metadataGeneration,
+      workspaceGitService: this.workspaceGitService,
+      logger: this.sessionLogger,
+    });
     this.checkoutSession = new CheckoutSession({
       host: {
         emit: (msg) => this.emit(msg),
@@ -946,12 +961,7 @@ export class Session {
       checkoutDiffManager,
       gitMetadataGenerator: createGitMetadataGenerator({
         workspaceGitService: this.workspaceGitService,
-        generation: createAgentStructuredTextGeneration({
-          agentManager: this.agentManager,
-          providerSnapshotManager,
-          readDaemonConfig: () => this.readStructuredGenerationDaemonConfig(),
-          getFocusedSelection: (cwd) => this.getFocusedAgentSelectionForCwd(cwd),
-        }),
+        generation: metadataGeneration,
       }),
       paseoHome: this.paseoHome,
       worktreesRoot: this.worktreesRoot,
@@ -2685,6 +2695,8 @@ export class Session {
         );
         return undefined;
       }
+      case "metadata.conversation_title.generate.request":
+        return this.handleConversationTitleRequest(msg);
       case "agent.fork_context.request":
         return this.handleAgentForkContextRequest(msg);
       case "agent.fork.request":
@@ -8104,6 +8116,22 @@ export class Session {
         source,
       );
     }
+  }
+
+  private async handleConversationTitleRequest(
+    msg: Extract<SessionInboundMessage, { type: "metadata.conversation_title.generate.request" }>,
+  ): Promise<void> {
+    let title: string | null = null;
+    let error: string | null = null;
+    try {
+      title = await this.generateConversationTitle(msg);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+    this.emit({
+      type: "metadata.conversation_title.generate.response",
+      payload: { requestId: msg.requestId, title, error },
+    });
   }
 
   private async handleAgentForkContextRequest(

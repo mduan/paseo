@@ -1,3 +1,6 @@
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -44,6 +47,7 @@ const needsInputColorMapping = (theme: Theme) => ({
   fill: getStatusDotColor({ theme, bucket: "needs_input" }) ?? undefined,
 });
 
+const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedCircleAlert = withUnistyles(CircleAlert);
 const ThemedMonitor = withUnistyles(Monitor);
 const ThemedFolder = withUnistyles(Folder);
@@ -122,6 +126,11 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   const {
     settings: { workspaceTitleSource },
   } = useAppSettings();
+  const aiRenamePending = useAiRenamePending({
+    serverId: workspace.serverId,
+    target: ConversationTitleTarget.Workspace,
+    id: workspace.workspaceId,
+  });
   const workspaceLabel = resolveSidebarWorkspacePrimaryLabel({ workspace, workspaceTitleSource });
   const showsSessionRows = Boolean(expandToggle?.visible && expandToggle.expanded);
   // The workspace carries label names; their colors live in its host's catalog, so the row is
@@ -160,6 +169,9 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
         </WorkspaceLeadingSlot>
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
+            {aiRenamePending ? (
+              <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
+            ) : null}
             <Text style={workspaceBranchTextStyle} numberOfLines={1}>
               {workspaceLabel}
             </Text>

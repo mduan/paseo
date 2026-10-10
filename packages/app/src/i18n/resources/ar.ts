@@ -658,6 +658,8 @@ export const ar: TranslationResources = {
         copyFilePath: "Copy file path",
         revealInExplorer: "إظهار في مستكشف الملفات",
         rename: "إعادة تسمية",
+        renameWithAi: "إعادة التسمية بالذكاء الاصطناعي",
+        renameWithAiChanged: "تغيّر الاسم أثناء إنشائه بالذكاء الاصطناعي. حاول مرة أخرى.",
         closeAbove: "إغلاق علامات التبويب أعلاه",
         closeBelow: "إغلاق علامات التبويب أدناه",
         closeLeft: "بالقرب من اليسار",
@@ -1268,6 +1270,7 @@ export const ar: TranslationResources = {
         copyPath: "نسخ المسار",
         copyBranchName: "انسخ اسم الفرع",
         rename: "إعادة تسمية مساحة العمل",
+        renameWithAi: "إعادة تسمية مساحة العمل بالذكاء الاصطناعي",
         pin: "تثبيت في الأعلى",
         unpin: "إلغاء التثبيت",
         archive: "أرشيف",
@@ -2106,7 +2109,7 @@ export const ar: TranslationResources = {
     metadataGeneration: {
       title: "إنشاء البيانات الوصفية",
       description:
-        "اختر النموذج الذي يستخدمه Paseo لعناوين مساحات العمل وأسماء الفروع ورسائل الالتزام ومسودات طلبات السحب",
+        "اختر النموذج الذي يستخدمه Paseo لعناوين مساحات العمل والمحادثات وأسماء الفروع ورسائل الالتزام ومسودات طلبات السحب",
       selection: "اختيار النموذج",
       automatic: "تلقائي",
       preferred: "يدوي",

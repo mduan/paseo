@@ -664,6 +664,8 @@ export const ja: TranslationResources = {
         copyFilePath: "ファイルパスをコピー",
         revealInExplorer: "ファイルエクスプローラーで表示",
         rename: "名前を変更",
+        renameWithAi: "AIで名前を変更",
+        renameWithAiChanged: "AIが生成している間に名前が変更されました。もう一度お試しください。",
         closeAbove: "上のタブを閉じる",
         closeBelow: "下のタブを閉じる",
         closeLeft: "左のタブを閉じる",
@@ -1282,6 +1284,7 @@ export const ja: TranslationResources = {
         copyPath: "パスをコピー",
         copyBranchName: "ブランチ名をコピー",
         rename: "ワークスペースの名前を変更",
+        renameWithAi: "AIでワークスペース名を変更",
         pin: "上部に固定",
         unpin: "固定解除",
         archive: "アーカイブ",
@@ -2126,7 +2129,7 @@ export const ja: TranslationResources = {
     metadataGeneration: {
       title: "メタデータ生成",
       description:
-        "ワークスペースのタイトル、ブランチ名、コミットメッセージ、プルリクエストの下書きに使用するモデルを選択します",
+        "ワークスペースとチャットのタイトル、ブランチ名、コミットメッセージ、プルリクエストの下書きに使用するモデルを選択します",
       selection: "モデル選択",
       automatic: "自動",
       preferred: "手動",

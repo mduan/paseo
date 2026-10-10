@@ -182,6 +182,22 @@ describe("MockLoadTestAgentClient", () => {
     });
   });
 
+  test("returns a title from a fork transcript for structured conversation naming", async () => {
+    vi.useFakeTimers();
+    const session = await new MockLoadTestAgentClient().createSession({
+      provider: "mock",
+      cwd: process.cwd(),
+      model: "ten-second-stream",
+    });
+    const result = session.run(
+      "Return JSON only with a single field 'title'.\n[User] Fix payment retries",
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(result).resolves.toMatchObject({
+      finalText: JSON.stringify({ title: "Fix payment retries", branch: "fix-payment-retries" }),
+    });
+  });
+
   test("returns schema-shaped JSON for structured branch-name generation", async () => {
     vi.useFakeTimers();
     const client = new MockLoadTestAgentClient();

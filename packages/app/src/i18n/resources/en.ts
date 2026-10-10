@@ -655,6 +655,8 @@ export const en = {
         copyFilePath: "Copy file path",
         revealInExplorer: "Reveal in file explorer",
         rename: "Rename",
+        renameWithAi: "Rename with AI",
+        renameWithAiChanged: "The name changed while AI was generating. Try again.",
         closeAbove: "Close tabs above",
         closeBelow: "Close tabs below",
         closeLeft: "Close to the left",
@@ -1276,6 +1278,7 @@ export const en = {
         copyPath: "Copy path",
         copyBranchName: "Copy branch name",
         rename: "Rename workspace",
+        renameWithAi: "Rename workspace with AI",
         pin: "Pin to top",
         unpin: "Unpin",
         archive: "Archive",
@@ -2272,7 +2275,7 @@ export const en = {
     metadataGeneration: {
       title: "Metadata generation",
       description:
-        "Choose the model Paseo uses for workspace titles, branch names, commit messages, and pull request drafts",
+        "Choose the model Paseo uses for workspace and chat titles, branch names, commit messages, and pull request drafts",
       selection: "Model selection",
       automatic: "Automatic",
       preferred: "Manual",

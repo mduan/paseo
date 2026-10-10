@@ -1,3 +1,5 @@
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename, useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { registerWorkspaceTabMenuBuilder } from "@/stores/workspace-tab-menu-registry";
@@ -596,6 +598,7 @@ function MobileWorkspaceTabOption({
     }),
     [t],
   );
+  const aiRename = useAiRename(normalizedServerId, ConversationTitleTarget.Agent);
   const menuTestIDBase = `workspace-tab-menu-${tab.tabId}`;
   const menuEntries = buildWorkspaceTabMenuEntries({
     surface: "mobile",
@@ -610,6 +613,8 @@ function MobileWorkspaceTabOption({
     onRevealFileInExplorer,
     onReloadAgent,
     onRenameTab,
+    onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+    renameWithAiPending: aiRename.isPending,
     onCloseTab,
     onCloseTabsBefore: onCloseTabsAbove,
     onCloseTabsAfter: onCloseTabsBelow,
@@ -1072,9 +1077,14 @@ function WorkspaceHeaderTitleBar({
   onViewScriptTerminal,
   onOpenUrlInBrowserTab,
 }: WorkspaceHeaderTitleBarProps) {
+  const aiRenamePending = useAiRenamePending({
+    serverId: normalizedServerId,
+    target: ConversationTitleTarget.Workspace,
+    id: normalizedWorkspaceId,
+  });
   return (
     <View style={styles.headerTitleContainer}>
-      {isLoading ? (
+      {isLoading || aiRenamePending ? (
         <View style={styles.headerTitleTextGroup}>
           <View style={styles.headerTitleSkeleton} />
         </View>
@@ -2331,6 +2341,7 @@ function WorkspaceScreenContent({
     }
   });
 
+  const aiRename = useAiRename(normalizedServerId, ConversationTitleTarget.Agent);
   const [hoveredCloseTabKey, setHoveredCloseTabKey] = useState<string | null>(null);
   const { handleRenameTab, renamingTab, handleRenameModalSubmit, handleRenameModalClose } =
     useWorkspaceTabRename({
@@ -3066,6 +3077,8 @@ function WorkspaceScreenContent({
           handleRevealFileInExplorer(path);
         },
         onReloadAgent: handleReloadAgent,
+        onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        renameWithAiPending: aiRename.isPending,
         // The rename modal only renders on the focused workspace, so bring this one forward.
         onRenameTab: (renameTab) => {
           navigateToWorkspace({
@@ -3090,6 +3103,9 @@ function WorkspaceScreenContent({
     });
   }, [
     allTabDescriptorsById,
+    aiRename.supported,
+    aiRename.rename,
+    aiRename.isPending,
     handleCloseOtherTabsInPane,
     handleCloseTabById,
     handleCloseTabsToLeftInPane,

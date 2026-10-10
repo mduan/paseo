@@ -451,20 +451,19 @@ function parseStructuredBranchNamePrompt(
     (text.includes("Return JSON only with fields 'title' and 'branch'.") ||
       text.includes('"title"') ||
       text.includes('"branch"'));
-  if (
-    !hasBranchNamePrompt &&
-    !(
-      text.includes("You must respond with JSON only that matches this JSON Schema") &&
-      text.includes('"title"') &&
-      text.includes('"branch"')
-    )
-  ) {
+  const hasTitlePrompt = text.includes("Return JSON only with a single field 'title'.");
+  const hasNameSchema =
+    text.includes("You must respond with JSON only that matches this JSON Schema") &&
+    text.includes('"title"') &&
+    text.includes('"branch"');
+  if (![hasBranchNamePrompt, hasTitlePrompt, hasNameSchema].some(Boolean)) {
     return null;
   }
 
   const seed =
     text.match(/<user-prompt>\n([\s\S]*?)\n<\/user-prompt>/)?.[1]?.trim() ??
     text.match(/<attachments>\n([\s\S]*?)\n<\/attachments>/)?.[1]?.trim() ??
+    text.match(/\[User\] ([^\n]+)/)?.[1]?.trim() ??
     "";
   const firstLine =
     seed

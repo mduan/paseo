@@ -13,6 +13,7 @@ import {
   FolderSearch,
   FolderOpen,
   Pencil,
+  Sparkles,
   RotateCw,
   X,
 } from "lucide-react-native";
@@ -30,6 +31,7 @@ const ThemedArrowRightToLine = withUnistyles(ArrowRightToLine);
 const ThemedCopyX = withUnistyles(CopyX);
 const ThemedFolderOpen = withUnistyles(FolderOpen);
 const ThemedFolderSearch = withUnistyles(FolderSearch);
+const ThemedSparkles = withUnistyles(Sparkles);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedX = withUnistyles(X);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -62,6 +64,8 @@ export function useWorkspaceTabMenuItemAdornments(
         return <ThemedFolderOpen size={16} uniProps={mutedColorMapping} />;
       case "folder-search":
         return <ThemedFolderSearch size={16} uniProps={mutedColorMapping} />;
+      case "sparkles":
+        return <ThemedSparkles size={16} uniProps={mutedColorMapping} />;
       case "pencil":
         return <ThemedPencil size={16} uniProps={mutedColorMapping} />;
       case "x":
