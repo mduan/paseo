@@ -2,6 +2,8 @@ import { z } from "zod";
 import Ajv, { type ErrorObject, type Options as AjvOptions } from "ajv";
 import type { AgentProvider, AgentSessionConfig } from "./agent-sdk-types.js";
 import type { AgentManager } from "./agent-manager.js";
+import { buildAgentPrompt } from "./prompt-attachments.js";
+import type { FirstAgentContext } from "@getpaseo/protocol/messages";
 
 export interface StructuredGenerationLogger {
   info: (obj: object, msg?: string) => void;
@@ -75,6 +77,7 @@ export interface StructuredAgentGenerationOptions<T> {
   agentId?: string;
   persistSession?: boolean;
   prompt: string;
+  images?: FirstAgentContext["images"];
   schema: z.ZodType<T> | JsonSchema;
   maxRetries?: number;
   schemaName?: string;
@@ -84,6 +87,7 @@ export interface StructuredAgentGenerationWithFallbackOptions<T> {
   manager: AgentManager;
   cwd: string;
   prompt: string;
+  images?: FirstAgentContext["images"];
   schema: z.ZodType<T> | JsonSchema;
   providers: readonly StructuredGenerationProvider[];
   agentConfigOverrides?: Omit<
@@ -362,7 +366,7 @@ export async function generateStructuredAgentResponse<T>(
   });
   try {
     const caller: AgentCaller = async (nextPrompt) => {
-      const result = await manager.runAgent(agent.id, nextPrompt);
+      const result = await manager.runAgent(agent.id, buildAgentPrompt(nextPrompt, options.images));
       if (typeof result.finalText === "string" && result.finalText.length > 0) {
         return result.finalText;
       }
@@ -442,6 +446,7 @@ export async function generateStructuredAgentResponseWithFallback<T>(
       const result = await runStructured({
         manager,
         prompt,
+        images: options.images,
         schema,
         maxRetries,
         schemaName,

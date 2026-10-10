@@ -117,6 +117,7 @@ export async function generateBranchNameFromFirstAgentContext(
         cwd: options.cwd,
         workspaceGitService: options.workspaceGitService,
       }),
+      images: options.firstAgentContext?.images,
       schema: BranchNameSchema,
       schemaName: "BranchName",
       maxRetries: 2,

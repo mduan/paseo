@@ -66,6 +66,29 @@ function createStructuredGenerator(result: { title: string; branch: string }) {
 }
 
 describe("generateBranchNameFromFirstAgentContext", () => {
+  test("passes image-only context to the naming model", async () => {
+    const structured = createStructuredGenerator({
+      title: "Fix checkout error",
+      branch: "fix-checkout-error",
+    });
+    const firstAgentContext = {
+      prompt: "",
+      images: [{ data: "c2NyZWVuc2hvdA==", mimeType: "image/png" }],
+    };
+
+    const result = await generateBranchNameFromFirstAgentContext({
+      agentManager: {} as AgentManager,
+      cwd: "/tmp/repo",
+      firstAgentContext,
+      logger: createLogger(),
+      deps: { generateStructuredAgentResponseWithFallback: structured.generateStructured },
+    });
+
+    expect(result).toEqual({ title: "Fix checkout error", branch: "fix-checkout-error" });
+    expect(structured.calls).toHaveLength(1);
+    expect(structured.calls[0]).toMatchObject({ images: firstAgentContext.images });
+  });
+
   test("returns title and branch independently — branch is not a slug of the title", async () => {
     const structured = createStructuredGenerator({
       title: "Add payments flow",
