@@ -71,6 +71,7 @@ export type WorkspaceTabMenuEntry =
         | "arrow-left-to-line"
         | "arrow-right-to-line"
         | "copy-x"
+        | "sparkles"
         | "pencil"
         | "arrow-left"
         | "arrow-right"
@@ -111,6 +112,8 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onRevealFileInExplorer: (path: string) => void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  onRenameTabWithAi?: (agentId: string) => void;
+  renameWithAiPending?: boolean;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsBefore: (tabId: string) => Promise<void> | void;
   onCloseTabsAfter: (tabId: string) => Promise<void> | void;
@@ -131,6 +134,8 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onRevealFileInExplorer: (path: string) => void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
+  onRenameTabWithAi?: (agentId: string) => void;
+  renameWithAiPending?: boolean;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
@@ -323,6 +328,19 @@ export function buildWorkspaceTabMenuEntries(
         onRenameTab(tab);
       },
     });
+    const renameWithAi = input.onRenameTabWithAi;
+    if (tab.target.kind === "agent" && renameWithAi) {
+      const { agentId } = tab.target;
+      entries.push({
+        kind: "item",
+        key: "rename-ai",
+        label: i18n.t("workspace.tabs.menu.renameWithAi"),
+        icon: "sparkles",
+        disabled: input.renameWithAiPending,
+        testID: `${menuTestIDBase}-rename-ai`,
+        onSelect: () => renameWithAi(agentId),
+      });
+    }
     entries.push({
       kind: "separator",
       key: "rename-separator",
@@ -470,6 +488,8 @@ export function buildWorkspaceDesktopTabActions(
       onRevealFileInExplorer: input.onRevealFileInExplorer,
       onReloadAgent: input.onReloadAgent,
       onRenameTab: input.onRenameTab,
+      onRenameTabWithAi: input.onRenameTabWithAi,
+      renameWithAiPending: input.renameWithAiPending,
       onCloseTab: input.onCloseTab,
       onCloseTabsBefore: input.onCloseTabsToLeft,
       onCloseTabsAfter: input.onCloseTabsToRight,

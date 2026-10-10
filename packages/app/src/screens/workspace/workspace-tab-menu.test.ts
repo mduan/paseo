@@ -564,8 +564,34 @@ describe("buildWorkspaceTabMenuEntries", () => {
       onCloseOtherTabs: vi.fn(),
     };
 
-    const agentEntries = buildWorkspaceTabMenuEntries({ ...sharedInput, tab: createAgentTab() });
-    const terminalEntries = buildWorkspaceTabMenuEntries({ ...sharedInput, tab: terminalTab });
+    const onRenameTabWithAi = vi.fn();
+    const agentEntries = buildWorkspaceTabMenuEntries({
+      ...sharedInput,
+      tab: createAgentTab(),
+      onRenameTabWithAi,
+      renameWithAiPending: true,
+    });
+    const terminalEntries = buildWorkspaceTabMenuEntries({
+      ...sharedInput,
+      tab: terminalTab,
+      onRenameTabWithAi,
+    });
+    const aiRename = agentEntries.find((entry) => entry.key === "rename-ai");
+    expect(agentEntries.map((entry) => entry.key).slice(2, 5)).toEqual([
+      "rename",
+      "rename-ai",
+      "rename-separator",
+    ]);
+    expect(aiRename).toMatchObject({ label: "Rename with AI", disabled: true });
+    if (!aiRename || aiRename.kind !== "item") throw new Error("Missing AI rename entry");
+    aiRename.onSelect();
+    expect(onRenameTabWithAi).toHaveBeenCalledWith("agent-123");
+    expect(terminalEntries.some((entry) => entry.key === "rename-ai")).toBe(false);
+    expect(
+      buildWorkspaceTabMenuEntries({ ...sharedInput, tab: createAgentTab() }).some(
+        (entry) => entry.key === "rename-ai",
+      ),
+    ).toBe(false);
 
     const agentRename = agentEntries.find(
       (entry) => entry.kind === "item" && entry.key === "rename",

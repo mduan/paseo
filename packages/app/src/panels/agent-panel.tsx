@@ -1,3 +1,5 @@
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -347,6 +349,11 @@ function useAgentPanelDescriptor(
       };
     }),
   );
+  const aiRenamePending = useAiRenamePending({
+    serverId: context.serverId,
+    target: ConversationTitleTarget.Agent,
+    id: target.agentId,
+  });
   const provider = descriptorState.provider;
   const label = resolveWorkspaceAgentTabLabel(descriptorState.title);
   const icon = useProviderIcon(provider, context.serverId);
@@ -355,7 +362,7 @@ function useAgentPanelDescriptor(
     label: label ?? "",
     subtitle: `${formatProviderLabel(provider)} agent`,
     tooltip: label ?? `${formatProviderLabel(provider)} agent`,
-    titleState: label ? "ready" : "loading",
+    titleState: label && !aiRenamePending ? "ready" : "loading",
     icon,
     statusBucket: descriptorState.status
       ? deriveSidebarStateBucket({

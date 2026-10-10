@@ -666,6 +666,8 @@ export const ru: TranslationResources = {
         copyFilePath: "Скопировать путь к файлу",
         revealInExplorer: "Показать в проводнике файлов",
         rename: "Переименовать",
+        renameWithAi: "Переименовать с ИИ",
+        renameWithAiChanged: "Название изменилось во время генерации ИИ. Попробуйте снова.",
         closeAbove: "Закрыть вкладки выше",
         closeBelow: "Закрыть вкладки ниже",
         closeLeft: "Закрыть вкладки слева",
@@ -1287,6 +1289,7 @@ export const ru: TranslationResources = {
         copyPath: "Копировать путь",
         copyBranchName: "Скопировать имя ветки",
         rename: "Переименовать рабочее пространство",
+        renameWithAi: "Переименовать рабочее пространство с ИИ",
         pin: "Закрепить вверху",
         unpin: "Открепить",
         archive: "Архивировать",
@@ -2140,7 +2143,7 @@ export const ru: TranslationResources = {
     metadataGeneration: {
       title: "Генерация метаданных",
       description:
-        "Выберите модель, которую Paseo будет использовать для названий рабочих пространств и веток, сообщений коммитов и черновиков PR",
+        "Выберите модель, которую Paseo будет использовать для названий рабочих пространств, чатов и веток, сообщений коммитов и черновиков PR",
       selection: "Выбор модели",
       automatic: "Автоматически",
       preferred: "Вручную",

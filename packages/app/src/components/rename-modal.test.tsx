@@ -1,8 +1,45 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename, useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
+
 import { JSDOM } from "jsdom";
-import React, { act } from "react";
+import React, { act, useCallback } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdaptiveRenameModal } from "./rename-modal";
+
+const aiRenameTest = vi.hoisted(() => ({
+  supported: true,
+  title: "Original title",
+  generate: vi.fn<() => Promise<string>>(),
+  setWorkspaceTitle: vi.fn<() => Promise<void>>(),
+  updateAgent: vi.fn<() => Promise<void>>(),
+  error: vi.fn(),
+}));
+vi.mock("@/runtime/host-features", () => ({ useHostFeature: () => aiRenameTest.supported }));
+vi.mock("@/runtime/host-runtime", () => ({
+  getHostRuntimeStore: () => ({
+    getClient: () => ({
+      generateConversationTitle: aiRenameTest.generate,
+      setWorkspaceTitle: aiRenameTest.setWorkspaceTitle,
+      updateAgent: aiRenameTest.updateAgent,
+    }),
+  }),
+}));
+vi.mock("@/contexts/toast-context", () => ({ useToast: () => ({ error: aiRenameTest.error }) }));
+vi.mock("@/stores/session-store", () => ({
+  useSessionStore: {
+    getState: () => ({
+      sessions: {
+        host: {
+          workspaces: new Map([["target", { title: aiRenameTest.title }]]),
+          agents: new Map([["target", { title: aiRenameTest.title }]]),
+          agentDetails: new Map(),
+        },
+      },
+    }),
+  },
+}));
 
 const { theme, adaptiveInputState } = vi.hoisted(() => ({
   adaptiveInputState: {
@@ -364,5 +401,100 @@ describe("RenameModal", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(queryError()?.textContent).toContain("Server said no");
     expect(querySubmit()?.disabled).toBe(false);
+  });
+});
+
+function AiRenameHarness({ target }: { target: ConversationTitleTarget }) {
+  const ai = useAiRename("host", target);
+  const pending = useAiRenamePending({ serverId: "host", target, id: "target" });
+  const rename = ai.rename;
+  const handleRename = useCallback(() => {
+    rename("target");
+    rename("target");
+  }, [rename]);
+  return (
+    <button type="button" data-testid="ai-rename" disabled={!ai.supported} onClick={handleRename}>
+      {pending ? "Pending" : "Ready"}
+    </button>
+  );
+}
+
+describe("AI rename", () => {
+  beforeEach(() => {
+    aiRenameTest.title = "Original title";
+    aiRenameTest.supported = true;
+    aiRenameTest.generate.mockReset();
+    aiRenameTest.setWorkspaceTitle.mockReset().mockResolvedValue();
+    aiRenameTest.updateAgent.mockReset().mockResolvedValue();
+    aiRenameTest.error.mockReset();
+  });
+
+  function renderAiRename(target: ConversationTitleTarget) {
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    act(() =>
+      root?.render(
+        <QueryClientProvider client={client}>
+          <AiRenameHarness target={target} />
+        </QueryClientProvider>,
+      ),
+    );
+    return client;
+  }
+
+  it.each([ConversationTitleTarget.Agent, ConversationTitleTarget.Workspace])(
+    "applies one %s name, tracks pending, and prevents duplicate generation",
+    async (target) => {
+      let resolve: ((title: string) => void) | undefined;
+      aiRenameTest.generate.mockImplementation(
+        () =>
+          new Promise<string>((done) => {
+            resolve = done;
+          }),
+      );
+      const client = renderAiRename(target);
+      click(document.querySelector('[data-testid="ai-rename"]'));
+      await flush();
+      expect(client.isMutating()).toBe(1);
+      expect(aiRenameTest.generate).toHaveBeenCalledTimes(1);
+      expect(aiRenameTest.generate).toHaveBeenCalledWith({ target, id: "target" });
+      await act(async () => resolve?.("Generated title"));
+      await vi.waitFor(() => expect(client.isMutating()).toBe(0));
+      if (target === ConversationTitleTarget.Workspace) {
+        expect(aiRenameTest.setWorkspaceTitle).toHaveBeenCalledWith("target", "Generated title");
+        expect(aiRenameTest.updateAgent).not.toHaveBeenCalled();
+      } else {
+        expect(aiRenameTest.updateAgent).toHaveBeenCalledWith("target", {
+          name: "Generated title",
+        });
+        expect(aiRenameTest.setWorkspaceTitle).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("keeps the existing name and clears pending when generation fails", async () => {
+    aiRenameTest.generate.mockRejectedValue(new Error("Model unavailable"));
+    const client = renderAiRename(ConversationTitleTarget.Workspace);
+    click(document.querySelector('[data-testid="ai-rename"]'));
+    await vi.waitFor(() => expect(aiRenameTest.error).toHaveBeenCalledWith("Model unavailable"));
+    expect(client.isMutating()).toBe(0);
+    expect(aiRenameTest.setWorkspaceTitle).not.toHaveBeenCalled();
+  });
+
+  it("preserves a manual rename made during generation", async () => {
+    aiRenameTest.generate.mockImplementation(async () => {
+      aiRenameTest.title = "Manual title";
+      return "Generated title";
+    });
+    renderAiRename(ConversationTitleTarget.Agent);
+    click(document.querySelector('[data-testid="ai-rename"]'));
+    await vi.waitFor(() => expect(aiRenameTest.error).toHaveBeenCalled());
+    expect(aiRenameTest.updateAgent).not.toHaveBeenCalled();
+  });
+
+  it("gates the action for older hosts", () => {
+    aiRenameTest.supported = false;
+    renderAiRename(ConversationTitleTarget.Agent);
+    const button = document.querySelector<HTMLButtonElement>('[data-testid="ai-rename"]');
+    expect(button?.disabled).toBe(true);
   });
 });

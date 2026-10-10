@@ -1941,6 +1941,18 @@ export const SetAgentTimelineSubscriptionRequestMessageSchema = z.object({
   requestId: z.string(),
 });
 
+export enum ConversationTitleTarget {
+  Agent = "agent",
+  Workspace = "workspace",
+}
+
+export const ConversationTitleRequestMessageSchema = z.object({
+  type: z.literal("metadata.conversation_title.generate.request"),
+  target: z.enum(ConversationTitleTarget),
+  id: z.string().min(1),
+  requestId: z.string(),
+});
+
 export const AgentForkContextRequestMessageSchema = z.object({
   type: z.literal("agent.fork_context.request"),
   agentId: z.string(),
@@ -3358,6 +3370,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProviderSubagentListRequestMessageSchema,
   ProviderSubagentTimelineRequestMessageSchema,
   SetAgentTimelineSubscriptionRequestMessageSchema,
+  ConversationTitleRequestMessageSchema,
   AgentForkContextRequestMessageSchema,
   AgentForkRequestMessageSchema,
   SetAgentModeRequestMessageSchema,
@@ -3753,6 +3766,7 @@ export const ServerInfoStatusPayloadSchema = z
         daemonSelfUpdate: z.boolean().optional(),
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: z.boolean().optional(),
+        conversationTitleGeneration: z.boolean().optional(),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: z.boolean().optional(),
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
@@ -4895,6 +4909,15 @@ export const AgentAttentionRequiredMessageSchema = z.object({
         }),
       })
       .optional(),
+  }),
+});
+
+export const ConversationTitleResponseMessageSchema = z.object({
+  type: z.literal("metadata.conversation_title.generate.response"),
+  payload: z.object({
+    requestId: z.string(),
+    title: z.string().nullable(),
+    error: z.string().nullable(),
   }),
 });
 
@@ -7062,6 +7085,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProviderSubagentUpdateMessageSchema,
   SetAgentTimelineSubscriptionResponseMessageSchema,
   AgentAttentionRequiredMessageSchema,
+  ConversationTitleResponseMessageSchema,
   AgentForkContextResponseMessageSchema,
   AgentForkResponseMessageSchema,
   CancelAgentResponseMessageSchema,
@@ -7394,6 +7418,7 @@ export type FetchRecentProviderSessionsRequestMessage = z.infer<
 export type FetchWorkspacesRequestMessage = z.infer<typeof FetchWorkspacesRequestMessageSchema>;
 export type ProjectListRequestMessage = z.infer<typeof ProjectListRequestMessageSchema>;
 export type FetchAgentRequestMessage = z.infer<typeof FetchAgentRequestMessageSchema>;
+export type ConversationTitleRequestMessage = z.infer<typeof ConversationTitleRequestMessageSchema>;
 export type AgentForkContextRequestMessage = z.infer<typeof AgentForkContextRequestMessageSchema>;
 export type AgentForkRequestMessage = z.infer<typeof AgentForkRequestMessageSchema>;
 export type SendAgentMessageRequest = z.infer<typeof SendAgentMessageRequestSchema>;

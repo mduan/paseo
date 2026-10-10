@@ -26,6 +26,7 @@ import {
   ShutdownRequestedStatusPayloadSchema,
   DaemonUpdateResponseSchema,
   SessionInboundMessageSchema,
+  type ConversationTitleRequestMessage,
   type ActiveTurnBehavior,
   type ServerInfoStatusPayload,
 } from "@getpaseo/protocol/messages";
@@ -3447,6 +3448,31 @@ export class DaemonClient {
     return subscribeTimeline(agentId, this.observeTimeline([agentId]), handler, (error) =>
       this.logger.error({ err: error }, "Timeline observation failed"),
     );
+  }
+
+  async generateConversationTitle(
+    input: Pick<ConversationTitleRequestMessage, "target" | "id">,
+  ): Promise<string> {
+    const requestId = this.createRequestId();
+    const message = SessionInboundMessageSchema.parse({
+      type: "metadata.conversation_title.generate.request",
+      ...input,
+      requestId,
+    });
+    const payload = await this.sendRequest({
+      requestId,
+      message,
+      timeout: 120000,
+      options: { skipQueue: true },
+      select: (msg) => {
+        if (msg.type !== "metadata.conversation_title.generate.response") return null;
+        return msg.payload.requestId === requestId ? msg.payload : null;
+      },
+    });
+    if (payload.error || !payload.title) {
+      throw new Error(payload.error ?? "No conversation title generated");
+    }
+    return payload.title;
   }
 
   async buildAgentForkContext(

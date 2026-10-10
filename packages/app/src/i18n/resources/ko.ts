@@ -660,6 +660,8 @@ export const ko: TranslationResources = {
         copyFilePath: "파일 경로 복사",
         revealInExplorer: "파일 탐색기에서 보기",
         rename: "이름 변경",
+        renameWithAi: "AI로 이름 변경",
+        renameWithAiChanged: "AI가 생성하는 동안 이름이 변경되었습니다. 다시 시도하세요.",
         closeAbove: "위쪽 탭 닫기",
         closeBelow: "아래쪽 탭 닫기",
         closeLeft: "왼쪽 탭 닫기",
@@ -1276,6 +1278,7 @@ export const ko: TranslationResources = {
         copyPath: "경로 복사",
         copyBranchName: "브랜치 이름 복사",
         rename: "워크스페이스 이름 변경",
+        renameWithAi: "AI로 작업 공간 이름 변경",
         pin: "상단에 고정",
         unpin: "고정 해제",
         archive: "보관",
@@ -2117,7 +2120,7 @@ export const ko: TranslationResources = {
     metadataGeneration: {
       title: "메타데이터 생성",
       description:
-        "워크스페이스 제목, 브랜치 이름, 커밋 메시지 및 풀 리퀘스트 초안에 사용할 모델을 선택하세요",
+        "워크스페이스 및 채팅 제목, 브랜치 이름, 커밋 메시지 및 풀 리퀘스트 초안에 사용할 모델을 선택하세요",
       selection: "모델 선택",
       automatic: "자동",
       preferred: "수동",

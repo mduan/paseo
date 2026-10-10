@@ -1,3 +1,6 @@
+import { TitleSkeleton } from "@/components/ui/title-skeleton";
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
   useCallback,
@@ -599,7 +602,6 @@ function TabHandleContent({
   isHighlighted,
   showLabel,
   backdrop,
-  tabLabelSkeletonStyle,
   tabLabelStyle,
   modifiedTestId,
 }: {
@@ -607,7 +609,6 @@ function TabHandleContent({
   isHighlighted: boolean;
   showLabel: boolean;
   backdrop: SurfaceBackdrop;
-  tabLabelSkeletonStyle: React.ComponentProps<typeof View>["style"];
   tabLabelStyle: React.ComponentProps<typeof Text>["style"];
   modifiedTestId: string;
 }) {
@@ -622,9 +623,7 @@ function TabHandleContent({
       <View style={styles.tabIcon}>
         <WorkspaceTabIcon presentation={presentation} active={isHighlighted} backdrop={backdrop} />
       </View>
-      {showLabel && presentation.titleState === "loading" ? (
-        <View style={tabLabelSkeletonStyle} />
-      ) : null}
+      {showLabel && presentation.titleState === "loading" ? <TitleSkeleton /> : null}
       {showLabel && presentation.titleState !== "loading" ? (
         <Text style={tabLabelStyle} selectable={false} numberOfLines={1} ellipsizeMode="tail">
           {presentation.label}
@@ -761,7 +760,6 @@ function TabChip({
   const tabAccessibilityState = useMemo(() => ({ selected: isActive }), [isActive]);
   const testIdentity =
     tab.target.kind === "new_tab" ? tab.tabId : buildDeterministicWorkspaceTabId(tab.target);
-  const tabLabelSkeletonStyle = styles.tabLabelSkeleton;
   const tabLabelStyle = useMemo(
     () => [styles.tabLabel, isHighlighted && styles.tabLabelActive],
     [isHighlighted],
@@ -795,7 +793,6 @@ function TabChip({
                 isHighlighted={isHighlighted}
                 showLabel={showLabel}
                 backdrop={chipBackdrop}
-                tabLabelSkeletonStyle={tabLabelSkeletonStyle}
                 tabLabelStyle={tabLabelStyle}
                 modifiedTestId={`workspace-tab-modified-${testIdentity}`}
               />
@@ -1439,6 +1436,7 @@ function ResolvedDesktopTabChip({
   showDropIndicatorAfter: boolean;
 }) {
   const { t } = useTranslation();
+  const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
   const presentation = item.presentation;
   const resolvedTab = useMemo(
     () =>
@@ -1453,6 +1451,8 @@ function ResolvedDesktopTabChip({
         onRevealFileInExplorer,
         onReloadAgent,
         onRenameTab,
+        onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        renameWithAiPending: aiRename.isPending,
         onCloseTab,
         onCloseTabsToLeft,
         onCloseTabsToRight,
@@ -1478,6 +1478,9 @@ function ResolvedDesktopTabChip({
       fileManager,
       onReloadAgent,
       onRenameTab,
+      aiRename.supported,
+      aiRename.rename,
+      aiRename.isPending,
       tabCount,
     ],
   );
@@ -1653,16 +1656,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   tabLabelMeasurement: {
     flexShrink: 0,
-  },
-  tabLabelSkeleton: {
-    width: 96,
-    maxWidth: "100%",
-    flexShrink: 1,
-    minWidth: 0,
-    height: 10,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface3,
-    opacity: 0.9,
   },
   tabLabelActive: {
     color: theme.colors.foreground,

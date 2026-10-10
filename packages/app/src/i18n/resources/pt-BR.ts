@@ -664,6 +664,8 @@ export const ptBR: TranslationResources = {
         copyFilePath: "Copiar caminho do arquivo",
         revealInExplorer: "Mostrar no explorador de arquivos",
         rename: "Renomear",
+        renameWithAi: "Renomear com IA",
+        renameWithAiChanged: "O nome mudou durante a geração com IA. Tente novamente.",
         closeAbove: "Fechar abas acima",
         closeBelow: "Fechar abas abaixo",
         closeLeft: "Fechar à esquerda",
@@ -1295,6 +1297,7 @@ export const ptBR: TranslationResources = {
         copyPath: "Copiar caminho",
         copyBranchName: "Copiar nome da branch",
         rename: "Renomear workspace",
+        renameWithAi: "Renomear espaço de trabalho com IA",
         pin: "Fixar no topo",
         unpin: "Desafixar",
         archive: "Arquivar",
@@ -2140,7 +2143,7 @@ export const ptBR: TranslationResources = {
     metadataGeneration: {
       title: "Geração de metadados",
       description:
-        "Escolha o modelo usado pelo Paseo para títulos de espaços de trabalho, nomes de branches, mensagens de commit e rascunhos de pull request",
+        "Escolha o modelo usado pelo Paseo para títulos de espaços de trabalho e chats, nomes de branches, mensagens de commit e rascunhos de pull request",
       selection: "Seleção de modelo",
       automatic: "Automática",
       preferred: "Manual",
