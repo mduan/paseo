@@ -2117,6 +2117,7 @@ export const ar: TranslationResources = {
       automaticHint: "يختار Paseo نموذجًا سريعًا متاحًا",
       preferredHint: "اختر النموذج الذي يستخدمه Paseo",
       model: "النموذج",
+      effort: "مستوى التفكير",
       fallbackHint: "إذا لم يكن متاحًا، يستخدم Paseo نموذجًا آخر متاحًا",
       docs: "الوثائق",
       saveError: "تعذر تحديث إنشاء البيانات الوصفية",
