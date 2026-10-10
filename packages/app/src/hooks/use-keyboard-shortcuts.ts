@@ -13,7 +13,7 @@ import {
   buildEffectiveBindings,
   getWorkspaceIndexJumpModifierKey,
 } from "@/keyboard/keyboard-shortcuts";
-import { resolveKeyboardFocusScope } from "@/keyboard/focus-scope";
+import { isSortableKeyboardEvent, resolveKeyboardFocusScope } from "@/keyboard/focus-scope";
 import {
   buildBrowserKeyboardPolicy,
   parseBrowserShortcutInput,
@@ -326,6 +326,9 @@ export function useKeyboardShortcuts({
     if (isImeComposingKeyboardEvent(event)) {
       return;
     }
+
+    // Sortable handles own their drag keys before global shortcuts consume them.
+    if (isSortableKeyboardEvent(event)) return;
 
     const store = useKeyboardShortcutsStore.getState();
     if (store.capturingShortcut) {
