@@ -160,7 +160,7 @@ export const ja: TranslationResources = {
       dropImagesHere: "ここに画像をドロップ",
       dropFilesHere: "ここにファイルをドロップ",
       editQueuedMessage: "キューに入れたメッセージを編集",
-      moveQueuedMessageToFront: "メッセージをキューの先頭に移動",
+      reorderQueuedMessage: "キュー内のメッセージを並べ替え",
       sendQueuedMessageNow: "キューに入れたメッセージを今すぐ送信",
       openImage: "画像添付ファイルを開く",
       removeImage: "画像添付ファイルを削除",
