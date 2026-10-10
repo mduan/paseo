@@ -1,6 +1,6 @@
 ---
 name: release-fork
-description: Release Paseo fork daemon changes when needed, build the Apple Silicon Mac DMG, and report its folder path. Use for "release fork" or "/release-fork".
+description: Release Paseo fork daemon changes when needed, build the Apple Silicon Mac DMG, and report a file link to the DMG. Use for "release fork" or "/release-fork".
 ---
 
 # Release fork
@@ -48,4 +48,4 @@ If relevant inputs match the published build, skip publication.
 
 1. If publication was skipped or deferred, merge the release branch into local `main` first. Run `npm run build:fork` from the `main` checkout. It disables desktop publication and uses ad hoc signing without notarization.
 2. Verify a nonempty `packages/desktop/release/Paseo-<version>-arm64.dmg` for the workspace version. Leave it unopened and unmounted. Installation and main-daemon restart (port 6767) require separate permission.
-3. Report publication status (skipped, verified, pending, or failed), version/release commit, signing limitation, and unfinished-step logs. In the final response, output the absolute path to the DMG folder: `<checkout>/packages/desktop/release/`.
+3. Report publication status (skipped, verified, pending, or failed), version/release commit, signing limitation, and unfinished-step logs. In the final response, output a clickable Markdown file link to the verified DMG. Use its full absolute path as both the link label and target: `[<checkout>/packages/desktop/release/Paseo-<version>-arm64.dmg](<checkout>/packages/desktop/release/Paseo-<version>-arm64.dmg)`.
