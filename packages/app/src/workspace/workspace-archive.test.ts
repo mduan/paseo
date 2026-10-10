@@ -1,5 +1,6 @@
 import { seedSessionHosts } from "@/test/seed-session";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { WorkspaceDirectoryReplica } from "@/runtime/directory-sync/workspace-replica";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -147,6 +148,35 @@ describe("archiveWorkspaceOptimistically", () => {
         workspaceId: archived.id,
       }),
     ).toBe(false);
+  });
+
+  it("keeps concurrently archived workspaces hidden when their requests time out after removal", async () => {
+    const archived = [workspace(), workspace({ id: "workspace-2" })];
+    getHostRuntimeStore().acceptWorkspaceSnapshots(SERVER_ID, archived);
+    const requests = new Map(
+      archived.map((entry) => [entry.id, deferred<ArchiveWorkspacePayload>()]),
+    );
+    const client = createClient(async (workspaceId) => requests.get(workspaceId)!.promise);
+    const replica = new WorkspaceDirectoryReplica(SERVER_ID);
+
+    const archive = archiveWorkspacesOptimistically({
+      getClient: () => client,
+      workspaces: archived.map((entry) => target({ workspaceId: entry.id })),
+    });
+
+    for (const entry of archived) {
+      expect(storedWorkspace(entry.id)).toBeUndefined();
+      replica.applyDelta({ kind: "remove", id: entry.id });
+    }
+    for (const request of requests.values()) {
+      request.reject(new Error("Request timed out"));
+    }
+    const failures = await archive;
+
+    for (const entry of archived) {
+      expect(storedWorkspace(entry.id)).toBeUndefined();
+    }
+    expect(failures).toEqual([]);
   });
 });
 

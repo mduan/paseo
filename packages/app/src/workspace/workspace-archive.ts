@@ -1,6 +1,7 @@
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import {
   clearWorkspaceArchivePending,
+  isWorkspaceArchivePending,
   markWorkspaceArchivePending,
 } from "@/contexts/session-workspace-upserts";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
@@ -91,6 +92,8 @@ export async function archiveWorkspaceOptimistically(input: {
       workspaceId: input.workspace.workspaceId,
     });
   } catch (error) {
+    // The removal event confirms archive before slow worktree cleanup can time out.
+    if (!isWorkspaceArchivePending(input.workspace)) return;
     restoreOptimisticallyHiddenWorkspace({
       serverId: input.workspace.serverId,
       workspaceId: input.workspace.workspaceId,
