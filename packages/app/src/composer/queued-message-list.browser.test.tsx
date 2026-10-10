@@ -84,6 +84,13 @@ afterEach(() => {
 });
 
 describe("queued message reordering", () => {
+  it("preserves the spacing between queued messages", () => {
+    const handles = page.getByRole("button", { name: "Reorder queued message" });
+    const first = handles.nth(0).element().parentElement!.getBoundingClientRect();
+    const second = handles.nth(1).element().parentElement!.getBoundingClientRect();
+    expect(second.top - first.bottom).toBe(8);
+  });
+
   it("reorders from the handle with the keyboard", async () => {
     await act(async () => {
       await userEvent.click(page.getByRole("button", { name: "Reorder queued message" }).nth(0));

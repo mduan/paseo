@@ -68,6 +68,7 @@ export function QueuedMessageList({
       keyExtractor={messageKey}
       renderItem={renderItem}
       onDragEnd={handleDragEnd}
+      containerStyle={styles.queueTrack}
       contentContainerStyle={styles.queueTrack}
       scrollEnabled={false}
       useDragHandle
