@@ -8,6 +8,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ForgeService } from "../services/forge-service.js";
 import { createRealpathAwarePathMatcher } from "../utils/path.js";
 import { createWorktree, type WorktreeConfig } from "../utils/worktree.js";
+import * as worktreeCommands from "../utils/worktree.js";
 import type { ManagedAgent } from "./agent/agent-manager.js";
 import type { AgentStorage, StoredAgentRecord } from "./agent/agent-storage.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
@@ -23,6 +24,7 @@ import { WorkspaceAutomationBlockedError } from "./workspace-automation-gate.js"
 const cleanupPaths: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const target of cleanupPaths.splice(0)) {
     rmSync(target, { recursive: true, force: true });
   }
@@ -189,6 +191,62 @@ function assertArchiveResult(
 }
 
 describe("archiveByScope", () => {
+  test("archives immediately but preserves a workspace restored while its disk deletion is queued", async () => {
+    const { tempDir, repoDir } = createGitRepo();
+    const paseoHome = path.join(tempDir, ".paseo");
+    const first = await createPaseoOwnedWorktree(repoDir, paseoHome, "queue-first");
+    const restored = await createPaseoOwnedWorktree(repoDir, paseoHome, "queue-restored");
+    const workspace: ActiveWorkspaceRef = {
+      workspaceId: "ws-queue-restored",
+      cwd: restored.worktreePath,
+      kind: "worktree",
+      worktreeRoot: restored.worktreePath,
+      isPaseoOwnedWorktree: true,
+      mainRepoRoot: repoDir,
+    };
+    const deps = createArchiveDeps({ paseoHome, activeWorkspaces: [workspace] });
+    deps.listActiveWorkspaces = async () => [...deps.activeWorkspaces];
+    const firstStarted = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const archiveQueued = Promise.withResolvers<void>();
+    const deletePaseoWorktree = worktreeCommands.deletePaseoWorktree;
+    vi.spyOn(worktreeCommands, "deletePaseoWorktree").mockImplementation((options) => {
+      const deletion = deletePaseoWorktree(options);
+      if (options.worktreePath === restored.worktreePath) archiveQueued.resolve();
+      return deletion;
+    });
+    const firstDeletion = deletePaseoWorktree({
+      cwd: repoDir,
+      worktreePath: first.worktreePath,
+      paseoHome,
+      assertDeletionAllowed: async () => {
+        firstStarted.resolve();
+        await releaseFirst.promise;
+      },
+    });
+    await firstStarted.promise;
+    const archive = archiveByScope(deps, {
+      scope: { kind: "workspace", workspaceId: workspace.workspaceId },
+      requestId: "req-queue-restored",
+    });
+    try {
+      await archiveQueued.promise;
+      expect(deps.activeWorkspaces).toEqual([]);
+      expect(existsSync(restored.worktreePath)).toBe(true);
+      deps.activeWorkspaces.push(workspace);
+    } finally {
+      releaseFirst.resolve();
+      await Promise.allSettled([firstDeletion, archive]);
+    }
+    assertArchiveResult(await archive, {
+      archivedWorkspaceIds: [workspace.workspaceId],
+      removedDirectory: false,
+    });
+    expect(existsSync(first.worktreePath)).toBe(false);
+    expect(existsSync(restored.worktreePath)).toBe(true);
+    expect(deps.sessionLogger?.warn).not.toHaveBeenCalled();
+  });
+
   test("workspace scope archives the record and removes the directory on last reference", async () => {
     const { tempDir, repoDir } = createGitRepo();
     const paseoHome = path.join(tempDir, ".paseo");

@@ -76,6 +76,12 @@ export interface ArchiveByScopeRequest {
   requestId: string;
 }
 
+class WorktreeStillReferencedError extends Error {
+  constructor(worktreePath: string) {
+    super(`Worktree is still referenced: ${worktreePath}`);
+  }
+}
+
 export async function requireActiveWorkspaceForArchive(
   dependencies: Pick<ArchiveDependencies, "listActiveWorkspaces">,
   workspaceId: string,
@@ -387,18 +393,6 @@ async function maybeRemoveDirectory(
     throw error;
   }
 
-  const remainingActive = await dependencies.listActiveWorkspaces();
-  if (
-    !(await isDirectoryUnreferenced(
-      remainingActive,
-      backing.path,
-      new Set(archivedWorkspaceIds),
-      dependencies,
-    ))
-  ) {
-    return false;
-  }
-
   try {
     await deletePaseoWorktree({
       cwd: backing.mainRepoRoot,
@@ -407,10 +401,17 @@ async function maybeRemoveDirectory(
       worktreesRoot: backing.paseoWorktreesRoot ?? undefined,
       paseoHome: dependencies.paseoHome,
       worktreesBaseRoot: dependencies.paseoWorktreesBaseRoot,
+      assertDeletionAllowed: async () => {
+        const remainingActive = await dependencies.listActiveWorkspaces();
+        if (!(await isDirectoryUnreferenced(remainingActive, backing.path, dependencies))) {
+          throw new WorktreeStillReferencedError(backing.path);
+        }
+      },
     });
     dependencies.github.invalidate({ cwd: backing.path });
     return true;
   } catch (error) {
+    if (error instanceof WorktreeStillReferencedError) return false;
     dependencies.sessionLogger?.warn(
       { err: error, targetPath: backing.path, requestId: request.requestId },
       "Worktree disk removal failed during archive; workspace already archived",
@@ -518,13 +519,11 @@ export async function archiveWorkspaceContents(
 async function isDirectoryUnreferenced(
   activeWorkspaces: ActiveWorkspaceRef[],
   targetDir: string,
-  archivedWorkspaceIds: ReadonlySet<string>,
   dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
 ): Promise<boolean> {
   const target = resolve(targetDir);
   const matchesTarget = createRealpathAwarePathMatcher(target);
   for (const workspace of activeWorkspaces) {
-    if (archivedWorkspaceIds.has(workspace.workspaceId)) continue;
     const backingDirectory = await resolveWorkspaceBackingDirectory(workspace, dependencies);
     if (matchesTarget(backingDirectory.path)) return false;
   }
