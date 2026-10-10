@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveKeyboardFocusScope } from "./focus-scope";
+import { isSortableKeyboardEvent, resolveKeyboardFocusScope } from "./focus-scope";
 
 class FakeNode {
   parentElement: FakeElement | null = null;
@@ -76,5 +76,29 @@ describe("resolveKeyboardFocusScope", () => {
       commandCenterOpen: false,
     });
     expect(scope).toBe("editable");
+  });
+
+  it.each(["Space", "Enter", "Tab", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"])(
+    "reserves %s for a sortable handle",
+    (code) => {
+      const target = new FakeElement({ selectors: ['[aria-roledescription="sortable"]'] });
+      expect(isSortableKeyboardEvent({ target: target as unknown as EventTarget, code })).toBe(
+        true,
+      );
+    },
+  );
+
+  it("keeps unrelated shortcuts available on a sortable handle", () => {
+    const target = new FakeElement({ selectors: ['[aria-roledescription="sortable"]'] });
+    expect(
+      isSortableKeyboardEvent({ target: target as unknown as EventTarget, code: "KeyK" }),
+    ).toBe(false);
+  });
+
+  it("keeps global Space available outside sortable handles", () => {
+    const target = new FakeElement();
+    expect(
+      isSortableKeyboardEvent({ target: target as unknown as EventTarget, code: "Space" }),
+    ).toBe(false);
   });
 });

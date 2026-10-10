@@ -1,11 +1,11 @@
 import type { ComposerTextSource } from "./text-source";
+import { QueuedMessageList } from "./queued-message-list";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   View,
-  Pressable,
   Text,
   StyleSheet as RNStyleSheet,
   type PressableStateCallbackType,
@@ -29,10 +29,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useShallow } from "zustand/shallow";
 import {
-  ArrowUp,
-  ArrowUpToLine,
   Square,
-  Pencil,
   AudioLines,
   CircleDot,
   FileText,
@@ -71,7 +68,7 @@ import {
   editQueuedComposerMessage,
   findForgeItemByOption,
   isAttachmentSelectedForForgeItem,
-  moveQueuedComposerMessageToFront,
+  reorderQueuedComposerMessages,
   openComposerAttachment,
   pickAndPersistImages,
   queueComposerMessage,
@@ -422,45 +419,6 @@ function renderAttachmentTray(args: RenderAttachmentTrayArgs): ReactElement | nu
   );
 }
 
-interface RenderQueueTrackArgs {
-  queuedMessages: readonly QueuedMessage[];
-  handleEditQueuedMessage: (id: string) => void;
-  handleMoveQueuedMessageToFront: (id: string) => void;
-  handleSendQueuedNow: (id: string) => Promise<void>;
-  editLabel: string;
-  moveToFrontLabel: string;
-  sendNowLabel: string;
-}
-
-function renderQueueTrack(args: RenderQueueTrackArgs): ReactElement | null {
-  const {
-    queuedMessages,
-    handleEditQueuedMessage,
-    handleMoveQueuedMessageToFront,
-    handleSendQueuedNow,
-    editLabel,
-    moveToFrontLabel,
-    sendNowLabel,
-  } = args;
-  if (queuedMessages.length === 0) return null;
-  return (
-    <View style={styles.queueTrack}>
-      {queuedMessages.map((item, index) => (
-        <QueuedMessageRow
-          key={item.id}
-          item={item}
-          onEdit={handleEditQueuedMessage}
-          onMoveToFront={index > 0 ? handleMoveQueuedMessageToFront : undefined}
-          onSendNow={handleSendQueuedNow}
-          editLabel={editLabel}
-          moveToFrontLabel={moveToFrontLabel}
-          sendNowLabel={sendNowLabel}
-        />
-      ))}
-    </View>
-  );
-}
-
 interface RenderComposerAttachmentPillArgs {
   attachment: ComposerAttachment;
   index: number;
@@ -719,71 +677,6 @@ function resolveMessageInputPassthroughAction(
     default:
       return null;
   }
-}
-
-interface QueuedMessageRowProps {
-  item: QueuedMessage;
-  onEdit: (id: string) => void;
-  onMoveToFront?: (id: string) => void;
-  onSendNow: (id: string) => void;
-  editLabel: string;
-  moveToFrontLabel: string;
-  sendNowLabel: string;
-}
-
-function QueuedMessageRow({
-  item,
-  onEdit,
-  onMoveToFront,
-  onSendNow,
-  editLabel,
-  moveToFrontLabel,
-  sendNowLabel,
-}: QueuedMessageRowProps) {
-  const handleEdit = useCallback(() => {
-    onEdit(item.id);
-  }, [onEdit, item.id]);
-  const handleMoveToFront = useCallback(() => {
-    onMoveToFront?.(item.id);
-  }, [onMoveToFront, item.id]);
-  const handleSendNow = useCallback(() => {
-    onSendNow(item.id);
-  }, [onSendNow, item.id]);
-  return (
-    <View style={styles.queueItem}>
-      <Text style={styles.queueText} numberOfLines={2} ellipsizeMode="tail">
-        {item.text}
-      </Text>
-      <View style={styles.queueActions}>
-        <Pressable
-          onPress={handleEdit}
-          style={styles.queueActionButton}
-          accessibilityLabel={editLabel}
-          accessibilityRole="button"
-        >
-          <ThemedPencil size={ICON_SIZE.sm} uniProps={iconForegroundMapping} />
-        </Pressable>
-        {onMoveToFront && (
-          <Pressable
-            onPress={handleMoveToFront}
-            style={styles.queueActionButton}
-            accessibilityLabel={moveToFrontLabel}
-            accessibilityRole="button"
-          >
-            <ThemedArrowUpToLine size={ICON_SIZE.sm} uniProps={iconForegroundMapping} />
-          </Pressable>
-        )}
-        <Pressable
-          onPress={handleSendNow}
-          style={[styles.queueActionButton, styles.queueSendButton]}
-          accessibilityLabel={sendNowLabel}
-          accessibilityRole="button"
-        >
-          <ThemedArrowUp size={ICON_SIZE.sm} uniProps={iconAccentForegroundMapping} />
-        </Pressable>
-      </View>
-    </View>
-  );
 }
 
 interface ImageAttachmentPillProps {
@@ -2016,11 +1909,16 @@ function ComposerContentImpl({
     [agentId, queueWriter, replaceUserInput, setSelectedAttachments],
   );
 
-  const handleMoveQueuedMessageToFront = useCallback(
-    (id: string) => {
-      moveQueuedComposerMessageToFront({ agentId, messageId: id, queue: queueWriter });
+  const handleReorderQueuedMessages = useCallback(
+    (messages: QueuedMessage[]) => {
+      reorderQueuedComposerMessages({
+        agentId,
+        messages,
+        expectedMessages: queuedMessages,
+        queue: queueWriter,
+      });
     },
-    [agentId, queueWriter],
+    [agentId, queuedMessages, queueWriter],
   );
 
   const handleSendQueuedNow = useCallback(
@@ -2434,23 +2332,18 @@ function ComposerContentImpl({
   );
 
   const queueList = useMemo(
-    () =>
-      renderQueueTrack({
-        queuedMessages,
-        handleEditQueuedMessage,
-        handleMoveQueuedMessageToFront,
-        handleSendQueuedNow,
-        editLabel: t("composer.attachments.editQueuedMessage"),
-        moveToFrontLabel: t("composer.attachments.moveQueuedMessageToFront"),
-        sendNowLabel: t("composer.attachments.sendQueuedMessageNow"),
-      }),
-    [
-      handleEditQueuedMessage,
-      handleMoveQueuedMessageToFront,
-      handleSendQueuedNow,
-      queuedMessages,
-      t,
-    ],
+    () => (
+      <QueuedMessageList
+        queuedMessages={queuedMessages}
+        onEdit={handleEditQueuedMessage}
+        onReorder={handleReorderQueuedMessages}
+        onSendNow={handleSendQueuedNow}
+        editLabel={t("composer.attachments.editQueuedMessage")}
+        reorderLabel={t("composer.attachments.reorderQueuedMessage")}
+        sendNowLabel={t("composer.attachments.sendQueuedMessageNow")}
+      />
+    ),
+    [handleEditQueuedMessage, handleReorderQueuedMessages, handleSendQueuedNow, queuedMessages, t],
   );
 
   const autocompleteConfiguration = useMemo(
@@ -2727,43 +2620,6 @@ const styles = StyleSheet.create((theme: Theme) => ({
   buttonDisabled: {
     opacity: 0.5,
   },
-  queueTrack: {
-    flexDirection: "column",
-    gap: theme.spacing[2],
-  },
-  queueItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
-    backgroundColor: theme.colors.surface1,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
-    gap: theme.spacing[2],
-  },
-  queueText: {
-    flex: 1,
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-  },
-  queueActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-  },
-  queueActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.borderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.surface2,
-  },
-  queueSendButton: {
-    backgroundColor: theme.colors.accent,
-  },
   sendErrorText: {
     color: theme.colors.palette.red[500],
     fontSize: theme.fontSize.base,
@@ -2771,9 +2627,6 @@ const styles = StyleSheet.create((theme: Theme) => ({
 })) as unknown as Record<string, object>;
 
 const ThemedAttachmentSpinner = withUnistyles(LoadingSpinner);
-const ThemedPencil = withUnistyles(Pencil);
-const ThemedArrowUp = withUnistyles(ArrowUp);
-const ThemedArrowUpToLine = withUnistyles(ArrowUpToLine);
 const ThemedGitPullRequest = withUnistyles(GitPullRequest);
 const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedAudioLines = withUnistyles(AudioLines);
@@ -2783,7 +2636,6 @@ const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-const iconAccentForegroundMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
 
 function renderForgeAttachmentIcon(icon: string): ReactElement {
   return (

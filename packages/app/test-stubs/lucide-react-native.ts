@@ -53,6 +53,7 @@ export const GitPullRequest = StubIcon;
 export const GitPullRequestClosed = StubIcon;
 export const GitPullRequestDraft = StubIcon;
 export const Globe = StubIcon;
+export const GripVertical = StubIcon;
 export const Heart = StubIcon;
 export const History = StubIcon;
 export const Home = StubIcon;

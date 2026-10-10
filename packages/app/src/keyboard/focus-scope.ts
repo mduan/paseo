@@ -1,7 +1,26 @@
 import type { KeyboardFocusScope } from "@/keyboard/actions";
 
+const SORTABLE_KEY_CODES = new Set([
+  "Space",
+  "Enter",
+  "Tab",
+  "Escape",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+]);
+
 function isElement(value: unknown): value is Element {
   return typeof Element !== "undefined" && value instanceof Element;
+}
+
+export function isSortableKeyboardEvent(event: Pick<KeyboardEvent, "target" | "code">): boolean {
+  if (!isElement(event.target)) return false;
+  return (
+    SORTABLE_KEY_CODES.has(event.code) &&
+    Boolean(event.target.closest('[aria-roledescription="sortable"]'))
+  );
 }
 
 function getFocusCandidateElements(target: EventTarget | null): Element[] {

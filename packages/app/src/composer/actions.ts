@@ -290,23 +290,19 @@ export function editQueuedComposerMessage(
   };
 }
 
-export type MoveQueuedComposerMessageToFrontInput = Pick<
-  SendQueuedComposerMessageNowInput,
-  "agentId" | "messageId" | "queue"
->;
+export type ReorderQueuedComposerMessagesInput = Readonly<{
+  agentId: string;
+  messages: QueuedComposerMessage[];
+  expectedMessages: readonly QueuedComposerMessage[];
+  queue: QueueWriter;
+}>;
 
-export function moveQueuedComposerMessageToFront(
-  input: MoveQueuedComposerMessageToFrontInput,
-): void {
+export function reorderQueuedComposerMessages(input: ReorderQueuedComposerMessagesInput): void {
   input.queue.write((prev) => {
-    const messages = prev.get(input.agentId) ?? [];
-    const index = messages.findIndex((item) => item.id === input.messageId);
-    if (index <= 0) return prev;
-    const reordered = [...messages];
-    const [item] = reordered.splice(index, 1);
-    reordered.unshift(item);
+    // A send or edit can remove a message before React cancels the drag.
+    if (prev.get(input.agentId) !== input.expectedMessages) return prev;
     const next = new Map(prev);
-    next.set(input.agentId, reordered);
+    next.set(input.agentId, input.messages);
     return next;
   });
 }

@@ -160,7 +160,7 @@ export const ptBR: TranslationResources = {
       dropImagesHere: "Solte imagens aqui",
       dropFilesHere: "Solte arquivos aqui",
       editQueuedMessage: "Editar mensagem na fila",
-      moveQueuedMessageToFront: "Mover mensagem para o início da fila",
+      reorderQueuedMessage: "Reordenar mensagem na fila",
       sendQueuedMessageNow: "Enviar mensagem da fila agora",
       openImage: "Abrir anexo de imagem",
       removeImage: "Remover anexo de imagem",

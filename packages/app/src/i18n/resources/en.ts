@@ -155,7 +155,7 @@ export const en = {
       dropImagesHere: "Drop images here",
       dropFilesHere: "Drop files here",
       editQueuedMessage: "Edit queued message",
-      moveQueuedMessageToFront: "Move queued message to front",
+      reorderQueuedMessage: "Reorder queued message",
       sendQueuedMessageNow: "Send queued message now",
       openImage: "Open image attachment",
       removeImage: "Remove image attachment",

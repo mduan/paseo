@@ -25,7 +25,7 @@ import {
   editQueuedComposerMessage,
   findForgeItemByOption,
   isAttachmentSelectedForForgeItem,
-  moveQueuedComposerMessageToFront,
+  reorderQueuedComposerMessages,
   openComposerAttachment,
   pickAndPersistImages,
   queueComposerMessage,
@@ -792,8 +792,8 @@ describe("editQueuedComposerMessage", () => {
   });
 });
 
-describe("moveQueuedComposerMessageToFront", () => {
-  it("moves the selected message with its attachments, preserving the other queues and order", () => {
+describe("reorderQueuedComposerMessages", () => {
+  it("reorders messages with their attachments, preserving other queues", () => {
     const first = { id: "first", text: "first", attachments: [] };
     const second = { id: "second", text: "second", attachments: [] };
     const selected: QueuedComposerMessage = {
@@ -814,27 +814,65 @@ describe("moveQueuedComposerMessageToFront", () => {
     );
     const original = queue.state;
 
-    moveQueuedComposerMessageToFront({ agentId: "agent", messageId: selected.id, queue });
+    reorderQueuedComposerMessages({
+      agentId: "agent",
+      messages: [first, selected, last, second],
+      expectedMessages: queue.read("agent"),
+      queue,
+    });
 
-    expect(queue.state.get("agent")).toEqual([selected, first, second, last]);
-    expect(queue.state.get("agent")?.[0]).toBe(selected);
+    expect(queue.state.get("agent")).toEqual([first, selected, last, second]);
+    expect(queue.state.get("agent")?.[1]).toBe(selected);
     expect(queue.state.get("other-agent")).toBe(otherQueue);
     expect(original.get("agent")).toEqual([first, second, selected, last]);
   });
 
-  it.each([
-    { agentId: "agent", messageId: "first" },
-    { agentId: "agent", messageId: "missing" },
-    { agentId: "missing-agent", messageId: "first" },
-  ])("leaves the queue unchanged for $agentId/$messageId", ({ agentId, messageId }) => {
-    const queue = createFakeQueue(
-      new Map([["agent", [{ id: "first", text: "first", attachments: [] }]]]),
-    );
-    const original = queue.state;
+  it.each(["first", "second"])("discards a stale reorder when %s is sent", async (messageId) => {
+    const first = { id: "first", text: "first", attachments: [] };
+    const second = { id: "second", text: "second", attachments: [] };
+    const queue = createFakeQueue(new Map([["agent", [first, second]]]));
+    const expectedMessages = queue.read("agent");
+    const send = sendQueuedComposerMessageNow({
+      agentId: "agent",
+      messageId,
+      queue,
+      submitMessage: async () => {},
+    });
+    const afterSend = queue.state;
 
-    moveQueuedComposerMessageToFront({ agentId, messageId, queue });
+    reorderQueuedComposerMessages({
+      agentId: "agent",
+      messages: [second, first],
+      expectedMessages,
+      queue,
+    });
 
-    expect(queue.state).toBe(original);
+    expect(queue.state).toBe(afterSend);
+    expect(queue.read("agent").map((message) => message.id)).not.toContain(messageId);
+    await send;
+  });
+
+  it("preserves a message added while a reorder was in flight", () => {
+    const first = { id: "first", text: "first", attachments: [] };
+    const second = { id: "second", text: "second", attachments: [] };
+    const queue = createFakeQueue(new Map([["agent", [first, second]]]));
+    const expectedMessages = queue.read("agent");
+    queueComposerMessage({ agentId: "agent", text: "third", attachments: [], queue });
+    const afterAppend = queue.state;
+
+    reorderQueuedComposerMessages({
+      agentId: "agent",
+      messages: [second, first],
+      expectedMessages,
+      queue,
+    });
+
+    expect(queue.state).toBe(afterAppend);
+    expect(queue.read("agent").map((message) => message.text)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
   });
 });
 
