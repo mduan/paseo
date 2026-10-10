@@ -1,6 +1,6 @@
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { TitleSkeleton } from "@/components/ui/title-skeleton";
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -47,7 +47,6 @@ const needsInputColorMapping = (theme: Theme) => ({
   fill: getStatusDotColor({ theme, bucket: "needs_input" }) ?? undefined,
 });
 
-const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedCircleAlert = withUnistyles(CircleAlert);
 const ThemedMonitor = withUnistyles(Monitor);
 const ThemedFolder = withUnistyles(Folder);
@@ -170,11 +169,16 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
             {aiRenamePending ? (
-              <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
-            ) : null}
-            <Text style={workspaceBranchTextStyle} numberOfLines={1}>
-              {workspaceLabel}
-            </Text>
+              <View style={styles.workspaceTitlePlaceholder}>
+                <TitleSkeleton
+                  testID={`sidebar-workspace-title-loading-${workspace.workspaceKey}`}
+                />
+              </View>
+            ) : (
+              <Text style={workspaceBranchTextStyle} numberOfLines={1}>
+                {workspaceLabel}
+              </Text>
+            )}
             <View style={sidebarWorkspaceRowStyles.rowRight}>{children}</View>
           </View>
           <WorkspaceMetaRow
@@ -507,6 +511,12 @@ const styles = StyleSheet.create((theme) => ({
   workspaceContentColumn: {
     flex: 1,
     minWidth: 0,
+  },
+  workspaceTitlePlaceholder: {
+    flex: 1,
+    minWidth: 0,
+    height: 20,
+    justifyContent: "center",
   },
   workspaceTitleRow: {
     flexDirection: "row",

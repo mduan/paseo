@@ -1,3 +1,4 @@
+import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
 import { test, expect, type Page } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -70,6 +71,7 @@ test.describe("Sidebar workspace rename", () => {
       });
       await workspace.client.waitForFinish(first.id, 30_000);
       await workspace.client.waitForFinish(second.id, 30_000);
+      const gate = await installDaemonWebSocketGate(page);
       await page.goto(buildHostAgentDetailRoute(getServerId(), second.id, workspace.workspaceId));
       await waitForWorkspaceTabsVisible(page);
       const row = page.getByTestId(workspaceRowTestId(workspace.workspaceId));
@@ -87,7 +89,20 @@ test.describe("Sidebar workspace rename", () => {
         path: testInfo.outputPath("workspace-ai-menu.png"),
         animations: "disabled",
       });
+      gate.holdNextServerMessage("metadata.conversation_title.generate.response");
       await workspaceAi.click();
+      const workspaceLoading = page.getByTestId(
+        `sidebar-workspace-title-loading-${getServerId()}:${workspace.workspaceId}`,
+      );
+      await expect(workspaceLoading).toBeVisible();
+      await expect(row).not.toContainText("Original workspace");
+      await page.screenshot({
+        path: testInfo.outputPath("workspace-ai-loading.png"),
+        animations: "disabled",
+      });
+      await gate.waitForHeldServerMessage("metadata.conversation_title.generate.response");
+      gate.releaseHeldServerMessage("metadata.conversation_title.generate.response");
+      await expect(workspaceLoading).toHaveCount(0);
       await expect(row).toContainText("Fix payment retries", { timeout: 30_000 });
       const tab = page.getByTestId(`workspace-tab-agent_${second.id}`).first();
       await tab.click({ button: "right" });
