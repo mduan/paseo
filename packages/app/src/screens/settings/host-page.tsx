@@ -961,7 +961,7 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
   }
 
   return (
-    <View style={settingsStyles.card} testID="host-page-update-card">
+    <View style={[settingsStyles.card, settingsStyles.section]} testID="host-page-update-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>{t("settings.host.daemon.update.title")}</Text>
@@ -981,25 +981,29 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
         </Button>
       </View>
       {updateState.status === "complete" ? (
-        <InlineAlert
-          size="sm"
-          variant="success"
-          title={t("desktop.daemon.lifecycle.workerUpdated", {
-            version: updateState.workerVersion,
-          })}
-          description={t("desktop.daemon.lifecycle.supervisorRefresh")}
-        />
+        <View style={styles.updateFeedback}>
+          <InlineAlert
+            size="sm"
+            variant="success"
+            title={t("desktop.daemon.lifecycle.workerUpdated", {
+              version: updateState.workerVersion,
+            })}
+            description={t("desktop.daemon.lifecycle.supervisorRefresh")}
+          />
+        </View>
       ) : null}
       {updateState.status === "installedOverSsh" ? (
-        <InlineAlert
-          size="sm"
-          variant="success"
-          title={t("settings.host.daemon.update.ssh.completeTitle")}
-          description={t("settings.host.daemon.update.ssh.completeDescription")}
-        />
+        <View style={styles.updateFeedback}>
+          <InlineAlert
+            size="sm"
+            variant="success"
+            title={t("settings.host.daemon.update.ssh.completeTitle")}
+            description={t("settings.host.daemon.update.ssh.completeDescription")}
+          />
+        </View>
       ) : null}
       {updateState.status === "failed" ? (
-        <View style={styles.updateFailure}>
+        <View style={styles.updateFeedback}>
           <InlineAlert
             size="sm"
             variant="error"
@@ -1853,7 +1857,7 @@ const terminalProfileStyles = StyleSheet.create((theme) => ({
 }));
 
 const styles = StyleSheet.create((theme) => ({
-  updateFailure: {
+  updateFeedback: {
     marginHorizontal: theme.spacing[4],
     marginBottom: theme.spacing[4],
   },
