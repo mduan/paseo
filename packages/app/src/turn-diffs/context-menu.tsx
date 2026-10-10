@@ -30,6 +30,7 @@ const explorerIcon = <ThemedExplorer size={16} uniProps={mutedColorMapping} />;
 
 type TurnDiffContextMenuProps = PropsWithChildren<{
   turnId: string;
+  focusPath?: string;
   onOpen?: (input: OpenTurnDiffInput) => void;
 }>;
 
@@ -45,7 +46,7 @@ export function TurnDiffContextMenu({ children, ...props }: TurnDiffContextMenuP
   );
 }
 
-function TurnDiffMenuContent({ turnId, onOpen }: TurnDiffContextMenuProps) {
+function TurnDiffMenuContent({ turnId, focusPath, onOpen }: TurnDiffContextMenuProps) {
   const { t } = useTranslation();
   const pane = usePaneContext();
   const isCompact = useIsCompactFormFactor();
@@ -70,7 +71,7 @@ function TurnDiffMenuContent({ turnId, onOpen }: TurnDiffContextMenuProps) {
     axis: FilePaneAxis.Vertical,
   });
   function openAt(destination: TurnDiffOpenLocation) {
-    onOpen?.({ turnId, destination });
+    onOpen?.({ turnId, focusPath, destination });
   }
   const openMain = useStableEvent(() => openAt(TurnDiffOpenLocation.Main));
   const openHorizontal = useStableEvent(() => openAt(TurnDiffOpenLocation.Horizontal));

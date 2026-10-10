@@ -2345,3 +2345,92 @@ test("turn diff card remembers pane-relative opens across projects and reloads",
     await first.cleanup();
   }
 });
+
+test("turn diff file menus retain hover and scroll every open destination to the file", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1800, height: 1000 });
+  const workspace = await seedRunningMockAgentWorkspace({
+    repoPrefix: "turn-diff-file-context-",
+    title: "Turn diff file context",
+    initialPrompt: "Record changes for file context menus",
+  });
+  try {
+    await writeFile(path.join(workspace.cwd, "first.txt"), "first file line\n".repeat(200));
+    await writeFile(path.join(workspace.cwd, "second.txt"), "second file\n");
+    await workspace.client.waitForFinish(workspace.agentId, 15_000);
+    await expect
+      .poll(async () => (await workspace.client.listAgentTurnDiffs(workspace.agentId)).length)
+      .toBe(1);
+    await openAgentRoute(page, workspace);
+    const agentTab = page.getByTestId(`workspace-tab-agent_${workspace.agentId}`);
+    const card = page.getByTestId("turn-diff-card").filter({ visible: true });
+    const row = card.getByTestId("turn-diff-file").filter({ hasText: "second.txt" });
+    const otherRow = card.getByTestId("turn-diff-file").filter({ hasText: "first.txt" });
+    const diffTab = page.locator(
+      '[data-testid^="workspace-tab-turn_diff_"], [data-testid^="explorer-sidebar-tab-turn_diff_"]',
+    );
+    const diffPane = page
+      .locator('[data-testid^="workspace-pane-"], [data-testid="workspace-explorer-sidebar"]')
+      .filter({ has: diffTab });
+    await expect(row).toBeVisible();
+    await page.mouse.move(1, 1);
+    const idleColor = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await row.hover();
+    await expect(row).not.toHaveCSS("background-color", idleColor);
+    const hoverColor = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(hoverColor).not.toBe(idleColor);
+    await row.click({ button: "right", position: { x: 20, y: 10 } });
+    await page.getByTestId("turn-diff-open-explorer").hover();
+    await expect(row).toHaveCSS("background-color", hoverColor);
+    await expect(otherRow).toHaveCSS("background-color", idleColor);
+    await expect(row).toHaveCSS("cursor", "pointer");
+    const rowBounds = await row.boundingBox();
+    if (!rowBounds) throw new Error("Turn diff file row has no bounds");
+    const cursor = await page.evaluate(
+      ({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        return target ? getComputedStyle(target).cursor : undefined;
+      },
+      { x: rowBounds.x + rowBounds.width - 5, y: rowBounds.y + rowBounds.height / 2 },
+    );
+    expect(cursor).toBe("pointer");
+    await page.keyboard.press("Escape");
+    await page.mouse.move(1, 1);
+    await expect(row).toHaveCSS("background-color", idleColor);
+
+    await card.click({ button: "right", position: { x: 5, y: 5 } });
+    await page.getByTestId("turn-diff-open-explorer").click();
+    const scroller = diffPane.getByTestId("git-diff-scroll");
+    await expect(scroller).toBeVisible();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
+    await agentTab.click();
+
+    for (const destination of [
+      "turn-diff-open-horizontal",
+      "turn-diff-open-vertical",
+      "turn-diff-open-explorer",
+      "turn-diff-open",
+    ]) {
+      await row.click({ button: "right", position: { x: 20, y: 10 } });
+      await page.getByTestId(destination).hover();
+      await expect(row).toHaveCSS("background-color", hoverColor);
+      await page.getByTestId(destination).click();
+      const header = diffHeaderForPath(diffPane, "second.txt");
+      await expect(header).toBeVisible();
+      await expect
+        .poll(() => scroller.evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(300);
+      await scroller.evaluate((element) => {
+        element.scrollTop = 0;
+        element.dispatchEvent(new Event("scroll", { bubbles: false }));
+      });
+      await agentTab.click();
+      await page.mouse.move(1, 1);
+      await expect(row).toHaveCSS("background-color", idleColor);
+    }
+  } finally {
+    await workspace.cleanup();
+  }
+});

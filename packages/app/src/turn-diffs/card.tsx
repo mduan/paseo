@@ -6,6 +6,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TurnDiffFileStat, TurnDiffSummary } from "@getpaseo/protocol/messages";
 import { Button } from "@/components/ui/button";
 import { DiffStat } from "@/components/diff-stat";
+import { useContextMenu } from "@/components/ui/context-menu";
 import type { TurnDiffOpenLocation } from "@/hooks/use-settings/storage";
 import { TurnDiffContextMenu } from "./context-menu";
 import type { Theme } from "@/styles/theme";
@@ -106,7 +107,14 @@ const TurnDiffCard = memo(function TurnDiffCard({
         </View>
         {showFileList
           ? visibleFiles.map((file) => (
-              <TurnDiffFileRow key={file.path} file={file} turnId={turnId} onOpen={onOpen} />
+              <TurnDiffContextMenu
+                key={file.path}
+                turnId={turnId}
+                focusPath={file.path}
+                onOpen={onOpen}
+              >
+                <TurnDiffFileRow file={file} turnId={turnId} onOpen={onOpen} />
+              </TurnDiffContextMenu>
             ))
           : null}
         {showFileList && hiddenCount > 0 ? (
@@ -138,6 +146,7 @@ function TurnDiffFileRow({
   turnId: string;
   onOpen?: (input: OpenTurnDiffInput) => void;
 }) {
+  const { open: menuOpen } = useContextMenu();
   const { directory, name } = splitPath(file.path);
   const handlePress = useCallback(
     () => onOpen?.({ turnId, focusPath: file.path }),
@@ -146,9 +155,9 @@ function TurnDiffFileRow({
   const rowStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
-      onOpen && (hovered || pressed) && styles.rowHovered,
+      onOpen && (hovered || pressed || menuOpen) && styles.rowHovered,
     ],
-    [onOpen],
+    [menuOpen, onOpen],
   );
   return (
     <Pressable
