@@ -189,6 +189,45 @@ test.describe("CodeMirror workspace file editing", () => {
     });
   }
 
+  test("copies and reveals a chat folder link without enabling file pane actions", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const workspace = await seedWorkspace({ repoPrefix: "file-link-folder-" });
+    const directory = path.join(workspace.repoPath, "release");
+    try {
+      await mkdir(directory);
+      const agent = await workspace.client.createAgent({
+        provider: "mock",
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Folder link",
+        modeId: "load-test",
+        model: "e2e-fast-stream",
+        initialPrompt: "Show the folder link",
+        featureValues: { mockAssistantResponse: `[Release folder](${directory}/)` },
+      });
+      await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: agent.id });
+      const link = page.getByRole("link", { name: "Release folder", exact: true }).first();
+      await expect(link).toBeVisible({ timeout: 15_000 });
+      await link.click({ button: "right" });
+      await expect(page.getByTestId("assistant-file-link-open-horizontal")).toBeDisabled();
+      await expect(page.getByTestId("assistant-file-link-open-vertical")).toBeDisabled();
+      await expect(page.getByTestId("assistant-file-link-copy-path")).toBeEnabled();
+      await expect(page.getByTestId("assistant-file-link-reveal")).toBeEnabled();
+      await page.getByTestId("assistant-file-link-copy-path").click();
+      await expect.poll(() => page.evaluate(readClipboardText)).toBe("release");
+      await link.click({ button: "right" });
+      await page.getByTestId("assistant-file-link-reveal").click();
+      const tree = page.getByTestId("file-explorer-tree-scroll");
+      await expect(tree).toBeVisible();
+      await expect(tree.getByText("release", { exact: true })).toBeVisible();
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   test("shows an absolute POSIX assistant file link relative to the workspace on hover", async ({
     page,
   }) => {

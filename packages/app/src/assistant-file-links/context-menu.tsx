@@ -73,7 +73,9 @@ function FileLinkMenuContent({
     serverId: pane.serverId,
     workspaceRoot: workspaceRoot ?? "",
   });
-  const path = target ? normalizeInlinePathTarget(target.path, workspaceRoot)?.file : undefined;
+  const normalized = target ? normalizeInlinePathTarget(target.path, workspaceRoot) : undefined;
+  const filePath = normalized?.file;
+  const path = filePath ?? normalized?.directory;
   const workspaceKey = buildWorkspaceTabPersistenceKey({
     serverId: pane.serverId,
     workspaceId: pane.workspaceId,
@@ -97,9 +99,9 @@ function FileLinkMenuContent({
     axis: FilePaneAxis.Vertical,
   });
   function openInPane(axis: FilePaneAxis) {
-    if (!target || !path) return;
+    if (!target || !filePath) return;
     pane.openFileInWorkspace({
-      location: { path, lineStart: target.lineStart, lineEnd: target.lineEnd },
+      location: { path: filePath, lineStart: target.lineStart, lineEnd: target.lineEnd },
       disposition: "main",
       paneAxis: axis,
     });
@@ -124,7 +126,7 @@ function FileLinkMenuContent({
         <>
           <ContextMenuItem
             leading={horizontalIcon}
-            disabled={!path || !horizontal}
+            disabled={!filePath || !horizontal}
             onSelect={openHorizontal}
             testID="assistant-file-link-open-horizontal"
           >
@@ -132,7 +134,7 @@ function FileLinkMenuContent({
           </ContextMenuItem>
           <ContextMenuItem
             leading={verticalIcon}
-            disabled={!path || !vertical}
+            disabled={!filePath || !vertical}
             onSelect={openVertical}
             testID="assistant-file-link-open-vertical"
           >
