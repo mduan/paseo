@@ -13,6 +13,7 @@ import { join, basename, dirname, isAbsolute, resolve, sep } from "path";
 import net from "node:net";
 import { createHash } from "node:crypto";
 import stripAnsi from "strip-ansi";
+import pLimit from "p-limit";
 import {
   buildStringCommandShellInvocation,
   createStringCommandShellEnv,
@@ -49,6 +50,8 @@ import { terminateWithTreeKill } from "./tree-kill.js";
 export { slugify, validateBranchSlug } from "@getpaseo/protocol/branch-slug";
 
 const execFileAsync = promisify(execFile);
+// shortcut: queued deletions are lost on daemon restart; persist cleanup intent when recovery is required.
+const worktreeDeletionLimit = pLimit(1);
 const READ_ONLY_GIT_ENV = {
   GIT_OPTIONAL_LOCKS: "0",
 } as const;
@@ -683,14 +686,16 @@ export async function runWorktreeSetupCommands(options: {
 
     if (result.exitCode !== 0) {
       if (options.cleanupOnFailure) {
-        try {
-          await runGitCommand(["worktree", "remove", options.worktreePath, "--force"], {
-            cwd: options.worktreePath,
-            timeout: 120_000,
-          });
-        } catch {
-          rmSync(options.worktreePath, { recursive: true, force: true });
-        }
+        await worktreeDeletionLimit(async () => {
+          try {
+            await runGitCommand(["worktree", "remove", options.worktreePath, "--force"], {
+              cwd: options.worktreePath,
+              timeout: 120_000,
+            });
+          } catch {
+            rmSync(options.worktreePath, { recursive: true, force: true });
+          }
+        });
       }
       throw new WorktreeSetupError(
         `Worktree setup command failed: ${cmd}\n${result.stderr}`.trim(),
@@ -1073,6 +1078,7 @@ export interface DeletePaseoWorktreeOptions {
   worktreesRoot?: string;
   paseoHome?: string;
   worktreesBaseRoot?: string;
+  assertDeletionAllowed?: () => Promise<void>;
 }
 
 export async function deletePaseoWorktree({
@@ -1083,6 +1089,7 @@ export async function deletePaseoWorktree({
   worktreesRoot,
   paseoHome,
   worktreesBaseRoot,
+  assertDeletionAllowed,
 }: DeletePaseoWorktreeOptions): Promise<void> {
   if (!worktreePath && !worktreeSlug) {
     throw new Error("worktreePath or worktreeSlug is required");
@@ -1117,38 +1124,41 @@ export async function deletePaseoWorktree({
     throw new Error("Refusing to delete non-Paseo worktree");
   }
 
-  if (await pathExists(resolvedWorktree)) {
-    for (const teardownCwd of teardownCwds ?? [resolvedWorktree]) {
-      await runWorktreeTeardownCommands({
-        worktreePath: resolvedWorktree,
-        teardownCwd,
-      });
+  await worktreeDeletionLimit(async () => {
+    await assertDeletionAllowed?.();
+    if (await pathExists(resolvedWorktree)) {
+      for (const teardownCwd of teardownCwds ?? [resolvedWorktree]) {
+        await runWorktreeTeardownCommands({
+          worktreePath: resolvedWorktree,
+          teardownCwd,
+        });
+      }
     }
-  }
 
-  if (cwd) {
-    try {
-      await runGitCommand(["worktree", "remove", resolvedWorktree, "--force"], {
-        cwd,
-        timeout: 120_000,
-      });
-    } catch {
-      // `git worktree remove` fails if the admin dir is already gone (e.g. a
-      // prior archive attempt removed it before the working tree could be
-      // fully cleaned up), or if the repo root has moved. Fall through to the
-      // rm retry loop below so the operation stays idempotent.
+    if (cwd) {
+      try {
+        await runGitCommand(["worktree", "remove", resolvedWorktree, "--force"], {
+          cwd,
+          timeout: 120_000,
+        });
+      } catch {
+        // `git worktree remove` fails if the admin dir is already gone (e.g. a
+        // prior archive attempt removed it before the working tree could be
+        // fully cleaned up), or if the repo root has moved. Fall through to the
+        // rm retry loop below so the operation stays idempotent.
+      }
     }
-  }
 
-  await removeDirectoryWithRetries(resolvedWorktree);
+    await removeDirectoryWithRetries(resolvedWorktree);
 
-  if (cwd) {
-    try {
-      await runGitCommand(["worktree", "prune"], { cwd, timeout: 30_000 });
-    } catch {
-      // not critical; git will prune lazily
+    if (cwd) {
+      try {
+        await runGitCommand(["worktree", "prune"], { cwd, timeout: 30_000 });
+      } catch {
+        // not critical; git will prune lazily
+      }
     }
-  }
+  });
 }
 
 export async function rollbackCreatedPaseoWorktree(

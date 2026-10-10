@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as gitCommands from "./run-git-command";
 import {
   createWorktree as createWorktreePrimitive,
   deriveWorktreeProjectHash,
   deletePaseoWorktree,
   isPaseoOwnedWorktreeCwd,
   mapWorkspaceCwdToWorktree,
+  runWorktreeSetupCommands,
   slugify,
   type CreateWorktreeOptions,
   type WorktreeConfig,
@@ -90,6 +92,7 @@ describe("paseo worktree manager", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -253,6 +256,147 @@ describe("paseo worktree manager", () => {
     await expect(
       deletePaseoWorktree({ cwd: repoDir, worktreePath: created.worktreePath, paseoHome }),
     ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    { outcome: "success", error: undefined, expected: { status: "fulfilled", value: undefined } },
+    {
+      outcome: "failure",
+      error: new Error("Deletion is blocked"),
+      expected: { status: "rejected", reason: new Error("Deletion is blocked") },
+    },
+  ])(
+    "queues worktree deletion until the previous $outcome settles",
+    async ({ error, expected }) => {
+      const first = await createLegacyWorktreeForTest({
+        branchName: "queue-first",
+        cwd: repoDir,
+        baseBranch: "main",
+        worktreeSlug: "queue-first",
+        paseoHome,
+      });
+      const second = await createLegacyWorktreeForTest({
+        branchName: "queue-second",
+        cwd: repoDir,
+        baseBranch: "main",
+        worktreeSlug: "queue-second",
+        paseoHome,
+      });
+      const firstStarted = Promise.withResolvers<void>();
+      const releaseFirst = Promise.withResolvers<void>();
+      const secondValidated = Promise.withResolvers<void>();
+      const started: string[] = [];
+      const runGitCommand = gitCommands.runGitCommand;
+      vi.spyOn(gitCommands, "runGitCommand").mockImplementation(async (args, options) => {
+        const result = await runGitCommand(args, options);
+        if (options.cwd === second.worktreePath && args.includes("--git-common-dir")) {
+          secondValidated.resolve();
+        }
+        return result;
+      });
+      const firstDeletion = deletePaseoWorktree({
+        cwd: repoDir,
+        worktreePath: first.worktreePath,
+        paseoHome,
+        assertDeletionAllowed: async () => {
+          started.push("first");
+          firstStarted.resolve();
+          await releaseFirst.promise;
+          if (error) throw error;
+        },
+      });
+      await firstStarted.promise;
+      const secondDeletion = deletePaseoWorktree({
+        cwd: repoDir,
+        worktreePath: second.worktreePath,
+        paseoHome,
+        assertDeletionAllowed: async () => {
+          started.push("second");
+          expect(existsSync(first.worktreePath)).toBe(Boolean(error));
+        },
+      });
+      const results = Promise.allSettled([firstDeletion, secondDeletion]);
+      try {
+        await secondValidated.promise;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(started).toEqual(["first"]);
+        expect(existsSync(second.worktreePath)).toBe(true);
+      } finally {
+        releaseFirst.resolve();
+        await results;
+      }
+      expect(await results).toEqual([expected, { status: "fulfilled", value: undefined }]);
+      expect(started).toEqual(["first", "second"]);
+      expect(existsSync(second.worktreePath)).toBe(false);
+    },
+  );
+
+  it("queues failed-setup cleanup behind an active worktree deletion", async () => {
+    writeFileSync(
+      join(repoDir, "paseo.json"),
+      JSON.stringify({ worktree: { setup: ['node -e "process.exit(9)"'] } }),
+    );
+    execFileSync("git", ["add", "paseo.json"], { cwd: repoDir });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "failing setup"], {
+      cwd: repoDir,
+    });
+    const first = await createLegacyWorktreeForTest({
+      branchName: "setup-queue-first",
+      cwd: repoDir,
+      baseBranch: "main",
+      worktreeSlug: "setup-queue-first",
+      runSetup: false,
+      paseoHome,
+    });
+    const second = await createLegacyWorktreeForTest({
+      branchName: "setup-queue-second",
+      cwd: repoDir,
+      baseBranch: "main",
+      worktreeSlug: "setup-queue-second",
+      runSetup: false,
+      paseoHome,
+    });
+    const firstStarted = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const setupFailed = Promise.withResolvers<void>();
+    const removedPaths: string[] = [];
+    const runGitCommand = gitCommands.runGitCommand;
+    vi.spyOn(gitCommands, "runGitCommand").mockImplementation((args, options) => {
+      if (args[0] === "worktree" && args[1] === "remove") removedPaths.push(args[2]!);
+      return runGitCommand(args, options);
+    });
+    const deletion = deletePaseoWorktree({
+      cwd: repoDir,
+      worktreePath: first.worktreePath,
+      paseoHome,
+      assertDeletionAllowed: async () => {
+        firstStarted.resolve();
+        await releaseFirst.promise;
+      },
+    });
+    await firstStarted.promise;
+    const setup = runWorktreeSetupCommands({
+      worktreePath: second.worktreePath,
+      branchName: second.branchName,
+      cleanupOnFailure: true,
+      onEvent: (event) => {
+        if (event.type === "command_completed") setupFailed.resolve();
+      },
+    });
+    const results = Promise.allSettled([deletion, setup]);
+    try {
+      await setupFailed.promise;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(removedPaths).toEqual([]);
+      expect(existsSync(second.worktreePath)).toBe(true);
+    } finally {
+      releaseFirst.resolve();
+      await results;
+    }
+    await expect(setup).rejects.toThrow("Worktree setup command failed");
+    expect(removedPaths).toEqual([first.worktreePath, second.worktreePath]);
+    expect(existsSync(first.worktreePath)).toBe(false);
+    expect(existsSync(second.worktreePath)).toBe(false);
   });
 
   it("deletes a worktree when the parent repo root is not available", async () => {
