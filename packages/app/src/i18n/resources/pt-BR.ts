@@ -440,6 +440,7 @@ export const ptBR: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "Abrir na barra lateral do explorador",
       open: "Abrir",
       right: "Abrir no painel direito",
       left: "Abrir no painel esquerdo",

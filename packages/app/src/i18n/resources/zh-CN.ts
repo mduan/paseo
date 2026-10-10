@@ -436,6 +436,7 @@ export const zhCN: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "在资源管理器侧栏中打开",
       open: "打开",
       right: "在右侧窗格中打开",
       left: "在左侧窗格中打开",

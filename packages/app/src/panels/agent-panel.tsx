@@ -85,7 +85,7 @@ import {
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { openTurnDiff, openWorkspaceChanges } from "@/workspace-tabs/open-supporting-view";
-import { useSettings } from "@/hooks/use-settings";
+import { persistAppSettings, useSettings } from "@/hooks/use-settings";
 import type { Theme } from "@/styles/theme";
 import type { PendingPermission } from "@/types/shared";
 import type { StreamItem, TodoEntry } from "@/types/stream";
@@ -1397,9 +1397,15 @@ const AgentStreamSection = memo(function AgentStreamSection({
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
   const turnDiffOpenLocation = useSettings((settings) => settings.turnDiffOpenLocation);
+  const { tabId: sourceTabId } = usePaneContext();
   const handleOpenTurnDiff = useCallback(
-    ({ turnId, focusPath }: OpenTurnDiffInput) => {
+    ({ turnId, focusPath, destination }: OpenTurnDiffInput) => {
       if (!agentId) return;
+      if (destination) {
+        void persistAppSettings({ turnDiffOpenLocation: destination }).catch((error) => {
+          toast.error(String(error));
+        });
+      }
       const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
       const tabId = openTurnDiff({
         isCompact: isCompactFormFactor,
@@ -1410,11 +1416,12 @@ const AgentStreamSection = memo(function AgentStreamSection({
           turnId,
           ...(focusPath ? { focusPath, focusRequestId: Date.now() } : {}),
         },
-        destination: turnDiffOpenLocation,
+        destination: destination ?? turnDiffOpenLocation,
+        sourceTabId,
       });
       if (tabId && workspaceKey) useWorkspaceLayoutStore.getState().focusTab(workspaceKey, tabId);
     },
-    [agentId, isCompactFormFactor, serverId, turnDiffOpenLocation, workspaceId],
+    [agentId, isCompactFormFactor, serverId, sourceTabId, toast, turnDiffOpenLocation, workspaceId],
   );
   const hasWorkspaceDiffStat = useWorkspaceHasDiffStat(serverId, workspaceId);
   const hasVisibleComposerTracks =

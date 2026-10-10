@@ -436,6 +436,7 @@ export const ar: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "فتح في الشريط الجانبي للمستكشف",
       open: "فتح",
       right: "فتح في اللوحة اليمنى",
       left: "فتح في اللوحة اليسرى",

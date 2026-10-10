@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { TurnDiffOpenLocation } from "@/hooks/use-settings/storage";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, SettingsCard, SettingsSelect } from "@/components/settings";
 import {
@@ -24,7 +25,7 @@ const SERVICE_URL_LABEL_KEYS: Record<ServiceUrlBehavior, string> = {
   external: "settings.general.serviceUrls.options.external",
 };
 
-type OpenLocationSource = keyof OpenInSidePanePreferences | "pullRequests" | "turnDiffs";
+type OpenLocationSource = keyof OpenInSidePanePreferences | "pullRequests";
 
 function OpenLocationRow({
   source,
@@ -87,14 +88,24 @@ function ServiceUrlRow() {
 export function OpenLocationSection() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
+  const turnDiffOptions = useMemo(
+    () =>
+      Object.values(TurnDiffOpenLocation).map((value) => ({
+        value,
+        label: t(`settings.layout.openInSidePane.destinations.${value}`),
+      })),
+    [t],
+  );
+  const changeTurnDiffLocation = useCallback(
+    (turnDiffOpenLocation: TurnDiffOpenLocation) => {
+      void updateSettings({ turnDiffOpenLocation });
+    },
+    [updateSettings],
+  );
   const handleDestinationChange = useCallback(
     (source: OpenLocationSource, destination: PullRequestOpenLocation) => {
       if (source === "pullRequests") {
         void updateSettings({ pullRequestOpenLocation: destination });
-        return;
-      }
-      if (source === "turnDiffs") {
-        void updateSettings({ turnDiffOpenLocation: destination });
         return;
       }
       void updateSettings({
@@ -120,11 +131,11 @@ export function OpenLocationSection() {
           allowExplorer
           onDestinationChange={handleDestinationChange}
         />
-        <OpenLocationRow
-          source="turnDiffs"
-          destination={settings.turnDiffOpenLocation}
-          allowExplorer
-          onDestinationChange={handleDestinationChange}
+        <SettingsSelect
+          label={t("settings.layout.openInSidePane.sources.turnDiffs.label")}
+          value={settings.turnDiffOpenLocation}
+          options={turnDiffOptions}
+          onValueChange={changeTurnDiffLocation}
         />
         <ServiceUrlRow />
       </SettingsCard>

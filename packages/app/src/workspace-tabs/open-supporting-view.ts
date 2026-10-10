@@ -8,6 +8,8 @@ import {
   useWorkspaceLayoutStore,
 } from "@/stores/workspace-layout-store";
 import type { OpenInSidePanePreferences, PullRequestOpenLocation } from "@/hooks/use-settings";
+import { TurnDiffOpenLocation } from "@/hooks/use-settings/storage";
+import { FilePaneAxis } from "@/workspace/file-open/pane";
 import type { ExplorerCheckoutContext } from "@/stores/explorer-checkout-context";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import {
@@ -19,6 +21,7 @@ import {
 import {
   openPreferredWorkspaceTarget,
   openWorkspaceTargetAtLocation,
+  openWorkspaceTargetInAdjacentPane,
 } from "@/workspace-tabs/open-beside";
 
 interface WorkspaceViewInput {
@@ -83,10 +86,39 @@ export function openTurnDiff(input: {
   isCompact: boolean;
   workspaceKey: string | null;
   target: Extract<WorkspaceTabTarget, { kind: "turn_diff" }>;
-  destination: PullRequestOpenLocation;
+  destination: TurnDiffOpenLocation;
+  sourceTabId: string;
 }): string | null {
-  if (input.destination === "explorer" && !usesCompactExplorerSidebar(input)) {
-    if (!input.workspaceKey) return null;
+  if (!input.workspaceKey) return null;
+  const isDesktop = !usesCompactExplorerSidebar(input);
+  const isAdjacent =
+    input.destination === TurnDiffOpenLocation.Horizontal ||
+    input.destination === TurnDiffOpenLocation.Vertical;
+  if (isDesktop && isAdjacent) {
+    return openWorkspaceTargetInAdjacentPane({
+      workspaceKey: input.workspaceKey,
+      target: input.target,
+      parentTabId: input.sourceTabId,
+      axis:
+        input.destination === TurnDiffOpenLocation.Horizontal
+          ? FilePaneAxis.Horizontal
+          : FilePaneAxis.Vertical,
+    });
+  }
+  if (isDesktop && input.destination === TurnDiffOpenLocation.Main) {
+    const store = useWorkspaceLayoutStore.getState();
+    const layout = store.layoutByWorkspace[input.workspaceKey];
+    const pane = layout && findPaneContainingTab(layout.root, input.sourceTabId);
+    if (!pane) return null;
+    return store.openTab({
+      workspaceKey: input.workspaceKey,
+      target: input.target,
+      parentTabId: input.sourceTabId,
+      intent: "reveal",
+      placement: { mode: "pane", paneId: pane.id },
+    });
+  }
+  if (input.destination === TurnDiffOpenLocation.Explorer && isDesktop) {
     const store = useWorkspaceLayoutStore.getState();
     const paneId = store.showExplorerSidebar(input.workspaceKey);
     return store.openTab({

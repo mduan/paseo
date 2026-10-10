@@ -441,6 +441,7 @@ export const es: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "Abrir en la barra lateral del explorador",
       open: "Abrir",
       right: "Abrir en el panel derecho",
       left: "Abrir en el panel izquierdo",

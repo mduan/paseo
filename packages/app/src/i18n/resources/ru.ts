@@ -440,6 +440,7 @@ export const ru: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "Открыть в боковой панели проводника",
       open: "Открыть",
       right: "Открыть в правой панели",
       left: "Открыть в левой панели",

@@ -61,6 +61,7 @@ import {
   openPreferredWorkspacePreview,
   openPreferredWorkspaceTarget,
   openWorkspaceTargetBeside,
+  openWorkspaceTargetInAdjacentPane,
 } from "@/workspace-tabs/open-beside";
 import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
 import { type ExplorerCheckoutContext } from "@/stores/explorer-checkout-context";
@@ -172,7 +173,6 @@ import {
   workspaceAgentVisibilityEqual,
 } from "@/workspace-tabs/agent-visibility";
 import { deriveWorkspacePaneState } from "@/screens/workspace/workspace-pane-state";
-import { resolveFilePanePlacement } from "@/workspace/file-open/pane";
 import {
   buildWorkspacePaneContentModel,
   WorkspacePaneContent,
@@ -2284,24 +2284,11 @@ function WorkspaceScreenContent({
     const target = createWorkspaceFileTabTarget(location);
     let tabId: string | null;
     if (request.paneAxis && canRenderDesktopPaneSplits) {
-      const store = useWorkspaceLayoutStore.getState();
-      const placement = resolveFilePanePlacement({
-        layout: store.layoutByWorkspace[persistenceKey],
-        sourceTabId: parentTabId,
-        explorerPaneId: store.explorerSidebarPaneIdByWorkspace[persistenceKey],
+      tabId = openWorkspaceTargetInAdjacentPane({
+        workspaceKey: persistenceKey,
+        target,
+        parentTabId,
         axis: request.paneAxis,
-      });
-      if (!placement) return;
-      const destinationPaneId =
-        placement.paneId ??
-        store.splitPaneEmpty(persistenceKey, {
-          targetPaneId: placement.sourcePaneId,
-          position: placement.position,
-        });
-      if (!destinationPaneId) return;
-      tabId = revealWorkspaceChildTab(persistenceKey, target, parentTabId, {
-        mode: "pane",
-        paneId: destinationPaneId,
       });
     } else if (request.disposition === "side") {
       tabId = openWorkspaceTargetBeside({ workspaceKey: persistenceKey, target, parentTabId });

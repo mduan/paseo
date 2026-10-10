@@ -4,6 +4,7 @@ import path from "node:path";
 import { type Locator, type Page } from "@playwright/test";
 import { buildHostWorkspaceRoute, buildSettingsSectionRoute } from "../../src/utils/host-routes";
 import { test, expect } from "../support/fixtures";
+import { openAgentRoute, seedRunningMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { getServerId } from "../support/helpers/server-id";
 import { connectSeedClient } from "../support/helpers/seed-client";
@@ -2235,3 +2236,112 @@ async function scrollToLowerUnwrappedDiffRows(page: Page): Promise<void> {
   });
   await expect(page.getByTestId("git-diff-canvas")).toBeVisible();
 }
+
+test("turn diff card remembers pane-relative opens across projects and reloads", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
+  });
+  const first = await seedRunningMockAgentWorkspace({
+    repoPrefix: "turn-diff-panes-",
+    title: "Turn diff panes",
+    initialPrompt: "Record changes for the pane test",
+  });
+  try {
+    await writeFile(path.join(first.cwd, "first.txt"), "first file\n");
+    await writeFile(path.join(first.cwd, "second.txt"), "second file\n");
+    await first.client.waitForFinish(first.agentId, 15_000);
+    await expect
+      .poll(async () => (await first.client.listAgentTurnDiffs(first.agentId)).length)
+      .toBe(1);
+    await openAgentRoute(page, first);
+    const agentTab = page.getByTestId(`workspace-tab-agent_${first.agentId}`);
+    const card = page.getByTestId("turn-diff-card").filter({ visible: true });
+    const diffTab = page.locator(
+      '[data-testid^="workspace-tab-turn_diff_"], [data-testid^="explorer-sidebar-tab-turn_diff_"]',
+    );
+    const diffPane = page
+      .locator('[data-testid^="workspace-pane-"], [data-testid="workspace-explorer-sidebar"]')
+      .filter({ has: diffTab });
+    await expect(card).toBeVisible();
+
+    await card.getByTestId("turn-diff-view-changes").click();
+    await expect(diffPane).toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+    await agentTab.click();
+    await card.click({ button: "right", position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("turn-diff-open-horizontal")).toHaveText("Open in right pane");
+    await expect(page.getByTestId("turn-diff-open-vertical")).toHaveText("Open in bottom pane");
+    await page.getByTestId("turn-diff-open-horizontal").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+    await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-pane-main");
+    const rightPaneId = await diffPane.getAttribute("data-testid");
+
+    await agentTab.click();
+    await card.getByTestId("turn-diff-file").filter({ hasText: "second.txt" }).click();
+    await expect(diffPane).toHaveAttribute("data-testid", rightPaneId!);
+    await expect(diffPane.locator('[data-diff-header-path="second.txt"]')).toBeVisible();
+
+    await agentTab.click();
+    await page.getByTestId("workspace-pane-main").getByTestId("workspace-new-tab-button").click();
+    await page.getByTestId("workspace-new-tab-menu-agent").click();
+    await agentTab.click();
+    await page.keyboard.press("Meta+Alt+Shift+ArrowRight");
+    const agentPane = page.locator('[data-testid^="workspace-pane-"]').filter({ has: agentTab });
+    await expect(agentPane).toHaveAttribute("data-testid", rightPaneId!);
+    await card.getByTestId("turn-diff-file").first().click({ button: "right" });
+    await expect(page.getByTestId("turn-diff-open-horizontal")).toHaveText("Open in left pane");
+    await page.getByTestId("turn-diff-open-vertical").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", rightPaneId!);
+    await agentTab.click();
+    await card.getByTestId("turn-diff-view-changes").click({ button: "right" });
+    await page.getByTestId("turn-diff-open").click();
+    await expect(diffPane).toHaveAttribute("data-testid", rightPaneId!);
+    await agentTab.click();
+    await card.click({ button: "right" });
+    await page.getByTestId("turn-diff-open-vertical").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", rightPaneId!);
+    const bottomPaneId = await diffPane.getAttribute("data-testid");
+    await agentTab.click();
+    await agentPane.getByTestId("workspace-new-tab-button").click();
+    await page.getByTestId("workspace-new-tab-menu-agent").click();
+    await agentTab.click();
+    await page.keyboard.press("Meta+Alt+Shift+ArrowDown");
+    await expect(agentPane).toHaveAttribute("data-testid", bottomPaneId!);
+    await card.click({ button: "right" });
+    await expect(page.getByTestId("turn-diff-open-vertical")).toHaveText("Open in top pane");
+    await page.keyboard.press("Escape");
+
+    const second = await seedRunningMockAgentWorkspace({
+      repoPrefix: "turn-diff-global-location-",
+      title: "Global turn diff location",
+      initialPrompt: "Record changes in another project",
+    });
+    try {
+      await writeFile(path.join(second.cwd, "other.txt"), "other project\n");
+      await second.client.waitForFinish(second.agentId, 15_000);
+      await expect
+        .poll(async () => (await second.client.listAgentTurnDiffs(second.agentId)).length)
+        .toBe(1);
+      await openAgentRoute(page, second);
+      await page.reload();
+      await page.getByTestId("turn-diff-view-changes").filter({ visible: true }).click();
+      await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+      await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-pane-main");
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (key) => JSON.parse(localStorage.getItem(key) ?? "{}").turnDiffOpenLocation,
+            APP_SETTINGS_KEY,
+          ),
+        )
+        .toBe("vertical");
+    } finally {
+      await second.cleanup();
+    }
+  } finally {
+    await first.cleanup();
+  }
+});
