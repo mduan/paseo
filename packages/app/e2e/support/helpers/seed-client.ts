@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { readFileSync } from "node:fs";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -28,6 +29,7 @@ interface SeedProjectDescriptor {
  * prefer those wrappers over reaching for this client directly.
  */
 export interface SeedDaemonClient {
+  listAgentTurnDiffs: DaemonClient["listAgentTurnDiffs"];
   connect(): Promise<void>;
   close(): Promise<void>;
   addProject(cwd: string): Promise<{

@@ -122,6 +122,9 @@ const styles = StyleSheet.create((theme) => {
       backgroundColor: "transparent",
       borderColor: theme.colors.borderAccent,
     },
+    outlineHovered: {
+      backgroundColor: theme.colors.interactionHighlight,
+    },
     ghost: {
       backgroundColor: "transparent",
       borderColor: "transparent",
@@ -210,6 +213,7 @@ export function Button({
     sizeStyle = styles.md;
   }
   const isGhostHovered = hovered && variant === "ghost";
+  const isOutlineHovered = hovered && variant === "outline" && !isDisabled;
 
   const handleHoverIn = useCallback(() => setHovered(true), []);
   const handleHoverOut = useCallback(() => setHovered(false), []);
@@ -219,11 +223,12 @@ export function Button({
       styles.base,
       sizeStyle,
       variantStyle,
+      isOutlineHovered ? styles.outlineHovered : null,
       pressed ? styles.pressed : null,
       isDisabled ? styles.disabled : null,
       style,
     ],
-    [sizeStyle, variantStyle, isDisabled, style],
+    [sizeStyle, variantStyle, isOutlineHovered, isDisabled, style],
   );
 
   const resolvedTextStyle = useMemo(

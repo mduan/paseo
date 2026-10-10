@@ -40,6 +40,13 @@ export type ReleaseChannel = "stable" | "beta";
 export type ServiceUrlBehavior = "ask" | "in-app" | "external";
 export type WorkspaceTitleSource = "title" | "branch";
 export type PullRequestOpenLocation = "main" | "side" | "explorer";
+export enum TurnDiffOpenLocation {
+  Main = "main",
+  Side = "side",
+  Explorer = "explorer",
+  Horizontal = "horizontal",
+  Vertical = "vertical",
+}
 /** What a sidebar workspace row shows in the space to the right of its title. */
 export type SidebarWorkspaceTrailing = "diff" | "timestamp" | "none";
 export type ToolCallDetailLevel = "overview" | "detailed";
@@ -116,7 +123,7 @@ export interface AppSettings {
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
-  turnDiffOpenLocation: PullRequestOpenLocation;
+  turnDiffOpenLocation: TurnDiffOpenLocation;
 }
 
 export type AppSettingsUpdate =
@@ -178,7 +185,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarBrowserRows: false,
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
-  turnDiffOpenLocation: "explorer",
+  turnDiffOpenLocation: TurnDiffOpenLocation.Explorer,
 };
 
 export const DEFAULT_APP_SETTINGS: Settings = {
@@ -307,7 +314,7 @@ const StoredAppSettingsSchema = z
         legacyPullRequestsInSidePane: undefined,
       }),
     pullRequestOpenLocation: z.enum(["main", "side", "explorer"]).optional(),
-    turnDiffOpenLocation: z.enum(["main", "side", "explorer"]).catch("explorer"),
+    turnDiffOpenLocation: z.enum(TurnDiffOpenLocation).catch(TurnDiffOpenLocation.Explorer),
     // COMPAT(explorerSidebarRouting): replaced by source-specific side-pane preferences in v0.6.
     openSupportingTabsInSidePanel: z.boolean().optional().catch(undefined),
     // COMPAT(rendererDesktopSettings): these fields used to share this renderer-owned key.

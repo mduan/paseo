@@ -16,6 +16,7 @@ import {
   parseTerminalScrollbackLines,
   resolveContentMaxWidth,
   saveAppSettings,
+  TurnDiffOpenLocation,
   type SettingsDeps,
 } from "./storage";
 import { createFakeDesktopBridge, createInMemoryKeyValueStorage } from "./fakes";
@@ -43,6 +44,24 @@ function makeDeps(
 }
 
 describe("loadAppSettingsFromStorage", () => {
+  it("defaults turn diff opens to Explorer", async () => {
+    expect((await loadAppSettingsFromStorage(makeDeps())).turnDiffOpenLocation).toBe(
+      TurnDiffOpenLocation.Explorer,
+    );
+  });
+
+  it.each(Object.values(TurnDiffOpenLocation))(
+    "persists the global turn diff destination %s",
+    async (destination) => {
+      const deps = makeDeps();
+      const queryClient = new QueryClient();
+      await saveAppSettings({ queryClient, deps, updates: { turnDiffOpenLocation: destination } });
+      expect((await loadAppSettingsFromStorage(deps)).turnDiffOpenLocation).toBe(destination);
+      expect(queryClient.getQueryData(APP_SETTINGS_QUERY_KEY)).toMatchObject({
+        turnDiffOpenLocation: destination,
+      });
+    },
+  );
   it("preserves a persisted steer send behavior", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({

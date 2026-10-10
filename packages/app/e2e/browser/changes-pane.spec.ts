@@ -4,6 +4,7 @@ import path from "node:path";
 import { type Locator, type Page } from "@playwright/test";
 import { buildHostWorkspaceRoute, buildSettingsSectionRoute } from "../../src/utils/host-routes";
 import { test, expect } from "../support/fixtures";
+import { openAgentRoute, seedRunningMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { getServerId } from "../support/helpers/server-id";
 import { connectSeedClient } from "../support/helpers/seed-client";
@@ -2235,3 +2236,211 @@ async function scrollToLowerUnwrappedDiffRows(page: Page): Promise<void> {
   });
   await expect(page.getByTestId("git-diff-canvas")).toBeVisible();
 }
+
+test("turn diff card remembers pane-relative opens across projects and reloads", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
+  });
+  const first = await seedRunningMockAgentWorkspace({
+    repoPrefix: "turn-diff-panes-",
+    title: "Turn diff panes",
+    initialPrompt: "Record changes for the pane test",
+  });
+  try {
+    await writeFile(path.join(first.cwd, "first.txt"), "first file\n");
+    await writeFile(path.join(first.cwd, "second.txt"), "second file\n");
+    await first.client.waitForFinish(first.agentId, 15_000);
+    await expect
+      .poll(async () => (await first.client.listAgentTurnDiffs(first.agentId)).length)
+      .toBe(1);
+    await openAgentRoute(page, first);
+    const agentTab = page.getByTestId(`workspace-tab-agent_${first.agentId}`);
+    const card = page.getByTestId("turn-diff-card").filter({ visible: true });
+    const diffTab = page.locator(
+      '[data-testid^="workspace-tab-turn_diff_"], [data-testid^="explorer-sidebar-tab-turn_diff_"]',
+    );
+    const diffPane = page
+      .locator('[data-testid^="workspace-pane-"], [data-testid="workspace-explorer-sidebar"]')
+      .filter({ has: diffTab });
+    await expect(card).toBeVisible();
+
+    const viewChanges = card.getByTestId("turn-diff-view-changes");
+    await page.mouse.move(1, 1);
+    const idleButtonColor = await viewChanges.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await viewChanges.hover();
+    await expect(viewChanges).not.toHaveCSS("background-color", idleButtonColor);
+    await page.mouse.move(1, 1);
+    await expect(viewChanges).toHaveCSS("background-color", idleButtonColor);
+
+    await card.getByTestId("turn-diff-view-changes").click();
+    await expect(diffPane).toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+    await agentTab.click();
+    await card.click({ button: "right", position: { x: 5, y: 5 } });
+    await expect(page.getByTestId("turn-diff-open-horizontal")).toHaveText("Open in right pane");
+    await expect(page.getByTestId("turn-diff-open-vertical")).toHaveText("Open in bottom pane");
+    await page.getByTestId("turn-diff-open-horizontal").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+    await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-pane-main");
+    const rightPaneId = await diffPane.getAttribute("data-testid");
+
+    await agentTab.click();
+    await card.getByTestId("turn-diff-file").filter({ hasText: "second.txt" }).click();
+    await expect(diffPane).toHaveAttribute("data-testid", rightPaneId!);
+    await expect(diffPane.locator('[data-diff-header-path="second.txt"]')).toBeVisible();
+
+    await agentTab.click();
+    await page.getByTestId("workspace-pane-main").getByTestId("workspace-new-tab-button").click();
+    await page.getByTestId("workspace-new-tab-menu-agent").click();
+    await agentTab.click();
+    await page.keyboard.press("Meta+Alt+Shift+ArrowRight");
+    const agentPane = page.locator('[data-testid^="workspace-pane-"]').filter({ has: agentTab });
+    await expect(agentPane).toHaveAttribute("data-testid", rightPaneId!);
+    await card.getByTestId("turn-diff-file").first().click({ button: "right" });
+    await expect(page.getByTestId("turn-diff-open-horizontal")).toHaveText("Open in left pane");
+    await page.getByTestId("turn-diff-open-vertical").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", rightPaneId!);
+    await agentTab.click();
+    await card.getByTestId("turn-diff-view-changes").click({ button: "right" });
+    await page.getByTestId("turn-diff-open").click();
+    await expect(diffPane).toHaveAttribute("data-testid", rightPaneId!);
+    await agentTab.click();
+    await card.click({ button: "right" });
+    await page.getByTestId("turn-diff-open-vertical").click();
+    await expect(diffPane).not.toHaveAttribute("data-testid", rightPaneId!);
+    const bottomPaneId = await diffPane.getAttribute("data-testid");
+    await agentTab.click();
+    await agentPane.getByTestId("workspace-new-tab-button").click();
+    await page.getByTestId("workspace-new-tab-menu-agent").click();
+    await agentTab.click();
+    await page.keyboard.press("Meta+Alt+Shift+ArrowDown");
+    await expect(agentPane).toHaveAttribute("data-testid", bottomPaneId!);
+    await card.click({ button: "right" });
+    await expect(page.getByTestId("turn-diff-open-vertical")).toHaveText("Open in top pane");
+    await page.keyboard.press("Escape");
+
+    const second = await seedRunningMockAgentWorkspace({
+      repoPrefix: "turn-diff-global-location-",
+      title: "Global turn diff location",
+      initialPrompt: "Record changes in another project",
+    });
+    try {
+      await writeFile(path.join(second.cwd, "other.txt"), "other project\n");
+      await second.client.waitForFinish(second.agentId, 15_000);
+      await expect
+        .poll(async () => (await second.client.listAgentTurnDiffs(second.agentId)).length)
+        .toBe(1);
+      await openAgentRoute(page, second);
+      await page.reload();
+      await page.getByTestId("turn-diff-view-changes").filter({ visible: true }).click();
+      await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-explorer-sidebar");
+      await expect(diffPane).not.toHaveAttribute("data-testid", "workspace-pane-main");
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (key) => JSON.parse(localStorage.getItem(key) ?? "{}").turnDiffOpenLocation,
+            APP_SETTINGS_KEY,
+          ),
+        )
+        .toBe("vertical");
+    } finally {
+      await second.cleanup();
+    }
+  } finally {
+    await first.cleanup();
+  }
+});
+
+test("turn diff file menus retain hover and scroll every open destination to the file", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1800, height: 1000 });
+  const workspace = await seedRunningMockAgentWorkspace({
+    repoPrefix: "turn-diff-file-context-",
+    title: "Turn diff file context",
+    initialPrompt: "Record changes for file context menus",
+  });
+  try {
+    await writeFile(path.join(workspace.cwd, "first.txt"), "first file line\n".repeat(200));
+    await writeFile(path.join(workspace.cwd, "second.txt"), "second file\n");
+    await workspace.client.waitForFinish(workspace.agentId, 15_000);
+    await expect
+      .poll(async () => (await workspace.client.listAgentTurnDiffs(workspace.agentId)).length)
+      .toBe(1);
+    await openAgentRoute(page, workspace);
+    const agentTab = page.getByTestId(`workspace-tab-agent_${workspace.agentId}`);
+    const card = page.getByTestId("turn-diff-card").filter({ visible: true });
+    const row = card.getByTestId("turn-diff-file").filter({ hasText: "second.txt" });
+    const otherRow = card.getByTestId("turn-diff-file").filter({ hasText: "first.txt" });
+    const diffTab = page.locator(
+      '[data-testid^="workspace-tab-turn_diff_"], [data-testid^="explorer-sidebar-tab-turn_diff_"]',
+    );
+    const diffPane = page
+      .locator('[data-testid^="workspace-pane-"], [data-testid="workspace-explorer-sidebar"]')
+      .filter({ has: diffTab });
+    await expect(row).toBeVisible();
+    await page.mouse.move(1, 1);
+    const idleColor = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await row.hover();
+    await expect(row).not.toHaveCSS("background-color", idleColor);
+    const hoverColor = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(hoverColor).not.toBe(idleColor);
+    await row.click({ button: "right", position: { x: 20, y: 10 } });
+    await page.getByTestId("turn-diff-open-explorer").hover();
+    await expect(row).toHaveCSS("background-color", hoverColor);
+    await expect(otherRow).toHaveCSS("background-color", idleColor);
+    await expect(row).toHaveCSS("cursor", "pointer");
+    const rowBounds = await row.boundingBox();
+    if (!rowBounds) throw new Error("Turn diff file row has no bounds");
+    const cursor = await page.evaluate(
+      ({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        return target ? getComputedStyle(target).cursor : undefined;
+      },
+      { x: rowBounds.x + rowBounds.width - 5, y: rowBounds.y + rowBounds.height / 2 },
+    );
+    expect(cursor).toBe("pointer");
+    await page.keyboard.press("Escape");
+    await page.mouse.move(1, 1);
+    await expect(row).toHaveCSS("background-color", idleColor);
+
+    await card.click({ button: "right", position: { x: 5, y: 5 } });
+    await page.getByTestId("turn-diff-open-explorer").click();
+    const scroller = diffPane.getByTestId("git-diff-scroll");
+    await expect(scroller).toBeVisible();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(0);
+    await agentTab.click();
+
+    for (const destination of [
+      "turn-diff-open-horizontal",
+      "turn-diff-open-vertical",
+      "turn-diff-open-explorer",
+      "turn-diff-open",
+    ]) {
+      await row.click({ button: "right", position: { x: 20, y: 10 } });
+      await page.getByTestId(destination).hover();
+      await expect(row).toHaveCSS("background-color", hoverColor);
+      await page.getByTestId(destination).click();
+      const header = diffHeaderForPath(diffPane, "second.txt");
+      await expect(header).toBeVisible();
+      await expect
+        .poll(() => scroller.evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(300);
+      await scroller.evaluate((element) => {
+        element.scrollTop = 0;
+        element.dispatchEvent(new Event("scroll", { bubbles: false }));
+      });
+      await agentTab.click();
+      await page.mouse.move(1, 1);
+      await expect(row).toHaveCSS("background-color", idleColor);
+    }
+  } finally {
+    await workspace.cleanup();
+  }
+});

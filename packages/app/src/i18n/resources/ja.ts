@@ -441,6 +441,7 @@ export const ja: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "エクスプローラーサイドバーで開く",
       open: "開く",
       right: "右のペインで開く",
       left: "左のペインで開く",

@@ -12,6 +12,7 @@ import {
 import { getPanelInstanceAttributes } from "@/panels/panel-instance-attributes";
 import { workspaceTabTargetsEqual } from "@/workspace-tabs/identity";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { resolveFilePanePlacement, type FilePaneAxis } from "@/workspace/file-open/pane";
 
 export type OpenInSidePaneSource = keyof OpenInSidePanePreferences;
 export type WorkspaceTargetOpenLocation = "main" | "side";
@@ -203,5 +204,35 @@ export function openWorkspaceTargetBeside(input: OpenWorkspaceTargetInput): stri
     intent: "reveal",
     placement: paneId ? { mode: "pane", paneId } : undefined,
     parentTabId: input.parentTabId ?? undefined,
+  });
+}
+
+export function openWorkspaceTargetInAdjacentPane(input: {
+  workspaceKey: string;
+  target: WorkspaceTabTarget;
+  parentTabId: string;
+  axis: FilePaneAxis;
+}): string | null {
+  const store = useWorkspaceLayoutStore.getState();
+  const placement = resolveFilePanePlacement({
+    layout: store.layoutByWorkspace[input.workspaceKey],
+    sourceTabId: input.parentTabId,
+    explorerPaneId: store.explorerSidebarPaneIdByWorkspace[input.workspaceKey],
+    axis: input.axis,
+  });
+  if (!placement) return null;
+  const paneId =
+    placement.paneId ??
+    store.splitPaneEmpty(input.workspaceKey, {
+      targetPaneId: placement.sourcePaneId,
+      position: placement.position,
+    });
+  if (!paneId) return null;
+  return store.openTab({
+    workspaceKey: input.workspaceKey,
+    target: input.target,
+    parentTabId: input.parentTabId,
+    intent: "reveal",
+    placement: { mode: "pane", paneId },
   });
 }

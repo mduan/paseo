@@ -433,6 +433,7 @@ export const en = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "Open in Explorer sidebar",
       open: "Open",
       right: "Open in right pane",
       left: "Open in left pane",
@@ -2135,6 +2136,8 @@ export const en = {
       openInSidePane: {
         title: "Open location",
         destinations: {
+          horizontal: "Horizontal pane",
+          vertical: "Vertical pane",
           main: "Main panel",
           side: "On the side",
           explorer: "Explorer sidebar",

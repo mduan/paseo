@@ -6,6 +6,9 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TurnDiffFileStat, TurnDiffSummary } from "@getpaseo/protocol/messages";
 import { Button } from "@/components/ui/button";
 import { DiffStat } from "@/components/diff-stat";
+import { useContextMenu } from "@/components/ui/context-menu";
+import type { TurnDiffOpenLocation } from "@/hooks/use-settings/storage";
+import { TurnDiffContextMenu } from "./context-menu";
 import type { Theme } from "@/styles/theme";
 
 const COLLAPSED_FILE_COUNT = 3;
@@ -13,6 +16,7 @@ const COLLAPSED_FILE_COUNT = 3;
 export interface OpenTurnDiffInput {
   turnId: string;
   focusPath?: string;
+  destination?: TurnDiffOpenLocation;
 }
 
 export interface TurnDiffCardsValue {
@@ -78,49 +82,58 @@ const TurnDiffCard = memo(function TurnDiffCard({
   }, [expanded]);
 
   return (
-    <View style={styles.card} testID="turn-diff-card">
-      <View style={styles.header}>
-        <View style={styles.iconBox}>
-          <ThemedDiff size={16} uniProps={foregroundColorMapping} />
+    <TurnDiffContextMenu turnId={turnId} onOpen={onOpen}>
+      <View style={styles.card} testID="turn-diff-card">
+        <View style={styles.header}>
+          <View style={styles.iconBox}>
+            <ThemedDiff size={16} uniProps={foregroundColorMapping} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+            <DiffStat additions={additions} deletions={deletions} />
+          </View>
+          {onOpen ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={handleViewChanges}
+              testID="turn-diff-view-changes"
+            >
+              {t("turnDiff.viewChanges")}
+            </Button>
+          ) : null}
         </View>
-        <View style={styles.headerText}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <DiffStat additions={additions} deletions={deletions} />
-        </View>
-        {onOpen ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={handleViewChanges}
-            testID="turn-diff-view-changes"
-          >
-            {t("turnDiff.viewChanges")}
-          </Button>
+        {showFileList
+          ? visibleFiles.map((file) => (
+              <TurnDiffContextMenu
+                key={file.path}
+                turnId={turnId}
+                focusPath={file.path}
+                onOpen={onOpen}
+              >
+                <TurnDiffFileRow file={file} turnId={turnId} onOpen={onOpen} />
+              </TurnDiffContextMenu>
+            ))
+          : null}
+        {showFileList && hiddenCount > 0 ? (
+          <View style={styles.row}>
+            <Button
+              variant="ghost"
+              size="xs"
+              onPress={handleToggleExpanded}
+              trailing={toggleIcon}
+              testID="turn-diff-toggle-files"
+            >
+              {expanded
+                ? t("turnDiff.showFewerFiles")
+                : t("turnDiff.showMoreFiles", { count: hiddenCount })}
+            </Button>
+          </View>
         ) : null}
       </View>
-      {showFileList
-        ? visibleFiles.map((file) => (
-            <TurnDiffFileRow key={file.path} file={file} turnId={turnId} onOpen={onOpen} />
-          ))
-        : null}
-      {showFileList && hiddenCount > 0 ? (
-        <View style={styles.row}>
-          <Button
-            variant="ghost"
-            size="xs"
-            onPress={handleToggleExpanded}
-            trailing={toggleIcon}
-            testID="turn-diff-toggle-files"
-          >
-            {expanded
-              ? t("turnDiff.showFewerFiles")
-              : t("turnDiff.showMoreFiles", { count: hiddenCount })}
-          </Button>
-        </View>
-      ) : null}
-    </View>
+    </TurnDiffContextMenu>
   );
 });
 
@@ -133,6 +146,7 @@ function TurnDiffFileRow({
   turnId: string;
   onOpen?: (input: OpenTurnDiffInput) => void;
 }) {
+  const { open: menuOpen } = useContextMenu();
   const { directory, name } = splitPath(file.path);
   const handlePress = useCallback(
     () => onOpen?.({ turnId, focusPath: file.path }),
@@ -141,9 +155,9 @@ function TurnDiffFileRow({
   const rowStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
-      onOpen && (hovered || pressed) && styles.rowHovered,
+      onOpen && (hovered || pressed || menuOpen) && styles.rowHovered,
     ],
-    [onOpen],
+    [menuOpen, onOpen],
   );
   return (
     <Pressable

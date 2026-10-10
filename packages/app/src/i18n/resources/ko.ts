@@ -437,6 +437,7 @@ export const ko: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "탐색기 사이드바에서 열기",
       open: "열기",
       right: "오른쪽 창에서 열기",
       left: "왼쪽 창에서 열기",

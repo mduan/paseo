@@ -442,6 +442,7 @@ export const fr: TranslationResources = {
   },
   workspace: {
     chatFileMenu: {
+      explorer: "Ouvrir dans la barre latérale de l’explorateur",
       open: "Ouvrir",
       right: "Ouvrir dans le volet droit",
       left: "Ouvrir dans le volet gauche",
