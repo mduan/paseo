@@ -171,6 +171,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
             {aiRenamePending ? (
               <View style={styles.workspaceTitlePlaceholder}>
                 <TitleSkeleton
+                  width="100%"
                   testID={`sidebar-workspace-title-loading-${workspace.workspaceKey}`}
                 />
               </View>
