@@ -1,20 +1,98 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type {
+  AgentModelDefinition,
+  AgentProvider,
+  ProviderSnapshotEntry,
+} from "@getpaseo/protocol/agent-types";
+import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
+import { Alert } from "@/components/ui/alert";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ExternalLink } from "@/components/ui/external-link";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { buildSelectableProviderSelectorProviders } from "@/provider-selection/provider-selection";
+import {
+  resolveDefaultModel,
+  resolveEffectiveModel,
+  resolveThinkingOptionId,
+} from "@/provider-selection/resolve-agent-form";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 
 const METADATA_GENERATION_DOCS_URL = "https://paseo.sh/docs/metadata-generation";
 type SelectionMode = "automatic" | "preferred";
+type MetadataGenerationProvider = MutableDaemonConfig["metadataGeneration"]["providers"][number];
+// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
+type MetadataEffortOptionProps = {
+  option: NonNullable<AgentModelDefinition["thinkingOptions"]>[number];
+  selected: boolean;
+  disabled: boolean;
+  onSelect: (thinkingOptionId: string) => void;
+};
+
+function MetadataEffortOption({ option, selected, disabled, onSelect }: MetadataEffortOptionProps) {
+  const handleSelect = useCallback(() => onSelect(option.id), [onSelect, option.id]);
+  return (
+    <DropdownMenuItem selected={selected} disabled={disabled} onSelect={handleSelect}>
+      {option.label}
+    </DropdownMenuItem>
+  );
+}
+
+// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
+type MetadataEffortRowProps = {
+  provider: MetadataGenerationProvider;
+  entries?: ProviderSnapshotEntry[];
+  disabled: boolean;
+  onSelect: (thinkingOptionId: string) => void;
+};
+
+function MetadataEffortRow({ provider, entries, disabled, onSelect }: MetadataEffortRowProps) {
+  const { t } = useTranslation();
+  const models = entries?.find((entry) => entry.provider === provider.provider)?.models ?? [];
+  const model = provider.model
+    ? resolveEffectiveModel(models, provider.model)
+    : resolveDefaultModel(models);
+  const options = model?.thinkingOptions ?? [];
+  const selectedOption = options.find((option) => option.id === provider.thinkingOptionId);
+  if (!options.length) return null;
+
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>{t("settings.metadataGeneration.effort")}</Text>
+      </View>
+      <DropdownMenu>
+        <DropdownTrigger
+          accessibilityRole="button"
+          accessibilityLabel={t("agentControls.thinking.select")}
+          disabled={disabled}
+          testID="metadata-generation-effort"
+        >
+          {selectedOption?.label ?? t("agentControls.thinking.select")}
+        </DropdownTrigger>
+        <DropdownMenuContent side="bottom" align="end" width={200}>
+          {options.map((option) => (
+            <MetadataEffortOption
+              key={option.id}
+              option={option}
+              selected={option.id === provider.thinkingOptionId}
+              disabled={disabled}
+              onSelect={onSelect}
+            />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </View>
+  );
+}
 
 export function MetadataGenerationPage({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
@@ -25,10 +103,11 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
     [snapshot.entries],
   );
   const configuredProviders = config?.metadataGeneration.providers;
-  const configuredProvider = configuredProviders?.[0] ?? null;
+  const configuredProvider = configuredProviders?.[0];
   const savedMode: SelectionMode = configuredProvider ? "preferred" : "automatic";
   const [draftMode, setDraftMode] = useState<SelectionMode | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string>();
   const mode = draftMode ?? savedMode;
 
   useEffect(() => {
@@ -37,28 +116,34 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
 
   const modeOptions = useMemo(
     () => [
-      { value: "automatic" as const, label: t("settings.metadataGeneration.automatic") },
-      { value: "preferred" as const, label: t("settings.metadataGeneration.preferred") },
+      {
+        value: "automatic" as const,
+        label: t("settings.metadataGeneration.automatic"),
+        disabled: isSaving,
+      },
+      {
+        value: "preferred" as const,
+        label: t("settings.metadataGeneration.preferred"),
+        disabled: isSaving,
+      },
     ],
-    [t],
+    [isSaving, t],
   );
 
   const saveProviders = useCallback(
-    async (providersPatch: { provider: string; model?: string }[]) => {
+    async (providersPatch: MutableDaemonConfig["metadataGeneration"]["providers"]) => {
       setIsSaving(true);
+      setSaveError(undefined);
       try {
         await patchConfig({ metadataGeneration: { providers: providersPatch } });
       } catch (error) {
         setDraftMode(null);
-        Alert.alert(
-          t("settings.metadataGeneration.saveError"),
-          error instanceof Error ? error.message : String(error),
-        );
+        setSaveError(error instanceof Error ? error.message : String(error));
       } finally {
         setIsSaving(false);
       }
     },
-    [patchConfig, t],
+    [patchConfig],
   );
 
   const handleModeChange = useCallback(
@@ -73,13 +158,36 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
 
   const handleModelSelect = useCallback(
     (provider: AgentProvider, model: string) => {
+      const models = snapshot.entries?.find((entry) => entry.provider === provider)?.models ?? [];
+      const isSameModel =
+        configuredProvider?.provider === provider && configuredProvider.model === model;
+      const thinkingOptionId = resolveThinkingOptionId({
+        availableModels: models,
+        modelId: model,
+        requestedThinkingOptionId: isSameModel ? (configuredProvider.thinkingOptionId ?? "") : "",
+      });
       setDraftMode("preferred");
       void saveProviders([
-        { provider, ...(model ? { model } : {}) },
+        {
+          provider,
+          ...(model ? { model } : {}),
+          ...(thinkingOptionId ? { thinkingOptionId } : {}),
+        },
         ...(configuredProviders?.slice(1) ?? []),
       ]);
     },
-    [configuredProviders, saveProviders],
+    [configuredProvider, configuredProviders, saveProviders, snapshot.entries],
+  );
+
+  const handleThinkingSelect = useCallback(
+    (thinkingOptionId: string) => {
+      if (!configuredProvider) return;
+      void saveProviders([
+        { ...configuredProvider, thinkingOptionId },
+        ...(configuredProviders?.slice(1) ?? []),
+      ]);
+    },
+    [configuredProvider, configuredProviders, saveProviders],
   );
 
   const handleSelectorOpen = useCallback(() => {
@@ -114,6 +222,13 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
       trailing={docsLink}
       testID="metadata-generation-settings"
     >
+      {saveError ? (
+        <Alert
+          variant="error"
+          title={t("settings.metadataGeneration.saveError")}
+          description={saveError}
+        />
+      ) : null}
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
@@ -157,6 +272,14 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
               desktopMinWidth={360}
             />
           </View>
+        ) : null}
+        {mode === "preferred" && configuredProvider ? (
+          <MetadataEffortRow
+            provider={configuredProvider}
+            entries={snapshot.entries}
+            disabled={isSaving}
+            onSelect={handleThinkingSelect}
+          />
         ) : null}
       </View>
     </SettingsSection>
