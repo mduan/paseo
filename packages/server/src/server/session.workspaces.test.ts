@@ -35,6 +35,7 @@ import type {
   AgentCreateSessionOptions,
   AgentLaunchContext,
   AgentPersistenceHandle,
+  AgentPromptInput,
   AgentRunResult,
   AgentSession,
   AgentSessionConfig,
@@ -48,7 +49,7 @@ import {
   writePaseoWorktreeMetadata,
 } from "../utils/worktree-metadata.js";
 import type { WorkspaceGitRuntimeSnapshot } from "./workspace-git-service.js";
-import type { GeneratedWorkspaceName } from "./worktree-branch-name-generator.js";
+import type { generateBranchNameFromFirstAgentContext } from "./worktree-branch-name-generator.js";
 import { WorkspaceAutoName } from "./workspace-auto-name.js";
 import type { ForgeService } from "../services/forge-service.js";
 import { createNoopWorkspaceGitService } from "./test-utils/workspace-git-service-stub.js";
@@ -570,7 +571,7 @@ function createSessionForWorkspaceTests(
       cwd: string,
       newName: string,
     ) => Promise<{ previousBranch: string | null; currentBranch: string | null }>;
-    generateWorkspaceName?: () => Promise<GeneratedWorkspaceName | null>;
+    generateWorkspaceName?: typeof generateBranchNameFromFirstAgentContext;
   } = {},
 ): TestSession {
   const logger = {
@@ -750,6 +751,103 @@ function createSessionForWorkspaceTests(
   );
   return session;
 }
+
+test.each([false, true])(
+  "image-only workspace creation names the workspace and preserves a concurrent manual chat name (%s)",
+  async (manuallyRenamed) => {
+    const images = [{ data: "c2NyZWVuc2hvdA==", mimeType: "image/png" }];
+    const workspaces = new Map<string, PersistedWorkspaceRecord>();
+    let created = false;
+    let chat = makeManagedAgent({
+      id: "image-chat",
+      cwd: REPO_CWD,
+      lifecycle: "idle",
+      updatedAt: "2026-10-09T00:00:00Z",
+    });
+    let stored = makeStoredAgent({ id: chat.id, cwd: chat.cwd, updatedAt: "2026-10-09T00:00:00Z" });
+    const namingPrompts: AgentPromptInput[] = [];
+    const workspaceContexts: unknown[] = [];
+    const emitted: SessionOutboundMessage[] = [];
+    const session = createSessionForWorkspaceTests({
+      onMessage: (message) => emitted.push(message),
+      workspaceRegistry: {
+        initialize: async () => {},
+        existsOnDisk: async () => true,
+        list: async () => [...workspaces.values()],
+        get: async (id) => workspaces.get(id) ?? null,
+        upsert: async (workspace) => {
+          workspaces.set(workspace.workspaceId, workspace);
+        },
+        update: async (id, update) => {
+          const current = workspaces.get(id);
+          if (!current) return null;
+          const next = update(current);
+          workspaces.set(id, next);
+          return next;
+        },
+        archive: async () => {},
+        remove: async () => {},
+      },
+      agentStorage: { get: async () => (created ? stored : null) },
+      agentManager: {
+        createAgent: async (
+          config: AgentSessionConfig,
+          _id: string,
+          options: { workspaceId?: string },
+        ) => {
+          if (config.internal) return { id: "naming-agent" };
+          created = true;
+          chat = { ...chat, workspaceId: options.workspaceId };
+          stored = { ...stored, workspaceId: options.workspaceId };
+          return chat;
+        },
+        getAgent: () => (created ? chat : null),
+        tryRunOutOfBand: () => false,
+        streamAgent: async function* () {},
+        waitForAgentRunStart: async () => {},
+        getProviderAvailability: async () => ({ available: true }),
+        runAgent: async (_id: string, prompt: AgentPromptInput) => {
+          namingPrompts.push(prompt);
+          if (manuallyRenamed) stored = { ...stored, title: "My name" };
+          return {
+            finalText: '{"title":"Fix checkout error","branch":"fix-checkout-error"}',
+            timeline: [],
+          };
+        },
+        closeAgent: async () => {},
+        deleteAgentState: async () => {},
+        setTitle: async (_id: string, title: string) => {
+          stored = { ...stored, title };
+        },
+      },
+      generateWorkspaceName: async ({ firstAgentContext }) => {
+        workspaceContexts.push(firstAgentContext);
+        return { title: "Fix checkout error", branch: null };
+      },
+    });
+
+    await session.handleMessage({
+      type: "workspace.create.request",
+      requestId: "image-only-workspace",
+      source: { kind: "directory", path: REPO_CWD },
+      agent: { agentId: chat.id, config: { provider: "codex", cwd: REPO_CWD }, images },
+    });
+    expect(findByType(emitted, "workspace.create.response")?.payload.error).toBeNull();
+    await vi.waitFor(() => {
+      expect(stored.title).toBe(manuallyRenamed ? "My name" : "Fix checkout error");
+      expect([...workspaces.values()]).toEqual([
+        expect.objectContaining({ title: "Fix checkout error" }),
+      ]);
+    });
+    expect(workspaceContexts).toEqual([{ images, prompt: undefined, attachments: undefined }]);
+    expect(namingPrompts).toEqual([
+      [
+        { type: "text", text: expect.stringContaining("Use the attached images") },
+        { type: "image", ...images[0] },
+      ],
+    ]);
+  },
+);
 
 test("project.list.request catches up by sequence on the existing RPC", async () => {
   const emitted: SessionOutboundMessage[] = [];

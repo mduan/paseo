@@ -1,5 +1,5 @@
 import { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment, FirstAgentContext } from "@getpaseo/protocol/messages";
 import type { AgentPromptContentBlock, AgentPromptInput } from "./agent-sdk-types.js";
 
 export { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
@@ -38,7 +38,7 @@ export function buildAgentPrompt(
 }
 
 export function buildAgentBranchNameSeed(
-  firstAgentContext: { prompt?: string; attachments?: readonly AgentAttachment[] } | undefined,
+  firstAgentContext: FirstAgentContext | undefined,
 ): string | undefined {
   if (!firstAgentContext) {
     return undefined;
@@ -47,6 +47,9 @@ export function buildAgentBranchNameSeed(
   const prompt = firstAgentContext.prompt?.trim();
   if (prompt) {
     parts.push(["<user-prompt>", prompt, "</user-prompt>"].join("\n"));
+  }
+  if (firstAgentContext.images?.length) {
+    parts.push("Use the attached images as source material for the task name.");
   }
   const renderedAttachments: string[] = [];
   for (const attachment of firstAgentContext.attachments ?? []) {

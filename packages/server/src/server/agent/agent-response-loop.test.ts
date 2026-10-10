@@ -8,6 +8,8 @@ import {
   type AgentCaller,
 } from "./agent-response-loop.js";
 import type { AgentManager } from "./agent-manager.js";
+import type { AgentPromptInput, AgentSessionConfig } from "./agent-sdk-types.js";
+import { asAgentManager } from "../test-utils/session-stubs.js";
 
 function createScriptedCaller(responses: string[]) {
   const prompts: string[] = [];
@@ -132,6 +134,57 @@ describe("getStructuredAgentResponse", () => {
 
 describe("generateStructuredAgentResponseWithFallback", () => {
   const schema = z.object({ summary: z.string() });
+
+  it("keeps images through provider fallback and JSON validation retries", async () => {
+    const images = [{ data: "c2NyZWVuc2hvdA==", mimeType: "image/png" }];
+    const prompts: AgentPromptInput[] = [];
+    const closed: string[] = [];
+    const deleted: string[] = [];
+    const manager = asAgentManager({
+      getProviderAvailability: async () => ({ available: true }),
+      createAgent: async (config: AgentSessionConfig) => ({ id: config.provider }),
+      runAgent: async (id: string, prompt: AgentPromptInput) => {
+        prompts.push(prompt);
+        if (id === "claude") throw new Error("Provider failed");
+        return {
+          finalText: prompts.length === 2 ? "invalid JSON" : '{"summary":"Checkout error"}',
+          timeline: [],
+        };
+      },
+      closeAgent: async (id: string) => {
+        closed.push(id);
+      },
+      deleteAgentState: async (id: string) => {
+        deleted.push(id);
+      },
+    });
+
+    await expect(
+      generateStructuredAgentResponseWithFallback({
+        manager,
+        cwd: "/tmp/project",
+        prompt: "Name the screenshot",
+        images,
+        schema,
+        providers: [{ provider: "claude" }, { provider: "codex" }],
+      }),
+    ).resolves.toEqual({ summary: "Checkout error" });
+
+    expect(prompts).toHaveLength(3);
+    for (const prompt of prompts) {
+      expect(prompt).toEqual([
+        { type: "text", text: expect.stringContaining("Name the screenshot") },
+        { type: "image", ...images[0] },
+      ]);
+    }
+    expect(prompts[2]).toEqual(
+      expect.arrayContaining([
+        { type: "text", text: expect.stringContaining("Previous response was invalid") },
+      ]),
+    );
+    expect(closed).toEqual(["claude", "codex"]);
+    expect(deleted).toEqual(["claude", "codex"]);
+  });
 
   function createManager(
     availability: Array<{ provider: string; available: boolean; error: string | null }>,

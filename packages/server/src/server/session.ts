@@ -1,4 +1,5 @@
 import { createConversationTitleGenerator } from "./agent/conversation-title.js";
+import { generateBranchNameFromFirstAgentContext } from "./worktree-branch-name-generator.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { BrowserAutomationHostCapabilitySchema } from "@getpaseo/protocol/browser-automation/capabilities";
@@ -132,7 +133,7 @@ import {
 import { assertPluginTimelineDataSize } from "./agent/agent-timeline-content.js";
 import { parsePluginClientId } from "./plugins/plugin-session-identity.js";
 import { buildAgentForkContextAttachment } from "./agent/activity-curator.js";
-import { buildAgentPrompt } from "./agent/prompt-attachments.js";
+import { buildAgentPrompt, buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import type { StructuredGenerationDaemonConfig } from "./agent/structured-generation-providers.js";
 import {
   getAgentStreamEventTurnId,
@@ -4099,7 +4100,11 @@ export class Session {
               {
                 ...request,
                 firstAgentContext: agentInput
-                  ? { prompt: agentInput.initialPrompt, attachments: agentInput.attachments }
+                  ? {
+                      prompt: agentInput.initialPrompt,
+                      images: agentInput.images,
+                      attachments: agentInput.attachments,
+                    }
                   : request.firstAgentContext,
               },
               id,
@@ -4278,6 +4283,7 @@ export class Session {
 
       const firstAgentContext: FirstAgentContext = {
         ...(trimmedPrompt ? { prompt: trimmedPrompt } : {}),
+        images,
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
       const workspacePromptTitle = resolveFirstAgentPromptTitle(firstAgentContext);
@@ -4333,7 +4339,37 @@ export class Session {
       );
       createdAgentId = snapshot.id;
       await this.agentUpdates.forwardLiveAgent(snapshot);
-      if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
+      if (!provisionalTitle && images?.length) {
+        void generateBranchNameFromFirstAgentContext({
+          agentManager: this.agentManager,
+          cwd: resolvedCwd,
+          workspaceGitService: this.workspaceGitService,
+          providerSnapshotManager: this.providerSnapshotManager,
+          daemonConfig: this.readStructuredGenerationDaemonConfig(),
+          currentSelection: {
+            provider: config.provider,
+            model: config.model,
+            thinkingOptionId: config.thinkingOptionId,
+          },
+          firstAgentContext,
+          logger: this.sessionLogger,
+        })
+          .then(async (generated) => {
+            if (!generated?.title) return undefined;
+            const stored = await this.agentStorage.get(snapshot.id);
+            if (stored && !stored.title && this.agentManager.getAgent(snapshot.id)) {
+              return this.agentManager.setTitle(snapshot.id, generated.title);
+            }
+            return undefined;
+          })
+          .catch((error) => {
+            this.sessionLogger.warn(
+              { err: error, agentId: snapshot.id },
+              "Failed to name image-only chat",
+            );
+          });
+      }
+      if (resolvedIntent.createdDirectoryWorkspace && buildAgentBranchNameSeed(firstAgentContext)) {
         this.workspaceAutoName.scheduleForDirectory(
           {
             workspaceId: resolvedIntent.intent.workspaceId,
