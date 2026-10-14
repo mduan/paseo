@@ -81,6 +81,7 @@ import { setAssistantMarkdownBlockHeight } from "@/utils/assistant-message-heigh
 import { getAssistantImageMetadata } from "@/utils/assistant-image-metadata";
 import { isRenderProfileEnabled } from "@/utils/render-profiler";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
+import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
 import { PlanCard } from "./plan-card";
 import { useToolCallSheet } from "./tool-call-sheet";
 import { ToolCallDetailsContent } from "./tool-call-details";
@@ -538,6 +539,15 @@ export const UserMessage = memo(function UserMessage({
           {hasAttachments ? (
             <View style={attachmentPreviewContainerStyle}>
               {attachments.map((attachment, index) => {
+                if (attachment.type === "review") {
+                  return (
+                    <ReviewAttachmentPill
+                      key={`review:${JSON.stringify(attachment)}`}
+                      attachment={attachment}
+                      testID="message-review-attachment-pill"
+                    />
+                  );
+                }
                 const content = getAgentAttachmentPillContent(attachment, t);
                 return (
                   <AttachmentFrame

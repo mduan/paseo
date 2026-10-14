@@ -7,6 +7,7 @@ import type {
 } from "@/attachments/types";
 import { getWorkspaceAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import { AttachmentLabel, AttachmentPill } from "@/components/attachment-pill";
+import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
 import {
   isWorkspaceAttachment,
   isPullRequestContextAttachment,
@@ -252,6 +253,17 @@ function WorkspaceAttachmentPill({
   const handleRemove = useCallback(() => {
     onRemove(index);
   }, [onRemove, index]);
+  if (attachment.kind === "review") {
+    return (
+      <ReviewAttachmentPill
+        attachment={attachment.attachment}
+        onOpen={handleOpen}
+        onRemove={handleRemove}
+        disabled={disabled}
+        testID={getPillTestID(attachment)}
+      />
+    );
+  }
   return (
     <AttachmentPill
       testID={getPillTestID(attachment)}

@@ -10,6 +10,7 @@ import { getServerId } from "../support/helpers/server-id";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import { openChangesPanel, waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
+import { submitMessage } from "../support/helpers/composer";
 
 interface DirtyWorkspace {
   id: string;
@@ -1096,6 +1097,72 @@ test("creates, cancels, edits, and deletes a review while keeping Changes focuse
     await editInlineReview(page, "Please keep this branch named explicitly");
     await deleteInlineReview(page);
   });
+});
+
+test("review attachments show linked comment rows in the composer and sent chat", async ({
+  page,
+}, testInfo) => {
+  const workspace = await createWorkspaceWithMountedTabDiff();
+  const client = await connectSeedClient();
+  cleanupTasks.push({ run: () => client.close() });
+  const agent = await client.createAgent({
+    provider: "mock",
+    cwd: workspace.repoPath,
+    workspaceId: workspace.id,
+    model: "e2e-fast-stream",
+    modeId: "load-test",
+    title: "Review attachment rows",
+  });
+  await useUnwrappedDiffLines(page);
+  await openWorkspaceChanges(page, workspace);
+  await startReviewOnFirstChangedLine(page);
+  await saveInlineReview(page, "Please explain this change.\nKeep the explanation concrete.");
+  await startReviewOnFirstChangedLine(page);
+  await saveInlineReview(page, "Does this need a regression test?");
+  await openAgentRoute(page, { workspaceId: workspace.id, agentId: agent.id });
+
+  const composerPill = page.getByTestId("composer-review-attachment-pill");
+  const popover = page.getByTestId("review-comments-popover");
+  await expect(composerPill).toContainText("2 comments");
+  await composerPill.hover();
+  await expect(
+    popover.getByText("Does this need a regression test?", { exact: true }),
+  ).toBeVisible();
+  await expect(popover.getByText(/Keep the explanation concrete/)).toBeVisible();
+  const fileLinks = popover.getByRole("link", { name: "src/use-mounted-tab-set.ts" });
+  await expect(fileLinks).toHaveCount(2);
+  await fileLinks.first().hover();
+  await expect(popover).toBeVisible();
+  await expect(popover).toHaveCSS("opacity", "1");
+  await page.screenshot({ path: testInfo.outputPath("composer-review-comments.png") });
+  await fileLinks.first().click();
+  await expect(page.getByTestId("workspace-file-pane").filter({ visible: true })).toBeVisible();
+  await expect(page.locator(".cm-line-target").filter({ visible: true })).toHaveCount(1);
+  await expect(popover).toHaveCount(0);
+  await page.getByTestId(`workspace-tab-agent_${agent.id}`).filter({ visible: true }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await composerPill.click();
+  const sheet = page.getByRole("slider", { name: "Bottom Sheet", exact: true });
+  await expect(sheet.getByRole("link", { name: "src/use-mounted-tab-set.ts" })).toHaveCount(2);
+  await sheet.getByRole("button", { name: /close/i }).click();
+  await page.setViewportSize({ width: 1400, height: 900 });
+
+  await submitMessage(page, "Address these review comments.");
+  const sentPill = page.getByTestId("message-review-attachment-pill");
+  await expect(sentPill).toContainText("2 comments");
+  await expect(composerPill).toHaveCount(0);
+  await sentPill.hover();
+  await expect(fileLinks).toHaveCount(2);
+  await fileLinks.last().hover();
+  await expect(
+    popover.getByText("Does this need a regression test?", { exact: true }),
+  ).toBeVisible();
+  await expect(popover).toHaveCSS("opacity", "1");
+  await page.screenshot({ path: testInfo.outputPath("sent-review-comments.png") });
+  await fileLinks.last().click();
+  await expect(page.getByTestId("workspace-file-pane").filter({ visible: true })).toBeVisible();
+  await expect(popover).toHaveCount(0);
 });
 
 test("split canvas creates a review on the changed side and keeps it in that column", async ({
