@@ -2416,6 +2416,42 @@ const x = 1;
     ]);
   });
 
+  it.each(["main", "master", "develop"])(
+    "keeps default %s in limited suggestions ahead of newer branches",
+    async (name) => {
+      execFileSync("git", ["branch", "-m", name], { cwd: repoDir });
+      execFileSync("git", ["update-ref", `refs/remotes/origin/${name}`, "HEAD"], { cwd: repoDir });
+      execFileSync(
+        "git",
+        ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${name}`],
+        {
+          cwd: repoDir,
+        },
+      );
+      execFileSync("git", ["checkout", "-b", "feature/newer"], { cwd: repoDir });
+      const initialDate = Number(
+        execFileSync("git", ["show", "-s", "--format=%ct", "HEAD"], { cwd: repoDir })
+          .toString()
+          .trim(),
+      );
+      execFileSync(
+        "git",
+        ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "newer"],
+        {
+          cwd: repoDir,
+          env: { ...process.env, GIT_COMMITTER_DATE: `${initialDate + 60} +0000` },
+        },
+      );
+
+      await expect(listBranchSuggestions(repoDir, { limit: 1 })).resolves.toEqual([
+        expect.objectContaining({ name, isDefault: true, hasLocal: true, hasRemote: true }),
+      ]);
+      await expect(listBranchSuggestions(repoDir, { query: "feature", limit: 1 })).resolves.toEqual(
+        [expect.objectContaining({ name: "feature/newer", isDefault: false })],
+      );
+    },
+  );
+
   it("reports local and origin divergence for branch suggestions", async () => {
     const remoteDir = join(tempDir, "remote.git");
     execFileSync("git", ["init", "--bare", "-b", "main", remoteDir]);

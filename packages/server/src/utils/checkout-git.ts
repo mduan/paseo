@@ -283,14 +283,28 @@ interface BranchSuggestionMeta {
   remoteOid?: string;
 }
 
-function sortBranchSuggestions(
-  branchNames: string[],
-  branchMeta: Map<string, BranchSuggestionMeta>,
-  query: string,
-): string[] {
+function sortBranchSuggestions({
+  branchNames,
+  branchMeta,
+  query,
+  defaultBranch,
+}: {
+  branchNames: string[];
+  branchMeta: Map<string, BranchSuggestionMeta>;
+  query: string;
+  defaultBranch: string | null;
+}): string[] {
   const normalizedQuery = query.trim().toLowerCase();
   const hasQuery = normalizedQuery.length > 0;
   return branchNames.sort((a, b) => {
+    // Keep the default available to the picker when recent branches fill the result limit.
+    if (!hasQuery) {
+      const aDefault = a === defaultBranch;
+      const bDefault = b === defaultBranch;
+      if (aDefault !== bDefault) {
+        return aDefault ? -1 : 1;
+      }
+    }
     if (hasQuery) {
       const aPrefix = a.toLowerCase().startsWith(normalizedQuery);
       const bPrefix = b.toLowerCase().startsWith(normalizedQuery);
@@ -371,13 +385,19 @@ export async function listBranchSuggestions(
     return [];
   }
 
-  const ordered = sortBranchSuggestions(filteredNames, branchMeta, query);
+  const defaultBranchName = normalizeBranchSuggestionName(defaultBranch ?? "");
+  const ordered = sortBranchSuggestions({
+    branchNames: filteredNames,
+    branchMeta,
+    query,
+    defaultBranch: defaultBranchName,
+  });
   return Promise.all(
     ordered.slice(0, limit).map(async (name): Promise<BranchSuggestion> => {
       const meta = branchMeta.get(name);
       const suggestion: BranchSuggestion = {
         name,
-        isDefault: name === normalizeBranchSuggestionName(defaultBranch ?? ""),
+        isDefault: name === defaultBranchName,
         committerDate: meta?.committerDate ?? 0,
         hasLocal: meta?.hasLocal ?? false,
         hasRemote: meta?.hasRemote ?? false,
