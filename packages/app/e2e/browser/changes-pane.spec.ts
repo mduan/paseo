@@ -463,6 +463,46 @@ test("in-flow file headers move with the diff document", async ({ page }) => {
   expect(motion).toEqual({ headerSurface: -120, shell: -120 });
 });
 
+test("scrolled diff controls do not punch holes in the desktop titlebar drag region", async ({
+  page,
+}) => {
+  const workspace = await createWorkspaceWithStickyTransitionDiff();
+  await useUnwrappedDiffLines(page);
+  await openWorkspaceChangesSurface(page, workspace);
+
+  const scroller = page.getByTestId("git-diff-scroll");
+  const firstHeader = page.getByTestId("diff-file-0-toggle");
+  const secondHeader = page.getByTestId("diff-file-1-toggle");
+  await expect(firstHeader).toBeVisible();
+  const targetScrollTop = await secondHeader.evaluate((element) => {
+    const scrollElement = element.closest<HTMLElement>('[data-testid="git-diff-scroll"]');
+    if (!scrollElement) throw new Error("Diff scroller is unavailable");
+    return scrollElement.scrollTop + element.getBoundingClientRect().top - 30;
+  });
+  await scroller.evaluate((element, scrollTop) => {
+    element.scrollTop = scrollTop;
+    element.dispatchEvent(new Event("scroll"));
+  }, targetScrollTop);
+  await expect
+    .poll(() => firstHeader.evaluate((element) => element.getBoundingClientRect().bottom))
+    .toBeLessThanOrEqual(40);
+  expect(
+    await firstHeader.evaluate((element) => element.getBoundingClientRect().bottom),
+  ).toBeGreaterThan(0);
+
+  const noDragControls = await scroller.evaluate((element) =>
+    Array.from(element.querySelectorAll<HTMLElement>("[role=button], input, textarea, [tabindex]"))
+      .filter(
+        (control) => getComputedStyle(control).getPropertyValue("-webkit-app-region") === "no-drag",
+      )
+      .map((control) => ({
+        testId: control.dataset.testid,
+        top: control.getBoundingClientRect().top,
+      })),
+  );
+  expect(noDragControls).toEqual([]);
+});
+
 test("the outgoing sticky header hands off without a gap or overlap", async ({
   page,
 }, testInfo) => {

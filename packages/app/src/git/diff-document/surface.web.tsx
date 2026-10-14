@@ -964,7 +964,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   );
 
   const surface = (
-    <div data-testid="git-diff-canvas-root" ref={rootRef} style={rootStyle}>
+    <div data-testid="git-diff-canvas-root" data-outside-titlebar ref={rootRef} style={rootStyle}>
       <div
         ref={scrollRef}
         data-testid="git-diff-scroll"
