@@ -6,6 +6,7 @@ import {
   orderedSelection,
   selectAllSource,
   selectCellSource,
+  selectWordSource,
   selectedSourceText,
 } from "./hit-testing";
 import { buildDiffDocumentModel } from "./model";
@@ -17,6 +18,31 @@ describe("diff hit testing", () => {
   it("locates the closest character from measured wrapped geometry", () => {
     const cell = changedCell(buildModel("abcdef", { viewportWidth: 90 }));
     expect(characterOffsetAtPoint({ cell, x: 6, y: 20, lineHeight: 18 })).toBe(5);
+  });
+
+  it("hits the clicked character instead of the nearest caret for word selection", () => {
+    const model = buildModel("word.next", { wrapLines: false });
+    const cell = changedCell(model);
+    const row = model.rows.find(
+      (candidate) => candidate.kind === "line" && candidate.cells.includes(cell),
+    )!;
+    const hit = hitTestDiffDocument({
+      model,
+      x: model.files[0]!.gutterWidth + 8 + 39,
+      documentY: row.top + 9,
+      horizontalOffset: 0,
+      snapToCharacterStart: true,
+    });
+
+    expect(hit?.kind).toBe("cell");
+    if (hit?.kind !== "cell") throw new Error("Expected a source character hit");
+    expect(hit.position.sourceOffset).toBe(3);
+    expect(selectedSourceText(model, selectWordSource({ model, position: hit.position })!)).toBe(
+      "word",
+    );
+    expect(
+      characterOffsetAtPoint({ cell, x: 40, y: 0, lineHeight: 18, snapToCharacterStart: true }),
+    ).toBe(4);
   });
 
   it("never places a character hit inside combining or ZWJ graphemes", () => {
@@ -108,12 +134,40 @@ describe("diff hit testing", () => {
   });
 
   it("selects one source line for context-menu copy", () => {
-    const model = buildModel("copy this", { wrapLines: false });
+    const model = buildModel("copy this", { viewportWidth: 90 });
     const cell = changedCell(model);
 
     expect(selectedSourceText(model, selectCellSource(model, position(model, cell, 4)))).toBe(
       "copy this",
     );
+  });
+
+  it.each([
+    { content: "const foo_bar = otherValue;", offset: 9, expected: "foo_bar" },
+    { content: "foo_bar.otherValue", offset: 12, expected: "otherValue" },
+    { content: "$foo_bar2", offset: 0, expected: "$foo_bar2" },
+    { content: "word.next", offset: 4, expected: "." },
+    { content: "word  next", offset: 5, expected: "  " },
+    { content: "café", offset: 3, expected: "café" },
+    { content: "a👨‍👩‍👧‍👦b", offset: 1, expected: "👨‍👩‍👧‍👦" },
+    { content: "a❤️b", offset: 1, expected: "❤️" },
+    { content: "last", offset: 4, expected: "last" },
+  ])(
+    "selects '$expected' at offset $offset in '$content' across wrapped fragments",
+    ({ content, offset, expected }) => {
+      const model = buildModel(content, { viewportWidth: 90 });
+      const cell = changedCell(model);
+      const selection = selectWordSource({ model, position: position(model, cell, offset) });
+
+      expect(selectedSourceText(model, selection!)).toBe(expected);
+    },
+  );
+
+  it("does not select a word on an empty line", () => {
+    const model = buildModel("");
+    expect(
+      selectWordSource({ model, position: position(model, changedCell(model), 0) }),
+    ).toBeNull();
   });
 
   it("selects all diff source in document order", () => {

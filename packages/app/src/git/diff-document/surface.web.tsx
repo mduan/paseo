@@ -31,6 +31,7 @@ import {
   hitTestDiffDocument,
   selectAllSource,
   selectCellSource,
+  selectWordSource,
   selectedSourceText,
 } from "./hit-testing";
 import { retainHorizontalOffsetMapForPaths } from "./horizontal-offsets";
@@ -610,9 +611,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
     [schedulePaint],
   );
   const pointHitAt = useCallback(
-    (clientX: number, clientY: number) => {
+    (input: { clientX: number; clientY: number; snapToCharacterStart?: boolean }) => {
       const currentModel = modelRef.current;
-      const point = documentPointAt(clientX, clientY);
+      const point = documentPointAt(input.clientX, input.clientY);
       if (!currentModel || !point) return null;
       const file = currentModel.files.find(
         (entry) => entry.top <= point.documentY && point.documentY < entry.bottom,
@@ -622,12 +623,14 @@ export function DiffSurface(props: DiffSurfaceProps) {
         x: point.x,
         documentY: point.documentY,
         horizontalOffset: file ? (horizontalOffsetsRef.current.get(file.path) ?? 0) : 0,
+        snapToCharacterStart: input.snapToCharacterStart,
       });
     },
     [documentPointAt],
   );
   const pointHit = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => pointHitAt(event.clientX, event.clientY),
+    (event: React.PointerEvent<HTMLDivElement>) =>
+      pointHitAt({ clientX: event.clientX, clientY: event.clientY }),
     [pointHitAt],
   );
   const lineGutterHitAt = useCallback(
@@ -674,14 +677,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const pointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
-      const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest(
-          '[data-diff-header="true"], [data-diff-review="true"], [role="menuitem"], button, input, textarea',
-        )
-      )
-        return;
+      if (isDiffControlTarget(event.target)) return;
       const hit = pointHit(event);
       if (hit?.kind === "gap") {
         expandGap({ path: hit.path, gapIndex: hit.gapIndex, direction: hit.direction });
@@ -861,6 +857,26 @@ export function DiffSurface(props: DiffSurfaceProps) {
     dragRef.current = null;
     lineDragRef.current = undefined;
   }, []);
+  const repeatedClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || event.detail < 2 || event.detail > 3) return;
+      if (isDiffControlTarget(event.target)) return;
+      const currentModel = modelRef.current;
+      const hit = pointHitAt({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        snapToCharacterStart: true,
+      });
+      if (!currentModel || hit?.kind !== "cell") return;
+      if (lineGutterHitAt(hit, event.clientX, event.clientY)) return;
+      const selection =
+        event.detail === 3
+          ? selectCellSource(currentModel, hit.position)
+          : selectWordSource({ model: currentModel, position: hit.position });
+      setSelection(selection);
+    },
+    [lineGutterHitAt, pointHitAt, setSelection],
+  );
   const pointerLeave = useCallback(() => updateActiveHeader(null), [updateActiveHeader]);
   const copy = useCallback(
     (event: React.ClipboardEvent<HTMLDivElement>) => {
@@ -872,7 +888,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   );
   const prepareContextMenu = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      const hit = pointHitAt(event.clientX, event.clientY);
+      const hit = pointHitAt({ clientX: event.clientX, clientY: event.clientY });
       setContextHit(hit?.kind === "cell" ? hit : null);
     },
     [pointHitAt],
@@ -973,6 +989,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
+        onClick={repeatedClick}
         onPointerCancel={cancelPointer}
         onLostPointerCapture={cancelPointer}
         onPointerLeave={pointerLeave}
@@ -1207,6 +1224,15 @@ function isHoverAddButtonVisible(input: {
 }): boolean {
   return Boolean(
     input.canReview && input.hoveredTarget && input.hoveredTarget.key !== input.pinnedTargetKey,
+  );
+}
+
+function isDiffControlTarget(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+    target.closest(
+      '[data-diff-header="true"], [data-diff-review="true"], [role="menuitem"], button, input, textarea',
+    ),
   );
 }
 

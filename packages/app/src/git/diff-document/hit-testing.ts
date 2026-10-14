@@ -15,6 +15,7 @@ export function hitTestDiffDocument(input: {
   x: number;
   documentY: number;
   horizontalOffset: number;
+  snapToCharacterStart?: boolean;
 }): DiffHit | null {
   const file = fileAtDocumentOffset(input.model.files, input.documentY);
   if (!file) return null;
@@ -50,6 +51,7 @@ export function hitTestDiffDocument(input: {
     x: contentX,
     y: textY,
     lineHeight: input.model.lineHeight,
+    snapToCharacterStart: input.snapToCharacterStart,
   });
   return {
     kind: "cell",
@@ -69,6 +71,7 @@ export function characterOffsetAtPoint(input: {
   x: number;
   y: number;
   lineHeight: number;
+  snapToCharacterStart?: boolean;
 }): number {
   const fragmentIndex = Math.min(
     input.cell.fragments.length - 1,
@@ -78,7 +81,10 @@ export function characterOffsetAtPoint(input: {
   if (!fragment) return 0;
   let width = 0;
   for (const grapheme of fragment.graphemes) {
-    if (input.x <= width + grapheme.width / 2) return grapheme.start;
+    const isHit = input.snapToCharacterStart
+      ? input.x < width + grapheme.width
+      : input.x <= width + grapheme.width / 2;
+    if (isHit) return grapheme.start;
     width += grapheme.width;
   }
   return fragment.end;
@@ -128,6 +134,29 @@ export function selectCellSource(
     anchor: { ...position, sourceOffset: 0 },
     focus: { ...position, sourceOffset: end },
   };
+}
+
+export function selectWordSource(input: {
+  model: DiffDocumentModel;
+  position: DiffCharacterPosition;
+}): DiffSelection | null {
+  const { model, position } = input;
+  const row = model.rows[position.rowIndex];
+  const cell = row?.kind === "line" ? row.cells[position.cellIndex] : null;
+  if (!cell?.content) return null;
+  const offset = Math.min(position.sourceOffset, cell.content.length - 1);
+  const segments = cell.content.matchAll(
+    /[\p{L}\p{N}_$][\p{L}\p{N}\p{M}_$]*|\s+|[^\p{L}\p{N}_$\s]+/gu,
+  );
+  for (const segment of segments) {
+    const end = segment.index + segment[0].length;
+    if (offset >= end) continue;
+    return {
+      anchor: { ...position, sourceOffset: segment.index },
+      focus: { ...position, sourceOffset: end },
+    };
+  }
+  return null;
 }
 
 export function selectAllSource(
