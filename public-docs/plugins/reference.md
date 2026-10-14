@@ -444,6 +444,21 @@ bypasses that cache. Entries carry `id`, `account.label`, and `fetchedAt`. Clien
 on `server_info.features.usageSources`. The older `provider.usage.list` RPC maps the same reports
 for 0.10 clients and renders problems into its `error` string.
 
+LiteLLM discovery reads `$PI_CODING_AGENT_DIR/litellm-proxy.json`, or
+`~/.pi/agent/litellm-proxy.json` when the directory is unset. This file is a convention of the
+Mixpanel Pi extension, not a LiteLLM standard. Set `LITELLM_CONFIG_PATH` on the daemon host to
+use another file, including when you do not use Pi. The file supplies `baseUrl` and `authMode`:
+`virtual-key` reads `apiKey`; `gcloud` uses the host's existing Google login. Only configure a
+gateway you trust to receive that credential. Requests reject redirects and never change the
+login or gateway configuration.
+
+The LiteLLM card uses central spending, not local session estimates. Team-member budgets live
+under `/team/info` even when `/user/info` has no budget or reset period. Each membership gets
+its own card; optional `teamId` in the configuration selects one. Personal and virtual-key
+limits appear separately when configured. Monthly labels require LiteLLM's `1mo` duration,
+and reset dates come from the reported budget. Hosts showing the same membership show the
+same allowance; do not add their totals together.
+
 The source icon follows the provider SVG restrictions above.
 
 ## Entry point and cleanup
