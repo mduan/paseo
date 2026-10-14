@@ -65,7 +65,7 @@ describe("LiteLLM usage source", () => {
     expect(accounts).toEqual([
       {
         key: expect.stringMatching(/^[a-f0-9]{64}$/),
-        label: "Engineering",
+        label: "user@example.com · Engineering",
         input: { path, teamId: "team-1" },
       },
     ]);
@@ -84,6 +84,7 @@ describe("LiteLLM usage source", () => {
         },
       ],
     });
+    expect(report).not.toHaveProperty("details");
     expect(JSON.stringify(accounts)).not.toContain("test-key");
   });
 

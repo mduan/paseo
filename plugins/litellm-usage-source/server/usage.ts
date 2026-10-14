@@ -109,7 +109,7 @@ export async function discover({
   const accounts = teams.length ? teams : [undefined];
   return accounts.map((team) => ({
     key: hashAccountKey(JSON.stringify([config.baseUrl, user.user_id, team?.team_id])),
-    label: team?.team_alias || user.user_info.user_email || undefined,
+    label: [user.user_info.user_email, team?.team_alias].filter(Boolean).join(" · ") || undefined,
     input: { path, ...(team ? { teamId: team.team_id } : {}) },
   }));
 }
@@ -157,9 +157,6 @@ export async function fetchUsage(
       status: "available",
       windows: [],
       balances,
-      details: user.user_info.user_email
-        ? [{ id: "account", label: "Account", value: user.user_info.user_email }]
-        : [],
     };
   } catch (error) {
     if (error instanceof LoginRejected)
