@@ -114,6 +114,7 @@ import {
   mapOmpRpcUiPermissionRequest,
 } from "./rpc-ui-permission-mapper.js";
 import { DEFAULT_OMP_THINKING_LEVEL, mapOmpModel } from "./map-omp-model.js";
+import { transformPiModels } from "../pi/agent.js";
 
 const OMP_PROVIDER = "omp";
 const OMP_CORE_CAPABILITIES: AgentCapabilityFlags = {
@@ -237,34 +238,8 @@ interface OmpSlashCommandInvocation {
 
 type AutoCompactMode = boolean | "toggle" | "unknown";
 
-function normalizeOmpModelLabel(label: string): string {
-  const normalizedLabel = label.trim().replace(/[_\s]+/g, " ");
-  const vendorSeparatorIndex = normalizedLabel.indexOf(": ");
-  if (vendorSeparatorIndex === -1) {
-    return normalizedLabel;
-  }
-
-  return normalizedLabel.slice(vendorSeparatorIndex + 2).trim();
-}
-
 export function transformOmpModels(models: AgentModelDefinition[]): AgentModelDefinition[] {
-  return models.map((model) => {
-    if (!model.label.includes("/")) {
-      return model;
-    }
-
-    const segments = model.label.split("/").filter((segment) => segment.length > 0);
-    const rawLabel = segments.at(-1);
-    if (!rawLabel) {
-      return model;
-    }
-
-    return {
-      ...model,
-      label: normalizeOmpModelLabel(rawLabel),
-      description: model.description ?? model.label,
-    };
-  });
+  return transformPiModels(models);
 }
 
 function isOmpThinkingLevel(value: string | null | undefined): value is OmpThinkingLevel {

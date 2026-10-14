@@ -12,7 +12,7 @@ import type { OmpUsagePollScheduler } from "./usage-poller.js";
 import { resolveOmpProviderOptions } from "./provider-config.js";
 import { OmpRuntimeEventSchema } from "./rpc-types.js";
 import { OmpHarness } from "./test-utils/omp-harness.js";
-import { OmpAgentClient } from "./agent.js";
+import { OmpAgentClient, transformOmpModels } from "./agent.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
 
@@ -1344,6 +1344,26 @@ describe("OMP agent client and session", () => {
     omp.runtime().acceptPrompt("hello OMP", "user-1");
     expect(omp.timeline().filter((item) => item.type === "user_message")).toEqual([
       { type: "user_message", text: "hello OMP", messageId: "user-1" },
+    ]);
+  });
+
+  test("transformOmpModels splits inline pricing and guidance into description without truncating at price slashes", () => {
+    expect(
+      transformOmpModels([
+        {
+          provider: "omp",
+          id: "litellm/gemini-4-argon",
+          label: "litellm/gemini-4-argon ($2/$10) — Google's frontier Gemini model.",
+          description: "litellm/gemini-4-argon",
+        },
+      ]),
+    ).toEqual([
+      {
+        provider: "omp",
+        id: "litellm/gemini-4-argon",
+        label: "gemini-4-argon",
+        description: "($2/$10) — Google's frontier Gemini model.",
+      },
     ]);
   });
 });

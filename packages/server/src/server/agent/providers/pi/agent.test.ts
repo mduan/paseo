@@ -3299,4 +3299,164 @@ describe("transformPiModels", () => {
       },
     ]);
   });
+
+  test("extracts inline pricing, tags, and guidance into description without splitting on price slashes", () => {
+    expect(
+      transformPiModels([
+        {
+          provider: "pi",
+          id: "litellm/gemini-4-argon",
+          label: "litellm/gemini-4-argon ($2/$10) — Google's frontier Gemini model.",
+          description: "litellm/gemini-4-argon",
+        },
+        {
+          provider: "pi",
+          id: "litellm/claude-sonnet-5-5",
+          label:
+            "litellm/claude-sonnet-5-5 ($2/$10 · Try this · daily-driver) — Recommended default for routine engineering work.",
+          description: "litellm/claude-sonnet-5-5",
+        },
+        {
+          provider: "pi",
+          id: "litellm/gpt-5.5",
+          label: "litellm/gpt-5.5 ($5/$30 · Legacy)",
+          description: "litellm/gpt-5.5",
+        },
+        {
+          provider: "pi",
+          id: "litellm/custom-route",
+          label: "litellm/custom-route (LiteLLM)",
+          description: "litellm/custom-route",
+        },
+        {
+          provider: "pi",
+          id: "litellm/plain-guidance",
+          label: "litellm/plain-guidance — Fast model for I/O tasks.",
+          description: "litellm/plain-guidance",
+        },
+      ]),
+    ).toEqual([
+      {
+        provider: "pi",
+        id: "litellm/gemini-4-argon",
+        label: "gemini-4-argon",
+        description: "($2/$10) — Google's frontier Gemini model.",
+      },
+      {
+        provider: "pi",
+        id: "litellm/claude-sonnet-5-5",
+        label: "claude-sonnet-5-5",
+        description:
+          "($2/$10 · Try this · daily-driver) — Recommended default for routine engineering work.",
+      },
+      {
+        provider: "pi",
+        id: "litellm/gpt-5.5",
+        label: "gpt-5.5",
+        description: "($5/$30 · Legacy)",
+      },
+      {
+        provider: "pi",
+        id: "litellm/custom-route",
+        label: "custom-route",
+        description: "(LiteLLM)",
+      },
+      {
+        provider: "pi",
+        id: "litellm/plain-guidance",
+        label: "plain-guidance",
+        description: "Fast model for I/O tasks.",
+      },
+    ]);
+  });
+
+  test("preserves model qualifiers in parentheses and handles degenerate or pre-described models", () => {
+    expect(
+      transformPiModels([
+        {
+          provider: "pi",
+          id: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+          label: "amazon-bedrock/Claude Sonnet 5.5 (EU)",
+          description: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+        },
+        {
+          provider: "pi",
+          id: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+          label: "amazon-bedrock/Claude Sonnet 5.5 (EU) — Use for EU residency.",
+          description: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+        },
+        {
+          provider: "pi",
+          id: "anthropic/claude-haiku-4-5",
+          label: "anthropic/Claude Haiku 4.5 (latest)",
+          description: "anthropic/claude-haiku-4-5",
+        },
+        {
+          provider: "pi",
+          id: "openrouter/openai/gpt-5.5:batch",
+          label: "openrouter/OpenAI: GPT-5.5 (batch)",
+          description: "openrouter/openai/gpt-5.5:batch",
+        },
+        {
+          provider: "pi",
+          id: "custom/model-128k",
+          label: "custom/Model (128k)",
+          description: "custom/model-128k",
+        },
+        {
+          provider: "pi",
+          id: "litellm/described-model",
+          label: "litellm/described-model ($2/$10) — Extra guidance",
+          description: "Custom tier",
+        },
+        {
+          provider: "pi",
+          id: "openrouter/",
+          label: "openrouter/",
+        },
+      ]),
+    ).toEqual([
+      {
+        provider: "pi",
+        id: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+        label: "Claude Sonnet 5.5 (EU)",
+        description: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+      },
+      {
+        provider: "pi",
+        id: "amazon-bedrock/eu.anthropic.claude-sonnet-5-5",
+        label: "Claude Sonnet 5.5 (EU)",
+        description: "Use for EU residency.",
+      },
+      {
+        provider: "pi",
+        id: "anthropic/claude-haiku-4-5",
+        label: "Claude Haiku 4.5 (latest)",
+        description: "anthropic/claude-haiku-4-5",
+      },
+      {
+        provider: "pi",
+        id: "openrouter/openai/gpt-5.5:batch",
+        label: "GPT-5.5 (batch)",
+        description: "openrouter/openai/gpt-5.5:batch",
+      },
+      {
+        provider: "pi",
+        id: "custom/model-128k",
+        label: "Model (128k)",
+        description: "custom/model-128k",
+      },
+      {
+        provider: "pi",
+        id: "litellm/described-model",
+        label: "described-model",
+        description: "Custom tier — ($2/$10) — Extra guidance",
+      },
+      {
+        provider: "pi",
+        id: "openrouter/",
+        label: "openrouter/",
+      },
+    ]);
+  });
 });

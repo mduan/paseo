@@ -299,6 +299,14 @@ interface PiSlashCommandInvocation {
 
 type AutoCompactMode = boolean | "toggle" | "unknown";
 
+const LEADING_PATH_PREFIX_PATTERN = /^(?:[^\s/]+\/)+/;
+const TRAILING_METADATA_PAREN_PATTERN = /^(.+?)\s+(\([^()]*(?:\$|·|\d+\/\d+|LiteLLM)[^()]*\))$/;
+
+interface ParsedPiModelLabel {
+  label: string;
+  inlineDescription?: string;
+}
+
 function normalizePiModelLabel(label: string): string {
   const normalizedLabel = label.trim().replace(/[_\s]+/g, " ");
   const vendorSeparatorIndex = normalizedLabel.indexOf(": ");
@@ -309,22 +317,78 @@ function normalizePiModelLabel(label: string): string {
   return normalizedLabel.slice(vendorSeparatorIndex + 2).trim();
 }
 
+function parsePiModelLabel(rawLabel: string): ParsedPiModelLabel {
+  const dashMatch = /^(.+?)\s+—\s+(.+)$/.exec(rawLabel);
+  if (dashMatch) {
+    const [, head, guidance] = dashMatch;
+    const metaMatch = TRAILING_METADATA_PAREN_PATTERN.exec(head);
+    if (metaMatch) {
+      const [, name, meta] = metaMatch;
+      return {
+        label: normalizePiModelLabel(name),
+        inlineDescription: `${meta} — ${guidance.trim()}`,
+      };
+    }
+    return {
+      label: normalizePiModelLabel(head),
+      inlineDescription: guidance.trim(),
+    };
+  }
+
+  // Trailing parenthetical metadata (cost, middle-dot tags, or LiteLLM tag) moves
+  // to description; model qualifiers like (EU), (latest), (batch), (128k) stay in label.
+  const metaOnlyMatch = TRAILING_METADATA_PAREN_PATTERN.exec(rawLabel);
+  if (metaOnlyMatch) {
+    const [, name, meta] = metaOnlyMatch;
+    return {
+      label: normalizePiModelLabel(name),
+      inlineDescription: meta,
+    };
+  }
+
+  return {
+    label: normalizePiModelLabel(rawLabel),
+  };
+}
+
+function resolvePiModelDescription(
+  model: AgentModelDefinition,
+  inlineDescription: string | undefined,
+): string {
+  const existing = model.description;
+  const hasDistinctExistingDescription =
+    Boolean(existing) && existing !== model.id && existing !== model.label;
+
+  if (!inlineDescription) {
+    return existing ?? model.label;
+  }
+  if (!hasDistinctExistingDescription) {
+    return inlineDescription;
+  }
+  return `${existing} — ${inlineDescription}`;
+}
+
 export function transformPiModels(models: AgentModelDefinition[]): AgentModelDefinition[] {
   return models.map((model) => {
-    if (!model.label.includes("/")) {
+    const trimmedLabel = model.label.trim();
+    const hadLeadingPathPrefix = LEADING_PATH_PREFIX_PATTERN.test(trimmedLabel);
+    const withoutPathPrefix = trimmedLabel.replace(LEADING_PATH_PREFIX_PATTERN, "").trim();
+    if (!withoutPathPrefix) {
       return model;
     }
 
-    const segments = model.label.split("/").filter((segment) => segment.length > 0);
-    const rawLabel = segments.at(-1);
-    if (!rawLabel) {
+    const { label, inlineDescription } = parsePiModelLabel(withoutPathPrefix);
+    if (!hadLeadingPathPrefix && !inlineDescription) {
+      return model;
+    }
+    if (!label) {
       return model;
     }
 
     return {
       ...model,
-      label: normalizePiModelLabel(rawLabel),
-      description: model.description ?? model.label,
+      label,
+      description: resolvePiModelDescription(model, inlineDescription),
     };
   });
 }

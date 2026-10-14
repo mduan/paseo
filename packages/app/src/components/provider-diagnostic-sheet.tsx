@@ -50,6 +50,11 @@ function rankModels<T>(items: T[], query: string, fields: (item: T) => string[])
 }
 
 function DiscoveredModelRow({ model }: { model: AgentModelDefinition }) {
+  const showDescription =
+    Boolean(model.description) &&
+    model.description !== model.id &&
+    model.description !== model.label;
+
   return (
     <View style={sheetStyles.modelRow}>
       <Text style={sheetStyles.modelTitle} numberOfLines={1}>
@@ -63,7 +68,7 @@ function DiscoveredModelRow({ model }: { model: AgentModelDefinition }) {
       >
         {model.id}
       </Text>
-      {model.description ? (
+      {showDescription ? (
         <Text style={sheetStyles.descriptionInline} numberOfLines={1}>
           {model.description}
         </Text>
