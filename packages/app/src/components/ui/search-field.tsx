@@ -6,10 +6,12 @@ import {
   type ReactNode,
   type ReactElement,
 } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
+import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
+import { isNative } from "@/constants/platform";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -100,15 +102,15 @@ export function SearchField({
         style={styles.input}
       />
       {value.length > 0 ? (
-        <Pressable
+        <ToolbarButton
           testID={clearTestID}
           onPress={handleClear}
-          accessibilityRole="button"
-          accessibilityLabel={clearAccessibilityLabel}
+          label={clearAccessibilityLabel}
+          compact={isNative}
           hitSlop={8}
         >
           <ThemedX size={14} uniProps={mutedColorMapping} />
-        </Pressable>
+        </ToolbarButton>
       ) : null}
       {trailing}
     </View>

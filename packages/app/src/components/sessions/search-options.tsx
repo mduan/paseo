@@ -6,6 +6,7 @@ import { StyleSheet } from "react-native-unistyles";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { useHistorySearch } from "@/hooks/use-history-search";
 import { Button } from "@/components/ui/button";
+import { isNative } from "@/constants/platform";
 import { SearchField } from "@/components/ui/search-field";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
@@ -59,7 +60,7 @@ function SearchOptionButton({
           accessibilityState={accessibilityState}
           aria-pressed={selected}
           testID={`sessions-search-${option}`}
-          style={selected && styles.selected}
+          style={[styles.option, selected && styles.selected]}
           textStyle={option === SearchOption.WholeWord && styles.wholeWord}
           onPress={toggle}
         >
@@ -132,6 +133,7 @@ export function HistorySearchField({
 const styles = StyleSheet.create((theme) => ({
   field: { gap: theme.spacing[2] },
   options: { flexDirection: "row", alignItems: "center" },
+  option: { paddingHorizontal: isNative ? theme.spacing[3] : theme.spacing[1] },
   selected: { backgroundColor: theme.colors.interactionHighlight },
   wholeWord: { textDecorationLine: "underline" },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
