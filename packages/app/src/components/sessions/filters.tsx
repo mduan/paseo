@@ -1,7 +1,15 @@
 /* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
 import { useCallback, useMemo, type ReactElement } from "react";
 import { Text, View } from "react-native";
-import { Archive, Bot, Cpu, PanelsTopLeft, Server, SlidersHorizontal } from "lucide-react-native";
+import {
+  Archive,
+  Bot,
+  Cpu,
+  PanelsTopLeft,
+  Server,
+  SlidersHorizontal,
+  X,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
@@ -324,9 +332,12 @@ export function HistoryFilterBar({
       ))}
       {!supported ? <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text> : null}
       {activeCount ? (
-        <Button size="sm" variant="ghost" onPress={clear}>
-          {t("sessions.filters.clear")}
-        </Button>
+        <View style={styles.clearGroup}>
+          <View style={styles.clearDivider} />
+          <Button size="sm" variant="ghost" leftIcon={X} onPress={clear}>
+            {t("sessions.filters.clear")}
+          </Button>
+        </View>
       ) : null}
     </View>
   );
@@ -338,6 +349,17 @@ function filterTriggerStyle(state: MenuTriggerState) {
 
 const styles = StyleSheet.create((theme) => ({
   bar: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: theme.spacing[2] },
+  clearGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    marginLeft: theme.spacing[2],
+  },
+  clearDivider: {
+    width: theme.borderWidth[1],
+    height: theme.spacing[4],
+    backgroundColor: theme.colors.border,
+  },
   trigger: {
     maxWidth: 260,
   },
