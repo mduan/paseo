@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { connectSeedClient } from "../support/helpers/seed-client";
@@ -82,11 +83,12 @@ async function verifyExactAndTypoHighlights(page: Page): Promise<void> {
   });
 }
 
-async function verifyAllSearchFieldHighlights(page: Page): Promise<void> {
-  await test.step("highlights workspace, agent, project and branch independently", async () => {
+async function verifyAllSearchFieldHighlights(page: Page, repoPath: string): Promise<void> {
+  await test.step("shows the repository folder and highlights each field independently", async () => {
     await search(page, `${NONCE} main`);
     await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
     const row = rowTitles(page).filter({ hasText: NONCE }).first();
+    await expect(row.getByTestId(/^agent-row-workspace-/)).toHaveText(path.basename(repoPath));
     for (const field of ["workspace", "title", "project", "branch"]) {
       await expect(
         row.getByTestId(new RegExp(`^agent-row-${field}-`)).getByText(/^main$/i),
@@ -159,9 +161,30 @@ test.describe("History search", () => {
 
       await verifyExactAndTypoHighlights(page);
 
-      await verifyAllSearchFieldHighlights(page);
+      await verifyAllSearchFieldHighlights(page, tempRepo.path);
 
       await verifyEmptySearchAndRecovery(page);
     });
   }
+
+  test("shows the worktree folder instead of the workspace title", async ({ page }) => {
+    const worktreeSlug = "history-folder-worktree";
+    const created = await client.createWorkspace({
+      source: { kind: "worktree", cwd: tempRepo.path, projectId, worktreeSlug },
+      title: "Review history folder labels",
+    });
+    if (!created.workspace) {
+      throw new Error(created.error ?? "Failed to create history worktree");
+    }
+    const agent = await createMockIdleAgent(client, {
+      cwd: created.workspace.workspaceDirectory,
+      workspaceId: created.workspace.id,
+      title: "Worktree folder label",
+    });
+
+    await resetSeededPageState(page);
+    await openSessions(page);
+    const row = page.getByTestId(new RegExp(`^agent-row-workspace-.*-${agent.id}$`));
+    await expect(row).toHaveText(worktreeSlug);
+  });
 });

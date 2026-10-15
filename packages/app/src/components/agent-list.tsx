@@ -34,6 +34,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import type { HistoryFields } from "@/components/sessions/preferences";
 import { formatTurnCount } from "@/utils/format-turn-count";
+import { pathBaseName } from "@/utils/path";
+import { resolveProjectPlacement } from "@/utils/project-placement";
 
 const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const refreshColorMapping = (theme: Theme) => ({
@@ -286,20 +288,24 @@ function SessionRowContext({
   fields: HistoryFields;
   search?: string;
 }) {
+  const placement = resolveProjectPlacement({
+    projectPlacement: agent.projectPlacement,
+    cwd: agent.cwd,
+  });
   const projectName = agent.projectPlacement?.projectName ?? "";
-  const branch = agent.projectPlacement?.checkout.currentBranch ?? "";
-  const workspaceName = agent.projectPlacement?.workspaceName ?? "";
+  const branch = placement.checkout.currentBranch ?? "";
+  const folderName = pathBaseName(placement.checkout.worktreeRoot ?? placement.checkout.cwd);
   const showProject = fields.project && Boolean(projectName);
-  const showWorkspace = fields.workspace && Boolean(workspaceName);
+  const showWorkspace = fields.workspace && Boolean(folderName);
   const showBranch = fields.branch && Boolean(branch);
   const showPlacement = showProject || showWorkspace;
   const ranges = useMemo(
     () => ({
-      workspace: findHighlightRanges(search ?? "", workspaceName),
+      workspace: findHighlightRanges(search ?? "", folderName),
       branch: findHighlightRanges(search ?? "", branch),
       project: findHighlightRanges(search ?? "", projectName),
     }),
-    [search, workspaceName, branch, projectName],
+    [search, folderName, branch, projectName],
   );
   return (
     <>
@@ -328,7 +334,7 @@ function SessionRowContext({
               {showProject ? <ThemedChevronRight size={12} uniProps={mutedIconMapping} /> : null}
               <ThemedFolder size={14} uniProps={mutedIconMapping} />
               <HighlightedText
-                text={workspaceName}
+                text={folderName}
                 ranges={ranges.workspace}
                 style={styles.sessionMetaText}
                 numberOfLines={1}
