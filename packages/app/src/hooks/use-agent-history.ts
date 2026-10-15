@@ -35,6 +35,7 @@ export interface AgentHistoryResult {
   /** False when any target host predates search; the screen hides the field. */
   isSearchSupported: boolean;
   isFilterSupported: boolean;
+  isAgentTypeFilterSupported: boolean;
   filterOptions: AgentHistoryFilterOptions;
   /** More sessions matched than the ranked page holds. Narrow the query. */
   isSearchTruncated: boolean;
@@ -324,7 +325,24 @@ export function useAgentHistory(options: {
       [targetServerIds],
     ),
   );
-  const filter = isFilterSupported ? options.filter : undefined;
+  // COMPAT(agentHistoryAgentTypeFilter): added in v0.11.0-fork.17, remove gate after 2027-04-15.
+  const isAgentTypeFilterSupported = useSessionStore(
+    useCallback(
+      (state) =>
+        targetServerIds.length > 0 &&
+        targetServerIds.every(
+          (id) => state.sessions[id]?.serverInfo?.features?.agentHistoryAgentTypeFilter === true,
+        ),
+      [targetServerIds],
+    ),
+  );
+  const filter = useMemo(() => {
+    if (!isFilterSupported || !options.filter) return undefined;
+    return {
+      ...options.filter,
+      isSubagent: isAgentTypeFilterSupported ? options.filter.isSubagent : undefined,
+    };
+  }, [isFilterSupported, isAgentTypeFilterSupported, options.filter]);
   const search = useMemo(() => {
     const trimmed = options.search?.trim() ?? "";
     return isSearchSupported ? trimmed : "";
@@ -444,6 +462,7 @@ export function useAgentHistory(options: {
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
     isFilterSupported,
+    isAgentTypeFilterSupported,
     filterOptions,
     isSearchTruncated,
     hostErrors,

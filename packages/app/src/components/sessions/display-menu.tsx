@@ -20,7 +20,7 @@ const FIELD_GROUPS = [
     HistoryField.Turns,
     HistoryField.Cost,
   ],
-  [HistoryField.Status, HistoryField.LastActivity],
+  [HistoryField.Subagent, HistoryField.Status, HistoryField.LastActivity],
 ];
 
 type HistoryDisplayMenuProps = {

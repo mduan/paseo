@@ -3105,6 +3105,7 @@ test("fetch_agent_history_request filters across history and paginates chronolog
       }),
       title: "Unbilled usage report",
       model: "history-model",
+      labels: { "paseo.parent-agent-id": "unrelated" },
       archivedAt: "2026-03-04T12:00:00.000Z",
     },
     {
@@ -3127,6 +3128,7 @@ test("fetch_agent_history_request filters across history and paginates chronolog
       }),
       title: "Add Stripe billing",
       model: "history-model",
+      labels: { "paseo.parent-agent-id": "unrelated" },
       archivedAt: "2026-03-04T12:00:00.000Z",
     },
   ];
@@ -3193,6 +3195,36 @@ test("fetch_agent_history_request filters across history and paginates chronolog
   const active = filterByType(emitted, "fetch_agent_history_response")[4];
   expect(active.payload.entries.map((entry) => entry.agent.id)).toEqual(["unrelated"]);
   expect(active.payload.filterOptions).toEqual(filteredFirst.payload.filterOptions);
+
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "main-agents",
+    filter: { isSubagent: false },
+    page: { limit: 1 },
+  });
+  const main = filterByType(emitted, "fetch_agent_history_response")[5];
+  expect(main.payload.entries.map((entry) => entry.agent.id)).toEqual(["unrelated"]);
+  expect(main.payload.pageInfo.hasMore).toBe(false);
+
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "subagents-first",
+    filter: { isSubagent: true },
+    page: { limit: 1 },
+  });
+  const children = filterByType(emitted, "fetch_agent_history_response")[6];
+  expect(children.payload.entries.map((entry) => entry.agent.id)).toEqual(["weak"]);
+  expect(children.payload.pageInfo.hasMore).toBe(true);
+
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "subagents-next",
+    filter: { isSubagent: true },
+    page: { limit: 1, cursor: children.payload.pageInfo.nextCursor! },
+  });
+  const nextChildren = filterByType(emitted, "fetch_agent_history_response")[7];
+  expect(nextChildren.payload.entries.map((entry) => entry.agent.id)).toEqual(["strong"]);
+  expect(nextChildren.payload.pageInfo.hasMore).toBe(false);
 });
 
 test("fetch_agent_history_request rejects a malformed search cursor", async () => {

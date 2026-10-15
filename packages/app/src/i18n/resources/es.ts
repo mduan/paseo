@@ -291,6 +291,7 @@ export const es: TranslationResources = {
       saveFailed:
         "No se pudieron guardar las preferencias del historial. Reintenta para guardar tus selecciones actuales.",
       fields: {
+        subagent: "Insignia de subagente",
         project: "Proyecto",
         workspace: "Carpeta",
         branch: "Rama",
@@ -305,6 +306,11 @@ export const es: TranslationResources = {
       },
     },
     filters: {
+      agentType: "Tipo de agente",
+      allAgents: "Todos los agentes",
+      mainAgents: "Agentes principales",
+      subagents: "Subagentes",
+
       title: "Filtros",
       hosts: "Hosts",
       projects: "Proyectos",
@@ -350,6 +356,7 @@ export const es: TranslationResources = {
       closed: "Cerrado",
     },
     badges: {
+      subagent: "Subagente",
       archived: "Archivado",
       pending: "{{count}}pendiente",
       attention: "Atención",

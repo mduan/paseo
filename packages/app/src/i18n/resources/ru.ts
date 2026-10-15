@@ -290,6 +290,7 @@ export const ru: TranslationResources = {
       saveFailed:
         "Не удалось сохранить настройки истории. Повторите попытку, чтобы сохранить текущий выбор.",
       fields: {
+        subagent: "Метка субагента",
         project: "Проект",
         workspace: "Папка",
         branch: "Ветка",
@@ -304,6 +305,11 @@ export const ru: TranslationResources = {
       },
     },
     filters: {
+      agentType: "Тип агента",
+      allAgents: "Все агенты",
+      mainAgents: "Основные агенты",
+      subagents: "Субагенты",
+
       title: "Фильтры",
       hosts: "Хосты",
       projects: "Проекты",
@@ -349,6 +355,7 @@ export const ru: TranslationResources = {
       closed: "Закрыт",
     },
     badges: {
+      subagent: "Субагент",
       archived: "В архиве",
       pending: "На рассмотрении: {{count}}",
       attention: "Внимание",

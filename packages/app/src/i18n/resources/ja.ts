@@ -290,6 +290,7 @@ export const ja: TranslationResources = {
       title: "表示",
       saveFailed: "履歴の設定を保存できませんでした。再試行して現在の選択を保存してください。",
       fields: {
+        subagent: "サブエージェントバッジ",
         project: "プロジェクト",
         workspace: "フォルダー",
         branch: "ブランチ",
@@ -304,6 +305,11 @@ export const ja: TranslationResources = {
       },
     },
     filters: {
+      agentType: "エージェントの種類",
+      allAgents: "すべてのエージェント",
+      mainAgents: "メインエージェント",
+      subagents: "サブエージェント",
+
       title: "フィルター",
       hosts: "ホスト",
       projects: "プロジェクト",
@@ -349,6 +355,7 @@ export const ja: TranslationResources = {
       closed: "クローズ",
     },
     badges: {
+      subagent: "サブエージェント",
       archived: "アーカイブ済み",
       pending: "{{count}}件保留中",
       attention: "注意",

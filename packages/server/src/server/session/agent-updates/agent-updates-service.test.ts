@@ -217,6 +217,26 @@ describe("matchesAgentUpdatesFilter", () => {
     expect(matchesAgentUpdatesFilter({ agent: makeAgentPayload({ id: "a" }), project })).toBe(true);
   });
 
+  test.each([
+    { labels: {}, subagent: false },
+    { labels: { "paseo.parent-agent-id": "parent" }, subagent: true },
+    { labels: { "paseo.parent-agent-id": "   " }, subagent: false },
+  ])("filters main agents and subagents using parent labels: $labels", ({ labels, subagent }) => {
+    const agent = makeAgentPayload({ id: "child", labels, archivedAt: "2026-03-02T00:00:00.000Z" });
+    expect(matchesAgentUpdatesFilter({ agent, project, filter: { includeArchived: true } })).toBe(
+      true,
+    );
+    for (const isSubagent of [true, false]) {
+      expect(
+        matchesAgentUpdatesFilter({
+          agent,
+          project,
+          filter: { includeArchived: true, isSubagent },
+        }),
+      ).toBe(isSubagent === subagent);
+    }
+  });
+
   test("label match vs mismatch", () => {
     const agent = makeAgentPayload({ id: "a", labels: { surface: "voice" } });
     expect(

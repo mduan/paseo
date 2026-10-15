@@ -1,4 +1,5 @@
 import type pino from "pino";
+import { isDelegatedAgent } from "@getpaseo/protocol/agent-labels";
 import type {
   AgentSnapshotPayload,
   ProjectPlacementPayload,
@@ -117,6 +118,9 @@ function matchesAgentHistoryFilter({
   agent: AgentSnapshotPayload;
   filter: AgentUpdatesFilter;
 }): boolean {
+  if (filter.isSubagent !== undefined && isDelegatedAgent(agent) !== filter.isSubagent) {
+    return false;
+  }
   if (filter.archived !== undefined && Boolean(agent.archivedAt) !== filter.archived) {
     return false;
   }

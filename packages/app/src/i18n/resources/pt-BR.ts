@@ -290,6 +290,7 @@ export const ptBR: TranslationResources = {
       saveFailed:
         "Não foi possível salvar as preferências do histórico. Tente novamente para salvar suas escolhas atuais.",
       fields: {
+        subagent: "Selo de subagente",
         project: "Projeto",
         workspace: "Pasta",
         branch: "Branch",
@@ -304,6 +305,11 @@ export const ptBR: TranslationResources = {
       },
     },
     filters: {
+      agentType: "Tipo de agente",
+      allAgents: "Todos os agentes",
+      mainAgents: "Agentes principais",
+      subagents: "Subagentes",
+
       title: "Filtros",
       hosts: "Hosts",
       projects: "Projetos",
@@ -349,6 +355,7 @@ export const ptBR: TranslationResources = {
       closed: "Fechada",
     },
     badges: {
+      subagent: "Subagente",
       archived: "Arquivado",
       pending: "{{count}} pendente(s)",
       attention: "Atenção",

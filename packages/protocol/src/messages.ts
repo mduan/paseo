@@ -925,6 +925,7 @@ const AgentDirectoryFilterSchema = z.object({
   requiresAttention: z.boolean().optional(),
   thinkingOptionId: z.string().nullable().optional(),
   archived: z.boolean().optional(),
+  isSubagent: z.boolean().optional(),
   providers: z.array(z.string()).optional(),
   models: z.array(z.object({ provider: z.string(), model: z.string().nullable() })).optional(),
 });
@@ -3754,6 +3755,7 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
         agentHistoryFilters: z.boolean().optional(),
+        agentHistoryAgentTypeFilter: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
