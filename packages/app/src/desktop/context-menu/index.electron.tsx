@@ -68,7 +68,10 @@ function ContentContextMenu() {
   const { t } = useTranslation();
   const toast = useToast();
   const { open, setOpen, setAnchorRect } = useContextMenu();
-  const floatingLayer = useGlobalWebOverlayLayer("floating", open);
+  const floatingLayer = Math.max(
+    useGlobalWebOverlayLayer("floating", open),
+    OVERLAY_Z.tooltip + OVERLAY_Z.floating,
+  );
   const [snapshot, setSnapshot] = useState<MenuSnapshot>();
   const { mutate, reset, isPending, isError, variables } = useMutation({
     mutationFn: async (action: ContentContextMenuAction) => {

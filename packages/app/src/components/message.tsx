@@ -82,6 +82,8 @@ import { getAssistantImageMetadata } from "@/utils/assistant-image-metadata";
 import { isRenderProfileEnabled } from "@/utils/render-profiler";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
+import { getAttachmentLink } from "@/attachments/link";
 import { PlanCard } from "./plan-card";
 import { useToolCallSheet } from "./tool-call-sheet";
 import { ToolCallDetailsContent } from "./tool-call-details";
@@ -549,10 +551,13 @@ export const UserMessage = memo(function UserMessage({
                   );
                 }
                 const content = getAgentAttachmentPillContent(attachment, t);
+                const key = `${attachment.type}:${"number" in attachment ? attachment.number : index}`;
+                const url = getAttachmentLink(attachment);
+                if (url) {
+                  return <LinkAttachmentPill key={key} url={url} content={content} />;
+                }
                 return (
-                  <AttachmentFrame
-                    key={`${attachment.type}:${"number" in attachment ? attachment.number : index}`}
-                  >
+                  <AttachmentFrame key={key}>
                     <AttachmentLabel
                       icon={content.icon}
                       title={content.title}

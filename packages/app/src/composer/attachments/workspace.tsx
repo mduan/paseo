@@ -8,6 +8,8 @@ import type {
 import { getWorkspaceAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import { AttachmentLabel, AttachmentPill } from "@/components/attachment-pill";
 import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
+import { getAttachmentLink } from "@/attachments/link";
 import {
   isWorkspaceAttachment,
   isPullRequestContextAttachment,
@@ -259,6 +261,20 @@ function WorkspaceAttachmentPill({
         attachment={attachment.attachment}
         onOpen={handleOpen}
         onRemove={handleRemove}
+        disabled={disabled}
+        testID={getPillTestID(attachment)}
+      />
+    );
+  }
+  const url = getAttachmentLink(attachment);
+  if (url) {
+    return (
+      <LinkAttachmentPill
+        url={url}
+        content={content}
+        onRemove={handleRemove}
+        accessibilityLabel={getOpenAccessibilityLabel(attachment, t)}
+        removeAccessibilityLabel={getRemoveAccessibilityLabel(attachment, t)}
         disabled={disabled}
         testID={getPillTestID(attachment)}
       />

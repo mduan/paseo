@@ -4,6 +4,51 @@ import { page, userEvent } from "vitest/browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueuedComposerMessage } from "./actions";
 import { QueuedMessageList } from "./queued-message-list";
+import { I18nextProvider } from "react-i18next";
+import { i18n } from "@/i18n/i18next";
+import { persistAttachmentFromDataUrl } from "@/attachments/service";
+import type { ComposerAttachment } from "@/attachments/types";
+import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
+import { ReducedMotionConfig, ReduceMotion } from "react-native-reanimated";
+
+const issueItem: ForgeSearchItem = {
+  kind: "issue",
+  number: 42,
+  title: "Sample issue",
+  url: "https://example.com/issues/42",
+  state: "open",
+  body: "Issue context",
+  labels: [],
+  baseRefName: null,
+  headRefName: null,
+};
+const changeRequestItem: ForgeSearchItem = {
+  ...issueItem,
+  kind: "change_request",
+  title: "Sample pull request",
+  url: "https://example.com/pull/42",
+};
+const externalAttachments: Extract<ComposerAttachment, { item: unknown }>[] = [
+  { kind: "forge_issue", item: issueItem },
+  { kind: "forge_change_request", item: changeRequestItem },
+  { kind: "github_issue", item: issueItem },
+  { kind: "github_pr", item: changeRequestItem },
+  {
+    kind: "plugin_resource",
+    pluginId: "notion",
+    sourceId: "pages",
+    sourceTitle: "Notion page",
+    sourceIcon: "FileText",
+    item: {
+      id: "notes",
+      identifier: "Design notes",
+      title: "Sample design notes",
+      url: "https://example.com/notes",
+      text: "Design context",
+      resourceType: "page",
+    },
+  },
+];
 
 const messages: QueuedComposerMessage[] = [
   { id: "first", text: "First queued message", attachments: [] },
@@ -16,19 +61,24 @@ let container: HTMLDivElement;
 const onReorder = vi.fn();
 const onEdit = vi.fn();
 const onSendNow = vi.fn();
+const onOpenAttachment = vi.fn();
 
 function render(queuedMessages = messages) {
   act(() => {
     root.render(
-      <QueuedMessageList
-        queuedMessages={queuedMessages}
-        onReorder={onReorder}
-        onEdit={onEdit}
-        onSendNow={onSendNow}
-        editLabel="Edit queued message"
-        reorderLabel="Reorder queued message"
-        sendNowLabel="Send queued message now"
-      />,
+      <I18nextProvider i18n={i18n}>
+        <ReducedMotionConfig mode={ReduceMotion.Always} />
+        <QueuedMessageList
+          queuedMessages={queuedMessages}
+          onReorder={onReorder}
+          onEdit={onEdit}
+          onSendNow={onSendNow}
+          onOpenAttachment={onOpenAttachment}
+          editLabel="Edit queued message"
+          reorderLabel="Reorder queued message"
+          sendNowLabel="Send queued message now"
+        />
+      </I18nextProvider>,
     );
   });
 }
@@ -84,6 +134,81 @@ afterEach(() => {
 });
 
 describe("queued message reordering", () => {
+  it.each(externalAttachments)("shows queued $kind link previews", async (attachment) => {
+    render([{ id: "linked", text: "Review this context.", attachments: [attachment] }]);
+    await act(async () =>
+      userEvent.hover(page.getByRole("button", { name: attachment.item.title })),
+    );
+    const link = page.getByRole("link", { name: attachment.item.url, exact: true });
+    await expect.element(link).toBeVisible();
+    expect(link.element().getAttribute("href")).toBe(attachment.item.url);
+    await act(async () =>
+      userEvent.click(page.getByRole("button", { name: attachment.item.title })),
+    );
+    await expect.element(link).toBeVisible();
+    expect(onOpenAttachment).not.toHaveBeenCalled();
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onSendNow).not.toHaveBeenCalled();
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("shows an image-only prompt and opens its image without sending or dragging", async () => {
+    const metadata = await persistAttachmentFromDataUrl({
+      dataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      fileName: "menu.png",
+    });
+    render([{ id: "image-only", text: "", attachments: [{ kind: "image", metadata }] }]);
+
+    const image = page.getByRole("button", { name: "Open image attachment" });
+    await expect.element(image).toBeVisible();
+    await expect.poll(() => image.element().querySelector("img")?.naturalWidth).toBe(1);
+    await act(async () => userEvent.click(image));
+
+    expect(onOpenAttachment).toHaveBeenCalledExactlyOnceWith({ kind: "image", metadata });
+    expect(onSendNow).not.toHaveBeenCalled();
+    expect(onReorder).not.toHaveBeenCalled();
+    await expect
+      .element(page.getByRole("button", { name: "Remove image attachment" }))
+      .not.toBeInTheDocument();
+  });
+
+  it.each([320, 600])(
+    "shows queued files above text without covering actions at %ipx",
+    async (width) => {
+      container.style.width = `${width}px`;
+      const fileName = "history-filter-configuration-and-reconnect-specification.pdf";
+      render([
+        {
+          ...messages[0],
+          attachments: [
+            {
+              kind: "file",
+              attachment: {
+                type: "uploaded_file",
+                id: "spec",
+                fileName,
+                mimeType: "application/pdf",
+                size: 248,
+                path: "/tmp/filter-spec.pdf",
+              },
+            },
+          ],
+        },
+      ]);
+
+      const attachment = page.getByText(fileName);
+      await expect.element(attachment).toBeVisible();
+      expect(attachment.element().getBoundingClientRect().bottom).toBeLessThan(
+        page.getByText(messages[0].text).element().getBoundingClientRect().top,
+      );
+      expect(attachment.element().getBoundingClientRect().right).toBeLessThanOrEqual(
+        page.getByRole("button", { name: "Edit queued message" }).element().getBoundingClientRect()
+          .left,
+      );
+    },
+  );
+
   it("preserves the spacing between queued messages", () => {
     const handles = page.getByRole("button", { name: "Reorder queued message" });
     const first = handles.nth(0).element().parentElement!.getBoundingClientRect();

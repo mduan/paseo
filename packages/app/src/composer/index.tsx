@@ -32,7 +32,6 @@ import {
   Square,
   AudioLines,
   CircleDot,
-  FileText,
   GitPullRequest,
   Image as ImageIcon,
   ClipboardPaste,
@@ -131,6 +130,8 @@ import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attachments-store";
 import { droppedItemsToSelectedFiles } from "@/composer/attachments/drop";
 import { getFileTypeLabel } from "@/attachments/file-types";
+import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
 import { Combobox, ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
 import {
   AttachmentFrame,
@@ -154,7 +155,6 @@ import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-sla
 import {
   appendWorkspaceFileAttachment,
   getWorkspaceFileAttachmentKey,
-  getWorkspaceFileAttachmentSubtitle,
 } from "@/attachments/workspace-file";
 import {
   resolveWorkspaceFileDrop,
@@ -488,7 +488,6 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
         attachment={attachment}
         index={index}
         disabled={disabled}
-        onOpen={onOpen}
         onRemove={onRemove}
         openLabel={labels.openGithub}
         removeLabel={labels.removeGithub}
@@ -501,7 +500,6 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
       attachment={attachment}
       index={index}
       disabled={disabled}
-      onOpen={onOpen}
       onRemove={onRemove}
       openLabel={labels.openGithub}
       removeLabel={labels.removeGithub}
@@ -729,7 +727,6 @@ interface GithubAttachmentPillProps {
   >;
   index: number;
   disabled: boolean;
-  onOpen: (attachment: ComposerAttachment) => void;
   onRemove: (index: number) => void;
   openLabel: (kind: string, numberLabel: string) => string;
   removeLabel: (kind: string, numberLabel: string) => string;
@@ -739,38 +736,30 @@ function GithubAttachmentPill({
   attachment,
   index,
   disabled,
-  onOpen,
   onRemove,
   openLabel,
   removeLabel,
 }: GithubAttachmentPillProps) {
+  const { t } = useTranslation();
+  const content = getComposerAttachmentPillContent(attachment, t);
   const item = attachment.item;
   const presentation = getForgePresentation(item.forge ?? "github");
   const isChangeRequest = item.kind === "change_request";
   const kindLabel = isChangeRequest ? presentation.changeRequestAbbrev : "issue";
-  const subtitleKind = isChangeRequest ? presentation.changeRequestAbbrev : "Issue";
   const numberPrefix = isChangeRequest ? presentation.numberPrefix : presentation.issueNumberPrefix;
-  const handleOpen = useCallback(() => {
-    onOpen(attachment);
-  }, [onOpen, attachment]);
   const handleRemove = useCallback(() => {
     onRemove(index);
   }, [onRemove, index]);
   return (
-    <AttachmentPill
+    <LinkAttachmentPill
       testID="composer-github-attachment-pill"
-      onOpen={handleOpen}
+      url={item.url}
+      content={content}
       onRemove={handleRemove}
-      openAccessibilityLabel={openLabel(kindLabel, `${numberPrefix}${item.number}`)}
+      accessibilityLabel={openLabel(kindLabel, `${numberPrefix}${item.number}`)}
       removeAccessibilityLabel={removeLabel(kindLabel, `${numberPrefix}${item.number}`)}
       disabled={disabled}
-    >
-      <AttachmentLabel
-        icon={isChangeRequest ? githubPrPillIcon : githubIssuePillIcon}
-        title={item.title}
-        subtitle={`${subtitleKind} ${numberPrefix}${item.number}`}
-      />
-    </AttachmentPill>
+    />
   );
 }
 
@@ -790,24 +779,20 @@ function FileAttachmentPill({
   removeLabel,
 }: FileAttachmentPillProps) {
   const { t } = useTranslation();
+  const content = getComposerAttachmentPillContent(attachment, t);
   const handleRemove = useCallback(() => {
     onRemove(index);
   }, [onRemove, index]);
-  const fileName = attachment.attachment.fileName;
   return (
     <AttachmentPill
       testID="composer-file-attachment-pill"
       onOpen={noopCallback}
       onRemove={handleRemove}
-      openAccessibilityLabel={fileName}
+      openAccessibilityLabel={content.title}
       removeAccessibilityLabel={removeLabel}
       disabled={disabled}
     >
-      <AttachmentLabel
-        icon={filePillIcon}
-        title={fileName}
-        subtitle={getFileTypeLabel(fileName) ?? t("message.attachments.file")}
-      />
+      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
     </AttachmentPill>
   );
 }
@@ -827,24 +812,21 @@ function WorkspaceFileAttachmentPill({
   onRemove,
   removeLabel,
 }: WorkspaceFileAttachmentPillProps) {
+  const { t } = useTranslation();
+  const content = getComposerAttachmentPillContent(attachment, t);
   const handleRemove = useCallback(() => {
     onRemove(index);
   }, [index, onRemove]);
-  const fileName = attachment.path.split("/").pop() ?? attachment.path;
   return (
     <AttachmentPill
       testID="composer-workspace-file-attachment-pill"
       onOpen={noopCallback}
       onRemove={handleRemove}
-      openAccessibilityLabel={fileName}
+      openAccessibilityLabel={content.title}
       removeAccessibilityLabel={removeLabel}
       disabled={disabled}
     >
-      <AttachmentLabel
-        icon={filePillIcon}
-        title={fileName}
-        subtitle={getWorkspaceFileAttachmentSubtitle(attachment)}
-      />
+      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
     </AttachmentPill>
   );
 }
@@ -2344,12 +2326,20 @@ function ComposerContentImpl({
         onEdit={handleEditQueuedMessage}
         onReorder={handleReorderQueuedMessages}
         onSendNow={handleSendQueuedNow}
+        onOpenAttachment={handleOpenAttachment}
         editLabel={t("composer.attachments.editQueuedMessage")}
         reorderLabel={t("composer.attachments.reorderQueuedMessage")}
         sendNowLabel={t("composer.attachments.sendQueuedMessageNow")}
       />
     ),
-    [handleEditQueuedMessage, handleReorderQueuedMessages, handleSendQueuedNow, queuedMessages, t],
+    [
+      handleEditQueuedMessage,
+      handleReorderQueuedMessages,
+      handleSendQueuedNow,
+      handleOpenAttachment,
+      queuedMessages,
+      t,
+    ],
   );
 
   const autocompleteConfiguration = useMemo(
@@ -2639,7 +2629,6 @@ const ThemedAudioLines = withUnistyles(AudioLines);
 const ThemedPaperclip = withUnistyles(Paperclip);
 const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
-const ThemedFileText = withUnistyles(FileText);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -2648,14 +2637,6 @@ function renderForgeAttachmentIcon(icon: string): ReactElement {
     <ForgeBrandIcon iconKind={icon} size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />
   );
 }
-
-const githubPrPillIcon = (
-  <ThemedGitPullRequest size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
-);
-const githubIssuePillIcon = (
-  <ThemedCircleDot size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
-);
-const filePillIcon = <ThemedFileText size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 
 const pendingFilePillIcon = (
   <ThemedAttachmentSpinner size={18} uniProps={iconForegroundMutedMapping} />

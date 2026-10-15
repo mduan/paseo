@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import { Pressable, Text } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Tooltip, TooltipTrigger } from "./tooltip";
+import { OVERLAY_Z, useWebOverlayRegistration } from "@/lib/overlay-root";
 
 vi.mock("@/constants/platform", () => ({
   isWeb: true,
@@ -41,7 +42,7 @@ let root: Root | null = null;
 let container: HTMLElement | null = null;
 
 beforeEach(() => {
-  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const dom = new JSDOM("<!doctype html><html><body></body></html>", { pretendToBeVisual: true });
   vi.stubGlobal("React", React);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("window", dom.window);
@@ -96,6 +97,45 @@ function pressTrigger(): void {
 }
 
 describe("TooltipTrigger", () => {
+  it("keeps an interactive preview open while a higher menu owns focus", () => {
+    const onOpenChange = vi.fn();
+    function MenuScope() {
+      const ref = useWebOverlayRegistration({
+        active: true,
+        layer: OVERLAY_Z.tooltip + OVERLAY_Z.floating,
+        onKeyDown: () => false,
+      });
+      return <div ref={ref} tabIndex={-1} />;
+    }
+    const renderPreview = (withMenu: boolean) => {
+      act(() => {
+        root?.render(
+          <>
+            <Tooltip interactive defaultOpen onOpenChange={onOpenChange}>
+              <TooltipTrigger testID="trigger">
+                <Text>Preview</Text>
+              </TooltipTrigger>
+            </Tooltip>
+            {withMenu && <MenuScope />}
+          </>,
+        );
+      });
+    };
+    const blur = () => {
+      act(() => {
+        container
+          ?.querySelector('[data-testid="trigger"]')
+          ?.dispatchEvent(new window.FocusEvent("focusout", { bubbles: true }));
+      });
+    };
+    renderPreview(true);
+    blur();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    renderPreview(false);
+    blur();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("keeps an asChild trigger disabled when the child is disabled", () => {
     const onPress = vi.fn();
 

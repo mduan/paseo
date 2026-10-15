@@ -7,6 +7,7 @@ import type { DesktopContentContextMenu } from "@/desktop/host";
 import { ToastApiProvider } from "@/contexts/toast-api-context";
 import { i18n } from "@/i18n/i18next";
 import { DesktopContentContextMenuHost } from "./index.electron";
+import { OVERLAY_Z } from "@/lib/overlay-root";
 
 const bridge = vi.hoisted(() => ({
   listener: undefined as ((payload: unknown) => void) | undefined,
@@ -124,6 +125,17 @@ describe("desktop content menu", () => {
     ]);
     fireEvent.click(screen.getByTestId("desktop-content-context-menu-copy-link"));
     await waitFor(() => expect(bridge.write).toHaveBeenCalledWith("https://example.com"));
+  });
+
+  it("paints above hover previews that do not own keyboard focus", async () => {
+    await mountMenu();
+    openMenu({ selectionText: "Review comment" });
+    const menu = screen.getByTestId("desktop-content-context-menu");
+    let layer = 0;
+    for (let node: HTMLElement | null = menu; node; node = node.parentElement) {
+      layer = Math.max(layer, Number(node.style.zIndex) || 0);
+    }
+    expect(layer).toBeGreaterThan(OVERLAY_Z.tooltip);
   });
 
   it("offers only image actions and invokes the native image operations", async () => {

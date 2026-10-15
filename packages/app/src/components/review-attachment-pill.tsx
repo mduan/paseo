@@ -8,6 +8,8 @@ import { AttachmentFrame, AttachmentLabel, AttachmentPill } from "@/components/a
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { MaterialFileIcon } from "@/components/material-file-icon";
 import { MarkdownLinkText } from "@/components/markdown/link-text";
+import { FileActionsContextMenuContent } from "@/components/file-actions-menu";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { FloatingScrollView } from "@/components/ui/floating";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,6 +18,8 @@ import { isNative } from "@/constants/platform";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
 import { resolveWorkspaceFilePaths } from "@/workspace/file-open";
 import { reviewLineLabel } from "@/review/range";
+import { copyToClipboard } from "@/utils/copy-to-clipboard";
+import { useToast } from "@/contexts/toast-api-context";
 
 // oxlint-disable-next-line typescript-eslint/consistent-type-definitions
 type ReviewAttachmentPillProps = {
@@ -130,6 +134,13 @@ type ReviewCommentRowProps = {
 };
 
 function ReviewCommentRow({ comment, cwd, divider, onClose, onOpenFile }: ReviewCommentRowProps) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const copyPath = useCallback(() => {
+    void copyToClipboard(comment.filePath)
+      .then(() => toast.copied())
+      .catch(() => toast.error(t("desktop.contextMenu.actionFailed")));
+  }, [comment.filePath, t, toast]);
   const openFile = useCallback(() => {
     const paths = resolveWorkspaceFilePaths({ path: comment.filePath, workspaceRoot: cwd });
     if (!paths) return;
@@ -145,12 +156,17 @@ function ReviewCommentRow({ comment, cwd, divider, onClose, onOpenFile }: Review
   }, [comment, cwd, onClose, onOpenFile]);
   return (
     <View style={[styles.row, divider && styles.divider]}>
-      <View style={styles.file}>
-        <MaterialFileIcon fileName={comment.filePath} size={16} />
-        <MarkdownLinkText style={styles.link} onPress={openFile}>
-          {comment.filePath}
-        </MarkdownLinkText>
-      </View>
+      <ContextMenu>
+        <ContextMenuTrigger contextOnly>
+          <View style={styles.file}>
+            <MaterialFileIcon fileName={comment.filePath} size={16} />
+            <MarkdownLinkText style={styles.link} onPress={openFile}>
+              {comment.filePath}
+            </MarkdownLinkText>
+          </View>
+        </ContextMenuTrigger>
+        <FileActionsContextMenuContent fileKind="file" onCopyRelativePath={copyPath} />
+      </ContextMenu>
       <Text style={styles.location}>
         {comment.startLineNumber
           ? `${reviewLineLabel({ side: comment.startSide ?? comment.side, lineNumber: comment.startLineNumber })} – `

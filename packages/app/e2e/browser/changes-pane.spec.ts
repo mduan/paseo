@@ -10,7 +10,7 @@ import { getServerId } from "../support/helpers/server-id";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import { openChangesPanel, waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
-import { submitMessage } from "../support/helpers/composer";
+import { fillComposerDraft, sendDraftToQueue } from "../support/helpers/composer";
 
 interface DirtyWorkspace {
   id: string;
@@ -1099,7 +1099,7 @@ test("creates, cancels, edits, and deletes a review while keeping Changes focuse
   });
 });
 
-test("review attachments show linked comment rows in the composer and sent chat", async ({
+test("review attachments show linked comment rows in the composer, queue, and sent chat", async ({
   page,
 }, testInfo) => {
   const workspace = await createWorkspaceWithMountedTabDiff();
@@ -1134,6 +1134,15 @@ test("review attachments show linked comment rows in the composer and sent chat"
   await fileLinks.first().hover();
   await expect(popover).toBeVisible();
   await expect(popover).toHaveCSS("opacity", "1");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await fileLinks.first().click({ button: "right" });
+  const copyPath = page.getByRole("menuitem", { name: "Copy relative path", exact: true });
+  await expect(copyPath).toBeVisible();
+  await expect(popover).toBeVisible();
+  await copyPath.click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("src/use-mounted-tab-set.ts");
   await page.screenshot({ path: testInfo.outputPath("composer-review-comments.png") });
   await fileLinks.first().click();
   await expect(page.getByTestId("workspace-file-pane").filter({ visible: true })).toBeVisible();
@@ -1148,7 +1157,29 @@ test("review attachments show linked comment rows in the composer and sent chat"
   await sheet.getByRole("button", { name: /close/i }).click();
   await page.setViewportSize({ width: 1400, height: 900 });
 
-  await submitMessage(page, "Address these review comments.");
+  await client.sendAgentMessage(agent.id, "withhold synthetic user message until interrupted");
+  await fillComposerDraft(page, "Address these review comments.");
+  await sendDraftToQueue(page);
+  const queuedPill = page.getByTestId("queued-review-attachment-pill");
+  await expect(queuedPill).toContainText("2 comments");
+  await expect(composerPill).toHaveCount(0);
+  await queuedPill.hover();
+  await expect(popover.getByText(/Keep the explanation concrete/)).toBeVisible();
+  await expect(fileLinks).toHaveCount(2);
+  await fileLinks.first().hover();
+  await expect(popover).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("queued-review-comments.png") });
+  await fileLinks.first().click();
+  await expect(page.getByTestId("workspace-file-pane").filter({ visible: true })).toBeVisible();
+  await page.getByTestId(`workspace-tab-agent_${agent.id}`).filter({ visible: true }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await queuedPill.click();
+  await expect(sheet.getByRole("link", { name: "src/use-mounted-tab-set.ts" })).toHaveCount(2);
+  await sheet.getByRole("button", { name: /close/i }).click();
+  await page.setViewportSize({ width: 1400, height: 900 });
+
+  await page.getByRole("button", { name: "Send queued message now" }).click();
   const sentPill = page.getByTestId("message-review-attachment-pill");
   await expect(sentPill).toContainText("2 comments");
   await expect(composerPill).toHaveCount(0);

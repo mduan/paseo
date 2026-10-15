@@ -1,4 +1,7 @@
 import { expect, test } from "../support/fixtures";
+import type { Locator } from "@playwright/test";
+import type { UserComposerAttachment } from "../../src/attachments/types";
+import { waitForSettledPosition } from "../support/helpers/sheet-layout";
 import { clickNewChat } from "../support/helpers/launcher";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { expectAgentIdle } from "../support/helpers/agent-stream";
@@ -53,6 +56,170 @@ const TEST_JSON = {
 };
 
 test.describe("Composer attachments", () => {
+  test("previews attachment URLs in the composer, queue, and sent chat", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const agent = await startRunningMockAgent(page, {
+      prefix: "attach-link-popup-",
+      model: "one-minute-stream",
+      prompt: "withhold synthetic user message until interrupted",
+    });
+    const issueUrl = "https://example.com/paseo/issues/281";
+    const pluginUrl =
+      "https://example.com/design/history-filters?workspace=attachment-audit&document=full-link-preview";
+    const attachments: UserComposerAttachment[] = [
+      {
+        kind: "forge_issue",
+        item: {
+          kind: "issue",
+          number: 281,
+          title: "Host unavailable after reload",
+          url: issueUrl,
+          state: "open",
+          body: "Issue context",
+          labels: [],
+          baseRefName: null,
+          headRefName: null,
+        },
+      },
+      {
+        kind: "forge_change_request",
+        item: {
+          kind: "change_request",
+          number: 284,
+          title: "Queued attachment previews",
+          url: "https://example.com/paseo/pull/284",
+          state: "open",
+          body: "PR context",
+          labels: [],
+          baseRefName: "main",
+          headRefName: "preview",
+        },
+      },
+      {
+        kind: "plugin_resource",
+        pluginId: "notion",
+        sourceId: "pages",
+        sourceTitle: "Notion page",
+        sourceIcon: "FileText",
+        item: {
+          id: "notes",
+          identifier: "Design notes",
+          title: "History filter design notes",
+          url: pluginUrl,
+          text: "Design context",
+          resourceType: "page",
+        },
+      },
+    ];
+    try {
+      await page.addInitScript(
+        ({ draftKey, attachments: seedAttachments }) => {
+          localStorage.setItem(
+            "paseo-drafts",
+            JSON.stringify({
+              state: {
+                drafts: {
+                  [draftKey]: {
+                    input: { text: "Inspect linked references.", attachments: seedAttachments },
+                    lifecycle: "active",
+                    updatedAt: Date.now(),
+                    version: 1,
+                  },
+                },
+                createModalDraft: null,
+              },
+              version: 5,
+            }),
+          );
+        },
+        { draftKey: `agent:${getServerId()}:${agent.agentId}`, attachments },
+      );
+      await page.reload();
+      await expect(page.getByTestId("composer-github-attachment-pill")).toHaveCount(2);
+      await expect(page.getByTestId("composer-plugin-resource-attachment-pill")).toBeVisible();
+      const popup = page.getByTestId("attachment-link-popup");
+      const link = popup.getByRole("link", { name: issueUrl, exact: true });
+      async function checkPopup(pill: Locator) {
+        await page.mouse.move(0, 0);
+        await expect(popup).toHaveCount(0);
+        await pill.hover();
+        await expect(link).toBeVisible();
+        await expect(link).toHaveAttribute("href", issueUrl);
+        await expect(popup.getByRole("button")).toHaveCount(0);
+        await link.hover();
+        await expect(link).toBeVisible();
+        expect(
+          await link.evaluate((node) =>
+            node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
+          ),
+        ).toBe(true);
+      }
+      await checkPopup(page.getByTestId("composer-github-attachment-pill").first());
+      await page.screenshot({ path: testInfo.outputPath("composer-link-popup.png") });
+      await page.mouse.move(0, 0);
+      await expect(popup).toHaveCount(0);
+      const composerPill = page.getByTestId("composer-github-attachment-pill").first();
+      await composerPill.focus();
+      await page.keyboard.press("Enter");
+      await expect(link).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(popup).toHaveCount(0);
+      await expect(composerPill).toBeFocused();
+      await expect
+        .poll(async () => (await agent.client.fetchAgent({ agentId: agent.agentId }))?.agent.status)
+        .toBe("running");
+      await checkPopup(composerPill);
+      await page
+        .context()
+        .route("https://example.com/**", (route) =>
+          route.fulfill({ contentType: "text/html", body: "Link destination" }),
+        );
+      const destinationPromise = page.waitForEvent("popup");
+      await link.click();
+      const destination = await destinationPromise;
+      await expect(destination).toHaveURL(issueUrl);
+      await destination.close();
+
+      await sendDraftToQueue(page);
+      const queued = page.getByTestId("queued-message-attachments");
+      await checkPopup(
+        queued.getByRole("button", { name: "Host unavailable after reload", exact: true }),
+      );
+      await page.screenshot({ path: testInfo.outputPath("queued-link-popup.png") });
+      await page.getByRole("button", { name: "Send queued message now" }).click();
+      const sent = page
+        .getByTestId("user-message")
+        .filter({ hasText: "Inspect linked references." });
+      const sentPill = sent.getByRole("button", {
+        name: "Host unavailable after reload",
+        exact: true,
+      });
+      await checkPopup(sentPill);
+      await page.screenshot({ path: testInfo.outputPath("sent-link-popup.png") });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await sentPill.click();
+      const sheet = page.getByRole("slider", { name: "Bottom Sheet", exact: true });
+      await expect(sheet.getByRole("link", { name: issueUrl, exact: true })).toBeInViewport();
+      await waitForSettledPosition(sheet);
+      await expect(sheet.getByRole("button", { name: /copy|open link/i })).toHaveCount(0);
+      await page.screenshot({ path: testInfo.outputPath("compact-link-sheet.png") });
+      await sheet.getByRole("button", { name: /close/i }).click();
+
+      await sent.getByRole("button", { name: "History filter design notes", exact: true }).click();
+      const longLink = sheet.getByRole("link", { name: pluginUrl, exact: true });
+      await expect(longLink).toBeInViewport();
+      await waitForSettledPosition(sheet);
+      const longLinkBounds = await longLink.boundingBox();
+      expect(longLinkBounds!.x + longLinkBounds!.width).toBeLessThanOrEqual(390);
+      await page.screenshot({ path: testInfo.outputPath("compact-long-link-sheet.png") });
+      await sheet.getByRole("button", { name: /close/i }).click();
+    } finally {
+      await agent.cleanup();
+    }
+  });
+
   test("selected file shows a loading attachment until upload is acknowledged", async ({
     page,
     withWorkspace,
@@ -221,6 +388,47 @@ test.describe("Composer attachments", () => {
 
       await expectQueuedMessageButton(page);
       await expectComposerDraft(page, "");
+    } finally {
+      await agent.cleanup();
+    }
+  });
+
+  test("shows queued attachments above text and expands image-only prompts", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const agent = await startRunningMockAgent(page, {
+      prefix: "attach-queue-preview-",
+      model: "one-minute-stream",
+      prompt: "Stay running while attachments queue.",
+    });
+    try {
+      await attachImageFromMenu(page, TEST_IMAGE);
+      await sendDraftToQueue(page);
+      const trays = page.getByTestId("queued-message-attachments");
+      await expect(trays).toHaveCount(1);
+      await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
+      await openImageLightbox(page);
+      await closeImageLightbox(page);
+
+      await attachFileFromMenu(page, TEST_JSON);
+      await fillComposerDraft(page, "Use the attached configuration.");
+      await sendDraftToQueue(page);
+      await expect(trays).toHaveCount(2);
+      const file = trays.nth(1).getByText(TEST_JSON.name);
+      await expect(file).toBeVisible();
+      const text = page.getByText("Use the attached configuration.", { exact: true });
+      const fileBounds = await file.boundingBox();
+      const textBounds = await text.boundingBox();
+      expect(fileBounds!.y + fileBounds!.height).toBeLessThan(textBounds!.y);
+      await expectComposerDraft(page, "");
+      await page.screenshot({ path: testInfo.outputPath("queued-attachments-desktop.png") });
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(file).toBeVisible();
+      await openImageLightbox(page);
+      await closeImageLightbox(page);
+      await page.screenshot({ path: testInfo.outputPath("queued-attachments-compact.png") });
     } finally {
       await agent.cleanup();
     }

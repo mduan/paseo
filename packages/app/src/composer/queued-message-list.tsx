@@ -2,7 +2,18 @@ import { useCallback, useMemo, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ArrowUp, GripVertical, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
+import type { ComposerAttachment } from "@/attachments/types";
+import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
+import {
+  AttachmentFrame,
+  AttachmentLabel,
+  AttachmentThumbnail,
+} from "@/components/attachment-pill";
 import { DraggableList } from "@/components/draggable-list";
+import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
+import { getAttachmentLink } from "@/attachments/link";
 import type { DraggableRenderItemInfo } from "@/components/draggable-list.types";
 import { isNative, isWeb } from "@/constants/platform";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
@@ -13,6 +24,7 @@ type QueuedMessageListProps = Readonly<{
   onEdit: (id: string) => void;
   onReorder: (messages: QueuedComposerMessage[]) => void;
   onSendNow: (id: string) => void;
+  onOpenAttachment: (attachment: ComposerAttachment) => void;
   editLabel: string;
   reorderLabel: string;
   sendNowLabel: string;
@@ -27,6 +39,7 @@ export function QueuedMessageList({
   onEdit,
   onReorder,
   onSendNow,
+  onOpenAttachment,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -50,12 +63,13 @@ export function QueuedMessageList({
         dragHandleProps={dragHandleProps}
         onEdit={onEdit}
         onSendNow={onSendNow}
+        onOpenAttachment={onOpenAttachment}
         editLabel={editLabel}
         reorderLabel={reorderLabel}
         sendNowLabel={sendNowLabel}
       />
     ),
-    [editLabel, onEdit, onSendNow, reorderLabel, sendNowLabel],
+    [editLabel, onEdit, onOpenAttachment, onSendNow, reorderLabel, sendNowLabel],
   );
 
   if (!queuedMessages.length) return null;
@@ -88,6 +102,7 @@ function QueuedMessageRow({
   dragHandleProps,
   onEdit,
   onSendNow,
+  onOpenAttachment,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -117,9 +132,22 @@ function QueuedMessageRow({
       >
         <ThemedGripVertical size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
       </DragHandle>
-      <Text style={styles.queueText} numberOfLines={2} ellipsizeMode="tail">
-        {item.text}
-      </Text>
+      <View style={styles.queueContent}>
+        {item.attachments.length > 0 ? (
+          <View style={styles.attachmentTray} testID="queued-message-attachments">
+            {item.attachments.map((attachment) => (
+              <View key={JSON.stringify(attachment)} style={styles.attachment}>
+                <QueuedAttachment attachment={attachment} onOpenAttachment={onOpenAttachment} />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {item.text ? (
+          <Text style={styles.queueText} numberOfLines={2} ellipsizeMode="tail">
+            {item.text}
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.queueActions}>
         <Pressable
           onPress={handleEdit}
@@ -139,6 +167,47 @@ function QueuedMessageRow({
         </Pressable>
       </View>
     </View>
+  );
+}
+
+type QueuedAttachmentProps = Readonly<{
+  attachment: ComposerAttachment;
+  onOpenAttachment: QueuedMessageListProps["onOpenAttachment"];
+}>;
+
+function QueuedAttachment({ attachment, onOpenAttachment }: QueuedAttachmentProps) {
+  const { t } = useTranslation();
+  const handleOpen = useCallback(() => {
+    onOpenAttachment(attachment);
+  }, [attachment, onOpenAttachment]);
+
+  if (attachment.kind === "image") {
+    return (
+      <AttachmentFrame
+        onPress={handleOpen}
+        accessibilityLabel={t("composer.attachments.openImage")}
+      >
+        <AttachmentThumbnail metadata={attachment.metadata} />
+      </AttachmentFrame>
+    );
+  }
+  if (attachment.kind === "review") {
+    return (
+      <ReviewAttachmentPill
+        attachment={attachment.attachment}
+        testID="queued-review-attachment-pill"
+      />
+    );
+  }
+  const content = getComposerAttachmentPillContent(attachment, t);
+  const url = getAttachmentLink(attachment);
+  if (url) {
+    return <LinkAttachmentPill url={url} content={content} />;
+  }
+  return (
+    <AttachmentFrame>
+      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
+    </AttachmentFrame>
   );
 }
 
@@ -165,8 +234,20 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  queueText: {
+  queueContent: {
     flex: 1,
+    minWidth: 0,
+    gap: theme.spacing[2],
+  },
+  attachmentTray: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  attachment: {
+    maxWidth: "100%",
+  },
+  queueText: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
   },

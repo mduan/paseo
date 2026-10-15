@@ -9,6 +9,8 @@ type MarkdownLinkTextProps = {
   style: StyleProp<TextStyle>;
   dataSet?: Record<string, string>;
   onHoverIn?(): void;
+  selectable?: boolean;
+  onBlur?(): void;
   children?: ReactNode;
 } & ({ href: string; onPress?: never } | { href?: never; onPress(): void });
 
@@ -18,6 +20,8 @@ export function MarkdownLinkText({
   href,
   onPress,
   onHoverIn,
+  selectable,
+  onBlur,
   children,
 }: MarkdownLinkTextProps) {
   const [hovered, setHovered] = useState(false);
@@ -46,6 +50,7 @@ export function MarkdownLinkText({
 
   return (
     <Text
+      selectable={selectable}
       accessibilityRole="link"
       dataSet={dataSet}
       style={textStyle}
@@ -56,6 +61,7 @@ export function MarkdownLinkText({
             onMouseEnter: handleHoverIn,
             onMouseLeave: handleHoverOut,
             onKeyDown: handleKeyDown,
+            onBlur,
           }
         : {})}
     >
