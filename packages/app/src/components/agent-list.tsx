@@ -314,7 +314,7 @@ function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
   const estimated = usage?.totalCostEstimated || usage?.paseoSubagentCostEstimated;
 
   return (
-    <View style={styles.metaItem}>
+    <View style={[styles.metaItem, styles.modelSummary]}>
       <View style={styles.metaItem}>
         <ProviderIcon
           provider={agent.provider}
@@ -658,6 +658,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1.5],
     maxWidth: "100%",
     flexShrink: 1,
+  },
+  modelSummary: {
+    gap: theme.spacing[1],
   },
   rowEnd: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2], flexShrink: 0 },
   activityTime: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
