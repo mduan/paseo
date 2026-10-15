@@ -86,5 +86,5 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
 }
 
 const styles = StyleSheet.create((theme) => ({
-  triggerText: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
+  triggerText: { fontSize: theme.fontSize.base, color: theme.colors.foregroundMuted },
 }));

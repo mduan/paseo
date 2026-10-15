@@ -1,15 +1,7 @@
 /* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
 import { useCallback, useMemo, type ReactElement } from "react";
 import { Text, View } from "react-native";
-import {
-  Archive,
-  Bot,
-  ChevronDown,
-  Cpu,
-  PanelsTopLeft,
-  Server,
-  SlidersHorizontal,
-} from "lucide-react-native";
+import { Archive, Bot, Cpu, PanelsTopLeft, Server, SlidersHorizontal } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { AGENT_PROVIDER_DEFINITIONS } from "@getpaseo/protocol/provider-manifest";
@@ -47,7 +39,6 @@ const ThemedBot = withUnistyles(Bot);
 const ThemedCpu = withUnistyles(Cpu);
 const ThemedPanels = withUnistyles(PanelsTopLeft);
 const ThemedServer = withUnistyles(Server);
-const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedSliders = withUnistyles(SlidersHorizontal);
 
 type FilterOption = { id: string; label: string; leading?: ReactElement };
@@ -321,7 +312,6 @@ export function HistoryFilterBar({
             <Text style={styles.triggerText} numberOfLines={1}>
               {filterLabel(group)}
             </Text>
-            <ThemedChevronDown size={14} uniProps={mutedIconMapping} />
           </MenuTrigger>
           <MenuSurface width={280} maxHeight={400} scrollable>
             {group.disabled ? (
@@ -351,7 +341,11 @@ const styles = StyleSheet.create((theme) => ({
   trigger: {
     maxWidth: 260,
   },
-  triggerText: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted, flexShrink: 1 },
+  triggerText: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+    flexShrink: 1,
+  },
   hint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
