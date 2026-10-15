@@ -53,13 +53,18 @@ export function createTextSearch({
   // shortcut: native regex can block the main thread; isolate it if runtime limits become required.
   let patterns: RegExp[];
   try {
-    patterns = tokens.map(
-      (token) =>
-        new RegExp(
-          options.regex ? token : token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-          options.caseSensitive ? "gu" : "giu",
-        ),
-    );
+    patterns = tokens.map((token) => {
+      const pattern = new RegExp(
+        options.regex ? token : token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        options.caseSensitive ? "gu" : "giu",
+      );
+      return options.wholeWord
+        ? new RegExp(
+            String.raw`(?<![\p{L}\p{M}\p{N}_])(?:${pattern.source})(?![\p{L}\p{M}\p{N}_])`,
+            pattern.flags,
+          )
+        : pattern;
+    });
   } catch (error) {
     if (error instanceof SyntaxError) throw new SearchQueryError(error.message);
     throw error;
@@ -68,13 +73,7 @@ export function createTextSearch({
     const ranges: MatchRange[] = [];
     // matchAll clones the expression, so repeated fields cannot inherit lastIndex.
     for (const match of text.matchAll(pattern)) {
-      const start = match.index;
-      const end = start + match[0].length;
-      const wholeWord =
-        !/[\p{L}\p{M}\p{N}_]$/u.test(text.slice(0, start)) &&
-        !/^[\p{L}\p{M}\p{N}_]/u.test(text.slice(end));
-      if (options.wholeWord && !options.regex && !wholeWord) continue;
-      ranges.push({ start, length: end - start });
+      ranges.push({ start: match.index, length: match[0].length });
     }
     return ranges;
   }

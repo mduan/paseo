@@ -5,7 +5,11 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { useHistorySearch } from "@/hooks/use-history-search";
-import { Button } from "@/components/ui/button";
+import {
+  toolbarLabelTriggerStyle,
+  type ToolbarLabelTriggerState,
+} from "@/components/ui/toolbar-label-trigger";
+import { buttonControlHeight } from "@/components/ui/control-geometry";
 import { isNative } from "@/constants/platform";
 import { SearchField } from "@/components/ui/search-field";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -36,13 +40,19 @@ function SearchOptionButton({
   label: symbol,
 }: SearchOptionsProps & (typeof OPTIONS)[number]) {
   const { t } = useTranslation();
-  const disabled = !supported || Boolean(option === SearchOption.WholeWord && value.regex);
+  const disabled = !supported;
   const selected = Boolean(value[option]) && !disabled;
   const label = t(`sessions.searchOptions.${option}`);
   let hint = label;
   if (!supported) hint = t("sessions.searchOptions.updateHost");
-  else if (option === SearchOption.WholeWord && value.regex)
-    hint = t("sessions.searchOptions.wholeWordRegex");
+  const buttonStyle = useCallback(
+    (state: ToolbarLabelTriggerState) => [
+      toolbarLabelTriggerStyle({ ...state, open: selected }),
+      styles.option,
+      disabled && styles.disabled,
+    ],
+    [disabled, selected],
+  );
   const accessibilityState = useMemo(() => ({ selected, disabled }), [selected, disabled]);
   const toggle = useCallback(
     () => onChange({ ...value, [option]: !value[option] }),
@@ -50,22 +60,20 @@ function SearchOptionButton({
   );
   return (
     <Tooltip enabledOnMobile>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="xs"
-          disabled={disabled}
-          accessibilityLabel={label}
-          accessibilityHint={hint}
-          accessibilityState={accessibilityState}
-          aria-pressed={selected}
-          testID={`sessions-search-${option}`}
-          style={[styles.option, selected && styles.selected]}
-          textStyle={option === SearchOption.WholeWord && styles.wholeWord}
-          onPress={toggle}
-        >
+      <TooltipTrigger
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint={hint}
+        accessibilityState={accessibilityState}
+        aria-pressed={selected}
+        testID={`sessions-search-${option}`}
+        style={buttonStyle}
+        onPress={toggle}
+      >
+        <Text style={[styles.symbol, option === SearchOption.WholeWord && styles.wholeWord]}>
           {symbol}
-        </Button>
+        </Text>
       </TooltipTrigger>
       <TooltipContent>
         <Text style={styles.tooltip}>{hint}</Text>
@@ -132,9 +140,14 @@ export function HistorySearchField({
 
 const styles = StyleSheet.create((theme) => ({
   field: { gap: theme.spacing[2] },
-  options: { flexDirection: "row", alignItems: "center" },
-  option: { paddingHorizontal: isNative ? theme.spacing[3] : theme.spacing[1] },
-  selected: { backgroundColor: theme.colors.interactionHighlight },
+  options: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+  option: {
+    minWidth: buttonControlHeight.xs,
+    minHeight: buttonControlHeight.xs,
+    paddingHorizontal: isNative ? theme.spacing[3] : theme.spacing[1],
+  },
+  disabled: { opacity: theme.opacity[50] },
+  symbol: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   wholeWord: { textDecorationLine: "underline" },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
   hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },

@@ -330,7 +330,6 @@ export const zhCN: TranslationResources = {
       caseSensitive: "区分大小写",
       wholeWord: "全字匹配",
       regex: "使用正则表达式",
-      wholeWordRegex: "正则表达式模式下无法使用全字匹配。",
       invalidRegex: "正则表达式无效。请修正后再搜索。",
       updateHost: "请更新已连接的主机以使用搜索选项。",
     },

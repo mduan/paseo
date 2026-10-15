@@ -333,16 +333,48 @@ describe("search matching options", () => {
       { start: 0, length: 4 },
       { start: 5, length: 5 },
     ]);
-    expect(
-      createTextSearch({ query: "bill", options: { regex: true, wholeWord: true } }).matches([
-        "billing",
-      ]),
-    ).toBe(true);
     expect(createTextSearch({ query: "^", options: { regex: true } }).ranges("Bill")).toEqual([]);
   });
+  it("combines regex and whole-word matching with Unicode boundaries", () => {
+    const search = createTextSearch({ query: "bill", options: { regex: true, wholeWord: true } });
+    expect(search.matches(["Bill export"])).toBe(true);
+    for (const text of ["billing", "unbilled", "bill_name", "billé", "ébill", "bill\u0301"]) {
+      expect(search.matches([text])).toBe(false);
+    }
+    expect(search.ranges("bill billing BILL")).toEqual([
+      { start: 0, length: 4 },
+      { start: 13, length: 4 },
+    ]);
+    expect(
+      createTextSearch({
+        query: "bill",
+        options: { regex: true, wholeWord: true, caseSensitive: true },
+      }).matches(["Bill"]),
+    ).toBe(false);
+  });
+  it("lets regex alternatives and lazy quantifiers finish a whole word", () => {
+    for (const query of ["bill|billing", "bill.*?"]) {
+      const search = createTextSearch({ query, options: { regex: true, wholeWord: true } });
+      expect(search.matches(["billing"])).toBe(true);
+      expect(search.ranges("billing bill")).toEqual([
+        { start: 0, length: 7 },
+        { start: 8, length: 4 },
+      ]);
+    }
+    const repeated = createTextSearch({
+      query: "(bill)\\1",
+      options: { regex: true, wholeWord: true },
+    });
+    expect(repeated.matches(["billbill"])).toBe(true);
+    expect(repeated.matches(["billbillx"])).toBe(false);
+  });
   it("rejects invalid patterns", () => {
-    for (const query of ["[", "("]) {
-      expect(() => createTextSearch({ query, options: { regex: true } })).toThrow(SearchQueryError);
+    for (const query of ["[", "(", "a)|(?:b"]) {
+      for (const wholeWord of [false, true]) {
+        expect(() => createTextSearch({ query, options: { regex: true, wholeWord } })).toThrow(
+          SearchQueryError,
+        );
+      }
     }
   });
   it("supports native backreferences and lookarounds", () => {

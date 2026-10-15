@@ -330,7 +330,6 @@ export const ar: TranslationResources = {
       caseSensitive: "مطابقة حالة الأحرف",
       wholeWord: "مطابقة الكلمة كاملة",
       regex: "استخدام تعبير نمطي",
-      wholeWordRegex: "مطابقة الكلمة كاملة غير متاحة في وضع التعبير النمطي.",
       invalidRegex: "التعبير النمطي غير صالح. صحح النمط للبحث.",
       updateHost: "حدّث المضيفين المتصلين لاستخدام خيارات البحث.",
     },

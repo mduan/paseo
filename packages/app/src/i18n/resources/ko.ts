@@ -331,7 +331,6 @@ export const ko: TranslationResources = {
       caseSensitive: "대소문자 구분",
       wholeWord: "단어 단위로 검색",
       regex: "정규식 사용",
-      wholeWordRegex: "정규식 모드에서는 단어 단위 검색을 사용할 수 없습니다.",
       invalidRegex: "잘못된 정규식입니다. 패턴을 수정하여 검색하세요.",
       updateHost: "검색 옵션을 사용하려면 연결된 호스트를 업데이트하세요.",
     },

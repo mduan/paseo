@@ -335,7 +335,6 @@ export const ptBR: TranslationResources = {
       caseSensitive: "Diferenciar maiúsculas e minúsculas",
       wholeWord: "Corresponder à palavra inteira",
       regex: "Usar expressão regular",
-      wholeWordRegex: "A correspondência de palavras inteiras não está disponível no modo regex.",
       invalidRegex: "Expressão regular inválida. Corrija o padrão para pesquisar.",
       updateHost: "Atualize os hosts conectados para usar as opções de pesquisa.",
     },

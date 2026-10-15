@@ -336,7 +336,6 @@ export const es: TranslationResources = {
       caseSensitive: "Distinguir mayúsculas y minúsculas",
       wholeWord: "Coincidir con la palabra completa",
       regex: "Usar expresión regular",
-      wholeWordRegex: "La coincidencia de palabras completas no está disponible en modo regex.",
       invalidRegex: "Expresión regular no válida. Corrige el patrón para buscar.",
       updateHost: "Actualiza los hosts conectados para usar las opciones de búsqueda.",
     },

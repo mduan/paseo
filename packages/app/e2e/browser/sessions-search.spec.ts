@@ -194,8 +194,13 @@ test.describe("History search", () => {
       await search(page, `${NONCE} bill`);
       await expect(page.getByTestId("sessions-empty")).toBeVisible();
       await regex.click();
-      await expect(wholeWord).toBeDisabled();
-      await expect(wholeWord).toHaveAttribute("aria-pressed", "false");
+      await expect(wholeWord).toBeEnabled();
+      await expect(wholeWord).toHaveAttribute("aria-pressed", "true");
+      await search(page, `${NONCE}.*bill`);
+      await expect(page.getByTestId("sessions-empty")).toBeVisible();
+      await wholeWord.click();
+      await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing]);
+      await wholeWord.click();
       await search(page, `${NONCE}.*(billing|usage)`);
       await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing]);
       await page.screenshot({

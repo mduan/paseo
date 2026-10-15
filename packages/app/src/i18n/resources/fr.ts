@@ -337,7 +337,6 @@ export const fr: TranslationResources = {
       caseSensitive: "Respecter la casse",
       wholeWord: "Mot entier",
       regex: "Utiliser une expression régulière",
-      wholeWordRegex: "La recherche de mots entiers est indisponible en mode regex.",
       invalidRegex: "Expression régulière non valide. Corrigez le motif pour rechercher.",
       updateHost: "Mettez à jour les hôtes connectés pour utiliser les options de recherche.",
     },
