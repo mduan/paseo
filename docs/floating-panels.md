@@ -65,7 +65,7 @@ Two escape hatches in the codebase:
   Android can detach the IME from an underlying TextInput. Fine for combobox
   (it has its own input) and tooltip (no input). **Not** fine for autocomplete
   (the composer's input must stay focused so the user keeps typing).
-- **`<Portal>` from `@gorhom/portal`** (hover-card, autocomplete-popover) —
+- **`<Portal>` from `@gorhom/portal`** (autocomplete-popover) —
   hoists the React subtree to a fixed mount point whose bounds cover the
   screen. Same window, same IME, hit-test works because the new parent is
   full-screen. This is the right default when you must keep IME attachment.
@@ -75,10 +75,10 @@ Two escape hatches in the codebase:
 
   Choose Modal vs Portal by whether the underlying input can lose its keyboard.
 
-On web, dropdown menus render into the shared `overlay-root`, not React Native
-Web's `<Modal>`/`<dialog>`. A browser top-layer dialog always paints above
-ordinary portals regardless of `z-index`, which would hide app toasts and
-tooltips behind the menu. The shared overlay scale keeps menus below toasts and
+On web, dropdown menus, tooltips, and workspace hover cards render into the shared
+`overlay-root`. A browser top-layer dialog paints above ordinary portals regardless
+of `z-index`. It can hide app toasts and tooltips behind menus.
+The shared overlay scale keeps menus below toasts and
 lets tooltip portals paint above both.
 
 The shared overlay scale is relative for interactive surfaces: a base floating

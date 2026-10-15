@@ -1,7 +1,9 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
+import { getServerId } from "../support/helpers/server-id";
+import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import {
   closeMobileAgentSidebar,
   expectMobileAgentSidebarHidden,
@@ -9,6 +11,20 @@ import {
   openMobileAgentSidebar,
 } from "../support/helpers/sidebar";
 import { waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
+
+async function replayPointerOut(target: Locator): Promise<void> {
+  // Electron can emit pointerout with no related target while hovering portaled content.
+  await target.evaluate((element) => {
+    const { left, top, width, height } = element.getBoundingClientRect();
+    const clientX = left + width / 2;
+    const clientY = top + height / 2;
+    const pointerTarget = document.elementFromPoint(clientX, clientY);
+    if (!pointerTarget) throw new Error("Pointer target is missing");
+    pointerTarget.dispatchEvent(
+      new PointerEvent("pointerout", { bubbles: true, relatedTarget: null, clientX, clientY }),
+    );
+  });
+}
 
 async function dragSidebarTo(page: Page, width: number) {
   const handle = page.getByTestId("left-sidebar-resize-handle");
@@ -131,6 +147,11 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
     await expect(sidebar).toBeHidden();
 
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(-10, 300);
+    await expect(sidebar).toBeHidden();
+
     await test.step("the edge and revealed controls sit above embedded pages", async () => {
       await page.evaluate(() => {
         const frame = document.createElement("iframe");
@@ -184,6 +205,140 @@ test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
     await expectMobileAgentSidebarVisible(page);
     await closeMobileAgentSidebar(page);
     await expectMobileAgentSidebarHidden(page);
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open across its workspace hover card", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-hover-card-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(600, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const row = page.getByTestId(`sidebar-workspace-row-${getServerId()}:${workspace.workspaceId}`);
+    await row.hover();
+    const card = page.getByTestId("workspace-hover-card");
+    await expect(card).toBeVisible();
+    await expect
+      .poll(() =>
+        card.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const target = document.elementFromPoint(bounds.left + 2, bounds.top + 20);
+          return element.contains(target);
+        }),
+      )
+      .toBe(true);
+    const rowBounds = await row.boundingBox();
+    const cardBounds = await card.boundingBox();
+    if (!rowBounds || !cardBounds) throw new Error("Workspace hover targets have no bounds");
+    await page.mouse.move(cardBounds.x + 20, rowBounds.y + rowBounds.height / 2, { steps: 20 });
+    await replayPointerOut(card);
+    await page.waitForTimeout(250);
+    await expect(sidebar).toBeVisible();
+    await expect(card).toBeVisible();
+    await row.hover();
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open across its session tooltip", async ({ page }) => {
+  const workspace = await seedMockAgentWorkspace({
+    repoPrefix: "sidebar-session-tooltip-",
+    title: "Sidebar session tooltip",
+    initialPrompt: "Reply with a short greeting",
+    featureValues: { mockAssistantResponse: "A session preview outside the sidebar" },
+  });
+  try {
+    await openAgentRoute(page, workspace);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const row = page.getByTestId(`sidebar-workspace-session-agent:${workspace.agentId}`);
+    const tooltip = page.getByTestId(
+      `sidebar-workspace-session-tooltip-agent:${workspace.agentId}`,
+    );
+    await row.hover();
+    await expect(tooltip).toBeVisible();
+    const sidebarBounds = await sidebar.boundingBox();
+    const tooltipBounds = await tooltip.boundingBox();
+    if (!sidebarBounds || !tooltipBounds) throw new Error("Session tooltip has no bounds");
+    const x = Math.max(sidebarBounds.x + sidebarBounds.width + 20, tooltipBounds.x + 20);
+    expect(x).toBeLessThan(tooltipBounds.x + tooltipBounds.width);
+    await page.mouse.move(x, tooltipBounds.y + 20, { steps: 20 });
+    await replayPointerOut(tooltip);
+    await page.waitForTimeout(250);
+    await expect(sidebar).toBeVisible();
+    await expect(tooltip).toBeVisible();
+    await page.mouse.move(x, tooltipBounds.y + tooltipBounds.height - 12, { steps: 10 });
+    await expect(sidebar).toBeVisible();
+    await expect(tooltip).toBeVisible();
+    await row.hover();
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+    await expect(tooltip).toBeHidden();
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open after its menu closes under the pointer", async ({
+  page,
+}) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-hover-menu-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(600, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const key = `${getServerId()}:${workspace.workspaceId}`;
+    const row = page.getByTestId(`sidebar-workspace-row-${key}`);
+    const copyPath = page.getByTestId(`sidebar-workspace-menu-copy-path-${key}`);
+    for (const contextMenu of [false, true]) {
+      for (const selectAction of [false, true]) {
+        await row.hover();
+        if (contextMenu) {
+          await row.click({ button: "right", position: { x: 60, y: 10 } });
+        } else {
+          await page.getByTestId(`sidebar-workspace-kebab-${key}`).click();
+        }
+        await expect(copyPath).toBeVisible();
+        if (selectAction) {
+          await copyPath.click();
+        } else {
+          await page
+            .getByRole("button", { name: "Menu backdrop", exact: true })
+            .click({ position: { x: 100, y: 100 } });
+        }
+        await expect(copyPath).toBeHidden();
+        await replayPointerOut(sidebar);
+        await page.waitForTimeout(250);
+        await expect(sidebar).toBeVisible();
+      }
+    }
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
   } finally {
     await workspace.cleanup();
   }

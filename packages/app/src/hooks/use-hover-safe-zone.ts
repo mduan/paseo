@@ -64,7 +64,8 @@ export function useHoverSafeZone({
 
     function handlePointerOut(event: PointerEvent) {
       if (event.relatedTarget === null) {
-        tracker.pointerLeftWindow();
+        // Electron can omit the destination while the pointer is still inside the safe zone.
+        tracker.pointerMoved(event.clientX, event.clientY);
       }
     }
 

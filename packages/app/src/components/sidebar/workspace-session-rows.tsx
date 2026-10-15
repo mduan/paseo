@@ -383,6 +383,7 @@ function SessionRowHoverTarget({
       <Tooltip delayDuration={300} enabledOnDesktop={!open} enabledOnMobile={false} interactive>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
+          testID={`sidebar-workspace-session-tooltip-${row.key}`}
           side="right"
           align="start"
           offset={8}

@@ -8,6 +8,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { Dimensions, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FadeIn, FadeOut } from "react-native-reanimated";
@@ -30,8 +31,6 @@ import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
 import { Pressable } from "react-native";
 import type { GestureResponderEvent } from "react-native";
-import { Portal } from "@gorhom/portal";
-import { useBottomSheetModalInternal } from "@gorhom/bottom-sheet";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -53,6 +52,8 @@ import { CheckPresentationIcon, getCheckPresentationTone } from "@/git/check-pre
 import { buildForgeChecksUrl } from "@/git/forge-url";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 import { WorkspaceLabelChip } from "@/workspace-labels/chip";
+import { useKeepSidebarRevealed } from "@/components/sidebar/hover-context";
+import { getOverlayRoot, OVERLAY_Z } from "@/lib/overlay-root";
 
 interface Rect {
   x: number;
@@ -143,6 +144,7 @@ function WorkspaceHoverCardDesktop({
   const triggerRef = useRef<View>(null);
   const contentRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
+  useKeepSidebarRevealed(open);
   const triggerHoveredRef = useRef(false);
 
   // While open, the safe zone covers trigger + content + the bridge between
@@ -212,7 +214,6 @@ function WorkspaceHoverCardContent({
     serverId: workspace.serverId,
     cwd: workspace.workspaceDirectory,
   });
-  const bottomSheetInternal = useBottomSheetModalInternal(true);
   const [triggerRect, setTriggerRect] = useState<Rect | null>(null);
   const [contentSize, setContentSize] = useState<{ width: number; height: number } | null>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -264,78 +265,73 @@ function WorkspaceHoverCardContent({
     [position?.x, position?.y],
   );
 
-  return (
-    <Portal hostName={bottomSheetInternal?.hostName}>
-      <View pointerEvents="box-none" style={styles.portalOverlay}>
-        <FloatingSurface
-          ref={contentRef}
-          entering={FadeIn.duration(80)}
-          exiting={FadeOut.duration(80)}
-          collapsable={false}
-          onLayout={handleLayout}
-          accessibilityRole="menu"
-          accessibilityLabel={t("workspace.hoverCard.scriptsAccessibility")}
-          testID="workspace-hover-card"
-          style={styles.card}
-          frameStyle={frameStyle}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} testID="hover-card-workspace-name">
-              {workspace.name}
-            </Text>
+  return createPortal(
+    <View pointerEvents="box-none" style={styles.portalOverlay}>
+      <FloatingSurface
+        ref={contentRef}
+        entering={FadeIn.duration(80)}
+        exiting={FadeOut.duration(80)}
+        collapsable={false}
+        onLayout={handleLayout}
+        accessibilityRole="menu"
+        accessibilityLabel={t("workspace.hoverCard.scriptsAccessibility")}
+        testID="workspace-hover-card"
+        style={styles.card}
+        frameStyle={frameStyle}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle} testID="hover-card-workspace-name">
+            {workspace.name}
+          </Text>
+        </View>
+        {prHint ? <PrBadge hint={prHint} style={styles.cardInfoRow} /> : null}
+        {workspace.diffStat ? (
+          <View style={styles.cardInfoRow}>
+            <ThemedFileDiff size={12} uniProps={foregroundMutedColorMapping} />
+            <DiffStat
+              additions={workspace.diffStat.additions}
+              deletions={workspace.diffStat.deletions}
+            />
           </View>
-          {prHint ? <PrBadge hint={prHint} style={styles.cardInfoRow} /> : null}
-          {workspace.diffStat ? (
-            <View style={styles.cardInfoRow}>
-              <ThemedFileDiff size={12} uniProps={foregroundMutedColorMapping} />
-              <DiffStat
-                additions={workspace.diffStat.additions}
-                deletions={workspace.diffStat.deletions}
-              />
-            </View>
-          ) : null}
-          <HostRow serverId={workspace.serverId} />
-          {workspace.currentBranch ? (
-            <CopyableInfoRow
-              icon={ThemedGitBranch}
-              value={workspace.currentBranch}
-              copyValue={workspace.currentBranch}
-              copyLabel={t("workspace.hoverCard.copyBranchName")}
-              testID="hover-card-workspace-branch"
-            />
-          ) : null}
-          {status?.baseRefLabel ? (
-            <CopyableInfoRow
-              icon={ThemedAnchor}
-              value={status.baseRefLabel}
-              copyValue={status.baseRefLabel}
-              copyLabel={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}. ${t("workspace.hoverCard.copyBranchName")}`}
-              testID="hover-card-workspace-base-branch"
-            />
-          ) : null}
-          {workspace.workspaceDirectoryLabel ? (
-            <CopyableInfoRow
-              icon={ThemedFolder}
-              value={workspace.workspaceDirectoryLabel}
-              copyValue={workspace.workspaceDirectory}
-              copyLabel={t("workspace.hoverCard.copyPath")}
-              testID="hover-card-workspace-cwd"
-            />
-          ) : null}
-          <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
-          {prHint?.checks && prHint.checks.length > 0 ? (
-            <>
-              <View style={styles.separator} />
-              <ChecksSummaryPressable
-                checks={prHint.checks}
-                url={prHint.url}
-                forge={prHint.forge}
-              />
-            </>
-          ) : null}
-        </FloatingSurface>
-      </View>
-    </Portal>
+        ) : null}
+        <HostRow serverId={workspace.serverId} />
+        {workspace.currentBranch ? (
+          <CopyableInfoRow
+            icon={ThemedGitBranch}
+            value={workspace.currentBranch}
+            copyValue={workspace.currentBranch}
+            copyLabel={t("workspace.hoverCard.copyBranchName")}
+            testID="hover-card-workspace-branch"
+          />
+        ) : null}
+        {status?.baseRefLabel ? (
+          <CopyableInfoRow
+            icon={ThemedAnchor}
+            value={status.baseRefLabel}
+            copyValue={status.baseRefLabel}
+            copyLabel={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}. ${t("workspace.hoverCard.copyBranchName")}`}
+            testID="hover-card-workspace-base-branch"
+          />
+        ) : null}
+        {workspace.workspaceDirectoryLabel ? (
+          <CopyableInfoRow
+            icon={ThemedFolder}
+            value={workspace.workspaceDirectoryLabel}
+            copyValue={workspace.workspaceDirectory}
+            copyLabel={t("workspace.hoverCard.copyPath")}
+            testID="hover-card-workspace-cwd"
+          />
+        ) : null}
+        <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
+        {prHint?.checks && prHint.checks.length > 0 ? (
+          <>
+            <View style={styles.separator} />
+            <ChecksSummaryPressable checks={prHint.checks} url={prHint.url} forge={prHint.forge} />
+          </>
+        ) : null}
+      </FloatingSurface>
+    </View>,
+    getOverlayRoot(),
   );
 }
 
@@ -586,7 +582,7 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
     bottom: 0,
     left: 0,
-    zIndex: 1000,
+    zIndex: OVERLAY_Z.tooltip,
   },
   card: {
     backgroundColor: theme.colors.surface1,

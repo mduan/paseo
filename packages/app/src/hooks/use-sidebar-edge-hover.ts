@@ -17,7 +17,9 @@ export function useSidebarEdgeHover({ enabled }: { enabled: boolean }) {
     if (!isWeb || !canReveal) return;
 
     function handlePointerOut(event: PointerEvent) {
-      if (event.relatedTarget === null) dismiss();
+      // Electron can omit the destination when a menu disappears under the pointer.
+      if (!event.relatedTarget && !document.elementFromPoint(event.clientX, event.clientY))
+        dismiss();
     }
 
     window.addEventListener("pointerout", handlePointerOut);
