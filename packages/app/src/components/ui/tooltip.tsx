@@ -36,6 +36,7 @@ import {
   OVERLAY_Z,
 } from "@/lib/overlay-root";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
+import { useKeepSidebarRevealed } from "@/components/sidebar/hover-context";
 
 type Side = "top" | "bottom" | "left" | "right";
 type Align = "start" | "center" | "end";
@@ -265,6 +266,7 @@ export function Tooltip({
   const opensOnPress = isNative || isCompact;
   const enabled = opensOnPress ? enabledOnMobile : enabledOnDesktop;
   const interactive = interactiveProp && isWeb && !opensOnPress;
+  useKeepSidebarRevealed(enabled && interactive && isOpen);
   const requestOpen = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen && interactive && hasWebOverlayAbove(OVERLAY_Z.tooltip)) return;

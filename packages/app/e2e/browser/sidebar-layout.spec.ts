@@ -3,6 +3,7 @@ import { expect, test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
+import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import {
   closeMobileAgentSidebar,
   expectMobileAgentSidebarHidden,
@@ -222,6 +223,51 @@ test("a hover-revealed sidebar stays open across its workspace hover card", asyn
     await expect(sidebar).toBeVisible();
     await page.mouse.move(900, 600);
     await expect(sidebar).toBeHidden();
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open across its session tooltip", async ({ page }) => {
+  const workspace = await seedMockAgentWorkspace({
+    repoPrefix: "sidebar-session-tooltip-",
+    title: "Sidebar session tooltip",
+    initialPrompt: "Reply with a short greeting",
+    featureValues: { mockAssistantResponse: "A session preview outside the sidebar" },
+  });
+  try {
+    await openAgentRoute(page, workspace);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const row = page.getByTestId(`sidebar-workspace-session-agent:${workspace.agentId}`);
+    const tooltip = page.getByTestId(
+      `sidebar-workspace-session-tooltip-agent:${workspace.agentId}`,
+    );
+    await row.hover();
+    await expect(tooltip).toBeVisible();
+    const sidebarBounds = await sidebar.boundingBox();
+    const tooltipBounds = await tooltip.boundingBox();
+    if (!sidebarBounds || !tooltipBounds) throw new Error("Session tooltip has no bounds");
+    const x = Math.max(sidebarBounds.x + sidebarBounds.width + 20, tooltipBounds.x + 20);
+    expect(x).toBeLessThan(tooltipBounds.x + tooltipBounds.width);
+    await page.mouse.move(x, tooltipBounds.y + 20, { steps: 20 });
+    await page.waitForTimeout(250);
+    await expect(sidebar).toBeVisible();
+    await expect(tooltip).toBeVisible();
+    await page.mouse.move(x, tooltipBounds.y + tooltipBounds.height - 12, { steps: 10 });
+    await expect(sidebar).toBeVisible();
+    await expect(tooltip).toBeVisible();
+    await row.hover();
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+    await expect(tooltip).toBeHidden();
   } finally {
     await workspace.cleanup();
   }
