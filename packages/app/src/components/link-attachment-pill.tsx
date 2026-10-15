@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import { isHttpUrl } from "@/utils/http-url";
-import { OVERLAY_Z, useWebOverlayRegistration } from "@/lib/overlay-root";
+import { hasWebOverlayAbove, OVERLAY_Z, useWebOverlayRegistration } from "@/lib/overlay-root";
 
 enum LinkPreviewState {
   Closed,
@@ -46,6 +46,7 @@ export function LinkAttachmentPill(props: LinkAttachmentPillProps) {
     if (enabled) setPreview(LinkPreviewState.Focused);
   }, [enabled]);
   const close = useCallback(() => {
+    if (isWeb && hasWebOverlayAbove(OVERLAY_Z.tooltip)) return;
     restoringFocus.current = true;
     setPreview(LinkPreviewState.Closed);
   }, []);
@@ -98,8 +99,8 @@ export function LinkAttachmentPill(props: LinkAttachmentPillProps) {
   const header = useMemo(() => ({ title: content.title }), [content.title]);
 
   useEffect(() => {
-    if (!enabled) close();
-  }, [enabled, close]);
+    if (!enabled) setPreview(LinkPreviewState.Closed);
+  }, [enabled]);
 
   const label = (
     <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />

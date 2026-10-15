@@ -29,7 +29,12 @@ import { StyleSheet } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { FloatingSurface } from "@/components/ui/floating";
 import { isNative, isWeb } from "@/constants/platform";
-import { getOverlayRoot, OVERLAY_Z } from "@/lib/overlay-root";
+import {
+  getOverlayRoot,
+  hasWebOverlayAbove,
+  OverlayLayerProvider,
+  OVERLAY_Z,
+} from "@/lib/overlay-root";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
 
 type Side = "top" | "bottom" | "left" | "right";
@@ -260,18 +265,25 @@ export function Tooltip({
   const opensOnPress = isNative || isCompact;
   const enabled = opensOnPress ? enabledOnMobile : enabledOnDesktop;
   const interactive = interactiveProp && isWeb && !opensOnPress;
+  const requestOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && interactive && hasWebOverlayAbove(OVERLAY_Z.tooltip)) return;
+      setIsOpen(nextOpen);
+    },
+    [interactive, setIsOpen],
+  );
 
   const { scheduleClose, cancelClose } = useHoverSafeZone({
     enabled: interactive && isOpen,
     triggerRef,
     contentRef,
-    onClose: () => setIsOpen(false),
+    onClose: () => requestOpen(false),
   });
 
   const value = useMemo<TooltipContextValue>(
     () => ({
       open: isOpen,
-      setOpen: setIsOpen,
+      setOpen: requestOpen,
       triggerRef,
       contentRef,
       enabled,
@@ -283,7 +295,7 @@ export function Tooltip({
     }),
     [
       isOpen,
-      setIsOpen,
+      requestOpen,
       enabled,
       interactive,
       scheduleClose,
@@ -565,7 +577,7 @@ export function TooltipContent({
           style={contentStyle}
           frameStyle={frameStyle}
         >
-          {children}
+          <OverlayLayerProvider layer={OVERLAY_Z.tooltip}>{children}</OverlayLayerProvider>
         </FloatingSurface>
       </View>,
       getOverlayRoot(),

@@ -1134,6 +1134,15 @@ test("review attachments show linked comment rows in the composer, queue, and se
   await fileLinks.first().hover();
   await expect(popover).toBeVisible();
   await expect(popover).toHaveCSS("opacity", "1");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await fileLinks.first().click({ button: "right" });
+  const copyPath = page.getByRole("menuitem", { name: "Copy relative path", exact: true });
+  await expect(copyPath).toBeVisible();
+  await expect(popover).toBeVisible();
+  await copyPath.click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("src/use-mounted-tab-set.ts");
   await page.screenshot({ path: testInfo.outputPath("composer-review-comments.png") });
   await fileLinks.first().click();
   await expect(page.getByTestId("workspace-file-pane").filter({ visible: true })).toBeVisible();

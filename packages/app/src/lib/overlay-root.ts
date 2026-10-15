@@ -111,6 +111,10 @@ export function hasActiveWebOverlay(): boolean {
   return getTopWebOverlay() !== undefined;
 }
 
+export function hasWebOverlayAbove(layer: number): boolean {
+  return webOverlayEntries.some((entry) => entry.getLayer() > layer);
+}
+
 function getFocusableElements(scope: HTMLElement): HTMLElement[] {
   const selector = [
     "a[href]",
