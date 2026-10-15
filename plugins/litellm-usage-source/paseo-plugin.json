@@ -1,0 +1,1 @@
+{ "id": "litellm-usage-source", "requirements": { "paseo": ">=0.11.0" } }
