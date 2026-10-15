@@ -332,6 +332,8 @@ export const es: TranslationResources = {
     noMatches: "No hay sesiones que coincidan",
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
+    recentSearches: "Búsquedas recientes",
+    noRecentSearches: "No hay búsquedas recientes",
     searchPlaceholder: "Buscar en el historial",
     actions: {
       loadMore: "Cargar más",

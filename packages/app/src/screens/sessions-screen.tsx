@@ -14,7 +14,9 @@ import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
 import { HistoryFilterBar, hasHistoryFilters } from "@/components/sessions/filters";
 import { HistoryDisplayMenu } from "@/components/sessions/display-menu";
+import { HistorySearchMenu } from "@/components/sessions/search-menu";
 import {
+  addRecentHistorySearch,
   EMPTY_HISTORY_FILTERS,
   HistoryField,
   HistoryAgentType,
@@ -93,7 +95,7 @@ function SessionsScreenContent() {
   const hosts = useHosts();
   const hostsLoaded = useHostRegistryLoaded();
   const { settings, updateSettings } = useAppSettings();
-  const { filters, fields } = settings.history;
+  const { filters, fields, recentSearches } = settings.history;
   const savePreferences = useMutation({
     scope: { id: "history-preferences" },
     mutationFn: (update: (current: HistoryPreferences) => HistoryPreferences) =>
@@ -115,6 +117,23 @@ function SessionsScreenContent() {
   // Settings already update optimistically; retry must not replay a toggle.
   const retrySave = useCallback(() => saveHistory((current) => current), [saveHistory]);
   const [searchInput, setSearchInput] = useState("");
+  const rememberSearch = useCallback(
+    (query: string) => {
+      if (addRecentHistorySearch({ searches: recentSearches, query }) === recentSearches) return;
+      saveHistory((current) => ({
+        ...current,
+        recentSearches: addRecentHistorySearch({ searches: current.recentSearches, query }),
+      }));
+    },
+    [recentSearches, saveHistory],
+  );
+  const selectRecentSearch = useCallback(
+    (query: string) => {
+      setSearchInput(query);
+      rememberSearch(query);
+    },
+    [rememberSearch],
+  );
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const filter = useMemo(
     () => ({
@@ -215,6 +234,10 @@ function SessionsScreenContent() {
     />
   );
   const displayMenu = <HistoryDisplayMenu fields={fields} onToggle={toggleField} />;
+  const searchMenu = useMemo(
+    () => <HistorySearchMenu searches={recentSearches} onSelect={selectRecentSearch} />,
+    [recentSearches, selectRecentSearch],
+  );
 
   return (
     <View style={styles.container}>
@@ -227,6 +250,8 @@ function SessionsScreenContent() {
                 fullWidth
                 value={searchInput}
                 onChangeText={setSearchInput}
+                onCommit={rememberSearch}
+                leading={searchMenu}
                 placeholder={t("sessions.searchPlaceholder")}
                 clearAccessibilityLabel={t("sessions.actions.clearSearch")}
                 testID="sessions-search-input"

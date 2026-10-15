@@ -27,6 +27,7 @@ import {
 import { DEFAULT_CONTENT_MAX_WIDTH, THEME_OPTIONS } from "@/styles/theme";
 import {
   DEFAULT_HISTORY_PREFERENCES,
+  addRecentHistorySearch,
   HistoryField,
   HistoryAgentType,
   HistoryStatus,
@@ -798,9 +799,17 @@ describe("saveAppSettings", () => {
         agentType: HistoryAgentType.Subagent,
       };
 
-      await saveAppSettings({ queryClient, updates: { history: { fields, filters } }, deps });
+      await saveAppSettings({
+        queryClient,
+        updates: { history: { ...DEFAULT_HISTORY_PREFERENCES, fields, filters } },
+        deps,
+      });
 
-      expect((await loadAppSettingsFromStorage(deps)).history).toEqual({ fields, filters });
+      expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+        ...DEFAULT_HISTORY_PREFERENCES,
+        fields,
+        filters,
+      });
 
       await saveAppSettings({
         queryClient,
@@ -810,11 +819,49 @@ describe("saveAppSettings", () => {
         deps,
       });
       expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+        ...DEFAULT_HISTORY_PREFERENCES,
         fields,
         filters: DEFAULT_HISTORY_PREFERENCES.filters,
       });
     },
   );
+
+  it("persists the 20 most recent unique History searches without changing filters", async () => {
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+    const searches = Array.from({ length: 20 }, (_, index) => `query ${index}`);
+    const recentSearches = addRecentHistorySearch({ searches, query: "  older search  " });
+    expect(recentSearches).toEqual(["older search", ...searches.slice(0, 19)]);
+    const reordered = addRecentHistorySearch({ searches: recentSearches, query: "query 3" });
+    expect(reordered).toEqual([
+      "query 3",
+      "older search",
+      "query 0",
+      "query 1",
+      "query 2",
+      ...searches.slice(4, 19),
+    ]);
+    expect(addRecentHistorySearch({ searches: reordered, query: "  " })).toBe(reordered);
+    expect(addRecentHistorySearch({ searches: reordered, query: " query 3 " })).toBe(reordered);
+
+    const history = { ...DEFAULT_HISTORY_PREFERENCES, recentSearches: reordered };
+    await saveAppSettings({ queryClient, updates: { history }, deps });
+    expect((await loadAppSettingsFromStorage(deps)).history).toEqual(history);
+  });
+
+  it("ignores malformed saved searches without resetting History preferences", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          history: { recentSearches: [42], fields: { host: false } },
+        }),
+      }),
+    });
+    expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+      ...DEFAULT_HISTORY_PREFERENCES,
+      fields: { ...DEFAULT_HISTORY_PREFERENCES.fields, host: false },
+    });
+  });
 
   it("restores valid History selections while defaulting missing and invalid fields", async () => {
     const deps = makeDeps({
@@ -829,6 +876,7 @@ describe("saveAppSettings", () => {
     });
 
     expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+      ...DEFAULT_HISTORY_PREFERENCES,
       fields: { ...DEFAULT_HISTORY_PREFERENCES.fields, host: false },
       filters: {
         ...DEFAULT_HISTORY_PREFERENCES.filters,

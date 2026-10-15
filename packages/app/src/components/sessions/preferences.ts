@@ -56,11 +56,28 @@ export type HistoryFields = z.infer<typeof HistoryFieldsSchema>;
 export type HistoryFilters = z.infer<typeof HistoryFiltersSchema>;
 export const EMPTY_HISTORY_FILTERS = HistoryFiltersSchema.parse({});
 export const DEFAULT_HISTORY_FIELDS = HistoryFieldsSchema.parse({});
+const RECENT_SEARCH_LIMIT = 20;
 
 export const HistoryPreferencesSchema = z.object({
   fields: HistoryFieldsSchema.catch(DEFAULT_HISTORY_FIELDS),
   filters: HistoryFiltersSchema.catch(EMPTY_HISTORY_FILTERS),
+  recentSearches: z.array(z.string().min(1)).max(RECENT_SEARCH_LIMIT).catch([]),
 });
 
 export type HistoryPreferences = z.infer<typeof HistoryPreferencesSchema>;
 export const DEFAULT_HISTORY_PREFERENCES = HistoryPreferencesSchema.parse({});
+
+export function addRecentHistorySearch({
+  searches,
+  query,
+}: {
+  searches: string[];
+  query: string;
+}): string[] {
+  const trimmed = query.trim();
+  if (!trimmed || searches[0] === trimmed) return searches;
+  return [trimmed, ...searches.filter((search) => search !== trimmed)].slice(
+    0,
+    RECENT_SEARCH_LIMIT,
+  );
+}

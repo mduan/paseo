@@ -326,6 +326,8 @@ export const ar: TranslationResources = {
     noMatches: "لا توجد جلسات مطابقة",
     tooManyMatches: "نتائج كثيرة جدًا — ضيّق نطاق البحث",
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
+    recentSearches: "عمليات البحث الأخيرة",
+    noRecentSearches: "لا توجد عمليات بحث أخيرة",
     searchPlaceholder: "البحث في السجل",
     actions: {
       loadMore: "تحميل المزيد",

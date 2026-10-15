@@ -149,6 +149,47 @@ test.describe("History search", () => {
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
   ]) {
+    test(`restores recent searches from the search icon at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await resetSeededPageState(page);
+      await openSessions(page);
+      await page.setViewportSize(viewport);
+      const input = page.getByTestId("sessions-search-input");
+      const trigger = page.getByTestId("sessions-search-history-trigger");
+      const menu = page.getByTestId("sessions-search-history-menu");
+
+      await trigger.click();
+      await expect(menu.getByText("No recent searches", { exact: true })).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      await input.fill(`${NONCE} billing`);
+      await input.press("Enter");
+      await page.getByTestId("sessions-search-clear").click();
+      await input.fill(`${NONCE} terminal`);
+      await trigger.click();
+      await expect(menu.getByRole("menuitem")).toHaveText([
+        `${NONCE} terminal`,
+        `${NONCE} billing`,
+      ]);
+      await expect(menu).toHaveCSS("opacity", "1");
+      await page.screenshot({ path: test.info().outputPath("search-history.png") });
+      await menu.getByRole("menuitem", { name: `${NONCE} billing`, exact: true }).click();
+      await expect(input).toHaveValue(`${NONCE} billing`);
+      await expect(menu).toHaveCount(0);
+      await expectVisibleTitles(page, [TITLES.billing]);
+
+      await page.reload();
+      await trigger.click();
+      await expect(menu.getByRole("menuitem")).toHaveText([
+        `${NONCE} billing`,
+        `${NONCE} terminal`,
+      ]);
+      await menu.getByRole("menuitem", { name: `${NONCE} terminal`, exact: true }).click();
+      await expect(input).toHaveValue(`${NONCE} terminal`);
+      await expectVisibleTitles(page, [TITLES.terminal]);
+    });
+
     test(`filters agent types and toggles subagent badges at ${viewport.width}px`, async ({
       page,
     }) => {

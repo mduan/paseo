@@ -331,6 +331,8 @@ export const ptBR: TranslationResources = {
     noMatches: "Nenhuma sessão corresponde",
     tooManyMatches: "Muitos resultados — refine a busca",
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
+    recentSearches: "Pesquisas recentes",
+    noRecentSearches: "Nenhuma pesquisa recente",
     searchPlaceholder: "Buscar no histórico",
     actions: {
       loadMore: "Carregar mais",

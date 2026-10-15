@@ -326,6 +326,8 @@ export const zhCN: TranslationResources = {
     noMatches: "没有匹配的会话",
     tooManyMatches: "匹配过多 — 请缩小搜索范围",
     hostLoadFailed: "{{host}}：无法加载历史",
+    recentSearches: "最近搜索",
+    noRecentSearches: "暂无最近搜索",
     searchPlaceholder: "搜索历史",
     actions: {
       loadMore: "加载更多",

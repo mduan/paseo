@@ -331,6 +331,8 @@ export const ru: TranslationResources = {
     noMatches: "Подходящих сессий не найдено",
     tooManyMatches: "Слишком много совпадений — уточните запрос",
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
+    recentSearches: "Недавние поиски",
+    noRecentSearches: "Нет недавних поисков",
     searchPlaceholder: "Поиск по истории",
     actions: {
       loadMore: "Загрузить ещё",

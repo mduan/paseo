@@ -327,6 +327,8 @@ export const ko: TranslationResources = {
     noMatches: "일치하는 세션이 없습니다",
     tooManyMatches: "일치 항목이 너무 많습니다 — 검색 범위를 좁히세요",
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
+    recentSearches: "최근 검색",
+    noRecentSearches: "최근 검색 없음",
     searchPlaceholder: "기록 검색",
     actions: {
       loadMore: "더 불러오기",

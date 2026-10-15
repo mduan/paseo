@@ -333,6 +333,8 @@ export const fr: TranslationResources = {
     noMatches: "Aucune séance correspondante",
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : Impossible de charger l'historique",
+    recentSearches: "Recherches récentes",
+    noRecentSearches: "Aucune recherche récente",
     searchPlaceholder: "Rechercher dans l'historique",
     actions: {
       loadMore: "Charger plus",

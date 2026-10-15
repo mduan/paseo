@@ -323,6 +323,8 @@ export const en = {
     noMatches: "No sessions match",
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
+    recentSearches: "Recent searches",
+    noRecentSearches: "No recent searches",
     searchPlaceholder: "Search history",
     actions: {
       loadMore: "Load more",

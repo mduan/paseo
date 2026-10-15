@@ -1,4 +1,11 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Pressable, View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -28,6 +35,8 @@ export interface SearchFieldProps {
   testID?: string;
   clearTestID?: string;
   fullWidth?: boolean;
+  leading?: ReactNode;
+  onCommit?: (value: string) => void;
 }
 
 /**
@@ -46,6 +55,8 @@ export function SearchField({
   testID,
   clearTestID,
   fullWidth = false,
+  leading,
+  onCommit,
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -53,17 +64,24 @@ export function SearchField({
     if (inputRef.current?.getText() !== value) inputRef.current?.replaceText(value);
   }, [value]);
   const handleFocus = useCallback(() => setIsFocused(true), []);
-  const handleBlur = useCallback(() => setIsFocused(false), []);
+  const handleCommit = useCallback(() => {
+    onCommit?.(inputRef.current?.getText() ?? value);
+  }, [onCommit, value]);
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    handleCommit();
+  }, [handleCommit]);
   const handleClear = useCallback(() => {
+    handleCommit();
     inputRef.current?.replaceText("");
     onChangeText("");
-  }, [onChangeText]);
+  }, [onChangeText, handleCommit]);
 
   return (
     <View
       style={[styles.field, fullWidth && styles.fieldFullWidth, isFocused && styles.fieldFocused]}
     >
-      <ThemedSearch size={14} uniProps={mutedColorMapping} />
+      {leading ?? <ThemedSearch size={14} uniProps={mutedColorMapping} />}
       <ThemedTextInput
         testID={testID}
         ref={inputRef}
@@ -71,6 +89,7 @@ export function SearchField({
         onChangeText={onChangeText}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onSubmitEditing={handleCommit}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         autoCapitalize="none"
