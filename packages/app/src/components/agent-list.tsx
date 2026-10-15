@@ -18,7 +18,11 @@ import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
 import { Archive, ChevronRight, Folder, GitBranch, Server } from "lucide-react-native";
-import { ProviderIcon } from "@/components/provider-icons";
+import { useProviderIcon } from "@/components/provider-icons";
+import { WorkspaceTabIcon } from "@/screens/workspace/workspace-tab-presentation";
+import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
+import { STATUS_BUCKET_LABELS } from "@/hooks/sidebar-status-view-model";
+import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { HighlightedText } from "@/components/ui/highlighted-text";
@@ -201,32 +205,88 @@ function SessionRow({
       accessibilityRole="button"
       testID={`agent-row-${agent.serverId}-${agent.id}`}
     >
-      <View style={styles.rowContent}>
-        <View style={styles.rowTitleRow}>
-          <HighlightedText
-            text={agent.title || t("agentList.fallbackTitle")}
-            ranges={titleRanges}
-            style={styles.sessionTitle}
-            numberOfLines={isMobile ? 2 : 1}
-            testID={`agent-row-title-${agent.serverId}-${agent.id}`}
-          />
-          <View style={styles.rowEnd}>
-            <SessionRowBadges
-              pendingPermissionCount={pendingPermissionCount}
-              showAttention={showAttention}
+      {({ hovered = false, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
+        <View style={styles.rowContent}>
+          <View style={styles.rowTitleRow}>
+            {fields.provider ? (
+              <SessionRowIcon
+                agent={agent}
+                showStatus={fields.status}
+                backdrop={getSessionRowBackdrop({ hovered, pressed, isSelected })}
+              />
+            ) : null}
+            <HighlightedText
+              text={agent.title || t("agentList.fallbackTitle")}
+              ranges={titleRanges}
+              style={styles.sessionTitle}
+              numberOfLines={isMobile ? 2 : 1}
+              testID={`agent-row-title-${agent.serverId}-${agent.id}`}
             />
-            {fields.lastActivity ? <AgentActivityTime date={agent.lastActivityAt} /> : null}
+            <View style={styles.rowEnd}>
+              <SessionRowBadges
+                pendingPermissionCount={pendingPermissionCount}
+                showAttention={showAttention}
+              />
+              {fields.lastActivity ? <AgentActivityTime date={agent.lastActivityAt} /> : null}
+            </View>
+          </View>
+          <View style={styles.rowMetaRow}>
+            <SessionRowContext agent={agent} fields={fields} search={search} />
+            <SessionRowModel agent={agent} fields={fields} />
+            {fields.status && agent.archivedAt ? (
+              <StatusBadge
+                label={t("agentList.badges.archived")}
+                leading={archivedIcon}
+                size="xs"
+              />
+            ) : null}
           </View>
         </View>
-        <View style={styles.rowMetaRow}>
-          <SessionRowContext agent={agent} fields={fields} search={search} />
-          <SessionRowModel agent={agent} fields={fields} />
-          {fields.status && agent.archivedAt ? (
-            <StatusBadge label={t("agentList.badges.archived")} leading={archivedIcon} size="xs" />
-          ) : null}
-        </View>
-      </View>
+      )}
     </Pressable>
+  );
+}
+
+function getSessionRowBackdrop({
+  hovered,
+  pressed,
+  isSelected,
+}: {
+  hovered: boolean;
+  pressed: boolean;
+  isSelected: boolean;
+}): SurfaceBackdrop {
+  if (pressed) return "surface2";
+  if (hovered) return "surface1";
+  return isSelected ? "surface2" : "surface0";
+}
+
+function SessionRowIcon({
+  agent,
+  showStatus,
+  backdrop,
+}: {
+  agent: AggregatedAgent;
+  showStatus: boolean;
+  backdrop: SurfaceBackdrop;
+}) {
+  const icon = useProviderIcon(agent.provider, agent.serverId);
+  const bucket = deriveSidebarStateBucket({
+    status: agent.turn.phase === "open" ? "running" : agent.status,
+    requiresAttention: agent.requiresAttention,
+    attentionReason: agent.attentionReason,
+    pendingPermissionCount: agent.pendingPermissionCount,
+  });
+  const statusBucket = showStatus ? bucket : null;
+  const presentation = useMemo(() => ({ icon, statusBucket }), [icon, statusBucket]);
+  return (
+    <View
+      role="status"
+      accessibilityLabel={showStatus ? STATUS_BUCKET_LABELS[bucket] : undefined}
+      testID={`agent-row-icon-${agent.serverId}-${agent.id}`}
+    >
+      <WorkspaceTabIcon presentation={presentation} backdrop={backdrop} />
+    </View>
   );
 }
 
@@ -326,24 +386,14 @@ function SessionRowModel({ agent, fields }: { agent: AggregatedAgent; fields: Hi
   const turns = fields.turns ? formatTurnCount(agent.turnCount) : undefined;
   const label = [model, effort, turns].filter(Boolean).join(" · ");
 
-  if (!fields.provider && !label && !fields.cost) return null;
+  if (!label && !fields.cost) return null;
 
   return (
     <View style={styles.metaItem}>
-      {fields.provider ? (
-        <ProviderIcon
-          provider={agent.provider}
-          serverId={agent.serverId}
-          size={14}
-          uniProps={mutedIconMapping}
-        />
-      ) : null}
-      {label || fields.cost ? (
-        <Text style={styles.sessionMetaText}>
-          {label}
-          {fields.cost ? <SessionRowCost agent={agent} prefix={Boolean(label)} /> : null}
-        </Text>
-      ) : null}
+      <Text style={styles.sessionMetaText}>
+        {label}
+        {fields.cost ? <SessionRowCost agent={agent} prefix={Boolean(label)} /> : null}
+      </Text>
     </View>
   );
 }
@@ -645,7 +695,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     flexWrap: "nowrap",
     gap: theme.spacing[2],
-    overflow: "hidden",
   },
   rowMetaRow: {
     flexDirection: "row",

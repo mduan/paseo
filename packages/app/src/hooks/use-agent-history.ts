@@ -5,7 +5,8 @@ import type {
   FetchAgentHistoryPageInfo,
 } from "@getpaseo/client/internal/daemon-client";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import {
@@ -13,7 +14,7 @@ import {
   useHostRuntimeConnectionStatuses,
   useHosts,
 } from "@/runtime/host-runtime";
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore, type Agent } from "@/stores/session-store";
 import { buildAgentDirectoryState } from "@/utils/agent-directory-sync";
 import { agentHistoryQueryKey, allAgentHistoryQueryKey } from "./agent-history-query-key";
 
@@ -264,6 +265,19 @@ export function useAgentHistory(options: {
   );
   const connectionStatuses = useHostRuntimeConnectionStatuses(requestedServerIds);
   const enabled = options.enabled ?? true;
+  useEffect(() => {
+    if (!enabled) return;
+    const releases = requestedServerIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
+    return () => releases.forEach((release) => release());
+  }, [enabled, requestedServerIds, runtime]);
+  const liveAgentsByServer = useSessionStore(
+    useShallow((state) => {
+      const agents: Record<string, Map<string, Agent> | undefined> = {};
+      for (const serverId of requestedServerIds)
+        agents[serverId] = state.sessions[serverId]?.agents;
+      return agents;
+    }),
+  );
   // A host the user asked about splits two ways: one this fetch can reach, and
   // one whose sessions will be missing from the answer. Both come out of here,
   // because dropping the unreachable ones silently is what lets the list — and
@@ -386,13 +400,25 @@ export function useAgentHistory(options: {
   const agents = useMemo(() => {
     const pages = data?.pages ?? [];
     const historyAgents = pages.flatMap((page) => page.agents);
-    const labelledAgents = historyAgents.map((agent) =>
-      Object.assign({}, agent, {
+    const labelledAgents = historyAgents.map((agent) => {
+      const live = liveAgentsByServer[agent.serverId]?.get(agent.id);
+      const current = Object.assign({}, agent, {
         serverLabel: serverLabelById.get(agent.serverId) ?? agent.serverLabel,
-      }),
-    );
+      });
+      if (live) {
+        Object.assign(current, {
+          status: live.status,
+          turn: live.turn,
+          turnCount: live.turnCount ?? agent.turnCount,
+          requiresAttention: live.requiresAttention,
+          attentionReason: live.attentionReason,
+          pendingPermissionCount: live.pendingPermissions.length,
+        });
+      }
+      return current;
+    });
     return sortByLatestActivity(labelledAgents);
-  }, [data?.pages, serverLabelById]);
+  }, [data?.pages, serverLabelById, liveAgentsByServer]);
   const filterOptions = useMemo<AgentHistoryFilterOptions>(
     () => ({
       projects: data?.pages.flatMap((page) => page.filterOptions?.projects ?? []) ?? [],

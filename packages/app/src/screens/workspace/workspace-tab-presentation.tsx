@@ -111,7 +111,7 @@ function WorkspaceTabPresentationResolverInner({
 }
 
 interface WorkspaceTabIconProps {
-  presentation: WorkspaceTabPresentation;
+  presentation: Pick<WorkspaceTabPresentation, "icon" | "statusBucket">;
   active?: boolean;
   size?: number;
   strokeWidth?: number;

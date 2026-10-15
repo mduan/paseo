@@ -12,6 +12,7 @@ import {
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
+import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
 const PRIMARY_LABEL = "Primary box";
 const SECONDARY_LABEL = "Secondary box";
@@ -353,6 +354,82 @@ test.describe("History search across hosts", () => {
       );
     } finally {
       await workspace.cleanup();
+    }
+  });
+
+  test("shows live sidebar status on the provider icon before the History title", async ({
+    page,
+  }, testInfo) => {
+    const title = `${NONCE} Live session status`;
+    const session = await seedMockAgentWorkspace({
+      repoPrefix: "history-session-status-",
+      title,
+      model: "ten-second-stream",
+    });
+    try {
+      await session.client.waitForAgentUpsert(session.agentId, (agent) => agent.status === "idle");
+      await gotoAppShell(page);
+      await openSessions(page);
+      const row = page.getByTestId(`agent-row-${getServerId()}-${session.agentId}`);
+      const icon = row.getByTestId(`agent-row-icon-${getServerId()}-${session.agentId}`);
+      const titleId = `agent-row-title-${getServerId()}-${session.agentId}`;
+      await expect(icon).toHaveAccessibleName("Done");
+      expect(
+        await icon.evaluate((element) => element.nextElementSibling?.getAttribute("data-testid")),
+      ).toBe(titleId);
+
+      await session.client.sendAgentMessage(
+        session.agentId,
+        "Stream a normal mock turn for History status.",
+      );
+      await expect(icon).toHaveAccessibleName("Working");
+      const ring = icon.getByRole("progressbar", { name: "Agent running" });
+      await expect(ring).toBeVisible();
+      expect(
+        await ring.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            const style = getComputedStyle(parent);
+            const clip = parent.getBoundingClientRect();
+            const clipsX = ["hidden", "clip", "auto", "scroll"].includes(style.overflowX);
+            const clipsY = ["hidden", "clip", "auto", "scroll"].includes(style.overflowY);
+            if (clipsX && (bounds.left < clip.left || bounds.right > clip.right)) return false;
+            if (clipsY && (bounds.top < clip.top || bounds.bottom > clip.bottom)) return false;
+          }
+          return true;
+        }),
+      ).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath("history-session-running.png") });
+      await session.client.waitForFinish(session.agentId, 30_000);
+      await expect(icon).toHaveAccessibleName("Ready to review");
+      await expect(icon.getByRole("progressbar")).toHaveCount(0);
+      await expect(row).toContainText("1 turn");
+
+      await session.client.clearWorkspaceAttention(session.workspaceId);
+      await expect(icon).toHaveAccessibleName("Done");
+      await session.client.sendAgentMessage(session.agentId, "emit a synthetic turn failure");
+      await expect(icon).toHaveAccessibleName("Failed", { timeout: 30_000 });
+      await page.screenshot({ path: testInfo.outputPath("history-session-failed.png") });
+
+      await page.getByTestId("sessions-display-trigger").click();
+      await page.getByTestId("sessions-display-status").click();
+      await page.keyboard.press("Escape");
+      await expect(icon).toHaveAccessibleName("");
+      await page.getByTestId("sessions-display-trigger").click();
+      await page.getByTestId("sessions-display-status").click();
+      await page.getByTestId("sessions-display-provider").click();
+      await page.keyboard.press("Escape");
+      await expect(icon).toHaveCount(0);
+      await expect(row.getByTestId(titleId)).toBeVisible();
+      await page.getByTestId("sessions-display-trigger").click();
+      await page.getByTestId("sessions-display-provider").click();
+      await page.keyboard.press("Escape");
+      await expect(icon).toHaveAccessibleName("Failed");
+
+      await session.client.sendAgentMessage(session.agentId, "emit a synthetic plan approval");
+      await expect(icon).toHaveAccessibleName("Needs input", { timeout: 30_000 });
+    } finally {
+      await session.cleanup();
     }
   });
 
