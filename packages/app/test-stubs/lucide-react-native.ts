@@ -114,3 +114,5 @@ export const Upload = StubIcon;
 export const Wrench = StubIcon;
 export const X = StubIcon;
 export const XCircle = StubIcon;
+export const ZoomIn = StubIcon;
+export const ZoomOut = StubIcon;

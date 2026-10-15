@@ -2,7 +2,6 @@ import {
   View,
   Text,
   Pressable,
-  Modal,
   RefreshControl,
   FlatList,
   type ListRenderItem,
@@ -14,7 +13,14 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { isDelegatedAgent } from "@getpaseo/protocol/agent-labels";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { isWeb } from "@/constants/platform";
+import {
+  OverlayLayerProvider,
+  useGlobalWebOverlayLayer,
+  useWebOverlayRegistration,
+} from "@/lib/overlay-root";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
@@ -495,6 +501,23 @@ export function AgentList({
     setActionAgent(null);
   }, []);
 
+  const modalLayer = useGlobalWebOverlayLayer("modal", isWeb && isActionSheetVisible);
+  const handleWebOverlayKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return false;
+      event.preventDefault();
+      event.stopPropagation();
+      handleCloseActionSheet();
+      return true;
+    },
+    [handleCloseActionSheet],
+  );
+  const setWebOverlayScope = useWebOverlayRegistration({
+    active: isWeb && isActionSheetVisible,
+    layer: modalLayer,
+    onKeyDown: handleWebOverlayKeyDown,
+  });
+
   const handleArchiveAgent = useCallback(() => {
     if (!actionAgent || !actionClient) {
       return;
@@ -584,28 +607,26 @@ export function AgentList({
     [onRefresh, isRefreshing],
   );
 
-  return (
-    <>
-      <FlatList
-        data={flatItems}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListFooterComponent={listFooterComponent}
-        refreshControl={refreshControl}
-      />
-
-      <Modal
+  const actionSheet = (
+    <OverlayLayerProvider layer={isWeb ? modalLayer : 0}>
+      <ModalPortal
+        layer={modalLayer}
         visible={isActionSheetVisible}
         animationType="fade"
         transparent
         onRequestClose={handleCloseActionSheet}
+        testID="agent-action-sheet"
       >
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.sheetBackdrop} onPress={handleCloseActionSheet} />
+        <View
+          ref={setWebOverlayScope}
+          tabIndex={isWeb ? -1 : undefined}
+          style={styles.sheetOverlay}
+        >
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={handleCloseActionSheet}
+            testID="agent-action-backdrop"
+          />
           <View style={sheetContainerStyle}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>
@@ -632,7 +653,25 @@ export function AgentList({
             </View>
           </View>
         </View>
-      </Modal>
+      </ModalPortal>
+    </OverlayLayerProvider>
+  );
+
+  return (
+    <>
+      <FlatList
+        data={flatItems}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListFooterComponent={listFooterComponent}
+        refreshControl={refreshControl}
+      />
+
+      {actionSheet}
     </>
   );
 }

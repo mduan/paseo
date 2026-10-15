@@ -1,3 +1,5 @@
+import { StyleSheet as NativeStyleSheet } from "react-native";
+
 const testTheme = {
   colorScheme: "light",
   colors: {
@@ -86,6 +88,7 @@ function isStyleFactory<T>(styles: T | StyleFactory<T>): styles is StyleFactory<
 }
 
 export const StyleSheet = {
+  absoluteFillObject: NativeStyleSheet.absoluteFillObject,
   create: <T>(styles: T | StyleFactory<T>): T =>
     isStyleFactory(styles) ? styles(testTheme) : styles,
 };
