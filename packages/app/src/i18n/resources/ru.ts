@@ -291,7 +291,7 @@ export const ru: TranslationResources = {
         "Не удалось сохранить настройки истории. Повторите попытку, чтобы сохранить текущий выбор.",
       fields: {
         project: "Проект",
-        workspace: "Рабочее пространство",
+        workspace: "Папка",
         branch: "Ветка",
         host: "Хост",
         provider: "Провайдер",

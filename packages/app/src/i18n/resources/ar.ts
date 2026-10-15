@@ -286,7 +286,7 @@ export const ar: TranslationResources = {
       saveFailed: "تعذّر حفظ تفضيلات السجل. أعد المحاولة لحفظ اختياراتك الحالية.",
       fields: {
         project: "المشروع",
-        workspace: "مساحة العمل",
+        workspace: "مجلد",
         branch: "الفرع",
         host: "المضيف",
         provider: "المزوّد",

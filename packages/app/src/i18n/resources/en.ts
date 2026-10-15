@@ -283,7 +283,7 @@ export const en = {
       saveFailed: "Couldn't save History preferences. Retry to save your current choices.",
       fields: {
         project: "Project",
-        workspace: "Workspace",
+        workspace: "Folder",
         branch: "Branch",
         host: "Host",
         provider: "Provider",

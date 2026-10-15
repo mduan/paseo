@@ -292,7 +292,7 @@ export const es: TranslationResources = {
         "No se pudieron guardar las preferencias del historial. Reintenta para guardar tus selecciones actuales.",
       fields: {
         project: "Proyecto",
-        workspace: "Espacio de trabajo",
+        workspace: "Carpeta",
         branch: "Rama",
         host: "Host",
         provider: "Proveedor",
