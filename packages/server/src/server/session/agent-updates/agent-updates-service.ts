@@ -110,6 +110,31 @@ function matchesAgentStructuralFilter(
   return true;
 }
 
+function matchesAgentHistoryFilter({
+  agent,
+  filter,
+}: {
+  agent: AgentSnapshotPayload;
+  filter: AgentUpdatesFilter;
+}): boolean {
+  if (filter.archived !== undefined && Boolean(agent.archivedAt) !== filter.archived) {
+    return false;
+  }
+  if (filter.providers?.length && !filter.providers.includes(agent.provider)) {
+    return false;
+  }
+  if (filter.models?.length) {
+    const model = agent.runtimeInfo?.model ?? agent.model;
+    if (
+      !filter.models.some((option) => option.provider === agent.provider && option.model === model)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Pure predicate shared by the live subscription stream and the snapshot listing
  * pager: does an agent (with its resolved project placement) satisfy a
@@ -135,6 +160,8 @@ export function matchesAgentUpdatesFilter(input: {
   if (!includeArchived && agent.archivedAt) {
     return false;
   }
+
+  if (filter && !matchesAgentHistoryFilter({ agent, filter })) return false;
 
   if (filter && !agentThinkingOptionMatchesFilter(agent, filter)) {
     return false;

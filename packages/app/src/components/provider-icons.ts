@@ -1,3 +1,4 @@
+import { withUnistyles } from "react-native-unistyles";
 import { useStore } from "zustand";
 import { providerSnapshotIcons } from "@/data/provider-icons";
 import { Bot, PackagePlus } from "lucide-react-native";
@@ -103,3 +104,12 @@ export function useProviderIcons(serverId?: string | null) {
     [icons],
   );
 }
+
+export const ProviderIcon = withUnistyles(function ProviderIcon({
+  provider,
+  serverId,
+  ...props
+}: ProviderIconProps & { provider: string; serverId?: string }) {
+  const Icon = useProviderIcon(provider, serverId);
+  return createElement(Icon, props);
+});

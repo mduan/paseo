@@ -235,6 +235,77 @@ describe("matchesAgentUpdatesFilter", () => {
     );
   });
 
+  test("history filters combine categories and accept any selected provider/model", () => {
+    const agent = {
+      ...makeAgentPayload({ id: "a", archivedAt: "2026-03-02T00:00:00.000Z" }),
+      model: "configured-model",
+      runtimeInfo: { provider: "codex", sessionId: null, model: "runtime-model" },
+    };
+    const filter = {
+      includeArchived: true,
+      archived: true,
+      providers: ["claude", "codex"],
+      models: [
+        { provider: "claude", model: "other" },
+        { provider: "codex", model: "runtime-model" },
+      ],
+      projectKeys: ["other-project", project.projectKey],
+    };
+    expect(matchesAgentUpdatesFilter({ agent, project, filter })).toBe(true);
+    expect(
+      matchesAgentUpdatesFilter({ agent, project, filter: { ...filter, archived: false } }),
+    ).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({ agent, project, filter: { ...filter, providers: ["claude"] } }),
+    ).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({
+        agent,
+        project,
+        filter: { ...filter, projectKeys: ["other-project"] },
+      }),
+    ).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({
+        agent,
+        project,
+        filter: { ...filter, models: [{ provider: "claude", model: "runtime-model" }] },
+      }),
+    ).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({
+        agent,
+        project,
+        filter: { ...filter, models: [{ provider: "codex", model: "configured-model" }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("history distinguishes unknown models from an unconstrained model filter", () => {
+    const agent = makeAgentPayload({ id: "a" });
+    expect(
+      matchesAgentUpdatesFilter({
+        agent,
+        project,
+        filter: { models: [{ provider: "codex", model: null }] },
+      }),
+    ).toBe(true);
+    expect(
+      matchesAgentUpdatesFilter({
+        agent: { ...agent, model: "known" },
+        project,
+        filter: { models: [{ provider: "codex", model: null }] },
+      }),
+    ).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({
+        agent,
+        project,
+        filter: { providers: [], models: [], archived: false },
+      }),
+    ).toBe(true);
+  });
+
   test("thinking-option filter compares the resolved option", () => {
     const high = makeAgentPayload({ id: "a", effectiveThinkingOptionId: "high" });
     expect(

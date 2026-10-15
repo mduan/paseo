@@ -10,20 +10,36 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCallback, useMemo, useState, type ReactElement } from "react";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
-import { Archive, ChevronRight } from "lucide-react-native";
-import { useProviderIcon } from "@/components/provider-icons";
+import { Archive, ChevronRight, Folder, GitBranch, Server } from "lucide-react-native";
+import { ProviderIcon } from "@/components/provider-icons";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { HighlightedText } from "@/components/ui/highlighted-text";
+import { formatSessionCost, resolveAgentCostBreakdown } from "@/components/agent-cost";
+import { formatThinkingOptionLabel } from "@/agent-controls/labels";
+import { ProjectIconView } from "@/components/project-icon-view";
+import type { Theme } from "@/styles/theme";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+
+const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const refreshColorMapping = (theme: Theme) => ({
+  tintColor: theme.colors.foregroundMuted,
+  colors: [theme.colors.foregroundMuted],
+});
+const ThemedArchive = withUnistyles(Archive);
+const ThemedFolder = withUnistyles(Folder);
+const ThemedBranch = withUnistyles(GitBranch);
+const ThemedServer = withUnistyles(Server);
+const ThemedChevronRight = withUnistyles(ChevronRight);
+const ThemedRefreshControl = withUnistyles(RefreshControl);
 
 interface AgentListProps {
   agents: AggregatedAgent[];
@@ -114,12 +130,12 @@ function SessionRowBadges({
   agent,
   archivedIcon,
   pendingPermissionCount,
-  showDesktopAttention,
+  showAttention,
 }: {
   agent: AggregatedAgent;
   archivedIcon: ReactElement;
   pendingPermissionCount: number;
-  showDesktopAttention: boolean;
+  showAttention: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -133,30 +149,10 @@ function SessionRowBadges({
           tone="warning"
         />
       ) : null}
-      {showDesktopAttention ? (
+      {showAttention ? (
         <SessionBadge label={t("agentList.badges.attention")} tone="danger" />
       ) : null}
     </>
-  );
-}
-
-function SessionRowTrailingAttention({
-  isMobile,
-  showAttentionIndicator,
-  requiresAttention,
-}: {
-  isMobile: boolean;
-  showAttentionIndicator: boolean;
-  requiresAttention: boolean | undefined;
-}) {
-  const { t } = useTranslation();
-  if (!isMobile || !showAttentionIndicator || !requiresAttention) {
-    return null;
-  }
-  return (
-    <View style={styles.rowTrailing}>
-      <SessionBadge label={t("agentList.badges.attention")} tone="danger" />
-    </View>
   );
 }
 
@@ -179,14 +175,12 @@ function SessionRow({
   onPress: (agent: AggregatedAgent) => void;
   onLongPress: (agent: AggregatedAgent) => void;
 }) {
-  const { theme } = useUnistyles();
   const { t } = useTranslation();
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
   const projectName = agent.projectPlacement?.projectName ?? "";
   const branch = agent.projectPlacement?.checkout.currentBranch ?? "";
   const workspaceName = agent.projectPlacement?.workspaceName ?? "";
-  const ProviderIcon = useProviderIcon(agent.provider, agent.serverId);
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
   const ranges = useMemo(
     () => ({
@@ -211,27 +205,8 @@ function SessionRow({
   const handlePress = useCallback(() => onPress(agent), [onPress, agent]);
   const handleLongPress = useCallback(() => onLongPress(agent), [onLongPress, agent]);
 
-  const archivedIcon = useMemo(
-    () => <Archive size={theme.fontSize.sm} color={theme.colors.foregroundMuted} />,
-    [theme.fontSize.sm, theme.colors.foregroundMuted],
-  );
-  const showDesktopAttention =
-    !isMobile && showAttentionIndicator && Boolean(agent.requiresAttention);
-
-  const agentTitle = (
-    <View style={styles.agentTitleRow}>
-      <View style={styles.providerIconWrap}>
-        <ProviderIcon size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
-      </View>
-      <HighlightedText
-        text={agent.title || t("agentList.fallbackTitle")}
-        ranges={ranges.title}
-        style={styles.sessionTitle}
-        numberOfLines={1}
-        testID={`agent-row-title-${agent.serverId}-${agent.id}`}
-      />
-    </View>
-  );
+  const archivedIcon = useMemo(() => <ThemedArchive size={12} uniProps={mutedIconMapping} />, []);
+  const showAttention = showAttentionIndicator && Boolean(agent.requiresAttention);
 
   return (
     <Pressable
@@ -244,93 +219,130 @@ function SessionRow({
       <View style={styles.rowContent}>
         <View style={styles.rowTitleRow}>
           <HighlightedText
-            text={workspaceName || projectName}
-            ranges={workspaceName ? ranges.workspace : ranges.project}
-            style={styles.workspaceTitleText}
-            numberOfLines={1}
-            testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
+            text={agent.title || t("agentList.fallbackTitle")}
+            ranges={ranges.title}
+            style={styles.sessionTitle}
+            numberOfLines={isMobile ? 2 : 1}
+            testID={`agent-row-title-${agent.serverId}-${agent.id}`}
           />
-          {!isMobile ? (
-            <>
-              <ChevronRight size={theme.iconSize.xs} color={theme.colors.foregroundMuted} />
-              {agentTitle}
-            </>
-          ) : null}
-          <SessionRowBadges
-            agent={agent}
-            archivedIcon={archivedIcon}
-            pendingPermissionCount={pendingPermissionCount}
-            showDesktopAttention={showDesktopAttention}
-          />
+          <View style={styles.rowEnd}>
+            <SessionRowBadges
+              agent={agent}
+              archivedIcon={archivedIcon}
+              pendingPermissionCount={pendingPermissionCount}
+              showAttention={showAttention}
+            />
+            <AgentActivityTime date={agent.lastActivityAt} />
+          </View>
         </View>
-        {isMobile ? agentTitle : null}
-        {isMobile ? (
-          <View style={styles.rowMetaRow}>
-            <HighlightedText
-              text={projectName}
-              ranges={ranges.project}
-              style={styles.sessionMetaText}
-              numberOfLines={1}
-              testID={`agent-row-project-${agent.serverId}-${agent.id}`}
-            />
-            <Text style={styles.sessionMetaSeparator}>·</Text>
-            <HighlightedText
-              text={branch}
-              ranges={ranges.branch}
-              style={styles.sessionMetaText}
-              numberOfLines={1}
-              testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
-            />
-            <Text style={styles.sessionMetaSeparator}>·</Text>
-            <AgentActivityTime date={agent.lastActivityAt} isMobile />
-            {showHostColumn && agent.serverLabel ? (
-              <>
-                <Text style={styles.sessionMetaSeparator}>·</Text>
-                <Text style={styles.sessionMetaText} numberOfLines={1}>
-                  {agent.serverLabel}
-                </Text>
-              </>
+        <View style={styles.rowMetaRow}>
+          <View style={styles.metaItem}>
+            {projectName ? (
+              <View style={styles.metaItem}>
+                <ProjectIconView
+                  iconDataUri={null}
+                  initial={projectName.charAt(0).toUpperCase()}
+                  projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
+                  size={14}
+                  textStyle={styles.projectIconText}
+                />
+                <HighlightedText
+                  text={projectName}
+                  ranges={ranges.project}
+                  style={styles.sessionMetaText}
+                  numberOfLines={1}
+                  testID={`agent-row-project-${agent.serverId}-${agent.id}`}
+                />
+              </View>
+            ) : null}
+            {workspaceName ? (
+              <View style={styles.metaItem}>
+                <ThemedChevronRight size={12} uniProps={mutedIconMapping} />
+                <ThemedFolder size={14} uniProps={mutedIconMapping} />
+                <HighlightedText
+                  text={workspaceName}
+                  ranges={ranges.workspace}
+                  style={styles.sessionMetaText}
+                  numberOfLines={1}
+                  testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
+                />
+              </View>
             ) : null}
           </View>
-        ) : null}
-      </View>
-      {!isMobile ? (
-        <View style={styles.rowColumns}>
-          <HighlightedText
-            text={projectName}
-            ranges={ranges.project}
-            style={styles.columnMeta}
-            numberOfLines={1}
-            testID={`agent-row-project-${agent.serverId}-${agent.id}`}
-          />
-          {showHostColumn ? (
-            <Text style={styles.columnMetaHost} numberOfLines={1}>
-              {agent.serverLabel}
-            </Text>
+          {branch ? (
+            <View style={styles.metaItem}>
+              <Text style={styles.sessionMetaSeparator}>·</Text>
+              <ThemedBranch size={14} uniProps={mutedIconMapping} />
+              <HighlightedText
+                text={branch}
+                ranges={ranges.branch}
+                style={styles.sessionMetaText}
+                numberOfLines={1}
+                testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
+              />
+            </View>
           ) : null}
-          <HighlightedText
-            text={branch}
-            ranges={ranges.branch}
-            style={styles.columnMeta}
-            numberOfLines={1}
-            testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
-          />
-          <AgentActivityTime date={agent.lastActivityAt} isMobile={false} />
+          {showHostColumn ? (
+            <View style={styles.metaItem}>
+              <ThemedServer size={14} uniProps={mutedIconMapping} />
+              <Text style={styles.sessionMetaText} numberOfLines={1}>
+                {agent.serverLabel}
+              </Text>
+            </View>
+          ) : null}
+          <SessionRowModel agent={agent} />
         </View>
-      ) : null}
-      <SessionRowTrailingAttention
-        isMobile={isMobile}
-        showAttentionIndicator={showAttentionIndicator}
-        requiresAttention={agent.requiresAttention}
-      />
+      </View>
     </Pressable>
   );
 }
 
-function AgentActivityTime({ date, isMobile }: { date: Date; isMobile: boolean }) {
+function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
+  const { t } = useTranslation();
+  const usage = agent.lastUsage;
+  const breakdown = resolveAgentCostBreakdown({
+    totalCostUsd: usage?.totalCostUsd,
+    subagentCostUsd: usage?.subagentCostUsd,
+    paseoSubagentCostUsd: usage?.paseoSubagentCostUsd,
+    totalCostUnavailable: usage?.totalCostUnavailable,
+  });
+  const costValue = breakdown?.totalCostUsd ?? usage?.totalCostUsd;
+  const cost =
+    costValue === undefined || agent.lastUsage?.totalCostUnavailable
+      ? null
+      : formatSessionCost(costValue);
+  const estimated = usage?.totalCostEstimated || usage?.paseoSubagentCostEstimated;
+
+  return (
+    <View style={styles.metaItem}>
+      <ProviderIcon
+        provider={agent.provider}
+        serverId={agent.serverId}
+        size={14}
+        uniProps={mutedIconMapping}
+      />
+      <Text style={styles.sessionMetaText}>
+        {agent.model ?? t("sessions.filters.unknownModel")}
+        {agent.thinkingOptionId
+          ? ` · ${formatThinkingOptionLabel({ id: agent.thinkingOptionId })}`
+          : undefined}
+        {" · "}
+        <Text
+          accessibilityLabel={
+            estimated && cost ? t("sessions.filters.estimatedCost", { cost }) : undefined
+          }
+        >
+          {cost ? `${estimated ? "~" : ""}${cost}` : t("sessions.filters.costUnavailable")}
+        </Text>
+      </Text>
+    </View>
+  );
+}
+
+function AgentActivityTime({ date }: { date: Date }) {
   const label = useTimeAgo(date);
   return (
-    <Text style={isMobile ? styles.sessionMetaText : styles.columnMetaFixed} numberOfLines={1}>
+    <Text style={styles.activityTime} numberOfLines={1}>
       {label}
     </Text>
   );
@@ -347,7 +359,6 @@ export function AgentList({
   showHostColumn = false,
   search,
 }: AgentListProps) {
-  const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [actionAgent, setActionAgent] = useState<AggregatedAgent | null>(null);
@@ -471,13 +482,9 @@ export function AgentList({
 
   const keyExtractor = useCallback((item: FlatListItem) => item.key, []);
 
-  const refreshColors = useMemo(
-    () => [theme.colors.foregroundMuted],
-    [theme.colors.foregroundMuted],
-  );
   const sheetContainerStyle = useMemo(
-    () => [styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, theme.spacing[6]) }],
-    [insets.bottom, theme.spacing],
+    () => [styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 24) }],
+    [insets.bottom],
   );
   const sheetArchiveTextStyle = useMemo(
     () => [styles.sheetArchiveText, isActionDaemonUnavailable && styles.sheetArchiveTextDisabled],
@@ -487,14 +494,13 @@ export function AgentList({
   const refreshControl = useMemo(
     () =>
       onRefresh ? (
-        <RefreshControl
+        <ThemedRefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          tintColor={theme.colors.foregroundMuted}
-          colors={refreshColors}
+          uniProps={refreshColorMapping}
         />
       ) : undefined,
-    [onRefresh, isRefreshing, theme.colors.foregroundMuted, refreshColors],
+    [onRefresh, isRefreshing],
   );
 
   return (
@@ -580,7 +586,7 @@ const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: theme.spacing[2],
+    paddingVertical: theme.spacing[3],
     paddingHorizontal: theme.spacing[3],
     borderRadius: {
       xs: theme.borderRadius.lg,
@@ -603,31 +609,13 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     overflow: "hidden",
   },
-  agentTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  providerIconWrap: {
-    flexShrink: 0,
-  },
-  workspaceTitleText: {
-    flexShrink: { xs: 1, md: 0 },
-    maxWidth: { xs: "100%", md: 320 },
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foreground,
-  },
   rowMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: theme.spacing[1],
-    marginTop: 2,
-  },
-  rowTrailing: {
-    marginLeft: theme.spacing[2],
+    columnGap: theme.spacing[3],
+    rowGap: theme.spacing[1],
+    marginTop: theme.spacing[1.5],
   },
   rowSelected: {
     backgroundColor: theme.colors.surface2,
@@ -639,15 +627,16 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface2,
   },
   sessionTitle: {
-    flexShrink: 1,
+    flex: 1,
     minWidth: 0,
     fontSize: theme.fontSize.base,
-    fontWeight: "400",
-    color: theme.colors.foregroundMuted,
+    fontWeight: theme.fontWeight.normal,
+    color: theme.colors.foreground,
   },
   sessionMetaText: {
+    flexShrink: 1,
     maxWidth: "100%",
-    fontSize: theme.fontSize.base,
+    fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
   },
   sessionMetaSeparator: {
@@ -655,33 +644,16 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     opacity: 0.7,
   },
-  rowColumns: {
+  metaItem: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 0,
-    gap: theme.spacing[3],
+    gap: theme.spacing[1.5],
+    maxWidth: "100%",
+    flexShrink: 1,
   },
-  columnMeta: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foregroundMuted,
-    flexShrink: 0,
-    width: 132,
-  },
-  columnMetaFixed: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foregroundMuted,
-    flexShrink: 0,
-    width: 72,
-    textAlign: "right" as const,
-  },
-  columnMetaHost: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foregroundMuted,
-    flexShrink: 0,
-    width: 120,
-    marginLeft: theme.spacing[4],
-    textAlign: "right" as const,
-  },
+  rowEnd: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2], flexShrink: 0 },
+  activityTime: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
+  projectIconText: { fontSize: 8 },
   sheetOverlay: {
     flex: 1,
     justifyContent: "flex-end",

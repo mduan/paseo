@@ -7,6 +7,7 @@ import type {
   SessionEventSubscription,
   UsageReportEntry,
   ProviderUsage,
+  AgentHistoryFilterOptions,
 } from "@getpaseo/protocol/messages";
 import { relative } from "node:path";
 import { isAbsolute } from "node:path";
@@ -384,6 +385,18 @@ type FetchAgentsResponsePayload = Extract<
 >["payload"];
 type FetchAgentsResponseEntry = FetchAgentsResponsePayload["entries"][number];
 type FetchAgentsResponsePageInfo = FetchAgentsResponsePayload["pageInfo"];
+function agentDirectoryFilter(
+  request: AgentDirectoryRequestMessage,
+): FetchAgentsRequestFilter | undefined {
+  if (
+    request.type === "fetch_agent_history_request" &&
+    request.filter?.includeArchived === undefined
+  ) {
+    return { ...request.filter, includeArchived: true };
+  }
+  return request.filter;
+}
+
 type AgentUpdatesFilter = FetchAgentsRequestFilter;
 type CreateAgentRequestMessage = Extract<SessionInboundMessage, { type: "create_agent_request" }>;
 
@@ -5470,22 +5483,51 @@ export class Session {
     return matchedEntries;
   }
 
+  private async listAgentHistoryFilterOptions({
+    agents,
+    getPlacement,
+  }: {
+    agents: AgentSnapshotPayload[];
+    getPlacement: (workspaceId: string | undefined) => Promise<ProjectPlacementPayload | null>;
+  }): Promise<AgentHistoryFilterOptions> {
+    // The catalog precedes filtering and pagination so older sessions remain selectable.
+    const entries = await this.collectFetchAgentsEntries({
+      candidates: agents,
+      limit: agents.length,
+      getPlacement,
+      filter: { includeArchived: true },
+    });
+    const projects = new Map<string, ProjectPlacementPayload>();
+    const models = new Map<string, AgentHistoryFilterOptions["models"][number]>();
+    for (const { agent, project } of entries) {
+      projects.set(project.projectKey, project);
+      const model = { provider: agent.provider, model: agent.runtimeInfo?.model ?? agent.model };
+      models.set(JSON.stringify([model.provider, model.model]), model);
+    }
+    return {
+      projects: Array.from(projects.values(), ({ projectKey, projectName }) => ({
+        projectKey,
+        projectName,
+      })),
+      models: [...models.values()],
+    };
+  }
+
   private async listFetchAgentsEntries(request: AgentDirectoryRequestMessage): Promise<{
     entries: FetchAgentsResponseEntry[];
     pageInfo: FetchAgentsResponsePageInfo;
     searchTruncated?: boolean;
+    filterOptions?: AgentHistoryFilterOptions;
   }> {
-    const filter =
-      request.type === "fetch_agent_history_request" &&
-      request.filter?.includeArchived === undefined
-        ? { ...request.filter, includeArchived: true }
-        : request.filter;
+    const filter = agentDirectoryFilter(request);
     const scope = request.type === "fetch_agents_request" ? request.scope : undefined;
     const sort = this.agentsPager.normalizeSort(request.sort);
 
+    const includeFilterOptions =
+      request.type === "fetch_agent_history_request" && request.includeFilterOptions;
     let agents = await this.listAgentPayloads({
       labels: filter?.labels,
-      includeArchived: filter?.includeArchived,
+      includeArchived: includeFilterOptions || filter?.includeArchived,
       includeUnavailablePersisted: request.type === "fetch_agent_history_request",
     });
     const activePlacementsByWorkspaceId =
@@ -5518,6 +5560,11 @@ export class Session {
       return placementPromise;
     };
 
+    let filterOptions: AgentHistoryFilterOptions | undefined;
+    if (includeFilterOptions) {
+      filterOptions = await this.listAgentHistoryFilterOptions({ agents, getPlacement });
+    }
+
     const search = agentDirectorySearchQuery(request);
     let candidates = [...agents];
     candidates.sort((left, right) => this.agentsPager.compare(left, right, sort));
@@ -5547,6 +5594,7 @@ export class Session {
         : null;
 
     return {
+      ...(filterOptions ? { filterOptions } : {}),
       entries: pagedEntries,
       pageInfo: {
         nextCursor,

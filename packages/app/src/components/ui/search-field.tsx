@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactElement } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { Pressable, View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -47,6 +47,9 @@ export function SearchField({
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
+  useLayoutEffect(() => {
+    if (inputRef.current?.getText() !== value) inputRef.current?.replaceText(value);
+  }, [value]);
   const handleFocus = useCallback(() => setIsFocused(true), []);
   const handleBlur = useCallback(() => setIsFocused(false), []);
   const handleClear = useCallback(() => {

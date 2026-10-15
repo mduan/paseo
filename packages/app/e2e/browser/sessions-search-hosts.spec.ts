@@ -3,14 +3,11 @@ import { expect, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { openSessions } from "../support/helpers/archive-tab";
-import { createIdleAgent } from "../support/helpers/archive-tab";
+import { createMockIdleAgent } from "../support/helpers/archive-tab";
 import { addConnectedHostAndReload, addOfflineHostAndReload } from "../support/helpers/hosts";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-// The constants module is plain TypeScript, so the Playwright runner can import
-// it — reaching through the `.tsx` picker would drag React Native into Node.
-import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker-constants";
 
 const PRIMARY_LABEL = "Primary box";
 const SECONDARY_LABEL = "Secondary box";
@@ -23,12 +20,16 @@ async function search(page: Page, query: string): Promise<void> {
 }
 
 async function selectHost(page: Page, serverId: string): Promise<void> {
-  await page.getByTestId("sessions-host-filter-trigger").click();
-  await page.getByTestId(`sessions-host-filter-item-${serverId}`).click();
+  await page.getByTestId("sessions-hosts-filter-trigger").click();
+  await page.getByTestId(`sessions-hosts-filter-item-${serverId}`).click();
+  await page.keyboard.press("Escape");
 }
 
 async function expectChronologicalTitles(page: Page, titles: string[]): Promise<void> {
-  const rows = page.getByRole("button").filter({ hasText: NONCE });
+  const rows = page
+    .getByRole("button")
+    .and(page.getByTestId(/^agent-row-/))
+    .filter({ hasText: NONCE });
   await expect(rows).toHaveCount(titles.length, { timeout: 30_000 });
   for (const [index, title] of titles.entries()) {
     await expect(rows.nth(index)).toContainText(title, { timeout: 30_000 });
@@ -59,7 +60,7 @@ test.describe("History search across hosts", () => {
         repoPrefix: "sessions-search-secondary-",
         port: secondaryDaemon.port,
       });
-      await createIdleAgent(secondaryWorkspace.client, {
+      await createMockIdleAgent(secondaryWorkspace.client, {
         cwd: secondaryWorkspace.repoPath,
         workspaceId: secondaryWorkspace.workspaceId,
         title: strongTitle,
@@ -67,7 +68,7 @@ test.describe("History search across hosts", () => {
 
       primaryWorkspace = await seedWorkspace({ repoPrefix: "sessions-search-primary-" });
       for (const title of [unrelatedTitle, weakTitle]) {
-        await createIdleAgent(primaryClient, {
+        await createMockIdleAgent(primaryClient, {
           cwd: primaryWorkspace.repoPath,
           workspaceId: primaryWorkspace.workspaceId,
           title,
@@ -92,18 +93,123 @@ test.describe("History search across hosts", () => {
       await expectChronologicalTitles(page, [weakTitle]);
 
       await selectHost(page, secondaryDaemon.serverId);
+      await expectChronologicalTitles(page, [weakTitle, strongTitle]);
+      await selectHost(page, getServerId());
       await expectChronologicalTitles(page, [strongTitle]);
 
       // Back to all hosts, and clearing the query returns every seeded session.
-      await selectHost(page, ALL_HOSTS_OPTION_ID);
+      await page.getByTestId("sessions-hosts-filter-trigger").click();
+      await page.getByTestId("sessions-hosts-filter-all").click();
+      await page.keyboard.press("Escape");
       await page.getByTestId("sessions-search-clear").click();
-      const rows = page.getByRole("button").filter({ hasText: NONCE });
+      const rows = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: NONCE });
       await expect(rows).toHaveCount(3, { timeout: 30_000 });
     } finally {
       await primaryWorkspace?.cleanup().catch(() => undefined);
       await secondaryWorkspace?.cleanup().catch(() => undefined);
       await primaryClient.close().catch(() => undefined);
       await secondaryDaemon.close().catch(() => undefined);
+    }
+  });
+
+  test("combines project, provider, model and archive filters on desktop and compact layouts", async ({
+    page,
+  }, testInfo) => {
+    const firstWorkspace = await seedWorkspace({ repoPrefix: "history-filters-first-" });
+    const secondWorkspace = await seedWorkspace({ repoPrefix: "history-filters-second-" });
+    const activeTitle = `${NONCE} Active history filter session`;
+    const archivedTitle = `${NONCE} Archived history filter session`;
+    try {
+      await createMockIdleAgent(firstWorkspace.client, {
+        cwd: firstWorkspace.repoPath,
+        workspaceId: firstWorkspace.workspaceId,
+        title: activeTitle,
+      });
+      const archived = await createMockIdleAgent(secondWorkspace.client, {
+        cwd: secondWorkspace.repoPath,
+        workspaceId: secondWorkspace.workspaceId,
+        title: archivedTitle,
+      });
+      await secondWorkspace.client.archiveAgent(archived.id);
+      await gotoAppShell(page);
+      await openSessions(page);
+      await search(page, NONCE);
+      await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
+      await expect(
+        page
+          .getByRole("button")
+          .and(page.getByTestId(/^agent-row-/))
+          .filter({ hasText: activeTitle }),
+      ).toContainText("e2e-fast-stream");
+      await expect(
+        page
+          .getByRole("button")
+          .and(page.getByTestId(/^agent-row-/))
+          .filter({ hasText: activeTitle }),
+      ).toContainText("Cost unavailable");
+      await expect(page.getByTestId("sessions-status-filter-trigger")).toHaveAttribute(
+        "role",
+        "button",
+      );
+      await page.getByTestId("sessions-status-filter-trigger").click();
+      await page.getByTestId("sessions-status-filter-item-active").click();
+      await page.keyboard.press("Escape");
+      await expectChronologicalTitles(page, [activeTitle]);
+      await page.getByTestId("sessions-projects-filter-trigger").click();
+      const projectItems = page.getByTestId(/^sessions-projects-filter-item-/);
+      await expect(projectItems).toHaveCount(2);
+      await projectItems.filter({ hasText: firstWorkspace.repoPath.split("/").pop()! }).click();
+      await projectItems.filter({ hasText: secondWorkspace.repoPath.split("/").pop()! }).click();
+      await page.keyboard.press("Escape");
+      await page.getByTestId("sessions-providers-filter-trigger").click();
+      await page.getByTestId("sessions-providers-filter-item-mock").click();
+      await page.keyboard.press("Escape");
+      await page.getByTestId("sessions-models-filter-trigger").click();
+      await page.getByTestId('sessions-models-filter-item-["mock","e2e-fast-stream"]').click();
+      await page.keyboard.press("Escape");
+      await expectChronologicalTitles(page, [activeTitle]);
+      await page.screenshot({ path: testInfo.outputPath("history-desktop.png") });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.getByTestId("sessions-filters-trigger")).toHaveAttribute("role", "button");
+      await page.getByTestId("sessions-filters-trigger").click();
+      await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
+      await page.getByTestId("sessions-status-filter-item-archived").click();
+      await page.screenshot({ path: testInfo.outputPath("history-compact-filters.png") });
+      await page
+        .getByRole("button", { name: "Bottom sheet backdrop" })
+        .click({ position: { x: 16, y: 16 } });
+      await expect(page.getByTestId("sessions-filters-sheet-content")).not.toBeVisible();
+      await expectChronologicalTitles(page, [archivedTitle]);
+      await page.screenshot({ path: testInfo.outputPath("history-compact.png") });
+    } finally {
+      await firstWorkspace.cleanup();
+      await secondWorkspace.cleanup();
+    }
+  });
+
+  test("clears the query text when resetting empty History filters", async ({ page }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-clear-filters-" });
+    const title = `${NONCE} Clear filters recovery`;
+    try {
+      await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title,
+      });
+      await gotoAppShell(page);
+      await openSessions(page);
+      await search(page, `${NONCE} nonexistentquery`);
+      const empty = page.getByTestId("sessions-empty");
+      await expect(empty).toBeVisible();
+      await empty.getByRole("button", { name: "Clear filters", exact: true }).click();
+      await expect(page.getByTestId("sessions-search-input")).toHaveValue("");
+      await expect(page.getByTestId("sessions-search-clear")).not.toBeVisible();
+      await expectChronologicalTitles(page, [title]);
+    } finally {
+      await workspace.cleanup();
     }
   });
 
@@ -114,7 +220,7 @@ test.describe("History search across hosts", () => {
     const reachableTitle = `${NONCE} Bill the reachable customer`;
 
     try {
-      await createIdleAgent(workspace.client, {
+      await createMockIdleAgent(workspace.client, {
         cwd: workspace.repoPath,
         workspaceId: workspace.workspaceId,
         title: reachableTitle,
