@@ -131,7 +131,7 @@ function FilterItems({
         id=""
         label={group.all}
         selected={!group.selected.length}
-        closeOnSelect={closeOnSelect}
+        closeOnSelect
         onSelect={select}
         testID={`sessions-${group.id}-filter-all`}
       />

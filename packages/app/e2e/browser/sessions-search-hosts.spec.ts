@@ -199,6 +199,11 @@ test.describe("History search across hosts", () => {
       await search(page, NONCE);
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
       await expectHistoryToolbar({ page });
+      for (const group of ["hosts", "projects", "providers", "models"]) {
+        await page.getByTestId(`sessions-${group}-filter-trigger`).click();
+        await page.getByTestId(`sessions-${group}-filter-all`).click();
+        await expect(page.getByTestId(`sessions-${group}-filter-all`)).not.toBeVisible();
+      }
       const archivedRow = page
         .getByRole("button")
         .and(page.getByTestId(/^agent-row-/))
@@ -304,6 +309,11 @@ test.describe("History search across hosts", () => {
       await expectHistoryToolbar({ page, compact: true });
       await expect(page.getByTestId("sessions-filters-trigger")).toHaveAttribute("role", "button");
       await page.getByTestId("sessions-filters-trigger").click();
+      await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
+      await page.getByTestId("sessions-hosts-filter-all").click();
+      await expect(page.getByTestId("sessions-filters-sheet-content")).not.toBeVisible();
+      await page.getByTestId("sessions-filters-trigger").click();
+      await page.getByTestId(`sessions-hosts-filter-item-${getServerId()}`).click();
       await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
       await page.getByTestId("sessions-status-filter-item-archived").click();
       await page.screenshot({ path: testInfo.outputPath("history-compact-filters.png") });
