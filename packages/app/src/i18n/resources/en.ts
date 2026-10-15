@@ -22,6 +22,10 @@ export const en = {
     total: "{{total}} matches",
   },
   common: {
+    turns: {
+      one: "{{count}} turn",
+      other: "{{count}} turns",
+    },
     bottomSheetBackdrop: "Bottom sheet backdrop",
     back: "Back",
     loading: "Loading...",
@@ -632,7 +636,6 @@ export const en = {
     },
     tabs: {
       loading: "Loading...",
-      effort: "{{effort}} effort",
       modified: "Unsaved changes",
       loadingAgentTitle: "Loading agent title",
       fallback: {

@@ -409,7 +409,7 @@ export class ClaudeTaskProtocolSource {
     const initialPresentation = title ? { title } : {};
     this.presentationById.set(id, initialPresentation);
     const initialSubtitle = buildClaudeSubagentSubtitle(initialPresentation);
-    if (initialSubtitle) this.lastSubtitleById.set(id, initialSubtitle);
+    if (initialSubtitle) this.lastSubtitleById.set(id, initialSubtitle.subtitle);
 
     // Open the provider-subagent timeline with the task it was actually given. Without this the
     // pane starts mid-conversation, showing replies to a question the reader never sees.
@@ -552,9 +552,9 @@ export class ClaudeTaskProtocolSource {
     const next: ClaudeSubagentPresentationFacts = { ...previous, ...patch };
     this.presentationById.set(id, next);
     const subtitle = buildClaudeSubagentSubtitle(next);
-    if (!subtitle || this.lastSubtitleById.get(id) === subtitle) return [];
-    this.lastSubtitleById.set(id, subtitle);
-    return [{ kind: "subtitle", id, subtitle }];
+    if (!subtitle || this.lastSubtitleById.get(id) === subtitle.subtitle) return [];
+    this.lastSubtitleById.set(id, subtitle.subtitle);
+    return [{ kind: "subtitle", id, ...subtitle }];
   }
 
   /**

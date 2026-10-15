@@ -18,8 +18,8 @@ const prices = new CodexPrices({
 });
 const read = { prices, serviceTier: "default" };
 
-function turnContext(model: string): string {
-  return `${JSON.stringify({ type: "turn_context", payload: { model } })}\n`;
+function turnContext({ model, effort }: { model: string; effort?: string | null }): string {
+  return `${JSON.stringify({ type: "turn_context", payload: { model, effort } })}\n`;
 }
 
 function tokenCount({
@@ -65,12 +65,12 @@ describe("CodexRolloutCost", () => {
   test("prices each request with its turn's model and the long-context rate", async () => {
     writeFileSync(
       file,
-      turnContext("gpt-6.1-sol") +
+      turnContext({ model: "gpt-6.1-sol" }) +
         // 100k uncached × $2/M + 10k output × $10/M = $0.30
         tokenCount({ total: 110_000, input: 100_000, output: 10_000 }) +
         // Long context: 300k uncached × $4/M + 10k output × $15/M = $1.35
         tokenCount({ total: 420_000, input: 300_000, output: 10_000 }) +
-        turnContext("gpt-6-luna") +
+        turnContext({ model: "gpt-6-luna" }) +
         // 200k uncached × $0.10/M = $0.02
         tokenCount({ total: 620_000, input: 200_000, output: 0 }),
     );
@@ -81,7 +81,8 @@ describe("CodexRolloutCost", () => {
   test("ignores re-emitted token counts and reads only appended lines", async () => {
     writeFileSync(
       file,
-      turnContext("gpt-6.1-sol") + tokenCount({ total: 1_000, input: 100_000, output: 0 }),
+      turnContext({ model: "gpt-6.1-sol" }) +
+        tokenCount({ total: 1_000, input: 100_000, output: 0 }),
     );
     const cost = new CodexRolloutCost(file);
     expect(await cost.read(read)).toBeCloseTo(0.2);
@@ -98,10 +99,21 @@ describe("CodexRolloutCost", () => {
     expect(await cost.read(read)).toBeCloseTo(0.4);
   });
 
+  test("reads the latest effort and clears it when the next turn has no recorded effort", async () => {
+    writeFileSync(file, "");
+    const cost = new CodexRolloutCost(file);
+    expect(cost.effort).toBeUndefined();
+    for (const effort of ["low", "xhigh", undefined, null]) {
+      appendFileSync(file, turnContext({ model: "gpt-6-luna", effort }));
+      await cost.read(read);
+      expect(cost.effort).toBe(effort ?? undefined);
+    }
+  });
+
   test("returns undefined when no request used a priced model", async () => {
     writeFileSync(
       file,
-      turnContext("unknown-model") + tokenCount({ total: 10, input: 10, output: 0 }),
+      turnContext({ model: "unknown-model" }) + tokenCount({ total: 10, input: 10, output: 0 }),
     );
 
     expect(await new CodexRolloutCost(file).read(read)).toBeUndefined();

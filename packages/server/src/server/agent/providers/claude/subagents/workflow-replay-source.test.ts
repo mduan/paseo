@@ -86,6 +86,7 @@ describe("Claude workflow replay", () => {
       title: "Workflow",
       description: "Runs one deterministic child and returns its structured result",
       subtitle: "Workflow · Sonnet 5 · 20.4k tokens",
+      subtitleParts: { context: "Workflow · Sonnet 5", usage: "20.4k tokens" },
       status: "completed",
       toolCallId: TOOL_CALL_ID,
     });

@@ -833,6 +833,7 @@ export const AgentSnapshotPayloadSchema = z.object({
   lastUserMessageAt: z.string().nullable(),
   status: AgentStatusSchema,
   activeTurn: AgentActiveTurnPayloadSchema.nullable().optional(),
+  turnCount: z.number().int().nonnegative().optional(),
   capabilities: AgentCapabilityFlagsSchema,
   currentModeId: z.string().nullable(),
   availableModes: z.array(AgentModeSchema),
@@ -4779,6 +4780,7 @@ export const AgentTimelineListPromptsResponseMessageSchema = z.object({
 });
 
 export const ProviderSubagentDescriptorPayloadSchema = z.object({
+  turnCount: z.number().int().nonnegative().optional(),
   id: z.string(),
   parentAgentId: z.string(),
   // COMPAT(providerSubagentNesting): added in v0.7, remove optional after 2027-03-04.
@@ -4794,6 +4796,7 @@ export const ProviderSubagentDescriptorPayloadSchema = z.object({
   // Compact provider-owned context for the shared track. Providers choose what belongs here and
   // format it for display; clients must not parse provider-specific facts out of this string.
   subtitle: z.string().nullable().optional(),
+  subtitleParts: z.object({ context: z.string(), usage: z.string() }).optional(),
 });
 
 export type ProviderSubagentDescriptorPayload = z.infer<

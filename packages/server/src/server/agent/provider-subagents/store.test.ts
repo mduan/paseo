@@ -2,6 +2,51 @@ import { describe, expect, test } from "vitest";
 import { ProviderSubagentStore } from "./store.js";
 
 describe("ProviderSubagentStore", () => {
+  test("counts native child prompts before and after its descriptor arrives", () => {
+    const store = new ProviderSubagentStore();
+    const prompt = {
+      type: "timeline",
+      id: "child",
+      item: { type: "user_message", text: "go" },
+    } as const;
+    store.apply("parent", "claude", prompt);
+    store.apply("parent", "claude", { type: "upsert", id: "child", subtitle: "Opus · ~$1.00" });
+    expect(store.get("parent", "child")?.turnCount).toBe(1);
+    store.apply("parent", "claude", prompt);
+    store.apply("parent", "claude", {
+      type: "timeline",
+      id: "child",
+      item: { type: "assistant_message", text: "done" },
+    });
+    store.apply("parent", "claude", { type: "upsert", id: "child", status: "completed" });
+    expect(store.get("parent", "child")).toMatchObject({ turnCount: 2, subtitle: "Opus · ~$1.00" });
+    store.deleteParent("parent");
+    store.apply("parent", "claude", prompt);
+    store.apply("parent", "claude", { type: "upsert", id: "child" });
+    expect(store.get("parent", "child")?.turnCount).toBe(1);
+    store.apply("parent", "claude", { type: "remove", id: "child" });
+    store.apply("parent", "claude", { type: "upsert", id: "child" });
+    expect(store.get("parent", "child")?.turnCount).toBeUndefined();
+    store.apply("parent", "claude", { type: "remove", id: "child" });
+    store.apply("parent", "claude", prompt);
+    store.deleteParent("parent");
+    store.apply("parent", "claude", { type: "upsert", id: "child" });
+    expect(store.get("parent", "child")?.turnCount).toBeUndefined();
+  });
+
+  test("preserves the context and usage split through status updates", () => {
+    const store = new ProviderSubagentStore();
+    const subtitleParts = { context: "Explore · Haiku 4.5", usage: "24.4k tokens · ~$0.03" };
+    store.apply("parent", "claude", {
+      type: "upsert",
+      id: "child",
+      subtitle: "Explore · Haiku 4.5 · 24.4k tokens · ~$0.03",
+      subtitleParts,
+    });
+    store.apply("parent", "claude", { type: "upsert", id: "child", status: "completed" });
+    expect(store.list("parent")[0]?.subtitleParts).toEqual(subtitleParts);
+  });
+
   test("keeps provider children and their timelines scoped to the parent agent", () => {
     const subagents = new ProviderSubagentStore();
 

@@ -153,6 +153,7 @@ function agent(id = "agent-1"): Agent {
         title: "Cached agent",
         labels: {},
         lastAssistantPreview: "Pushed both branches",
+        turnCount: 12,
         runtimeInfo: {
           provider: "claude",
           sessionId: "session-1",
@@ -324,6 +325,7 @@ describe("ReplicaCache", () => {
     expect(restoredDirectory.agents.get("agent-1")?.lastAssistantPreview).toBe(
       "Pushed both branches",
     );
+    expect(restoredDirectory.agents.get("agent-1")?.turnCount).toBe(12);
     expect(restoredDirectory.agents.get("agent-1")?.runtimeInfo?.model).toBe("opus");
     expect(restoredDirectory.agents.get("agent-1")?.lastUsage).toEqual({
       contextWindowUsedTokens: 1200,

@@ -58,7 +58,11 @@ import { type CodexPriceList, type CodexPrices, getSharedCodexPriceList } from "
 import { CodexRolloutCost } from "./codex/rollout-cost.js";
 import { rollupProviderSubagentCosts } from "../provider-subagents/cost.js";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
-import { formatSubagentCosts } from "../provider-subagents/subtitle-format.js";
+import {
+  buildSubagentSubtitle,
+  formatEffort,
+  formatSubagentCosts,
+} from "../provider-subagents/subtitle-format.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -3486,6 +3490,7 @@ interface CodexSubAgentCallState {
 /** What a child thread's subtitle reports. Codex reports tokens per thread but no cost. */
 interface CodexSubAgentUsage {
   model?: string;
+  effort?: string;
   tokens?: number;
   costUsd?: number;
   rolloutCost?: Promise<CodexRolloutCost | undefined>;
@@ -6379,6 +6384,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       if (!rolloutCost || !prices) return;
       usage.costUsd = await rolloutCost.read({ prices, serviceTier: this.serviceTier });
       usage.model = rolloutCost.model;
+      usage.effort = rolloutCost.effort;
       if (this.subAgentUsageByThreadId.get(threadId) !== usage) return;
       this.refreshCostPresentation();
     } catch (error) {
@@ -6395,20 +6401,23 @@ export class CodexAppServerAgentSession implements AgentSession {
     // A provider subtitle replaces the row's agent type, so it leads with it.
     const callId = this.subAgentCallIdByChildThreadId.get(threadId);
     const detail = callId ? this.subAgentCallsByCallId.get(callId)?.toolCall.detail : undefined;
-    const subtitle = [
-      detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
-      usage.model,
-      formatSubagentTokens(usage.tokens),
-      ...formatSubagentCosts({ ownCostUsd: usage.costUsd, subagentCostUsd }),
-    ]
-      .filter((part): part is string => part !== undefined)
-      .join(" · ");
-    if (!subtitle || subtitle === usage.subtitle) return;
-    usage.subtitle = subtitle;
+    const presentation = buildSubagentSubtitle({
+      context: [
+        detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
+        usage.model,
+        formatEffort(usage.effort),
+      ],
+      usage: [
+        formatSubagentTokens(usage.tokens),
+        ...formatSubagentCosts({ ownCostUsd: usage.costUsd, subagentCostUsd }),
+      ],
+    });
+    if (!presentation || presentation.subtitle === usage.subtitle) return;
+    usage.subtitle = presentation.subtitle;
     this.emitEvent({
       type: "provider_subagent",
       provider: CODEX_PROVIDER,
-      event: { type: "upsert", id: threadId, subtitle },
+      event: { type: "upsert", id: threadId, ...presentation },
     });
   }
 

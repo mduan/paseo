@@ -26,6 +26,10 @@ export const ar: TranslationResources = {
     total: "{{total}} تطابقات",
   },
   common: {
+    turns: {
+      one: "{{count}} دور",
+      other: "{{count}} أدوار",
+    },
     bottomSheetBackdrop: "خلفية اللوحة السفلية",
     back: "خلف",
     loading: "تحميل...",
@@ -635,7 +639,6 @@ export const ar: TranslationResources = {
     },
     tabs: {
       loading: "تحميل...",
-      effort: "جهد {{effort}}",
       modified: "تغييرات غير محفوظة",
       loadingAgentTitle: "جارٍ تحميل عنوان الوكيل",
       fallback: {

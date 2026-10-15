@@ -1,3 +1,4 @@
+import type { ProviderSubagentSubtitle } from "../../../provider-subagents/subtitle-format.js";
 import type { AgentTimelineItem } from "../../../agent-sdk-types.js";
 import type {
   ProviderSubagentInputEvent,
@@ -30,7 +31,13 @@ export type SubagentObservation =
     }
   | { kind: "status"; id: string; status: ProviderSubagentStatus; timestamp?: string }
   /** Complete provider-owned secondary label. Clients display this without parsing it. */
-  | { kind: "subtitle"; id: string; subtitle: string; timestamp?: string }
+  | {
+      kind: "subtitle";
+      id: string;
+      subtitle: string;
+      subtitleParts?: ProviderSubagentSubtitle["subtitleParts"];
+      timestamp?: string;
+    }
   | { kind: "timeline"; id: string; item: AgentTimelineItem; timestamp?: string };
 
 /**
@@ -62,6 +69,7 @@ export function foldSubagentObservations(
         type: "upsert",
         id: observation.id,
         subtitle: observation.subtitle,
+        subtitleParts: observation.subtitleParts,
         ...(observation.timestamp ? { timestamp: observation.timestamp } : {}),
       });
       continue;

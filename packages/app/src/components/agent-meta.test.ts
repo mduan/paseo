@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { i18n } from "@/i18n/i18next";
+import { beforeAll, describe, expect, it } from "vitest";
 import { buildAgentMetaParts } from "./agent-meta";
 
 const SELECTION = {
@@ -9,6 +10,18 @@ const SELECTION = {
 };
 
 describe("buildAgentMetaParts", () => {
+  beforeAll(async () => {
+    await i18n.changeLanguage("en");
+  });
+  it("formats known turn counts even without cost or token usage", () => {
+    for (const count of [0, 1, 12]) {
+      expect(
+        buildAgentMetaParts({ selection: SELECTION, usage: undefined, turnCount: count }).turns,
+      ).toBe(`${count} ${count === 1 ? "turn" : "turns"}`);
+    }
+    expect(buildAgentMetaParts({ selection: SELECTION, usage: undefined }).turns).toBeUndefined();
+  });
+
   it("builds model, effort, tokens, and combined cost", () => {
     expect(
       buildAgentMetaParts({

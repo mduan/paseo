@@ -30,6 +30,19 @@ function cloneRow<T extends AgentTimelineRow>(row: T): T {
   return { ...row };
 }
 
+// shortcut: history without turn IDs counts prompts, replace when providers expose historical turn boundaries.
+export function countTimelineTurns(
+  rows: readonly Pick<AgentTimelineRow, "item" | "turnId">[],
+): number {
+  const turnIds = new Set<string>();
+  let prompts = 0;
+  for (const row of rows) {
+    if (row.turnId) turnIds.add(row.turnId);
+    else if (row.item.type === "user_message") prompts += 1;
+  }
+  return turnIds.size + prompts;
+}
+
 export class InMemoryAgentTimelineStore {
   private readonly states = new Map<string, AgentTimelineState>();
 

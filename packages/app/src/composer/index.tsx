@@ -276,6 +276,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
       paseoSubagentCostUsd: usage.paseoSubagentCostUsd ?? null,
       paseoSubagentCostEstimated: usage.paseoSubagentCostEstimated ?? false,
       totalCostUsd: usage.totalCostUsd ?? null,
+      turnCount: agent?.turnCount,
       totalCostUnavailable: usage.totalCostUnavailable ?? false,
       totalCostEstimated: usage.totalCostEstimated ?? false,
       model: agent?.model ?? null,
@@ -284,6 +285,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
 }
 
 function renderContextWindowMeter({
+  turnCount,
   contextWindowMaxTokens,
   contextWindowUsedTokens,
   subagentCostUsd,
@@ -297,6 +299,7 @@ function renderContextWindowMeter({
   pending,
   glyphSize,
 }: {
+  turnCount?: number;
   contextWindowMaxTokens: number | null;
   contextWindowUsedTokens: number | null;
   subagentCostUsd: number | null;
@@ -316,6 +319,7 @@ function renderContextWindowMeter({
   }
   return (
     <ContextWindowMeter
+      turnCount={turnCount}
       maxTokens={contextWindowMaxTokens}
       usedTokens={contextWindowUsedTokens}
       subagentCostUsd={subagentCostUsd}
@@ -2074,6 +2078,7 @@ function ComposerContentImpl({
         paseoSubagentCostUsd: agentState.paseoSubagentCostUsd,
         paseoSubagentCostEstimated: agentState.paseoSubagentCostEstimated,
         totalCostUsd: agentState.totalCostUsd,
+        turnCount: agentState.turnCount,
         totalCostUnavailable: agentState.totalCostUnavailable,
         totalCostEstimated: agentState.totalCostEstimated,
         // Providers report cost when a turn ends, so mid-turn it is the previous total.
@@ -2089,6 +2094,7 @@ function ComposerContentImpl({
       agentState.paseoSubagentCostUsd,
       agentState.paseoSubagentCostEstimated,
       agentState.totalCostUsd,
+      agentState.turnCount,
       agentState.totalCostUnavailable,
       agentState.totalCostEstimated,
       isAgentRunning,

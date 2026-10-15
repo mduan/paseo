@@ -552,13 +552,10 @@ function AgentPreview({
   );
 }
 
-/** Model, effort, and session cost; each part is left out when the agent doesn't report it. */
+/** Model, effort, turns, and session cost; each part is left out when the agent doesn't report it. */
 function AgentTooltipMeta({ serverId, agentId }: { serverId: string; agentId: string }) {
-  const { t } = useTranslation();
-  const { model, effort, cost } = useAgentMetaParts({ serverId, agentId });
-  const parts = [model, effort ? t("workspace.tabs.effort", { effort }) : null, cost].filter(
-    Boolean,
-  );
+  const { model, effort, turns, cost } = useAgentMetaParts({ serverId, agentId });
+  const parts = [model, effort, turns, cost].filter(Boolean);
   return parts.length > 0 ? <Text style={styles.tooltipMeta}>{parts.join(" · ")}</Text> : null;
 }
 

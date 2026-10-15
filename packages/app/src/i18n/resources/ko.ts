@@ -26,6 +26,10 @@ export const ko: TranslationResources = {
     total: "일치 항목 {{total}}개",
   },
   common: {
+    turns: {
+      one: "{{count}}턴",
+      other: "{{count}}턴",
+    },
     bottomSheetBackdrop: "하단 시트 배경",
     back: "뒤로",
     loading: "불러오는 중...",
@@ -636,7 +640,6 @@ export const ko: TranslationResources = {
     },
     tabs: {
       loading: "불러오는 중...",
-      effort: "추론 {{effort}}",
       modified: "저장되지 않은 변경사항",
       loadingAgentTitle: "에이전트 제목 불러오는 중",
       fallback: {

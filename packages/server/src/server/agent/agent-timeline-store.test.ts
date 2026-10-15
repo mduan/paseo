@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
+import { countTimelineTurns, InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
 
 describe("InMemoryAgentTimelineStore", () => {
   it("clamps an overshooting before cursor into the bounded tail window", () => {
@@ -210,4 +210,20 @@ it("includes transitive tool updates in a contiguous projected tail", () => {
   const tail = store.fetch("a", { limit: 1 });
   expect(tail.rows.map((row) => row.seqStart)).toEqual([1, 2, 3, 5]);
   expect(tail).toMatchObject({ startSeq: 1, endSeq: 6, hasOlder: false });
+});
+
+describe("countTimelineTurns", () => {
+  it("counts canonical turns once, including steers and promptless turns", () => {
+    expect(
+      countTimelineTurns([
+        { turnId: "a", item: { type: "user_message", text: "start" } },
+        { turnId: "a", item: { type: "assistant_message", text: "working" } },
+        { turnId: "a", item: { type: "user_message", text: "steer" } },
+        { turnId: "b", item: { type: "assistant_message", text: "autonomous" } },
+        { item: { type: "user_message", text: "legacy" } },
+        { item: { type: "assistant_message", text: "reply" } },
+      ]),
+    ).toBe(3);
+    expect(countTimelineTurns([])).toBe(0);
+  });
 });

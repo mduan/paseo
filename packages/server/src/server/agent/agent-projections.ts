@@ -93,6 +93,7 @@ export function toStoredAgentRecord(
     persistence,
     lastError: agent.lastError ?? undefined,
     lastAssistantPreview: agent.lastAssistantPreview,
+    turnCount: agent.turnCount,
     lastUsage: sanitizeUsage(agent.lastUsage),
     requiresAttention: agent.attention.requiresAttention,
     attentionReason: agent.attention.requiresAttention ? agent.attention.attentionReason : null,
@@ -128,6 +129,7 @@ export function toAgentPayload(
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt ? agent.lastUserMessageAt.toISOString() : null,
     status: agent.lifecycle,
+    turnCount: agent.turnCount,
     activeTurn: agent.activeTurnId
       ? {
           turnId: agent.activeTurnId,
@@ -245,6 +247,7 @@ export function buildStoredAgentPayload(
     updatedAt: updatedAt.toISOString(),
     lastUserMessageAt: lastUserMessageAt ? lastUserMessageAt.toISOString() : null,
     status: record.lastStatus,
+    turnCount: record.turnCount,
     capabilities: defaultCapabilities,
     currentModeId: record.lastModeId ?? null,
     availableModes: [],

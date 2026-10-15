@@ -580,3 +580,14 @@ describe("toAssistantPreview", () => {
     expect(toAssistantPreview("  \n ")).toBeUndefined();
   });
 });
+
+it("preserves session turn counts in live, stored, and archived projections", () => {
+  const agent = createManagedAgent({ turnCount: 0 });
+  expect(toAgentPayload(agent).turnCount).toBe(0);
+  const record = toStoredAgentRecord(agent);
+  expect(record.turnCount).toBe(0);
+  expect(
+    buildStoredAgentPayload({ ...record, archivedAt: new Date().toISOString() }, ["claude"])
+      .turnCount,
+  ).toBe(0);
+});

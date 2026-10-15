@@ -1,3 +1,8 @@
+import {
+  buildSubagentSubtitle,
+  formatEffort as formatVariant,
+  type ProviderSubagentSubtitle,
+} from "../../provider-subagents/subtitle-format.js";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
 
 export interface OpenCodeSubagentPresentationFacts {
@@ -43,14 +48,11 @@ export function claimOpenCodeSubagentFallbackTitle(
 /** Build the complete compact subtitle OpenCode exposes to provider-neutral clients. */
 export function buildOpenCodeSubagentSubtitle(
   facts: OpenCodeSubagentPresentationFacts,
-): string | undefined {
-  const parts = [
-    readPart(facts.agentName),
-    readPart(facts.modelId),
-    formatVariant(facts.variant),
-    formatSubagentTokens(facts.totalTokens),
-  ].filter((part): part is string => part !== undefined);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+): ProviderSubagentSubtitle | undefined {
+  return buildSubagentSubtitle({
+    context: [readPart(facts.agentName), readPart(facts.modelId), formatVariant(facts.variant)],
+    usage: [formatSubagentTokens(facts.totalTokens)],
+  });
 }
 
 /**
@@ -60,29 +62,18 @@ export function buildOpenCodeSubagentSubtitle(
 export function foldOpenCodeSubagentPresentation(
   state: OpenCodeSubagentPresentationState,
   patch: OpenCodeSubagentPresentationFacts,
-): string | undefined {
+): ProviderSubagentSubtitle | undefined {
   if (patch.agentName !== undefined) state.facts.agentName = patch.agentName;
   if (patch.modelId !== undefined) state.facts.modelId = patch.modelId;
   if (patch.variant !== undefined) state.facts.variant = patch.variant;
   if (patch.totalTokens !== undefined) state.facts.totalTokens = patch.totalTokens;
   const subtitle = buildOpenCodeSubagentSubtitle(state.facts);
-  if (!subtitle || subtitle === state.lastSubtitle) return undefined;
-  state.lastSubtitle = subtitle;
+  if (!subtitle || subtitle.subtitle === state.lastSubtitle) return undefined;
+  state.lastSubtitle = subtitle.subtitle;
   return subtitle;
 }
 
 function readPart(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function formatVariant(variant: string | undefined): string | undefined {
-  const normalized = readPart(variant);
-  if (!normalized) return undefined;
-  if (normalized === "xhigh") return "Extra High";
-  return normalized
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }

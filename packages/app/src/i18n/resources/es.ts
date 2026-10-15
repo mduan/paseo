@@ -27,6 +27,10 @@ export const es: TranslationResources = {
     total: "{{total}} coincidencias",
   },
   common: {
+    turns: {
+      one: "{{count}} turno",
+      other: "{{count}} turnos",
+    },
     bottomSheetBackdrop: "Fondo del panel inferior",
     back: "Atrás",
     loading: "Cargando...",
@@ -641,7 +645,6 @@ export const es: TranslationResources = {
     },
     tabs: {
       loading: "Cargando...",
-      effort: "Esfuerzo {{effort}}",
       modified: "Cambios sin guardar",
       loadingAgentTitle: "Título del agente de carga",
       fallback: {

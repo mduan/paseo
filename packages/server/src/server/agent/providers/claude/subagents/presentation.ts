@@ -1,5 +1,10 @@
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
-import { formatSubagentCosts } from "../../../provider-subagents/subtitle-format.js";
+import {
+  buildSubagentSubtitle,
+  formatEffort,
+  formatSubagentCosts,
+  type ProviderSubagentSubtitle,
+} from "../../../provider-subagents/subtitle-format.js";
 import { findClaudeModel } from "../models.js";
 
 export interface ClaudeSubagentUsage {
@@ -20,18 +25,17 @@ export interface ClaudeSubagentPresentationFacts {
 /** Build the complete compact subtitle Claude exposes to provider-neutral clients. */
 export function buildClaudeSubagentSubtitle(
   facts: ClaudeSubagentPresentationFacts,
-): string | undefined {
-  const parts = [
-    readPart(facts.title),
-    formatModel(facts.model),
-    formatEffort(facts.effort),
-    formatSubagentTokens(facts.usage?.totalTokens),
-    ...formatSubagentCosts({
-      ownCostUsd: facts.costUsd,
-      subagentCostUsd: facts.subagentCostUsd,
-    }),
-  ].filter((part): part is string => part !== undefined);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+): ProviderSubagentSubtitle | undefined {
+  return buildSubagentSubtitle({
+    context: [readPart(facts.title), formatModel(facts.model), formatEffort(facts.effort)],
+    usage: [
+      formatSubagentTokens(facts.usage?.totalTokens),
+      ...formatSubagentCosts({
+        ownCostUsd: facts.costUsd,
+        subagentCostUsd: facts.subagentCostUsd,
+      }),
+    ],
+  });
 }
 
 function readPart(value: string | undefined): string | undefined {
@@ -43,15 +47,4 @@ function formatModel(modelId: string | undefined): string | undefined {
   const normalized = readPart(modelId);
   if (!normalized) return undefined;
   return findClaudeModel(normalized)?.label ?? normalized;
-}
-
-function formatEffort(effort: string | undefined): string | undefined {
-  const normalized = readPart(effort);
-  if (!normalized) return undefined;
-  if (normalized === "xhigh") return "Extra High";
-  return normalized
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }

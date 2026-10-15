@@ -254,7 +254,7 @@ function SubagentsTrackRow({
   );
 }
 
-/** The meta line provider-native rows get from their subtitle: model · effort · tokens · cost. */
+/** The meta line provider-native rows get from their subtitle: model · effort · turns · tokens · cost. */
 function PaseoSubagentTitle({
   serverId,
   agentId,
@@ -264,8 +264,8 @@ function PaseoSubagentTitle({
   agentId: string;
   label: string;
 }): ReactElement {
-  const { model, effort, tokens, cost } = useAgentMetaParts({ serverId, agentId });
-  const meta = [model, effort, tokens, cost].filter(Boolean).join(" · ");
+  const { model, effort, turns, tokens, cost } = useAgentMetaParts({ serverId, agentId });
+  const meta = [model, effort, turns, tokens, cost].filter(Boolean).join(" · ");
   return <RowTitle label={label} meta={meta} />;
 }
 

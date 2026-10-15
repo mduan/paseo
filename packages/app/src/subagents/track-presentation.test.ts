@@ -216,11 +216,24 @@ describe("buildSubagentRowPresentationData for provider rows", () => {
       title: "title" in overrides ? (overrides.title ?? null) : "general-purpose",
       description: overrides.description ?? null,
       subtitle: overrides.subtitle ?? null,
+      turnCount: overrides.turnCount,
+      subtitleParts: overrides.subtitleParts,
       status: overrides.status ?? "running",
       requiresAttention: false,
       createdAt: overrides.createdAt ?? new Date("2026-07-26T00:00:00.000Z"),
     };
   }
+
+  it("shows native turn counts alongside the provider's cost subtitle", () => {
+    const presentation = buildSubagentRowPresentationData(
+      providerRow({
+        turnCount: 2,
+        subtitle: "Explore · Haiku 4.5 · 24.4k tokens · ~$0.03",
+        subtitleParts: { context: "Explore · Haiku 4.5", usage: "24.4k tokens · ~$0.03" },
+      }),
+    );
+    expect(presentation.subtitle).toBe("Explore · Haiku 4.5 · 2 turns · 24.4k tokens · ~$0.03");
+  });
 
   it("names the row after the task and demotes the subagent type", () => {
     const presentation = buildSubagentRowPresentationData(

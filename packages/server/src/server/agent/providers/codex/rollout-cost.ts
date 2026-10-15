@@ -16,6 +16,7 @@ import type { CodexPrices } from "./pricing.js";
 export class CodexRolloutCost {
   private readonly lines: AppendedLinesReader;
   private currentModel: string | undefined;
+  private currentEffort: string | undefined;
   private highestTotalTokens = -1;
   private costUsd = 0;
   private pricedRequests = 0;
@@ -27,6 +28,10 @@ export class CodexRolloutCost {
   /** The model of the latest turn read so far. */
   get model(): string | undefined {
     return this.currentModel;
+  }
+
+  get effort(): string | undefined {
+    return this.currentEffort;
   }
 
   /**
@@ -51,6 +56,7 @@ export class CodexRolloutCost {
     const payload = toRecord(entry?.payload);
     if (entry?.type === "turn_context") {
       if (typeof payload?.model === "string") this.currentModel = payload.model;
+      this.currentEffort = typeof payload?.effort === "string" ? payload.effort : undefined;
       return;
     }
     if (payload?.type !== "token_count") return;

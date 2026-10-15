@@ -282,7 +282,7 @@ function buildSubtitleObservation(
   if (!hasDetails) return null;
   const subtitle = buildClaudeSubagentSubtitle(facts);
   if (!subtitle) return null;
-  return { kind: "subtitle", id, subtitle, ...(timestamp ? { timestamp } : {}) };
+  return { kind: "subtitle", id, ...subtitle, ...(timestamp ? { timestamp } : {}) };
 }
 
 /** Rebuild replayed subtitles with each transcript's own cost and its descendants' rollup. */

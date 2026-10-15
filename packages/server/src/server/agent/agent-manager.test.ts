@@ -669,6 +669,144 @@ async function startAndSteerThroughManager(
   return { manager, agentId: agent.id, workdir };
 }
 
+test("turn count includes active turns and ignores steers and duplicate starts", async () => {
+  const session = new SteeringTestSession({ provider: "codex", cwd: process.cwd() });
+  const { manager, agentId, workdir } = await startAndSteerThroughManager(session);
+  try {
+    expect(manager.getAgent(agentId)?.turnCount).toBe(1);
+    session.pushEvent({ type: "turn_started", provider: "codex", turnId: "active-turn-1" });
+    await manager.flush();
+    expect(manager.getAgent(agentId)?.turnCount).toBe(1);
+    await manager.cancelAgentRun(agentId);
+    await startAgentRun(manager, agentId, "next", logger);
+    await manager.waitForAgentRunStart(agentId);
+    expect(manager.getAgent(agentId)?.turnCount).toBe(2);
+  } finally {
+    await manager.closeAgent(agentId);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("turn count is reconstructed on reopen from full history and saved across restart", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-turn-count-"));
+  const registry = new AgentStorage(join(workdir, "agents"), logger);
+  const store = new RecordingTimelineStore();
+  const agentId = randomUUID();
+  const timestamp = new Date().toISOString();
+  const rows: AgentTimelineRow[] = Array.from({ length: 240 }, (_, index) => ({
+    seq: index + 1,
+    timestamp,
+    item: { type: "user_message", text: `prompt ${index}` },
+  }));
+  await store.bulkInsert(agentId, rows);
+  await registry.upsert({
+    id: agentId,
+    provider: "codex",
+    cwd: workdir,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    lastStatus: "closed",
+    labels: {},
+    persistence: { provider: "codex", sessionId: "history" },
+  });
+  let manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry,
+    durableTimelineStore: store,
+    logger,
+  });
+  try {
+    await ensureAgentLoaded(agentId, { agentManager: manager, agentStorage: registry, logger });
+    await manager.hydrateTimelineFromProvider(agentId);
+    expect(manager.getAgent(agentId)?.turnCount).toBe(240);
+    expect((await store.fetchCommitted(agentId)).rows).toHaveLength(200);
+    await manager.flush();
+    expect((await registry.get(agentId))?.turnCount).toBe(240);
+    await manager.closeAgent(agentId);
+    manager = new AgentManager({ clients: { codex: new TestAgentClient() }, registry, logger });
+    await ensureAgentLoaded(agentId, { agentManager: manager, agentStorage: registry, logger });
+    expect(manager.getAgent(agentId)?.turnCount).toBe(240);
+  } finally {
+    await manager.closeAgent(agentId);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("turn count follows rebuilt provider history after rewind without double-counting steers", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-turn-count-history-"));
+  let turns = 2;
+  class HistorySession extends TestAgentSession {
+    override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      for (let index = 0; index < turns; index += 1) {
+        for (const text of ["prompt", "steer"]) {
+          yield {
+            type: "timeline",
+            provider: "codex",
+            turnId: `turn-${index}`,
+            item: { type: "user_message", text },
+          };
+        }
+      }
+    }
+  }
+  const client = new (class extends TestAgentClient {
+    override async resumeSession(): Promise<AgentSession> {
+      return new HistorySession({ provider: "codex", cwd: workdir });
+    }
+  })();
+  const manager = new AgentManager({ clients: { codex: client }, logger });
+  let agentId: string | undefined;
+  try {
+    const agent = await manager.resumeAgentFromPersistence(
+      { provider: "codex", sessionId: "history" },
+      { cwd: workdir },
+    );
+    agentId = agent.id;
+    await manager.hydrateTimelineFromProvider(agent.id);
+    expect(manager.getAgent(agent.id)?.turnCount).toBe(2);
+    turns = 1;
+    await manager.hydrateTimelineFromProvider(agent.id, { force: true });
+    expect(manager.getAgent(agent.id)?.turnCount).toBe(1);
+  } finally {
+    if (agentId) await manager.closeAgent(agentId);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("turn count updates are published for live native subagents", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-turn-count-native-"));
+  const client = new SessionRecordingAgentClient();
+  const manager = new AgentManager({ clients: { codex: client }, logger });
+  let agentId: string | undefined;
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    agentId = agent.id;
+    const events: AgentManagerEvent[] = [];
+    manager.subscribe((event) => events.push(event), { agentId: agent.id });
+    const session = client.sessions[0]!;
+    session.pushEvent({
+      type: "provider_subagent",
+      provider: "codex",
+      event: { type: "upsert", id: "native", title: "Child" },
+    });
+    session.pushEvent({
+      type: "provider_subagent",
+      provider: "codex",
+      event: { type: "timeline", id: "native", item: { type: "user_message", text: "go" } },
+    });
+    await manager.flush();
+    expect(events).toContainEqual({
+      type: "provider_subagent",
+      event: { type: "upsert", subagent: expect.objectContaining({ id: "native", turnCount: 1 }) },
+    });
+  } finally {
+    if (agentId) await manager.closeAgent(agentId);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("uses an injected timeline store without making it a production requirement", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-timeline-store-"));
   const store = new RecordingTimelineStore();
@@ -743,6 +881,7 @@ test("refreshing an agent replaces the injected timeline store instead of append
     for (let refresh = 0; refresh < 2; refresh += 1) {
       await manager.reloadAgentSession(agent.id, undefined, { rehydrateFromDisk: true });
       await manager.hydrateTimelineFromProvider(agent.id, { broadcast: true });
+      expect(manager.getAgent(agent.id)?.turnCount).toBe(1);
       await manager.flush();
     }
 

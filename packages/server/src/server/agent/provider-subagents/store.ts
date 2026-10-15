@@ -1,3 +1,4 @@
+import type { ProviderSubagentSubtitle } from "./subtitle-format.js";
 import type { AgentProvider, AgentTimelineItem } from "../agent-sdk-types.js";
 import { limitAgentTimelineItemContent } from "../agent-timeline-content.js";
 import { InMemoryAgentTimelineStore } from "../agent-timeline-store.js";
@@ -23,6 +24,8 @@ export interface ProviderSubagentDescriptor {
   toolCallId: string | null;
   cwd: string | null;
   subtitle: string | null;
+  turnCount?: number;
+  subtitleParts?: ProviderSubagentSubtitle["subtitleParts"];
 }
 
 export type ProviderSubagentInputEvent =
@@ -39,6 +42,7 @@ export type ProviderSubagentInputEvent =
       toolCallId?: string | null;
       cwd?: string | null;
       subtitle?: string | null;
+      subtitleParts?: ProviderSubagentSubtitle["subtitleParts"];
       parentSubagentId?: string | null;
       timestamp?: string;
     }
@@ -78,6 +82,7 @@ function stickyField<T>(next: T | undefined, previous: T | null | undefined): T 
 export class ProviderSubagentStore {
   private readonly descriptors = new Map<string, ProviderSubagentDescriptor>();
   private readonly timelines = new InMemoryAgentTimelineStore();
+  private readonly turnCounts = new Map<string, number>();
 
   apply(
     parentAgentId: string,
@@ -88,12 +93,17 @@ export class ProviderSubagentStore {
     if (event.type === "remove") {
       this.descriptors.delete(key);
       this.timelines.delete(key);
+      this.turnCounts.delete(key);
       return { type: "remove", parentAgentId, subagentId: event.id };
     }
 
     if (event.type === "timeline") {
       if (!this.timelines.has(key)) {
         this.timelines.initialize(key);
+      }
+      // shortcut: child streams lack turn IDs, use canonical IDs when the event contract carries them.
+      if (event.item.type === "user_message") {
+        this.turnCounts.set(key, (this.turnCounts.get(key) ?? 0) + 1);
       }
       const row = this.timelines.append(key, limitAgentTimelineItemContent(event.item), {
         timestamp: event.timestamp,
@@ -108,7 +118,7 @@ export class ProviderSubagentStore {
       };
     }
 
-    const previous = this.descriptors.get(key);
+    const previous: Partial<ProviderSubagentDescriptor> = this.descriptors.get(key) ?? {};
     if (!this.timelines.has(key)) {
       this.timelines.initialize(key);
     }
@@ -117,32 +127,40 @@ export class ProviderSubagentStore {
       id: event.id,
       parentAgentId,
       provider,
-      title: stickyField(event.title, previous?.title),
-      description: stickyField(event.description, previous?.description),
-      status: event.status ?? previous?.status ?? "running",
-      createdAt: previous?.createdAt ?? timestamp,
+      title: stickyField(event.title, previous.title),
+      description: stickyField(event.description, previous.description),
+      status: event.status ?? previous.status ?? "running",
+      createdAt: previous.createdAt ?? timestamp,
       updatedAt: timestamp,
-      toolCallId: stickyField(event.toolCallId, previous?.toolCallId),
-      cwd: stickyField(event.cwd, previous?.cwd),
-      subtitle: stickyField(event.subtitle, previous?.subtitle),
-      parentSubagentId: stickyField(event.parentSubagentId, previous?.parentSubagentId),
+      toolCallId: stickyField(event.toolCallId, previous.toolCallId),
+      cwd: stickyField(event.cwd, previous.cwd),
+      subtitle: stickyField(event.subtitle, previous.subtitle),
+      subtitleParts: event.subtitleParts ?? previous.subtitleParts,
+      parentSubagentId: stickyField(event.parentSubagentId, previous.parentSubagentId),
     };
     this.descriptors.set(key, subagent);
-    return { type: "upsert", subagent };
+    return { type: "upsert", subagent: this.withTurnCount(subagent) };
   }
 
   list(parentAgentId: string): ProviderSubagentDescriptor[] {
     return [...this.descriptors.values()]
       .filter((subagent) => subagent.parentAgentId === parentAgentId)
+      .map((subagent) => this.withTurnCount(subagent))
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   }
 
   listAll(): ProviderSubagentDescriptor[] {
-    return [...this.descriptors.values()];
+    return [...this.descriptors.values()].map((subagent) => this.withTurnCount(subagent));
   }
 
   get(parentAgentId: string, subagentId: string): ProviderSubagentDescriptor | null {
-    return this.descriptors.get(storeKey(parentAgentId, subagentId)) ?? null;
+    const descriptor = this.descriptors.get(storeKey(parentAgentId, subagentId));
+    return descriptor ? this.withTurnCount(descriptor) : null;
+  }
+
+  private withTurnCount(subagent: ProviderSubagentDescriptor): ProviderSubagentDescriptor {
+    const key = storeKey(subagent.parentAgentId, subagent.id);
+    return { ...subagent, turnCount: this.turnCounts.get(key) };
   }
 
   fetchTimeline(
@@ -160,6 +178,9 @@ export class ProviderSubagentStore {
       this.descriptors.delete(key);
       this.timelines.delete(key);
       events.push({ type: "remove", parentAgentId, subagentId: subagent.id });
+    }
+    for (const key of this.turnCounts.keys()) {
+      if (key.startsWith(`${parentAgentId}\0`)) this.turnCounts.delete(key);
     }
     return events;
   }
