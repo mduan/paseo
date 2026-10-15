@@ -1,3 +1,4 @@
+import { SearchOptionsSchema } from "./search/options.js";
 import { AgentProfileSchema, AgentSkillSelectionSchema } from "./agent-profile.js";
 export {
   AgentProfileSchema,
@@ -1360,6 +1361,7 @@ export const FetchAgentHistoryRequestMessageSchema = z.object({
   // A free-text filter over agent title, workspace name, branch, and project name.
   // Matching rows follow the requested sort and cursor pagination.
   search: z.string().optional(),
+  searchOptions: SearchOptionsSchema.optional(),
   sort: z
     .array(
       z.object({
@@ -3754,6 +3756,7 @@ export const ServerInfoStatusPayloadSchema = z
         agentTimelinePromptIndex: z.boolean().optional(),
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
+        agentHistorySearchOptions: z.boolean().optional(),
         agentHistoryFilters: z.boolean().optional(),
         agentHistoryAgentTypeFilter: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.

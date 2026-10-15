@@ -2427,6 +2427,7 @@ export class DaemonClient {
       ...(options?.includeFilterOptions ? { includeFilterOptions: true } : {}),
       ...(options?.filter ? { filter: options.filter } : {}),
       ...(options?.search ? { search: options.search } : {}),
+      ...(options?.searchOptions ? { searchOptions: options.searchOptions } : {}),
       ...(options?.sort ? { sort: options.sort } : {}),
       ...(options?.page ? { page: options.page } : {}),
     });

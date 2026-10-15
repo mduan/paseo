@@ -333,6 +333,13 @@ export const ru: TranslationResources = {
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
     recentSearches: "Недавние поиски",
     noRecentSearches: "Нет недавних поисков",
+    searchOptions: {
+      caseSensitive: "Учитывать регистр",
+      wholeWord: "Слово целиком",
+      regex: "Использовать регулярное выражение",
+      invalidRegex: "Недопустимое регулярное выражение. Исправьте шаблон для поиска.",
+      updateHost: "Обновите подключённые хосты, чтобы использовать параметры поиска.",
+    },
     searchPlaceholder: "Поиск по истории",
     actions: {
       loadMore: "Загрузить ещё",

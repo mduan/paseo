@@ -329,6 +329,13 @@ export const ko: TranslationResources = {
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
     recentSearches: "최근 검색",
     noRecentSearches: "최근 검색 없음",
+    searchOptions: {
+      caseSensitive: "대소문자 구분",
+      wholeWord: "단어 단위로 검색",
+      regex: "정규식 사용",
+      invalidRegex: "잘못된 정규식입니다. 패턴을 수정하여 검색하세요.",
+      updateHost: "검색 옵션을 사용하려면 연결된 호스트를 업데이트하세요.",
+    },
     searchPlaceholder: "기록 검색",
     actions: {
       loadMore: "더 불러오기",

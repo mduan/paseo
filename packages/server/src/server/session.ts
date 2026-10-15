@@ -49,7 +49,7 @@ import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
-import { matchesAgentHistoryQuery } from "./agent-history-search.js";
+import { createAgentHistorySearch } from "./agent-history-search.js";
 import type { SpeechToTextProvider, TextToSpeechProvider } from "./speech/speech-provider.js";
 import type { TurnDetectionProvider } from "./speech/turn-detection-provider.js";
 import {
@@ -375,7 +375,7 @@ type AgentDirectoryRequestMessage = FetchAgentsRequestMessage | FetchAgentHistor
  */
 function agentDirectorySearchQuery(request: AgentDirectoryRequestMessage): string {
   if (request.type !== "fetch_agent_history_request") return "";
-  return request.search?.trim() ?? "";
+  return request.searchOptions?.regex ? (request.search ?? "") : (request.search?.trim() ?? "");
 }
 type FetchAgentsRequestFilter = NonNullable<FetchAgentsRequestMessage["filter"]>;
 type FetchAgentsRequestSort = NonNullable<FetchAgentsRequestMessage["sort"]>[number];
@@ -5444,8 +5444,12 @@ export class Session {
     getPlacement: (workspaceId: string | undefined) => Promise<ProjectPlacementPayload | null>;
     filter: AgentUpdatesFilter | undefined;
     search?: string;
+    searchOptions?: FetchAgentHistoryRequestMessage["searchOptions"];
   }): Promise<FetchAgentsResponseEntry[]> {
-    const { candidates, limit, getPlacement, filter, search } = params;
+    const { candidates, limit, getPlacement, filter, search, searchOptions } = params;
+    const matchesSearch = search
+      ? createAgentHistorySearch({ query: search, options: searchOptions })
+      : undefined;
     const matchedEntries: FetchAgentsResponseEntry[] = [];
     const batchSize = 25;
     for (
@@ -5473,7 +5477,7 @@ export class Session {
         ) {
           continue;
         }
-        if (search && !matchesAgentHistoryQuery(search, entry)) continue;
+        if (matchesSearch && !matchesSearch(entry)) continue;
         matchedEntries.push(entry);
         if (matchedEntries.length > limit) {
           break;
@@ -5584,6 +5588,8 @@ export class Session {
       getPlacement,
       filter,
       search,
+      searchOptions:
+        request.type === "fetch_agent_history_request" ? request.searchOptions : undefined,
     });
 
     const pagedEntries = matchedEntries.slice(0, limit);

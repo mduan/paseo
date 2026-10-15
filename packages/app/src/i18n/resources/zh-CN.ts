@@ -328,6 +328,13 @@ export const zhCN: TranslationResources = {
     hostLoadFailed: "{{host}}：无法加载历史",
     recentSearches: "最近搜索",
     noRecentSearches: "暂无最近搜索",
+    searchOptions: {
+      caseSensitive: "区分大小写",
+      wholeWord: "全字匹配",
+      regex: "使用正则表达式",
+      invalidRegex: "正则表达式无效。请修正后再搜索。",
+      updateHost: "请更新已连接的主机以使用搜索选项。",
+    },
     searchPlaceholder: "搜索历史",
     actions: {
       loadMore: "加载更多",

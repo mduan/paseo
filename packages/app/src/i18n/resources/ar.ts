@@ -328,6 +328,13 @@ export const ar: TranslationResources = {
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
     recentSearches: "عمليات البحث الأخيرة",
     noRecentSearches: "لا توجد عمليات بحث أخيرة",
+    searchOptions: {
+      caseSensitive: "مطابقة حالة الأحرف",
+      wholeWord: "مطابقة الكلمة كاملة",
+      regex: "استخدام تعبير نمطي",
+      invalidRegex: "التعبير النمطي غير صالح. صحح النمط للبحث.",
+      updateHost: "حدّث المضيفين المتصلين لاستخدام خيارات البحث.",
+    },
     searchPlaceholder: "البحث في السجل",
     actions: {
       loadMore: "تحميل المزيد",

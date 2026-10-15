@@ -6,10 +6,13 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
+import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
+import { iconButtonChromeFrameStyle } from "@/components/ui/icon-button-chrome";
+import { isNative } from "@/constants/platform";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -35,6 +38,9 @@ export interface SearchFieldProps {
   testID?: string;
   clearTestID?: string;
   fullWidth?: boolean;
+  autoFocus?: boolean;
+  invalid?: boolean;
+  trailing?: ReactNode;
   leading?: ReactNode;
   onCommit?: (value: string) => void;
 }
@@ -55,6 +61,9 @@ export function SearchField({
   testID,
   clearTestID,
   fullWidth = false,
+  autoFocus = false,
+  invalid = false,
+  trailing,
   leading,
   onCommit,
 }: SearchFieldProps): ReactElement {
@@ -75,11 +84,17 @@ export function SearchField({
     handleCommit();
     inputRef.current?.replaceText("");
     onChangeText("");
+    inputRef.current?.focus();
   }, [onChangeText, handleCommit]);
 
   return (
     <View
-      style={[styles.field, fullWidth && styles.fieldFullWidth, isFocused && styles.fieldFocused]}
+      style={[
+        styles.field,
+        fullWidth && styles.fieldFullWidth,
+        isFocused && styles.fieldFocused,
+        invalid && styles.fieldInvalid,
+      ]}
     >
       {leading ?? <ThemedSearch size={14} uniProps={mutedColorMapping} />}
       <ThemedTextInput
@@ -92,22 +107,26 @@ export function SearchField({
         onSubmitEditing={handleCommit}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
+        autoFocus={autoFocus}
+        aria-invalid={invalid}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
         style={styles.input}
       />
       {value.length > 0 ? (
-        <Pressable
+        <ToolbarButton
           testID={clearTestID}
           onPress={handleClear}
-          accessibilityRole="button"
-          accessibilityLabel={clearAccessibilityLabel}
+          label={clearAccessibilityLabel}
+          compact={isNative}
+          style={iconButtonChromeFrameStyle(isNative ? "small" : "large", isNative)}
           hitSlop={8}
         >
           <ThemedX size={14} uniProps={mutedColorMapping} />
-        </Pressable>
+        </ToolbarButton>
       ) : null}
+      {trailing}
     </View>
   );
 }
@@ -133,6 +152,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.borderAccent,
     backgroundColor: theme.colors.surface2,
   },
+  fieldInvalid: { borderColor: theme.colors.statusDanger },
   fieldFullWidth: { maxWidth: "100%" },
   input: {
     flex: 1,

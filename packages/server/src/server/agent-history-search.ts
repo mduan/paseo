@@ -1,26 +1,27 @@
+/* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
 import type { AgentSnapshotPayload, ProjectPlacementPayload } from "@getpaseo/protocol/messages";
-import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import { createTextSearch } from "@getpaseo/protocol/search/query";
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
 
-export interface AgentHistorySearchCandidate {
+export type AgentHistorySearchCandidate = {
   agent: AgentSnapshotPayload;
   project: ProjectPlacementPayload;
-}
+};
 
 /** Search the names people recall, never an incomplete subset of transcripts. */
-export function matchesAgentHistoryQuery(
-  query: string,
-  { agent, project }: AgentHistorySearchCandidate,
-): boolean {
-  return (
-    scoreTextFields(
-      query,
-      [
-        project.workspaceName ?? "",
-        agent.title ?? "",
-        project.checkout.currentBranch ?? "",
-        project.projectName,
-      ],
-      { typoTolerant: true },
-    ) !== null
-  );
+export function createAgentHistorySearch({
+  query,
+  options,
+}: {
+  query: string;
+  options?: SearchOptions;
+}) {
+  const search = createTextSearch({ query, options });
+  return ({ agent, project }: AgentHistorySearchCandidate): boolean =>
+    search.matches([
+      project.workspaceName ?? "",
+      agent.title ?? "",
+      project.checkout.currentBranch ?? "",
+      project.projectName,
+    ]);
 }

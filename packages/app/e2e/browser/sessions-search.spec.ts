@@ -5,6 +5,10 @@ import { test } from "../support/fixtures";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import {
+  openMobileAgentSidebar,
+  expectMobileAgentSidebarVisible,
+} from "../support/helpers/sidebar";
+import {
   createMockIdleAgent,
   openSessions,
   resetSeededPageState,
@@ -22,6 +26,18 @@ const TITLES = {
   unbilled: `${NONCE} main Unbilled usage report`,
   terminal: `${NONCE} main Terminal resize fix`,
 } as const;
+
+function trackHistoryRequests(page: Page) {
+  const requests: { search?: string; searchOptions?: { regex?: boolean } }[] = [];
+  page.on("websocket", (socket) =>
+    socket.on("framesent", ({ payload }) => {
+      if (typeof payload !== "string") return;
+      const frame = JSON.parse(payload);
+      if (frame.type === "fetch_agent_history_request") requests.push(frame);
+    }),
+  );
+  return requests;
+}
 
 async function search(page: Page, query: string): Promise<void> {
   await page.getByTestId("sessions-search-input").fill(query);
@@ -149,6 +165,79 @@ test.describe("History search", () => {
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
   ]) {
+    test(`applies inline search options and restores focus at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      const requests = trackHistoryRequests(page);
+      await resetSeededPageState(page);
+      await openSessions(page);
+      await page.setViewportSize(viewport);
+      const input = page.getByTestId("sessions-search-input");
+      await expect(input).toBeFocused();
+      const caseSensitive = page.getByTestId("sessions-search-caseSensitive");
+      const wholeWord = page.getByTestId("sessions-search-wholeWord");
+      const regex = page.getByTestId("sessions-search-regex");
+
+      await search(page, `${NONCE} stripe`);
+      await expectVisibleTitles(page, [TITLES.billing]);
+      await caseSensitive.click();
+      await expect(caseSensitive).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByTestId("sessions-empty")).toBeVisible();
+      await search(page, `${NONCE} Stripe`);
+      await expectVisibleTitles(page, [TITLES.billing]);
+      await expect(
+        rowTitles(page).filter({ hasText: NONCE }).getByText("Stripe", { exact: true }),
+      ).toBeVisible();
+      await caseSensitive.click();
+
+      await wholeWord.click();
+      await search(page, `${NONCE} bill`);
+      await expect(page.getByTestId("sessions-empty")).toBeVisible();
+      await regex.click();
+      await expect(wholeWord).toBeEnabled();
+      await expect(wholeWord).toHaveAttribute("aria-pressed", "true");
+      await search(page, `${NONCE}.*bill`);
+      await expect(page.getByTestId("sessions-empty")).toBeVisible();
+      await wholeWord.click();
+      await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing]);
+      await wholeWord.click();
+      await search(page, `${NONCE}.*(billing|usage)`);
+      await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing]);
+      await page.screenshot({
+        path: test.info().outputPath(`history-search-${viewport.width}.png`),
+      });
+      const requestCount = requests.length;
+      await search(page, "[");
+      await expect(page.getByTestId("sessions-search-error")).toBeVisible();
+      await expect(rowTitles(page)).toHaveCount(0);
+      await page.screenshot({
+        path: test.info().outputPath(`history-search-invalid-${viewport.width}.png`),
+      });
+      // Wait through the debounce to prove invalid input sends no history request.
+      await page.waitForTimeout(300);
+      expect(requests).toHaveLength(requestCount);
+      await search(page, `${NONCE}.*billing`);
+      await expect(page.getByTestId("sessions-search-error")).toHaveCount(0);
+      await expectVisibleTitles(page, [TITLES.billing]);
+      expect(
+        requests.some((request) => request.searchOptions?.regex && request.search === "["),
+      ).toBe(false);
+      await regex.click();
+      await expect(wholeWord).toBeEnabled();
+      await expect(wholeWord).toHaveAttribute("aria-pressed", "true");
+      await search(page, `${NONCE} main`);
+      await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
+
+      await rowTitles(page).filter({ hasText: NONCE }).first().click();
+      if (viewport.width < 600) {
+        await openMobileAgentSidebar(page);
+        await expectMobileAgentSidebarVisible(page);
+      }
+      await openSessions(page);
+      await expect(page.getByTestId("sessions-search-input")).toBeFocused();
+      await expect(page.getByTestId("sessions-search-input")).toHaveValue("");
+    });
+
     test(`restores recent searches from the search icon at ${viewport.width}px`, async ({
       page,
     }) => {

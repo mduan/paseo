@@ -1,3 +1,4 @@
+import { createTextSearch, SearchQueryError } from "./query.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -297,5 +298,114 @@ describe("matchRanges", () => {
 
   it("returns nothing for an empty query", () => {
     expect(matchRanges("", "anything", { tier: 0, offset: 0 })).toEqual([]);
+  });
+});
+
+describe("search matching options", () => {
+  it("matches case exactly while retaining multi-field queries", () => {
+    const search = createTextSearch({ query: "Bill Paseo", options: { caseSensitive: true } });
+    expect(search.matches(["Bill export", "Paseo"])).toBe(true);
+    expect(search.matches(["bill export", "Paseo"])).toBe(false);
+    expect(search.ranges("Bill and bill")).toEqual([{ start: 0, length: 4 }]);
+  });
+  it("requires whole Unicode words and disables fuzzy and subsequence matching", () => {
+    const search = createTextSearch({ query: "bill", options: { wholeWord: true } });
+    expect(search.matches(["Bill export"])).toBe(true);
+    for (const text of ["billing", "unbilled", "bill_name", "billé", "ébill", "bull", "boil"]) {
+      expect(search.matches([text])).toBe(false);
+    }
+    expect(search.ranges("bill / BILL")).toEqual([
+      { start: 0, length: 4 },
+      { start: 7, length: 4 },
+    ]);
+  });
+  it("supports regex alternatives, anchors, boundaries, and case sensitivity", () => {
+    const search = createTextSearch({ query: "^Bill|usage$", options: { regex: true } });
+    expect(search.matches(["billing"])).toBe(true);
+    expect(search.matches(["Unbilled usage"])).toBe(true);
+    expect(search.matches(["Unbilled export"])).toBe(false);
+    expect(
+      createTextSearch({ query: "^Bill", options: { regex: true, caseSensitive: true } }).matches([
+        "billing",
+      ]),
+    ).toBe(false);
+    expect(search.ranges("Bill usage")).toEqual([
+      { start: 0, length: 4 },
+      { start: 5, length: 5 },
+    ]);
+    expect(createTextSearch({ query: "^", options: { regex: true } }).ranges("Bill")).toEqual([]);
+  });
+  it("combines regex and whole-word matching with Unicode boundaries", () => {
+    const search = createTextSearch({ query: "bill", options: { regex: true, wholeWord: true } });
+    expect(search.matches(["Bill export"])).toBe(true);
+    for (const text of ["billing", "unbilled", "bill_name", "billé", "ébill", "bill\u0301"]) {
+      expect(search.matches([text])).toBe(false);
+    }
+    expect(search.ranges("bill billing BILL")).toEqual([
+      { start: 0, length: 4 },
+      { start: 13, length: 4 },
+    ]);
+    expect(
+      createTextSearch({
+        query: "bill",
+        options: { regex: true, wholeWord: true, caseSensitive: true },
+      }).matches(["Bill"]),
+    ).toBe(false);
+  });
+  it("lets regex alternatives and lazy quantifiers finish a whole word", () => {
+    for (const query of ["bill|billing", "bill.*?"]) {
+      const search = createTextSearch({ query, options: { regex: true, wholeWord: true } });
+      expect(search.matches(["billing"])).toBe(true);
+      expect(search.ranges("billing bill")).toEqual([
+        { start: 0, length: 7 },
+        { start: 8, length: 4 },
+      ]);
+    }
+    const repeated = createTextSearch({
+      query: "(bill)\\1",
+      options: { regex: true, wholeWord: true },
+    });
+    expect(repeated.matches(["billbill"])).toBe(true);
+    expect(repeated.matches(["billbillx"])).toBe(false);
+  });
+  it("rejects invalid patterns", () => {
+    for (const query of ["[", "(", "a)|(?:b"]) {
+      for (const wholeWord of [false, true]) {
+        expect(() => createTextSearch({ query, options: { regex: true, wholeWord } })).toThrow(
+          SearchQueryError,
+        );
+      }
+    }
+  });
+  it("supports native backreferences and lookarounds", () => {
+    expect(
+      createTextSearch({ query: "(bill)\\1", options: { regex: true } }).matches(["billbill"]),
+    ).toBe(true);
+    expect(
+      createTextSearch({ query: "bill(?=ing)", options: { regex: true } }).ranges("billing"),
+    ).toEqual([{ start: 0, length: 4 }]);
+  });
+  it("preserves significant regex whitespace and escapes literal metacharacters", () => {
+    const search = createTextSearch({ query: " bill ", options: { regex: true } });
+    expect(search.matches([" bill "])).toBe(true);
+    expect(search.matches(["bill"])).toBe(false);
+    expect(
+      createTextSearch({ query: "a.b", options: { caseSensitive: true } }).matches(["axb"]),
+    ).toBe(false);
+    expect(
+      createTextSearch({ query: "a.b", options: { caseSensitive: true } }).ranges("a.b"),
+    ).toEqual([{ start: 0, length: 3 }]);
+  });
+  it("resets regex state across fields and handles zero-width Unicode matches", () => {
+    const search = createTextSearch({ query: "bill", options: { regex: true } });
+    expect(search.matches(["billing"])).toBe(true);
+    expect(search.matches(["billing"])).toBe(true);
+    expect(search.ranges("bill bill")).toEqual([
+      { start: 0, length: 4 },
+      { start: 5, length: 4 },
+    ]);
+    const zeroWidth = createTextSearch({ query: "(?=.)", options: { regex: true } });
+    expect(zeroWidth.matches(["😀"])).toBe(true);
+    expect(zeroWidth.ranges("😀")).toEqual([]);
   });
 });

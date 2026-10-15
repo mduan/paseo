@@ -11,7 +11,7 @@ import { MenuHeader } from "@/components/headers/menu-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
-import { SearchField } from "@/components/ui/search-field";
+import { HistorySearchField } from "@/components/sessions/search-options";
 import { HistoryFilterBar, hasHistoryFilters } from "@/components/sessions/filters";
 import { HistoryDisplayMenu } from "@/components/sessions/display-menu";
 import { HistorySearchMenu } from "@/components/sessions/search-menu";
@@ -26,14 +26,11 @@ import {
 } from "@/components/sessions/preferences";
 import type { Theme } from "@/styles/theme";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useHistorySearch } from "@/hooks/use-history-search";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
 import { useAppSettings } from "@/hooks/use-settings";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
-
-/** Long enough that a typed word is one request, short enough to feel live. */
-const SEARCH_DEBOUNCE_MS = 200;
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -116,7 +113,8 @@ function SessionsScreenContent() {
   );
   // Settings already update optimistically; retry must not replay a toggle.
   const retrySave = useCallback(() => saveHistory((current) => current), [saveHistory]);
-  const [searchInput, setSearchInput] = useState("");
+  const historySearch = useHistorySearch();
+  const { setInput: setSearchInput, query: search } = historySearch;
   const rememberSearch = useCallback(
     (query: string) => {
       if (addRecentHistorySearch({ searches: recentSearches, query }) === recentSearches) return;
@@ -132,9 +130,8 @@ function SessionsScreenContent() {
       setSearchInput(query);
       rememberSearch(query);
     },
-    [rememberSearch],
+    [rememberSearch, setSearchInput],
   );
-  const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const filter = useMemo(
     () => ({
       ...(filters.agentType === HistoryAgentType.All
@@ -157,6 +154,8 @@ function SessionsScreenContent() {
     isLoadingMore,
     isError,
     isSearchSupported,
+    isSearchOptionsSupported,
+    isSearchPaused,
     isFilterSupported,
     isAgentTypeFilterSupported,
     filterOptions,
@@ -168,6 +167,8 @@ function SessionsScreenContent() {
     serverIds: filters.hosts,
     filter,
     search,
+    searchOptions: historySearch.queryOptions,
+    enabled: historySearch.enabled,
   });
   const isSearching = isSearchSupported && search.length > 0;
 
@@ -200,7 +201,7 @@ function SessionsScreenContent() {
   const handleClearFilters = useCallback(() => {
     setSearchInput("");
     setFilters(EMPTY_HISTORY_FILTERS);
-  }, [setFilters]);
+  }, [setFilters, setSearchInput]);
 
   const listFooterComponent = useMemo(() => {
     // COMPAT(historyPagination): old daemons return a truncated relevance page.
@@ -246,16 +247,11 @@ function SessionsScreenContent() {
         <View style={styles.searchRow}>
           {isSearchSupported ? (
             <View style={styles.searchField}>
-              <SearchField
-                fullWidth
-                value={searchInput}
-                onChangeText={setSearchInput}
+              <HistorySearchField
+                search={historySearch}
+                supported={isSearchOptionsSupported}
                 onCommit={rememberSearch}
                 leading={searchMenu}
-                placeholder={t("sessions.searchPlaceholder")}
-                clearAccessibilityLabel={t("sessions.actions.clearSearch")}
-                testID="sessions-search-input"
-                clearTestID="sessions-search-clear"
               />
             </View>
           ) : null}
@@ -267,47 +263,51 @@ function SessionsScreenContent() {
       </View>
       <HistoryPreferencesError visible={savePreferences.isError} onRetry={retrySave} />
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}
-      {isInitialLoad ? (
-        <View style={styles.loadingContainer}>
-          <ThemedLoadingSpinner size="large" uniProps={mutedColorMapping} />
-        </View>
-      ) : null}
-      {showLoadError ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Unable to load sessions</Text>
-          <Button variant="ghost" onPress={handleRefresh}>
-            Try again
-          </Button>
-        </View>
-      ) : null}
-      {showResults && agents.length === 0 ? (
-        <View style={styles.emptyContainer} testID="sessions-empty">
-          <Text style={styles.emptyText}>{emptyText}</Text>
-          {isSearching || isFiltering ? (
-            <Button variant="ghost" onPress={handleClearFilters}>
-              {t("sessions.filters.clear")}
-            </Button>
-          ) : (
-            <Button variant="ghost" leftIcon={ChevronLeft} onPress={handleBack}>
-              Back
-            </Button>
-          )}
-          <Button variant="ghost" leftIcon={Import} onPress={importSession.open}>
-            {t("importSession.title")}
-          </Button>
-        </View>
-      ) : null}
-      {showResults && agents.length > 0 ? (
-        <AgentList
-          agents={agents}
-          isRefreshing={isManualRefresh}
-          onRefresh={handleRefresh}
-          listFooterComponent={listFooterComponent}
-          showAttentionIndicator={false}
-          fields={fields}
-          search={isSearching ? search : undefined}
-        />
-      ) : null}
+      {isSearchPaused ? null : (
+        <>
+          {isInitialLoad ? (
+            <View style={styles.loadingContainer}>
+              <ThemedLoadingSpinner size="large" uniProps={mutedColorMapping} />
+            </View>
+          ) : null}
+          {showLoadError ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Unable to load sessions</Text>
+              <Button variant="ghost" onPress={handleRefresh}>
+                Try again
+              </Button>
+            </View>
+          ) : null}
+          {showResults && agents.length === 0 ? (
+            <View style={styles.emptyContainer} testID="sessions-empty">
+              <Text style={styles.emptyText}>{emptyText}</Text>
+              {isSearching || isFiltering ? (
+                <Button variant="ghost" onPress={handleClearFilters}>
+                  {t("sessions.filters.clear")}
+                </Button>
+              ) : (
+                <Button variant="ghost" leftIcon={ChevronLeft} onPress={handleBack}>
+                  Back
+                </Button>
+              )}
+              <Button variant="ghost" leftIcon={Import} onPress={importSession.open}>
+                {t("importSession.title")}
+              </Button>
+            </View>
+          ) : null}
+          {showResults && agents.length > 0 ? (
+            <AgentList
+              agents={agents}
+              isRefreshing={isManualRefresh}
+              onRefresh={handleRefresh}
+              listFooterComponent={listFooterComponent}
+              showAttentionIndicator={false}
+              fields={fields}
+              search={isSearching ? historySearch.matcher : undefined}
+            />
+          ) : null}
+        </>
+      )}
       {importSession.sheet}
     </View>
   );

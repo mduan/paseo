@@ -110,6 +110,39 @@ test("history search filters before pagination and keeps newest matches first", 
     expect(second.entries.map((entry) => entry.agent.id)).toEqual(["older-exact"]);
     expect(second.pageInfo.hasMore).toBe(false);
     expect(second.entries[0].searchMatches).toBeUndefined();
+    const wholeWord = await client.fetchAgentHistory({
+      search: "bill",
+      searchOptions: { wholeWord: true },
+      page: { limit: 1 },
+    });
+    expect(wholeWord.entries.map((entry) => entry.agent.id)).toEqual(["older-exact"]);
+    expect(wholeWord.pageInfo.hasMore).toBe(false);
+    const regexFirst = await client.fetchAgentHistory({
+      search: "[Uu]nbilled|^bill$",
+      searchOptions: { regex: true, caseSensitive: true },
+      page: { limit: 1 },
+    });
+    expect(regexFirst.entries.map((entry) => entry.agent.id)).toEqual(["newer-partial"]);
+    const regexSecond = await client.fetchAgentHistory({
+      search: "[Uu]nbilled|^bill$",
+      searchOptions: { regex: true, caseSensitive: true },
+      page: { limit: 1, cursor: regexFirst.pageInfo.nextCursor! },
+    });
+    expect(regexSecond.entries.map((entry) => entry.agent.id)).toEqual(["older-exact"]);
+    expect(regexSecond.pageInfo.hasMore).toBe(false);
+    const wrongCase = await client.fetchAgentHistory({
+      search: "Bill",
+      searchOptions: { caseSensitive: true },
+    });
+    expect(wrongCase.entries).toEqual([]);
+    const spaces = await client.fetchAgentHistory({
+      search: " bill ",
+      searchOptions: { regex: true },
+    });
+    expect(spaces.entries).toEqual([]);
+    await expect(
+      client.fetchAgentHistory({ search: "[", searchOptions: { regex: true } }),
+    ).rejects.toThrow();
   } finally {
     await client?.close().catch(() => undefined);
     await daemon?.close().catch(() => undefined);

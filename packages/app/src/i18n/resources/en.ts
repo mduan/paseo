@@ -325,6 +325,13 @@ export const en = {
     hostLoadFailed: "{{host}}: Could not load history",
     recentSearches: "Recent searches",
     noRecentSearches: "No recent searches",
+    searchOptions: {
+      caseSensitive: "Match case",
+      wholeWord: "Match whole word",
+      regex: "Use regular expression",
+      invalidRegex: "Invalid regular expression. Correct the pattern to search.",
+      updateHost: "Update connected hosts to use search options.",
+    },
     searchPlaceholder: "Search history",
     actions: {
       loadMore: "Load more",

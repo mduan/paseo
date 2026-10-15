@@ -335,6 +335,13 @@ export const fr: TranslationResources = {
     hostLoadFailed: "{{host}} : Impossible de charger l'historique",
     recentSearches: "Recherches récentes",
     noRecentSearches: "Aucune recherche récente",
+    searchOptions: {
+      caseSensitive: "Respecter la casse",
+      wholeWord: "Mot entier",
+      regex: "Utiliser une expression régulière",
+      invalidRegex: "Expression régulière non valide. Corrigez le motif pour rechercher.",
+      updateHost: "Mettez à jour les hôtes connectés pour utiliser les options de recherche.",
+    },
     searchPlaceholder: "Rechercher dans l'historique",
     actions: {
       loadMore: "Charger plus",

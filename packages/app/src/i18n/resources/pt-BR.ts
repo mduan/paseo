@@ -333,6 +333,13 @@ export const ptBR: TranslationResources = {
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
     recentSearches: "Pesquisas recentes",
     noRecentSearches: "Nenhuma pesquisa recente",
+    searchOptions: {
+      caseSensitive: "Diferenciar maiúsculas e minúsculas",
+      wholeWord: "Corresponder à palavra inteira",
+      regex: "Usar expressão regular",
+      invalidRegex: "Expressão regular inválida. Corrija o padrão para pesquisar.",
+      updateHost: "Atualize os hosts conectados para usar as opções de pesquisa.",
+    },
     searchPlaceholder: "Buscar no histórico",
     actions: {
       loadMore: "Carregar mais",
