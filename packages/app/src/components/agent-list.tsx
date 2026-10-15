@@ -660,7 +660,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
   },
   modelSummary: {
-    gap: theme.spacing[0.5],
+    gap: 3,
   },
   rowEnd: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2], flexShrink: 0 },
   activityTime: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
