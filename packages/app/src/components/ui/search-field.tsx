@@ -11,6 +11,7 @@ import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
+import { iconButtonChromeFrameStyle } from "@/components/ui/icon-button-chrome";
 import { isNative } from "@/constants/platform";
 import {
   EditingTextInput as TextInput,
@@ -107,6 +108,7 @@ export function SearchField({
           onPress={handleClear}
           label={clearAccessibilityLabel}
           compact={isNative}
+          style={iconButtonChromeFrameStyle(isNative ? "small" : "large", isNative)}
           hitSlop={8}
         >
           <ThemedX size={14} uniProps={mutedColorMapping} />

@@ -6,10 +6,9 @@ import { StyleSheet } from "react-native-unistyles";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { useHistorySearch } from "@/hooks/use-history-search";
 import {
-  toolbarLabelTriggerStyle,
-  type ToolbarLabelTriggerState,
-} from "@/components/ui/toolbar-label-trigger";
-import { buttonControlHeight } from "@/components/ui/control-geometry";
+  iconButtonChromeStyle,
+  type IconButtonChromeState,
+} from "@/components/ui/icon-button-chrome";
 import { isNative } from "@/constants/platform";
 import { SearchField } from "@/components/ui/search-field";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -46,11 +45,13 @@ function SearchOptionButton({
   let hint = label;
   if (!supported) hint = t("sessions.searchOptions.updateHost");
   const buttonStyle = useCallback(
-    (state: ToolbarLabelTriggerState) => [
-      toolbarLabelTriggerStyle({ ...state, open: selected }),
-      styles.option,
-      disabled && styles.disabled,
-    ],
+    (state: IconButtonChromeState) =>
+      iconButtonChromeStyle({
+        size: isNative ? "small" : "large",
+        compact: isNative,
+        state: { ...state, active: selected },
+        disabled,
+      }),
     [disabled, selected],
   );
   const accessibilityState = useMemo(() => ({ selected, disabled }), [selected, disabled]);
@@ -141,12 +142,6 @@ export function HistorySearchField({
 const styles = StyleSheet.create((theme) => ({
   field: { gap: theme.spacing[2] },
   options: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
-  option: {
-    minWidth: buttonControlHeight.xs,
-    minHeight: buttonControlHeight.xs,
-    paddingHorizontal: isNative ? theme.spacing[3] : theme.spacing[1],
-  },
-  disabled: { opacity: theme.opacity[50] },
   symbol: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   wholeWord: { textDecorationLine: "underline" },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
