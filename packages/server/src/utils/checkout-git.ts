@@ -283,34 +283,6 @@ interface BranchSuggestionMeta {
   remoteOid?: string;
 }
 
-function sortBranchSuggestions(
-  branchNames: string[],
-  branchMeta: Map<string, BranchSuggestionMeta>,
-  query: string,
-): string[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  const hasQuery = normalizedQuery.length > 0;
-  return branchNames.sort((a, b) => {
-    if (hasQuery) {
-      const aPrefix = a.toLowerCase().startsWith(normalizedQuery);
-      const bPrefix = b.toLowerCase().startsWith(normalizedQuery);
-      if (aPrefix !== bPrefix) {
-        return aPrefix ? -1 : 1;
-      }
-    }
-
-    const aMeta = branchMeta.get(a);
-    const bMeta = branchMeta.get(b);
-    const aDate = aMeta?.committerDate ?? 0;
-    const bDate = bMeta?.committerDate ?? 0;
-    if (aDate !== bDate) {
-      return bDate - aDate;
-    }
-
-    return a.localeCompare(b);
-  });
-}
-
 export async function listBranchSuggestions(
   cwd: string,
   options?: { query?: string; limit?: number },
@@ -371,13 +343,29 @@ export async function listBranchSuggestions(
     return [];
   }
 
-  const ordered = sortBranchSuggestions(filteredNames, branchMeta, query);
+  const defaultBranchName = normalizeBranchSuggestionName(defaultBranch ?? "");
+  // Keep the default available to the picker when recent branches fill the result limit.
+  const ordered = filteredNames.sort((a, b) => {
+    const aPreferred = query ? a.toLowerCase().startsWith(query) : a === defaultBranchName;
+    const bPreferred = query ? b.toLowerCase().startsWith(query) : b === defaultBranchName;
+    if (aPreferred !== bPreferred) {
+      return aPreferred ? -1 : 1;
+    }
+
+    const aDate = branchMeta.get(a)?.committerDate ?? 0;
+    const bDate = branchMeta.get(b)?.committerDate ?? 0;
+    if (aDate !== bDate) {
+      return bDate - aDate;
+    }
+
+    return a.localeCompare(b);
+  });
   return Promise.all(
     ordered.slice(0, limit).map(async (name): Promise<BranchSuggestion> => {
       const meta = branchMeta.get(name);
       const suggestion: BranchSuggestion = {
         name,
-        isDefault: name === normalizeBranchSuggestionName(defaultBranch ?? ""),
+        isDefault: name === defaultBranchName,
         committerDate: meta?.committerDate ?? 0,
         hasLocal: meta?.hasLocal ?? false,
         hasRemote: meta?.hasRemote ?? false,
