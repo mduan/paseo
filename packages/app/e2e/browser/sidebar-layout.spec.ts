@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
+import { getServerId } from "../support/helpers/server-id";
 import {
   closeMobileAgentSidebar,
   expectMobileAgentSidebarHidden,
@@ -184,6 +185,83 @@ test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
     await expectMobileAgentSidebarVisible(page);
     await closeMobileAgentSidebar(page);
     await expectMobileAgentSidebarHidden(page);
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open across its workspace hover card", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-hover-card-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(600, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const row = page.getByTestId(`sidebar-workspace-row-${getServerId()}:${workspace.workspaceId}`);
+    await row.hover();
+    const card = page.getByTestId("workspace-hover-card");
+    await expect(card).toBeVisible();
+    const rowBounds = await row.boundingBox();
+    const cardBounds = await card.boundingBox();
+    if (!rowBounds || !cardBounds) throw new Error("Workspace hover targets have no bounds");
+    await page.mouse.move(cardBounds.x + 20, rowBounds.y + rowBounds.height / 2, { steps: 20 });
+    await page.waitForTimeout(250);
+    await expect(sidebar).toBeVisible();
+    await expect(card).toBeVisible();
+    await row.hover();
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("a hover-revealed sidebar stays open after its menu closes under the pointer", async ({
+  page,
+}) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-hover-menu-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(600, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const key = `${getServerId()}:${workspace.workspaceId}`;
+    const row = page.getByTestId(`sidebar-workspace-row-${key}`);
+    const copyPath = page.getByTestId(`sidebar-workspace-menu-copy-path-${key}`);
+    for (const contextMenu of [false, true]) {
+      for (const selectAction of [false, true]) {
+        await row.hover();
+        if (contextMenu) {
+          await row.click({ button: "right", position: { x: 60, y: 10 } });
+        } else {
+          await page.getByTestId(`sidebar-workspace-kebab-${key}`).click();
+        }
+        await expect(copyPath).toBeVisible();
+        if (selectAction) {
+          await copyPath.click();
+        } else {
+          await page
+            .getByRole("button", { name: "Menu backdrop", exact: true })
+            .click({ position: { x: 100, y: 100 } });
+        }
+        await expect(copyPath).toBeHidden();
+        await page.waitForTimeout(250);
+        await expect(sidebar).toBeVisible();
+      }
+    }
+    await page.mouse.move(900, 600);
+    await expect(sidebar).toBeHidden();
   } finally {
     await workspace.cleanup();
   }

@@ -53,6 +53,7 @@ import { CheckPresentationIcon, getCheckPresentationTone } from "@/git/check-pre
 import { buildForgeChecksUrl } from "@/git/forge-url";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 import { WorkspaceLabelChip } from "@/workspace-labels/chip";
+import { useKeepSidebarRevealed } from "@/components/sidebar/hover-context";
 
 interface Rect {
   x: number;
@@ -143,6 +144,7 @@ function WorkspaceHoverCardDesktop({
   const triggerRef = useRef<View>(null);
   const contentRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
+  useKeepSidebarRevealed(open);
   const triggerHoveredRef = useRef(false);
 
   // While open, the safe zone covers trigger + content + the bridge between
