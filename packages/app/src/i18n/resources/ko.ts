@@ -1329,6 +1329,7 @@ export const ko: TranslationResources = {
         newWorkspace: "새 워크스페이스",
         showMore: "더 보기",
         showLess: "간략히 보기",
+        resumeWorkspaceDraft: "워크스페이스 초안 이어서 작성",
         createWorkspaceFor: "{{projectName}}을(를) 위한 새 워크스페이스 생성",
         copyPath: "경로 복사",
         copyBranchName: "브랜치 이름 복사",

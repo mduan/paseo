@@ -181,9 +181,9 @@ export async function createWorktreeViaDaemon(
 
 export async function openNewWorkspaceComposer(
   page: Page,
-  input: { projectKey: string; projectDisplayName: string },
+  input: { projectKey: string; projectDisplayName: string; projectViewKey?: string },
 ): Promise<void> {
-  const projectViewKey = projectEquivalenceViewKey(input.projectKey);
+  const projectViewKey = input.projectViewKey ?? projectEquivalenceViewKey(input.projectKey);
   const projectRow = page.getByTestId(`sidebar-project-row-${projectViewKey}`).first();
   await expect(projectRow).toBeVisible({ timeout: 30_000 });
   await projectRow.hover();
@@ -316,7 +316,10 @@ export async function selectNewWorkspaceProject(
   page: Page,
   input: { projectKey: string; projectDisplayName: string; projectViewKey?: string },
 ): Promise<void> {
-  const trigger = page.getByTestId("new-workspace-project-picker-trigger");
+  const trigger = page
+    .getByTestId("new-workspace-project-picker-trigger")
+    .filter({ visible: true })
+    .first();
   await expect(trigger).toBeVisible({ timeout: 30_000 });
   await trigger.click();
 

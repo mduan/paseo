@@ -46,6 +46,7 @@ import { ScreenHeader } from "@/components/headers/screen-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
+import { useDraftStore } from "@/stores/draft-store";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
@@ -1937,6 +1938,18 @@ export function NewWorkspaceScreen({
     }),
   });
   const composerState = chatDraft.composerState;
+  useEffect(() => {
+    if (draftId || !selectedProject || !selectedSourceDirectory || !isStillOnCreateScreen()) return;
+    const selectedProjectId = getHostProjectId(selectedProject, selectedServerId);
+    if (!selectedProjectId) return;
+    useDraftStore.getState().setNewWorkspaceProject({
+      viewKey: selectedProject.viewKey,
+      serverId: selectedServerId,
+      projectId: selectedProjectId,
+      sourceDirectory: selectedSourceDirectory,
+      displayName: selectedProject.projectName,
+    });
+  }, [draftId, selectedProject, selectedServerId, selectedSourceDirectory, isStillOnCreateScreen]);
   const [pickerSelection, dispatchPickerSelection] = useReducer(
     reducePickerSelection,
     initialPickerSelectionState,

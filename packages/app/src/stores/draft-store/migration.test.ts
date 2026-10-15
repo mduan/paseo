@@ -116,6 +116,26 @@ function workspaceReviewAttachment(): Extract<ComposerAttachment, { kind: "revie
 }
 
 describe("draft-store migration", () => {
+  it("preserves the New workspace draft project when loading persisted drafts", async () => {
+    const newWorkspaceProject = {
+      viewKey: "project-a",
+      serverId: "host-a",
+      projectId: "project-a",
+      sourceDirectory: "/project-a",
+      displayName: "Project A",
+    };
+    const state = {
+      drafts: { "new-workspace": activeDraft("Unsent prompt", 1) },
+      createModalDraft: null,
+      newWorkspaceProject,
+    };
+    expect(PersistedDraftStoreSchema.parse(state)).toEqual(state);
+    const migrated = await migratePersistedState(state, {
+      migrateLegacyImages: passThroughMigrateLegacyImages,
+      nowMs: 2,
+    });
+    expect(migrated).toEqual(state);
+  });
   it("keeps a supported legacy draft for migration", async () => {
     const backing = createMemoryStorage();
     const legacyState = {

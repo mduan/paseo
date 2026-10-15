@@ -41,7 +41,12 @@ import {
 import { type GestureType } from "react-native-gesture-handler";
 import { WorkspaceRenameModal } from "@/components/workspace-rename-modal";
 import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-actions";
-import { ExternalLink, Settings, MoreVertical, Plus, Trash2 } from "lucide-react-native";
+import { ExternalLink, Settings, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react-native";
+import { useDraftStore } from "@/stores/draft-store";
+import {
+  selectNewWorkspaceDraftProject,
+  type NewWorkspaceDraftProject,
+} from "@/stores/draft-store/state";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
 import type { DraggableListDragHandleProps } from "./draggable-list.types";
@@ -174,6 +179,7 @@ const WORKSPACE_STATUS_DOT_WIDTH = 14;
 const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedPlus = withUnistyles(Plus);
+const ThemedPencil = withUnistyles(Pencil);
 const ThemedMoreVertical = withUnistyles(MoreVertical);
 const ThemedTrash2 = withUnistyles(Trash2);
 const ThemedSettings = withUnistyles(Settings);
@@ -261,6 +267,7 @@ interface ProjectHeaderRowProps {
   chevron: "expand" | "collapse" | null;
   onPress: () => void;
   worktreeTarget: SidebarProjectHostTarget | null;
+  draftProject?: NewWorkspaceDraftProject;
   isProjectActive?: boolean;
   onWorkspacePress?: () => void;
   shortcutNumber?: number | null;
@@ -420,6 +427,7 @@ function ProjectRowTrailingActions({
   workspaceCount,
   displayName,
   worktreeTarget,
+  hasDraft,
   settingsTarget,
   projectPath,
   isHovered,
@@ -434,6 +442,7 @@ function ProjectRowTrailingActions({
   workspaceCount: number;
   displayName: string;
   worktreeTarget: SidebarProjectHostTarget | null;
+  hasDraft: boolean;
   settingsTarget: { serverId: string; projectId: string } | null;
   projectPath: string;
   isHovered: boolean;
@@ -475,12 +484,13 @@ function ProjectRowTrailingActions({
           />
         </View>
       ) : null}
-      {worktreeTarget ? (
+      {worktreeTarget || hasDraft ? (
         <NewWorktreeButton
           displayName={displayName}
           onPress={onBeginWorkspaceSetup}
-          visible={actionsVisible}
-          showShortcutHint={isProjectActive}
+          visible={actionsVisible || hasDraft}
+          isDraft={hasDraft}
+          showShortcutHint={isProjectActive && !hasDraft}
           testID={`sidebar-project-new-worktree-${projectViewKey}`}
         />
       ) : null}
@@ -752,6 +762,7 @@ function NewWorktreeButton({
   loading = false,
   testID,
   showShortcutHint = false,
+  isDraft = false,
 }: {
   displayName: string;
   onPress: () => void;
@@ -759,9 +770,14 @@ function NewWorktreeButton({
   loading?: boolean;
   testID: string;
   showShortcutHint?: boolean;
+  isDraft?: boolean;
 }) {
   const { t } = useTranslation();
   const newWorktreeKeys = useShortcutKeys("new-worktree");
+  const Icon = isDraft ? ThemedPencil : ThemedPlus;
+  const label = isDraft
+    ? t("sidebar.workspace.actions.resumeWorkspaceDraft")
+    : t("sidebar.workspace.actions.newWorkspace");
 
   const pressableStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -789,16 +805,20 @@ function NewWorktreeButton({
             onPress={handlePress}
             disabled={loading}
             accessibilityRole={platformIsWeb ? undefined : "button"}
-            accessibilityLabel={t("sidebar.workspace.actions.createWorkspaceFor", {
-              projectName: displayName,
-            })}
+            accessibilityLabel={
+              isDraft
+                ? label
+                : t("sidebar.workspace.actions.createWorkspaceFor", {
+                    projectName: displayName,
+                  })
+            }
             testID={testID}
           >
             {({ hovered, pressed }) =>
               loading ? (
                 <ThemedLoadingSpinner size={14} uniProps={foregroundMutedColorMapping} />
               ) : (
-                <ThemedPlus
+                <Icon
                   size={15}
                   uniProps={
                     hovered || pressed ? foregroundColorMapping : foregroundMutedColorMapping
@@ -810,9 +830,7 @@ function NewWorktreeButton({
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center" offset={8}>
           <View style={styles.projectActionTooltipRow}>
-            <Text style={styles.projectActionTooltipText}>
-              {t("sidebar.workspace.actions.newWorkspace")}
-            </Text>
+            <Text style={styles.projectActionTooltipText}>{label}</Text>
             {showShortcutHint && newWorktreeKeys ? (
               <Shortcut chord={newWorktreeKeys} style={styles.projectActionTooltipShortcut} />
             ) : null}
@@ -898,6 +916,7 @@ function ProjectHeaderRow({
   chevron,
   onPress,
   worktreeTarget,
+  draftProject,
   isProjectActive = false,
   onWorkspacePress,
   shortcutNumber = null,
@@ -918,19 +937,22 @@ function ProjectHeaderRow({
   const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
   const settingsTarget = project.hosts[0] ?? null;
   const handleBeginWorkspaceSetup = useCallback(() => {
-    if (!worktreeTarget) {
+    const target =
+      draftProject ??
+      (worktreeTarget
+        ? {
+            serverId: worktreeTarget.serverId,
+            sourceDirectory: worktreeTarget.iconWorkingDir,
+            displayName,
+            projectId: worktreeTarget.projectId,
+          }
+        : undefined);
+    if (!target) {
       return;
     }
     onWorkspacePress?.();
-    router.navigate(
-      buildNewWorkspaceRoute({
-        serverId: worktreeTarget.serverId,
-        sourceDirectory: worktreeTarget.iconWorkingDir,
-        displayName,
-        projectId: worktreeTarget.projectId,
-      }) as Href,
-    );
-  }, [displayName, onWorkspacePress, worktreeTarget]);
+    router.navigate(buildNewWorkspaceRoute(target) as Href);
+  }, [displayName, draftProject, onWorkspacePress, worktreeTarget]);
   const interaction = useLongPressDragInteraction({
     drag,
     menuController,
@@ -1006,6 +1028,7 @@ function ProjectHeaderRow({
         workspaceCount={project.workspaces.length}
         displayName={displayName}
         worktreeTarget={worktreeTarget}
+        hasDraft={Boolean(draftProject)}
         settingsTarget={settingsTarget}
         projectPath={projectPath}
         isHovered={isHovered}
@@ -1616,6 +1639,7 @@ function ProjectBlock({
   collapsed,
   displayName,
   iconDataUri,
+  draftProject,
   selectionEnabled,
   showShortcutBadges,
   shortcutIndexByWorkspaceKey,
@@ -1640,6 +1664,7 @@ function ProjectBlock({
   collapsed: boolean;
   displayName: string;
   iconDataUri: string | null;
+  draftProject?: NewWorkspaceDraftProject;
   selectionEnabled: boolean;
   showShortcutBadges: boolean;
   shortcutIndexByWorkspaceKey: Map<string, number>;
@@ -1891,6 +1916,7 @@ function ProjectBlock({
         project={project}
         displayName={displayName}
         iconDataUri={iconDataUri}
+        draftProject={draftProject}
         statusBucket={aggregateStatusBucket}
         selected={false}
         chevron={rowModel.chevron}
@@ -1924,6 +1950,7 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.collapsed === next.collapsed &&
     previous.displayName === next.displayName &&
     previous.iconDataUri === next.iconDataUri &&
+    previous.draftProject === next.draftProject &&
     previous.selectionEnabled === next.selectionEnabled &&
     previous.showShortcutBadges === next.showShortcutBadges &&
     previous.shortcutIndexByWorkspaceKey === next.shortcutIndexByWorkspaceKey &&
@@ -2215,6 +2242,7 @@ function ProjectModeList({
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspacePlacement[]) => void;
 }) {
+  const draftProject = useDraftStore(selectNewWorkspaceDraftProject);
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const visiblePendingCreations = useVisiblePendingWorkspaceCreations();
   const pendingCreationsByProject = useMemo(
@@ -2323,6 +2351,7 @@ function ProjectModeList({
           collapsed={collapsedProjectKeys.has(item.viewKey)}
           displayName={item.projectName}
           iconDataUri={projectIconByProjectViewKey.get(item.viewKey) ?? null}
+          draftProject={draftProject?.viewKey === item.viewKey ? draftProject : undefined}
           selectionEnabled={selectionEnabled}
           showShortcutBadges={showShortcutBadges}
           shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
@@ -2358,6 +2387,7 @@ function ProjectModeList({
       parentGestureRef,
       dragGestureHostActive,
       projectIconByProjectViewKey,
+      draftProject,
       selectionEnabled,
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
@@ -2679,7 +2709,7 @@ const styles = StyleSheet.create((theme) => ({
   projectTrailingActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: theme.spacing[2],
     flexShrink: 0,
     // MoreVertical paints only around the center of its 14px SVG. Keep the 24px controls,
     // but pull their painted edge through the unused view-box space onto the row rail.

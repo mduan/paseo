@@ -1359,6 +1359,7 @@ export const es: TranslationResources = {
         newWorkspace: "Nuevo espacio de trabajo",
         showMore: "Mostrar más",
         showLess: "Mostrar menos",
+        resumeWorkspaceDraft: "Retomar el borrador del espacio de trabajo",
         createWorkspaceFor: "Crea un nuevo espacio de trabajo para{{projectName}}",
         copyPath: "Copiar ruta",
         copyBranchName: "Copiar nombre de sucursal",

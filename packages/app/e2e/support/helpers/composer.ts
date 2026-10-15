@@ -178,7 +178,7 @@ export async function removeAttachmentPill(
   pillTestId: string,
   removeAccessibilityLabel: string,
 ): Promise<void> {
-  await page.getByTestId(pillTestId).first().hover();
+  await page.getByTestId(pillTestId).filter({ visible: true }).first().hover();
   await page.getByRole("button", { name: removeAccessibilityLabel }).first().click();
 }
 

@@ -1349,6 +1349,7 @@ export const ptBR: TranslationResources = {
         newWorkspace: "Novo workspace",
         showMore: "Mostrar mais",
         showLess: "Mostrar menos",
+        resumeWorkspaceDraft: "Retomar rascunho do workspace",
         createWorkspaceFor: "Criar um novo workspace para {{projectName}}",
         copyPath: "Copiar caminho",
         copyBranchName: "Copiar nome da branch",

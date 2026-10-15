@@ -1336,6 +1336,7 @@ export const ja: TranslationResources = {
         newWorkspace: "新しいワークスペース",
         showMore: "さらに表示",
         showLess: "表示を減らす",
+        resumeWorkspaceDraft: "ワークスペースの下書きを再開",
         createWorkspaceFor: "{{projectName}}の新しいワークスペースを作成",
         copyPath: "パスをコピー",
         copyBranchName: "ブランチ名をコピー",
