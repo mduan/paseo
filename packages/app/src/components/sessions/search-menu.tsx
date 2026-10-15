@@ -11,9 +11,15 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import type { Theme } from "@/styles/theme";
+import { iconButtonChromeStyle } from "@/components/ui/icon-button-chrome";
+import type { MenuTriggerState } from "@/components/ui/menu";
 
 const ThemedSearch = withUnistyles(Search);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+
+function searchTriggerStyle(state: MenuTriggerState) {
+  return iconButtonChromeStyle({ size: "small", state });
+}
 
 type HistorySearchMenuProps = {
   searches: string[];
@@ -37,6 +43,7 @@ export function HistorySearchMenu({ searches, onSelect }: HistorySearchMenuProps
         accessibilityLabel={t("sessions.recentSearches")}
         testID="sessions-search-history-trigger"
         hitSlop={8}
+        style={searchTriggerStyle}
       >
         <ThemedSearch size={14} uniProps={mutedColorMapping} />
       </DropdownMenuTrigger>
