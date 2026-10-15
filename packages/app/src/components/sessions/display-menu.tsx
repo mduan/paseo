@@ -5,7 +5,15 @@ import { Settings2 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { toolbarLabelTriggerStyle } from "@/components/ui/toolbar-label-trigger";
-import { MenuItem, MenuRoot, MenuSeparator, MenuSurface, MenuTrigger } from "@/components/ui/menu";
+import {
+  MenuItem,
+  MenuRoot,
+  MenuSeparator,
+  MenuSurface,
+  MenuTrigger,
+  type MenuTriggerState,
+} from "@/components/ui/menu";
+import { buttonControlHeight } from "@/components/ui/control-geometry";
 import type { Theme } from "@/styles/theme";
 import { HistoryField, type HistoryFields } from "./preferences";
 
@@ -56,7 +64,7 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
         accessibilityRole="button"
         accessibilityLabel={t("sessions.display.title")}
         testID="sessions-display-trigger"
-        style={toolbarLabelTriggerStyle}
+        style={displayTriggerStyle}
       >
         <ThemedSettings size={14} uniProps={mutedIconMapping} />
         <Text style={styles.triggerText}>{t("sessions.display.title")}</Text>
@@ -85,6 +93,14 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
   );
 }
 
+function displayTriggerStyle(state: MenuTriggerState) {
+  return [toolbarLabelTriggerStyle(state), styles.trigger];
+}
+
 const styles = StyleSheet.create((theme) => ({
+  trigger: {
+    minHeight: buttonControlHeight.sm,
+    paddingHorizontal: theme.spacing[2],
+  },
   triggerText: { fontSize: theme.fontSize.base, color: theme.colors.foregroundMuted },
 }));

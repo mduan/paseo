@@ -387,6 +387,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   trigger: {
     minHeight: buttonControlHeight.sm,
+    paddingHorizontal: theme.spacing[2],
     maxWidth: 260,
   },
   triggerText: {

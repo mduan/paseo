@@ -87,10 +87,14 @@ async function expectHistoryToolbar({
     .toEqual({ leftAligned: true, fullWidth: true });
   const triggers = compact
     ? ["sessions-filters-trigger"]
-    : ["hosts", "projects", "providers", "models", "status"].map(
+    : ["hosts", "projects", "providers", "models", "agentType", "status"].map(
         (group) => `sessions-${group}-filter-trigger`,
       );
+  const displayHeight = await page
+    .getByTestId("sessions-display-trigger")
+    .evaluate((element) => element.getBoundingClientRect().height);
   for (const trigger of [...triggers, "sessions-display-trigger"]) {
+    await expect(page.getByTestId(trigger)).toHaveCSS("height", `${displayHeight}px`);
     await expect(page.getByTestId(trigger)).toHaveCSS("border-top-width", "0px");
     await expect(page.getByTestId(trigger)).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   }
@@ -99,6 +103,50 @@ async function expectHistoryToolbar({
 // Searching across hosts merges each host's chronological matching sessions.
 test.describe("History search across hosts", () => {
   test.describe.configure({ timeout: 420_000 });
+
+  test("keeps History toolbar controls aligned when clearing filters", async ({ page }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-toolbar-" });
+    const title = `${NONCE} Toolbar`;
+    try {
+      await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title,
+      });
+      await gotoAppShell(page);
+      await openSessions(page);
+      await search(page, NONCE);
+      await expectChronologicalTitles(page, [title]);
+      await expectHistoryToolbar({ page });
+      const toolbar = page.getByTestId("sessions-display-trigger").locator("..");
+      const hostTrigger = page.getByTestId("sessions-hosts-filter-trigger");
+      const row = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: title });
+      const toolbarHeight = (await toolbar.boundingBox())?.height;
+      const triggerTop = (await hostTrigger.boundingBox())?.y;
+      const rowTop = (await row.boundingBox())?.y;
+
+      await page.getByTestId("sessions-status-filter-trigger").click();
+      await page.getByTestId("sessions-status-filter-item-active").click();
+      const clear = page.getByRole("button", { name: "Clear filters", exact: true });
+      await expect(clear).toBeVisible();
+      await expect.poll(async () => (await toolbar.boundingBox())?.height).toBe(toolbarHeight);
+      await expect.poll(async () => (await hostTrigger.boundingBox())?.y).toBe(triggerTop);
+      await expect.poll(async () => (await row.boundingBox())?.y).toBe(rowTop);
+      await clear.click();
+      await expect(clear).not.toBeVisible();
+      await expect.poll(async () => (await toolbar.boundingBox())?.height).toBe(toolbarHeight);
+      await expect.poll(async () => (await hostTrigger.boundingBox())?.y).toBe(triggerTop);
+      await expect.poll(async () => (await row.boundingBox())?.y).toBe(rowTop);
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expectHistoryToolbar({ page, compact: true });
+    } finally {
+      await workspace.cleanup();
+    }
+  });
 
   test("orders matches from every host chronologically and narrows to one host on demand", async ({
     page,
