@@ -4,7 +4,7 @@ import { test } from "../support/fixtures";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import {
-  createIdleAgent,
+  createMockIdleAgent,
   openSessions,
   resetSeededPageState,
 } from "../support/helpers/archive-tab";
@@ -27,7 +27,7 @@ async function search(page: Page, query: string): Promise<void> {
 }
 
 function rowTitles(page: Page) {
-  return page.getByRole("button");
+  return page.getByRole("button").and(page.getByTestId(/^agent-row-/));
 }
 
 async function expectVisibleTitles(page: Page, titles: string[]): Promise<void> {
@@ -70,12 +70,12 @@ async function verifyRecencyBeforeMatchStrength(page: Page): Promise<void> {
 async function verifyExactAndTypoHighlights(page: Page): Promise<void> {
   await test.step("highlights exact and typo-resolved matches", async () => {
     await search(page, `${NONCE} billing`);
-    const row = page.getByRole("button").filter({ hasText: NONCE }).first();
+    const row = rowTitles(page).filter({ hasText: NONCE }).first();
     await expect(row.getByText("billing", { exact: true })).toBeVisible({ timeout: 30_000 });
 
     await search(page, `${NONCE} bulling`);
     await expectVisibleTitles(page, [TITLES.billing]);
-    const typoRow = page.getByRole("button").filter({ hasText: NONCE }).first();
+    const typoRow = rowTitles(page).filter({ hasText: NONCE }).first();
     await expect(typoRow.getByText("billing", { exact: true })).toBeVisible({
       timeout: 30_000,
     });
@@ -102,7 +102,11 @@ async function verifyEmptySearchAndRecovery(page: Page): Promise<void> {
     await expect(page.getByTestId("sessions-empty")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("No sessions match")).toBeVisible({ timeout: 30_000 });
 
-    await page.getByText("Clear search").click();
+    await page
+      .getByTestId("sessions-empty")
+      .getByRole("button", { name: "Clear filters", exact: true })
+      .click();
+    await expect(page.getByTestId("sessions-search-input")).toHaveValue("");
     await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
   });
 }
@@ -128,7 +132,7 @@ test.describe("History search", () => {
     const workspaceId = created.workspace.id;
 
     for (const title of [TITLES.terminal, TITLES.billing, TITLES.unbilled]) {
-      await createIdleAgent(client, { cwd: tempRepo.path, workspaceId, title });
+      await createMockIdleAgent(client, { cwd: tempRepo.path, workspaceId, title });
     }
   });
 

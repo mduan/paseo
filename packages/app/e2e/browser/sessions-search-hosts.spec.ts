@@ -150,6 +150,10 @@ test.describe("History search across hosts", () => {
           .and(page.getByTestId(/^agent-row-/))
           .filter({ hasText: activeTitle }),
       ).toContainText("Cost unavailable");
+      await expect(page.getByTestId("sessions-status-filter-trigger")).toHaveAttribute(
+        "role",
+        "button",
+      );
       await page.getByTestId("sessions-status-filter-trigger").click();
       await page.getByTestId("sessions-status-filter-item-active").click();
       await page.keyboard.press("Escape");
@@ -169,6 +173,7 @@ test.describe("History search across hosts", () => {
       await expectChronologicalTitles(page, [activeTitle]);
       await page.screenshot({ path: testInfo.outputPath("history-desktop.png") });
       await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.getByTestId("sessions-filters-trigger")).toHaveAttribute("role", "button");
       await page.getByTestId("sessions-filters-trigger").click();
       await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
       await page.getByTestId("sessions-status-filter-item-archived").click();
@@ -182,6 +187,29 @@ test.describe("History search across hosts", () => {
     } finally {
       await firstWorkspace.cleanup();
       await secondWorkspace.cleanup();
+    }
+  });
+
+  test("clears the query text when resetting empty History filters", async ({ page }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-clear-filters-" });
+    const title = `${NONCE} Clear filters recovery`;
+    try {
+      await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title,
+      });
+      await gotoAppShell(page);
+      await openSessions(page);
+      await search(page, `${NONCE} nonexistentquery`);
+      const empty = page.getByTestId("sessions-empty");
+      await expect(empty).toBeVisible();
+      await empty.getByRole("button", { name: "Clear filters", exact: true }).click();
+      await expect(page.getByTestId("sessions-search-input")).toHaveValue("");
+      await expect(page.getByTestId("sessions-search-clear")).not.toBeVisible();
+      await expectChronologicalTitles(page, [title]);
+    } finally {
+      await workspace.cleanup();
     }
   });
 

@@ -287,6 +287,7 @@ export function HistoryFilterBar({
     return (
       <MenuRoot compactMode="sheet">
         <MenuTrigger
+          accessibilityRole="button"
           style={styles.trigger}
           accessibilityLabel={t("sessions.filters.title")}
           testID="sessions-filters-trigger"
@@ -330,6 +331,7 @@ export function HistoryFilterBar({
       {groups.map((group) => (
         <MenuRoot key={group.id}>
           <MenuTrigger
+            accessibilityRole="button"
             style={styles.trigger}
             testID={`sessions-${group.id}-filter-trigger`}
             accessibilityLabel={`${group.title}: ${filterLabel(group)}`}
