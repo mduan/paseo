@@ -27,6 +27,48 @@ async function dragSidebarTo(page: Page, width: number) {
   await page.mouse.move(x, y, { steps: 15 });
 }
 
+async function expectSidebarSlide({
+  page,
+  action,
+  opening,
+}: {
+  page: Page;
+  action: () => Promise<void>;
+  opening: boolean;
+}) {
+  const sampler = await page.evaluateHandle(() => {
+    const sidebar = document.querySelector('[data-testid="left-sidebar"]');
+    if (!sidebar) throw new Error("Sidebar is not mounted");
+    const frames: number[] = [];
+    let frameId: number;
+    const sample = () => {
+      const { x, width } = sidebar.getBoundingClientRect();
+      if (width > 0 && x < -1 && x > 1 - width) frames.push(x);
+      frameId = requestAnimationFrame(sample);
+    };
+    frameId = requestAnimationFrame(sample);
+    return () => {
+      cancelAnimationFrame(frameId);
+      return frames;
+    };
+  });
+  let frames: number[] = [];
+  try {
+    await action();
+    const sidebar = page.getByTestId("left-sidebar");
+    if (opening) {
+      await expect(sidebar).toBeVisible();
+      await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    } else {
+      await expect(sidebar).toBeHidden();
+    }
+  } finally {
+    frames = await sampler.evaluate((stop) => stop());
+    await sampler.dispose();
+  }
+  expect(frames.length, "sidebar should paint intermediate slide positions").toBeGreaterThan(0);
+}
+
 test("a collapsed sidebar slides over content and dismisses when the mouse leaves", async ({
   page,
 }, testInfo) => {
@@ -142,6 +184,32 @@ test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
     await expectMobileAgentSidebarVisible(page);
     await closeMobileAgentSidebar(page);
     await expectMobileAgentSidebarHidden(page);
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("hover and the sidebar button slide open and closed", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-motion-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const toggle = page.getByTestId("menu-button").filter({ visible: true }).first();
+
+    await expectSidebarSlide({ page, action: () => toggle.click(), opening: false });
+    await expectSidebarSlide({ page, action: () => page.mouse.move(25, 300), opening: true });
+    await expectSidebarSlide({ page, action: () => page.mouse.move(600, 300), opening: false });
+    await expectSidebarSlide({
+      page,
+      action: async () => {
+        await toggle.focus();
+        await page.keyboard.press("Enter");
+      },
+      opening: true,
+    });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
   } finally {
     await workspace.cleanup();
   }
