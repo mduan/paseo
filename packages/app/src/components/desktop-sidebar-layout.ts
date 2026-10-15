@@ -2,6 +2,7 @@ import { SETTINGS_DESKTOP_SPLIT_MIN_WIDTH } from "@/constants/layout";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/stores/panel-store";
 
 const MIN_DESKTOP_CENTER_WIDTH = 400;
+export const SIDEBAR_EDGE_WIDTH = MIN_SIDEBAR_WIDTH / 4;
 
 export function resolveDesktopSidebarVisibility(input: {
   chromeEnabled: boolean;

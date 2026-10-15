@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useWindowDimensions } from "react-native";
-import { resolveDesktopSidebarWidth } from "@/components/desktop-sidebar-layout";
+import {
+  resolveDesktopSidebarWidth,
+  SIDEBAR_EDGE_WIDTH,
+} from "@/components/desktop-sidebar-layout";
 import { getOverlayRoot, isTargetInWebOverlay } from "@/lib/overlay-root";
 import { usePanelStore } from "@/stores/panel-store";
 
@@ -39,8 +42,11 @@ export function DesktopSidebarSurface({
   }, [host, overlay]);
 
   useLayoutEffect(() => {
-    host.style.width = overlay ? `${visibleSidebarWidth}px` : "";
+    const surfaceWidth = active ? visibleSidebarWidth : SIDEBAR_EDGE_WIDTH;
+    host.style.width = overlay ? `${surfaceWidth}px` : "";
     host.style.pointerEvents = overlay && active ? "auto" : "none";
+    // Native drag regions swallow mouse events even beneath a web overlay.
+    host.style.setProperty("-webkit-app-region", overlay ? "no-drag" : "");
   }, [active, host, overlay, visibleSidebarWidth]);
 
   useLayoutEffect(() => {

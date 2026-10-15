@@ -42,6 +42,10 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
     await page.getByTestId("menu-button").filter({ visible: true }).first().click();
     await page.mouse.move(600, 300);
     await expect(sidebar).toBeHidden();
+    const surface = sidebar.locator("..");
+    // CDP mouse input bypasses Electron's native drag-region hit-testing.
+    await expect(surface).toHaveCSS("-webkit-app-region", "no-drag");
+    await expect.poll(async () => (await surface.boundingBox())?.width).toBe(50);
     const tabs = page.getByTestId("workspace-tabs-row").filter({ visible: true }).first();
     const contentBounds = await tabs.boundingBox();
 
@@ -55,6 +59,8 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
       await expect(sidebar).toBeVisible();
       await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
       await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(420);
+      await expect(surface).toHaveCSS("-webkit-app-region", "no-drag");
+      await expect.poll(async () => (await surface.boundingBox())?.width).toBe(420);
       await expect.poll(async () => (await sidebar.boundingBox())?.height).toBe(viewport.height);
       await page.mouse.move(600, y);
       await expect(sidebar).toBeHidden();
