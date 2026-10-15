@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/menu";
 import { toolbarLabelTriggerStyle } from "@/components/ui/toolbar-label-trigger";
 import { Button } from "@/components/ui/button";
+import { buttonControlHeight } from "@/components/ui/control-geometry";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { ProviderIcon } from "@/components/provider-icons";
 import { ProjectIconView } from "@/components/project-icon-view";
@@ -360,7 +361,13 @@ function filterTriggerStyle(state: MenuTriggerState) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  bar: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: theme.spacing[2] },
+  bar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minHeight: buttonControlHeight.sm,
+  },
   clearGroup: {
     flexDirection: "row",
     alignItems: "center",
