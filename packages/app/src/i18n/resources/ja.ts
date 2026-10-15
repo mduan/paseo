@@ -51,6 +51,7 @@ export const ja: TranslationResources = {
       noOptionsMatchSearch: "検索に一致するオプションがありません。",
     },
     states: {
+      renaming: "名前を変更中...",
       loading: "読み込み中...",
       starting: "起動中...",
       copied: "コピーしました",

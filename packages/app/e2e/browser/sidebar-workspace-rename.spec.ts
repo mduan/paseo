@@ -72,7 +72,12 @@ test.describe("Sidebar workspace rename", () => {
       await workspace.client.waitForFinish(first.id, 30_000);
       await workspace.client.waitForFinish(second.id, 30_000);
       const gate = await installDaemonWebSocketGate(page);
+      gate.holdNextServerMessage("fetch_workspaces_response");
       await page.goto(buildHostAgentDetailRoute(getServerId(), second.id, workspace.workspaceId));
+      const header = page.getByTestId("workspace-header-title");
+      await expect(header).toHaveText("Loading...");
+      await gate.waitForHeldServerMessage("fetch_workspaces_response");
+      gate.releaseHeldServerMessage("fetch_workspaces_response");
       await waitForWorkspaceTabsVisible(page);
       const row = page.getByTestId(workspaceRowTestId(workspace.workspaceId));
       await expect(row).toBeVisible({ timeout: 30_000 });
@@ -91,10 +96,11 @@ test.describe("Sidebar workspace rename", () => {
       });
       gate.holdNextServerMessage("metadata.conversation_title.generate.response");
       await workspaceAi.click();
-      const workspaceLoading = page.getByTestId(
-        `sidebar-workspace-title-loading-${getServerId()}:${workspace.workspaceId}`,
+      const workspaceTitle = page.getByTestId(
+        `sidebar-workspace-title-${getServerId()}:${workspace.workspaceId}`,
       );
-      await expect(workspaceLoading).toBeVisible();
+      await expect(workspaceTitle).toHaveText("Renaming...");
+      await expect(header).toHaveText("Renaming...");
       await expect(row).not.toContainText("Original workspace");
       await page.screenshot({
         path: testInfo.outputPath("workspace-ai-loading.png"),
@@ -102,7 +108,8 @@ test.describe("Sidebar workspace rename", () => {
       });
       await gate.waitForHeldServerMessage("metadata.conversation_title.generate.response");
       gate.releaseHeldServerMessage("metadata.conversation_title.generate.response");
-      await expect(workspaceLoading).toHaveCount(0);
+      await expect(workspaceTitle).toHaveText("Fix payment retries", { timeout: 30_000 });
+      await expect(header).toHaveText("Fix payment retries");
       await expect(row).toContainText("Fix payment retries", { timeout: 30_000 });
       const tab = page.getByTestId(`workspace-tab-agent_${second.id}`).first();
       await tab.click({ button: "right" });
@@ -113,7 +120,20 @@ test.describe("Sidebar workspace rename", () => {
         path: testInfo.outputPath("chat-ai-menu.png"),
         animations: "disabled",
       });
+      gate.holdNextServerMessage("metadata.conversation_title.generate.response");
       await chatAi.click();
+      const chatRow = page.getByTestId(`sidebar-workspace-session-agent:${second.id}`);
+      await expect(chatRow).toContainText("Renaming...");
+      await expect(tab).toContainText("Renaming...");
+      await expect(chatRow).not.toContainText("Loading");
+      await expect(chatRow).not.toContainText("Second chat");
+      await page.screenshot({
+        path: testInfo.outputPath("chat-ai-loading.png"),
+        animations: "disabled",
+      });
+      await gate.waitForHeldServerMessage("metadata.conversation_title.generate.response");
+      gate.releaseHeldServerMessage("metadata.conversation_title.generate.response");
+      await expect(chatRow).toContainText("Add billing checks", { timeout: 30_000 });
       await expect(tab).toContainText("Add billing checks", { timeout: 30_000 });
       await page.reload();
       await expect(row).toContainText("Fix payment retries", { timeout: 30_000 });

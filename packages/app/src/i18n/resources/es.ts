@@ -51,6 +51,7 @@ export const es: TranslationResources = {
       noOptionsMatchSearch: "Ninguna opción coincide con su búsqueda.",
     },
     states: {
+      renaming: "Cambiando nombre...",
       loading: "Cargando...",
       starting: "A partir de...",
       copied: "Copiado",

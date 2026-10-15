@@ -51,6 +51,7 @@ export const ru: TranslationResources = {
       noOptionsMatchSearch: "Нет вариантов, соответствующих вашему запросу.",
     },
     states: {
+      renaming: "Переименование...",
       loading: "Загрузка...",
       starting: "Начало...",
       copied: "Скопировано",

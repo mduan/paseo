@@ -46,6 +46,7 @@ export const en = {
       noOptionsMatchSearch: "No options match your search.",
     },
     states: {
+      renaming: "Renaming...",
       loading: "Loading...",
       starting: "Starting...",
       copied: "Copied",

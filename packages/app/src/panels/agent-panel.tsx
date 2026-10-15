@@ -328,6 +328,7 @@ function useAgentPanelDescriptor(
   target: { kind: "agent"; agentId: string },
   context: { serverId: string },
 ): PanelDescriptor {
+  const { t } = useTranslation();
   const subagents = useSubagentsForParent({
     serverId: context.serverId,
     parentAgentId: target.agentId,
@@ -355,14 +356,16 @@ function useAgentPanelDescriptor(
     id: target.agentId,
   });
   const provider = descriptorState.provider;
-  const label = resolveWorkspaceAgentTabLabel(descriptorState.title);
+  const label = aiRenamePending
+    ? t("common.states.renaming")
+    : resolveWorkspaceAgentTabLabel(descriptorState.title);
   const icon = useProviderIcon(provider, context.serverId);
 
   return {
     label: label ?? "",
     subtitle: `${formatProviderLabel(provider)} agent`,
     tooltip: label ?? `${formatProviderLabel(provider)} agent`,
-    titleState: label && !aiRenamePending ? "ready" : "loading",
+    titleState: label ? "ready" : "loading",
     icon,
     statusBucket: descriptorState.status
       ? deriveSidebarStateBucket({

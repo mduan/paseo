@@ -50,6 +50,7 @@ export const ko: TranslationResources = {
       noOptionsMatchSearch: "검색과 일치하는 옵션이 없습니다.",
     },
     states: {
+      renaming: "이름 변경 중...",
       loading: "불러오는 중...",
       starting: "시작 중...",
       copied: "복사됨",
