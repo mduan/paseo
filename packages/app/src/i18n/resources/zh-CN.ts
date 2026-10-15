@@ -1192,6 +1192,7 @@ export const zhCN: TranslationResources = {
         labels: "标签",
         diff: "差异统计",
         timestamp: "最近活动",
+        workspaceCount: "工作区数量",
       },
       checks: {
         iconAndText: "图标和文字",

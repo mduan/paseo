@@ -108,6 +108,7 @@ export interface AppSettings {
   sidebarWorkspaceTrailing: SidebarWorkspaceTrailing;
   sidebarRowItems: SidebarRowItems;
   sidebarChecksDisplay: SidebarChecksDisplay;
+  sidebarShowWorkspaceCount: boolean;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
   sidebarNavItems: SidebarNavPreference[];
   /** Sidebar footer items in display order; empty means the default order, all visible. */
@@ -176,6 +177,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarWorkspaceTrailing: "diff",
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
+  sidebarShowWorkspaceCount: true,
   sidebarNavItems: [],
   sidebarFooterItems: [],
   history: DEFAULT_HISTORY_PREFERENCES,
@@ -279,6 +281,7 @@ const StoredAppSettingsSchema = z
       .enum(["iconAndText", "icon", "none"])
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
+    sidebarShowWorkspaceCount: z.boolean().catch(true),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     history: HistoryPreferencesSchema.catch(DEFAULT_HISTORY_PREFERENCES),

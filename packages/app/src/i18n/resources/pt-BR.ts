@@ -1227,6 +1227,7 @@ export const ptBR: TranslationResources = {
         labels: "Etiquetas",
         diff: "Estatísticas de diff",
         timestamp: "Última atividade",
+        workspaceCount: "Contagem de espaços de trabalho",
       },
       checks: {
         iconAndText: "Ícone e texto",

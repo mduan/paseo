@@ -24,6 +24,8 @@ export interface SidebarDisplayPreferences {
   toggleRowItem: (item: SidebarRowItem) => void;
   checksDisplay: SidebarChecksDisplay;
   setChecksDisplay: (display: SidebarChecksDisplay) => void;
+  showWorkspaceCount: boolean;
+  toggleWorkspaceCount: () => void;
   trailing: SidebarWorkspaceTrailing;
   /** Picking the choice that is already showing clears the slot. */
   toggleTrailing: (choice: SidebarTrailingChoice) => void;
@@ -66,6 +68,7 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       sidebarWorkspaceTrailing,
       sidebarRowItems,
       sidebarChecksDisplay,
+      sidebarShowWorkspaceCount,
     },
     updateSettings,
   } = useAppSettings();
@@ -93,6 +96,10 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
     [updateSettings],
   );
 
+  const toggleWorkspaceCount = useCallback(() => {
+    void updateSettings({ sidebarShowWorkspaceCount: !sidebarShowWorkspaceCount });
+  }, [updateSettings, sidebarShowWorkspaceCount]);
+
   const toggleTrailing = useCallback(
     (choice: SidebarTrailingChoice) => {
       void updateSettings({
@@ -112,6 +119,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       toggleRowItem,
       checksDisplay: sidebarChecksDisplay,
       setChecksDisplay,
+      showWorkspaceCount: sidebarShowWorkspaceCount,
+      toggleWorkspaceCount,
       trailing: sidebarWorkspaceTrailing,
       toggleTrailing,
       hostFilters,
@@ -133,6 +142,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       toggleRowItem,
       sidebarChecksDisplay,
       setChecksDisplay,
+      sidebarShowWorkspaceCount,
+      toggleWorkspaceCount,
       sidebarWorkspaceTrailing,
       toggleTrailing,
       hostFilters,

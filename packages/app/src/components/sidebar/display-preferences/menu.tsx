@@ -21,6 +21,7 @@ import {
   GitBranch,
   GitPullRequest,
   Globe,
+  Hash,
   Server,
   Settings2,
   Tag,
@@ -65,6 +66,7 @@ const ThemedSettings2 = withUnistyles(Settings2);
 /** CI's mark: the subject of the checks row, and the shape the icon-only option leaves behind. */
 const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedCircle = withUnistyles(Circle);
+const ThemedHash = withUnistyles(Hash);
 
 /** Fits the item's 16pt leading slot with a hair of room, matching the trailing check. */
 const OPTION_ICON_SIZE = 14;
@@ -540,9 +542,8 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Two groups, split by the separator. Above it, what a row may say about a workspace — each one
- * independent. Below it, the one thing the slot to the right of the title holds, so picking the
- * one already showing empties the slot and gives the width back to the title.
+ * Three groups: workspace details, the trailing slot, and project header counts. Picking the
+ * trailing choice already showing empties the slot and gives the width back to the title.
  *
  * CI is the one item above the separator with three answers rather than two, so it opens a page
  * instead of ticking, and it goes last: a row that navigates does not belong in the middle of a
@@ -550,6 +551,10 @@ function OptionList<Value extends string>({
  */
 function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
   const { t } = useTranslation();
+  const countIcon = useMemo(
+    () => <ThemedHash size={OPTION_ICON_SIZE} uniProps={mutedIconMapping} />,
+    [],
+  );
   return (
     <>
       {SIDEBAR_ROW_ITEMS.map((item) => (
@@ -578,6 +583,16 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
           testID={`sidebar-workspace-trailing-${choice}`}
         />
       ))}
+      <MenuSeparator />
+      <MenuItem
+        leading={countIcon}
+        selected={preferences.showWorkspaceCount}
+        closeOnSelect={false}
+        onSelect={preferences.toggleWorkspaceCount}
+        testID="sidebar-show-workspace-count"
+      >
+        {t("sidebar.display.show.workspaceCount")}
+      </MenuItem>
     </>
   );
 }

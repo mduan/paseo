@@ -1208,6 +1208,7 @@ export const en = {
         labels: "Labels",
         diff: "Diff stats",
         timestamp: "Last activity",
+        workspaceCount: "Workspace count",
       },
       checks: {
         iconAndText: "Icon and text",

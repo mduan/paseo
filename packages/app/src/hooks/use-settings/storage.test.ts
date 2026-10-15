@@ -780,6 +780,19 @@ describe("saveAppSettings", () => {
     expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems).toEqual(sidebarRowItems);
   });
 
+  it("shows workspace counts by default and persists toggling them off and on", async () => {
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+
+    expect((await loadAppSettingsFromStorage(deps)).sidebarShowWorkspaceCount).toBe(true);
+
+    await saveAppSettings({ queryClient, updates: { sidebarShowWorkspaceCount: false }, deps });
+    expect((await loadAppSettingsFromStorage(deps)).sidebarShowWorkspaceCount).toBe(false);
+
+    await saveAppSettings({ queryClient, updates: { sidebarShowWorkspaceCount: true }, deps });
+    expect((await loadAppSettingsFromStorage(deps)).sidebarShowWorkspaceCount).toBe(true);
+  });
+
   it.each(Object.values(HistoryField))(
     "persists the History %s field being switched off",
     async (field) => {

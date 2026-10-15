@@ -1213,6 +1213,7 @@ export const ja: TranslationResources = {
         labels: "ラベル",
         diff: "差分統計",
         timestamp: "最終アクティビティ",
+        workspaceCount: "ワークスペース数",
       },
       checks: {
         iconAndText: "アイコンとテキスト",
