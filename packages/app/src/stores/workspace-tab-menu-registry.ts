@@ -1,21 +1,53 @@
 import { create } from "zustand";
 import type { WorkspaceTabMenuEntry } from "@/screens/workspace/workspace-tab-menu";
+import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
+
+type PendingSelection = Pick<WorkspaceTabDescriptor, "tabId"> & {
+  workspaceKey: string;
+  entryKey: string;
+};
 
 export type WorkspaceTabMenuBuilder = (tabId: string) => WorkspaceTabMenuEntry[] | null;
 
 /**
- * Tab menu actions (close with confirmation, rename modal, bulk close) live in a mounted
- * WorkspaceScreen. It publishes them here, keyed by layout persistence key, so the sidebar's
- * nested session rows can offer the same menu.
+ * Tab actions need the workspace's dialogs and close policies. The sidebar can show its menu
+ * before that screen mounts; selecting an action opens the workspace and waits for its builder.
  */
 export const useWorkspaceTabMenuRegistry = create<{
   builders: Record<string, WorkspaceTabMenuBuilder>;
+  pendingSelection?: PendingSelection;
 }>(() => ({ builders: {} }));
+
+export function selectWorkspaceTabMenuEntry({
+  serverId,
+  workspaceId,
+  tab,
+  entryKey,
+}: {
+  serverId: string;
+  workspaceId: string;
+  tab: WorkspaceTabDescriptor;
+  entryKey: string;
+}) {
+  useWorkspaceTabMenuRegistry.setState({
+    pendingSelection: { workspaceKey: `${serverId}:${workspaceId}`, tabId: tab.tabId, entryKey },
+  });
+  navigateToWorkspace({ serverId, workspaceId, target: tab.target });
+}
 
 export function registerWorkspaceTabMenuBuilder(key: string, builder: WorkspaceTabMenuBuilder) {
   useWorkspaceTabMenuRegistry.setState((state) => ({
     builders: { ...state.builders, [key]: builder },
   }));
+  const pending = useWorkspaceTabMenuRegistry.getState().pendingSelection;
+  if (pending?.workspaceKey === key) {
+    const entry = builder(pending.tabId)?.find((item) => item.key === pending.entryKey);
+    if (entry?.kind === "item") {
+      useWorkspaceTabMenuRegistry.setState({ pendingSelection: undefined });
+      entry.onSelect();
+    }
+  }
   return () => {
     useWorkspaceTabMenuRegistry.setState((state) => {
       if (state.builders[key] !== builder) return state;

@@ -1,3 +1,5 @@
+import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
+import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import {
   createContext,
   memo,
@@ -27,9 +29,17 @@ import {
   sidebarKebabTriggerStyle,
 } from "@/components/sidebar/sidebar-workspace-menu";
 import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
-import type { WorkspaceTabMenuEntry } from "@/screens/workspace/workspace-tab-menu";
+import {
+  buildWorkspaceTabMenuEntries,
+  type WorkspaceTabMenuEntry,
+} from "@/screens/workspace/workspace-tab-menu";
+import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { buildDeterministicWorkspaceTabId } from "@/workspace-tabs/identity";
 import { useWorkspaceTabMenuItemAdornments } from "@/screens/workspace/workspace-tab-menu-item";
-import { useWorkspaceTabMenuRegistry } from "@/stores/workspace-tab-menu-registry";
+import {
+  selectWorkspaceTabMenuEntry,
+  useWorkspaceTabMenuRegistry,
+} from "@/stores/workspace-tab-menu-registry";
 import { workspaceTerminalsPushRoute } from "@/data/push-router";
 import { useReplicaQuery } from "@/data/query";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -50,8 +60,15 @@ import {
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
-import { collectAllTabs, findPaneById } from "@/stores/workspace-layout-actions";
-import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import {
+  collectAllTabs,
+  findPaneById,
+  findPaneContainingTab,
+} from "@/stores/workspace-layout-actions";
+import {
+  selectExplorerSidebarPaneId,
+  useWorkspaceLayoutStore,
+} from "@/stores/workspace-layout-store";
 import { isWorkspaceRootAgent } from "@/subagents/policies";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getAgentActivityAt } from "@/utils/workspace-agent-activity";
@@ -235,10 +252,10 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   selected: boolean;
 }) {
   const { t } = useTranslation();
-  const tab = useMemo(
+  const tab = useMemo<WorkspaceTabDescriptor>(
     () => ({
       key: row.key,
-      tabId: row.tabId ?? row.key,
+      tabId: row.tabId ?? buildDeterministicWorkspaceTabId(row.target),
       kind: row.target.kind,
       target: row.target,
     }),
@@ -267,11 +284,7 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
   const isCompact = useIsCompactFormFactor();
   const layoutKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId }) ?? "";
-  // Only a mounted workspace screen can run the tab actions, so unvisited workspaces get no menu.
-  const hasMenu = useWorkspaceTabMenuRegistry((state) =>
-    Boolean(row.tabId && state.builders[layoutKey]),
-  );
-  const kebab = useOpenKebabMenuVisibility(hasMenu && (isHovered || isNative || isCompact));
+  const kebab = useOpenKebabMenuVisibility(isHovered || isNative || isCompact);
 
   const content = (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
@@ -280,7 +293,6 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
           row={row}
           serverId={serverId}
           presentation={presentation}
-          hasMenu={hasMenu}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
@@ -310,10 +322,12 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                       ? t("workspace.tabs.loading")
                       : presentation.label}
                   </Text>
-                  {kebab.showKebab && row.tabId ? (
+                  {kebab.showKebab ? (
                     <WorkspaceSessionKebab
                       layoutKey={layoutKey}
-                      tabId={row.tabId}
+                      tab={tab}
+                      serverId={serverId}
+                      workspaceId={workspaceId}
                       label={presentation.label}
                     />
                   ) : null}
@@ -346,7 +360,6 @@ function SessionRowHoverTarget({
   row,
   serverId,
   presentation,
-  hasMenu,
   onPointerEnter,
   onPointerLeave,
   children,
@@ -354,7 +367,6 @@ function SessionRowHoverTarget({
   row: WorkspaceSessionRow;
   serverId: string;
   presentation: WorkspaceTabPresentation;
-  hasMenu: boolean;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   children: ReactElement;
@@ -363,7 +375,6 @@ function SessionRowHoverTarget({
   return (
     <ContextMenuTrigger
       contextOnly
-      enabled={hasMenu}
       enabledOnMobile={false}
       style={styles.hoverTarget}
       onPointerEnter={onPointerEnter}
@@ -399,17 +410,61 @@ function SessionRowHoverTarget({
 
 function WorkspaceSessionKebab({
   layoutKey,
-  tabId,
+  tab,
+  serverId,
+  workspaceId,
   label,
 }: {
   layoutKey: string;
-  tabId: string;
+  tab: WorkspaceTabDescriptor;
+  serverId: string;
+  workspaceId: string;
   label: string;
 }) {
   const { open } = useContextMenu();
+  const { tabId } = tab;
   const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
-  // Built on open so the entries reflect the pane's tabs at that moment.
-  const entries = useMemo(() => (open ? (builder?.(tabId) ?? []) : []), [builder, open, tabId]);
+  const layout = useWorkspaceLayoutStore((state) => state.layoutByWorkspace[layoutKey]);
+  const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
+  let entries: WorkspaceTabMenuEntry[] = [];
+  if (open) {
+    const layoutState = useWorkspaceLayoutStore.getState();
+    const pane = layout && findPaneContainingTab(layout.root, tabId);
+    const tabIds = pane?.tabIds ?? [tabId];
+    const select = (entryKey: string) =>
+      selectWorkspaceTabMenuEntry({ serverId, workspaceId, tab, entryKey });
+    entries =
+      builder?.(tabId) ??
+      buildWorkspaceTabMenuEntries({
+        surface: "desktop",
+        tab,
+        index: tabIds.indexOf(tabId),
+        tabCount: tabIds.length,
+        menuTestIDBase: `workspace-tab-context-${tabId}`,
+        onCopyResumeCommand: () => select("copy-resume-command"),
+        onCopyAgentId: () => select("copy-agent-id"),
+        onCopyTerminalId: () => select("copy-terminal-id"),
+        onCopyFilePath: () => select("copy-file-path"),
+        onRevealFileInExplorer: () => select("reveal-in-explorer"),
+        onReloadAgent: () => select("reload-agent"),
+        onRenameTab: () => select("rename"),
+        onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        renameWithAiPending: aiRename.isPending,
+        onCloseTab: () => select("close"),
+        onCloseTabsBefore: () => select("close-before"),
+        onCloseTabsAfter: () => select("close-after"),
+        onCloseOtherTabs: () => select("close-others"),
+        paneMoves: layout
+          ? {
+              root: layout.root,
+              explorerSidebarPaneId: selectExplorerSidebarPaneId(layoutState, layoutKey),
+              workspaceKey: layoutKey,
+              moveTabToPane: layoutState.moveTabToPane,
+              splitPane: layoutState.splitPane,
+            }
+          : undefined,
+      });
+  }
   return (
     <>
       <DropdownMenuTrigger

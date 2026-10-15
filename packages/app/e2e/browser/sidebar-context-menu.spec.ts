@@ -24,19 +24,32 @@ test.describe("Sidebar context menus", () => {
     });
 
     try {
-      await openAgentRoute(page, workspace);
+      await gotoAppShell(page);
       const row = page
         .getByTestId(`sidebar-workspace-session-agent:${workspace.agentId}`)
         .filter({ visible: true });
       await expect(row).toBeVisible();
       await expect(row.getByText("Hello from the sidebar preview", { exact: true })).toBeVisible();
       const menu = page.getByTestId(`sidebar-workspace-session-menu-agent_${workspace.agentId}`);
+      const initialUrl = page.url();
+
+      await row.click({ button: "right", position: { x: 2, y: 2 } });
+      await expect(menu).toBeVisible();
+      await expect(page).toHaveURL(initialUrl);
+      await menu.getByRole("menuitem", { name: "Rename", exact: true }).click();
+      const renameModal = page.getByTestId(`workspace-tab-rename-modal-agent-${workspace.agentId}`);
+      await expect(renameModal).toBeVisible();
+      await renameModal.getByRole("button", { name: "Cancel", exact: true }).click();
+
+      await openAgentRoute(page, workspace);
 
       await row.hover();
       await row.getByTestId(`sidebar-workspace-session-kebab-agent_${workspace.agentId}`).click();
       await expect(menu).toBeVisible();
       const overflowActions = await menu.getByRole("menuitem").allTextContents();
       await page.keyboard.press("Escape");
+      await page.goto(initialUrl);
+      await expect(row).toBeVisible();
 
       for (const target of [
         row.getByText("Sidebar tab actions", { exact: true }),
