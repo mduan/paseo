@@ -113,7 +113,23 @@ test.describe("Sidebar workspace rename", () => {
         path: testInfo.outputPath("chat-ai-menu.png"),
         animations: "disabled",
       });
+      gate.holdNextServerMessage("metadata.conversation_title.generate.response");
       await chatAi.click();
+      const chatRow = page.getByTestId(`sidebar-workspace-session-agent:${second.id}`);
+      const chatLoading = page.getByTestId(
+        `sidebar-workspace-session-title-loading-agent:${second.id}`,
+      );
+      await expect(chatLoading).toBeVisible();
+      await expect(chatRow).not.toContainText("Loading");
+      await expect(chatRow).not.toContainText("Second chat");
+      await page.screenshot({
+        path: testInfo.outputPath("chat-ai-loading.png"),
+        animations: "disabled",
+      });
+      await gate.waitForHeldServerMessage("metadata.conversation_title.generate.response");
+      gate.releaseHeldServerMessage("metadata.conversation_title.generate.response");
+      await expect(chatLoading).toHaveCount(0);
+      await expect(chatRow).toContainText("Add billing checks", { timeout: 30_000 });
       await expect(tab).toContainText("Add billing checks", { timeout: 30_000 });
       await page.reload();
       await expect(row).toContainText("Fix payment retries", { timeout: 30_000 });
