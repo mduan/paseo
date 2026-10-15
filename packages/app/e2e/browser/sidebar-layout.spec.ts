@@ -132,6 +132,11 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
     await expect(sidebar).toBeHidden();
 
+    await page.mouse.move(2, 300);
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(-10, 300);
+    await expect(sidebar).toBeHidden();
+
     await test.step("the edge and revealed controls sit above embedded pages", async () => {
       await page.evaluate(() => {
         const frame = document.createElement("iframe");
@@ -256,6 +261,22 @@ test("a hover-revealed sidebar stays open after its menu closes under the pointe
             .click({ position: { x: 100, y: 100 } });
         }
         await expect(copyPath).toBeHidden();
+        // Replay Electron's pointerout with no related target when a menu closes inside the window.
+        await sidebar.evaluate((element) => {
+          const { left, top, width, height } = element.getBoundingClientRect();
+          const clientX = left + width / 2;
+          const clientY = top + height / 2;
+          const target = document.elementFromPoint(clientX, clientY);
+          if (!target) throw new Error("Sidebar pointer target is missing");
+          target.dispatchEvent(
+            new PointerEvent("pointerout", {
+              bubbles: true,
+              relatedTarget: null,
+              clientX,
+              clientY,
+            }),
+          );
+        });
         await page.waitForTimeout(250);
         await expect(sidebar).toBeVisible();
       }

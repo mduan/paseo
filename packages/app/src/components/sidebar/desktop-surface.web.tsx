@@ -61,15 +61,6 @@ export function DesktopSidebarSurface({
     function dismissOutside(event: MouseEvent) {
       pointerRef.current = event;
       if (event.buttons || hoverHolds) return;
-      // A menu backdrop can cover the sidebar without the pointer leaving it.
-      const bounds = host.getBoundingClientRect();
-      if (
-        event.clientX >= bounds.left &&
-        event.clientX < bounds.right &&
-        event.clientY >= bounds.top &&
-        event.clientY < bounds.bottom
-      )
-        return;
       const target = document.elementFromPoint(event.clientX, event.clientY);
       const insideSurface =
         target instanceof Node && (host.contains(target) || isTargetInWebOverlay(target));
