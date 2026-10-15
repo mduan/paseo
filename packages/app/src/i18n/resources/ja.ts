@@ -321,7 +321,7 @@ export const ja: TranslationResources = {
       allProviders: "すべてのプロバイダー",
       allModels: "すべてのモデル",
       clear: "フィルターをクリア",
-      updateHost: "履歴を絞り込むには選択したホストを更新してください",
+      updateHost: "履歴を絞り込むには、選択したホスト上のデーモンを更新してください。",
       unknownModel: "不明なモデル",
       costUnavailable: "費用は不明",
       estimatedCost: "推定費用: {{cost}}",

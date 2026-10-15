@@ -316,7 +316,7 @@ export const zhCN: TranslationResources = {
       allProviders: "所有提供商",
       allModels: "所有模型",
       clear: "清除筛选",
-      updateHost: "请更新所选主机以筛选历史记录",
+      updateHost: "请更新所选主机上的 daemon 以筛选历史记录。",
       unknownModel: "未知模型",
       costUnavailable: "费用不可用",
       estimatedCost: "估算费用：{{cost}}",

@@ -321,7 +321,7 @@ export const ru: TranslationResources = {
       allProviders: "Все провайдеры",
       allModels: "Все модели",
       clear: "Сбросить фильтры",
-      updateHost: "Обновите выбранные хосты для фильтрации истории",
+      updateHost: "Обновите демоны на выбранных хостах для фильтрации истории.",
       unknownModel: "Неизвестная модель",
       costUnavailable: "Стоимость недоступна",
       estimatedCost: "Примерная стоимость: {{cost}}",

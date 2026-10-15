@@ -322,7 +322,7 @@ export const es: TranslationResources = {
       allProviders: "Todos los proveedores",
       allModels: "Todos los modelos",
       clear: "Borrar filtros",
-      updateHost: "Actualiza los hosts seleccionados para filtrar el historial",
+      updateHost: "Actualiza los daemons de los hosts seleccionados para filtrar el historial.",
       unknownModel: "Modelo desconocido",
       costUnavailable: "Costo no disponible",
       estimatedCost: "Costo estimado: {{cost}}",

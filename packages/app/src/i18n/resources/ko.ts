@@ -317,7 +317,7 @@ export const ko: TranslationResources = {
       allProviders: "모든 제공업체",
       allModels: "모든 모델",
       clear: "필터 지우기",
-      updateHost: "기록을 필터링하려면 선택한 호스트를 업데이트하세요",
+      updateHost: "기록을 필터링하려면 선택한 호스트의 데몬을 업데이트하세요.",
       unknownModel: "알 수 없는 모델",
       costUnavailable: "비용 정보 없음",
       estimatedCost: "예상 비용: {{cost}}",

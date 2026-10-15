@@ -321,7 +321,7 @@ export const ptBR: TranslationResources = {
       allProviders: "Todos os provedores",
       allModels: "Todos os modelos",
       clear: "Limpar filtros",
-      updateHost: "Atualize os hosts selecionados para filtrar o histórico",
+      updateHost: "Atualize os daemons nos hosts selecionados para filtrar o histórico.",
       unknownModel: "Modelo desconhecido",
       costUnavailable: "Custo indisponível",
       estimatedCost: "Custo estimado: {{cost}}",

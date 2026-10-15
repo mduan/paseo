@@ -316,7 +316,7 @@ export const ar: TranslationResources = {
       allProviders: "جميع المزوّدين",
       allModels: "جميع النماذج",
       clear: "مسح عوامل التصفية",
-      updateHost: "حدّث المضيفين المحددين لتصفية السجل",
+      updateHost: "حدّث برامج Daemon على المضيفين المحددين لتصفية السجل.",
       unknownModel: "نموذج غير معروف",
       costUnavailable: "التكلفة غير متاحة",
       estimatedCost: "التكلفة التقديرية: {{cost}}",
