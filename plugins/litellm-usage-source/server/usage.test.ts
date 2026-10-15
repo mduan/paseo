@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { inputSchema } from "../shared/input.js";
 import { AuthMode, configPath, readConfig } from "./config.js";
 import { discover, fetchUsage } from "./usage.js";
 
@@ -148,6 +149,27 @@ describe("LiteLLM usage source", () => {
     expect(all[0]?.key).not.toBe(all[1]?.key);
     await writeConfig({ teamId: "team-2" });
     expect(await discover({ path, fetchApi })).toEqual([all[1]]);
+  });
+
+  it("keeps a discovered card on its team until rediscovery after config changes", async () => {
+    const fetchApi = api({
+      "/user/info": { ...user, teams: [...user.teams, { team_id: "team-2", team_alias: "Other" }] },
+      "/team/info?team_id=team-2": {
+        team_memberships: [{ ...membership, team_id: "team-2", spend: 90 }],
+      },
+    });
+    await writeConfig({ teamId: "team-1" });
+    const original = inputSchema.parse((await discover({ path, fetchApi }))[0]?.input);
+    await writeConfig({ teamId: "team-2" });
+    expect(await fetchUsage(original, { fetchApi })).toMatchObject({
+      status: "available",
+      balances: [{ id: "team_member", used: 16.17 }],
+    });
+    const updated = inputSchema.parse((await discover({ path, fetchApi }))[0]?.input);
+    expect(await fetchUsage(updated, { fetchApi })).toMatchObject({
+      status: "available",
+      balances: [{ id: "team_member", used: 90 }],
+    });
   });
 
   it("shows personal and key limits separately, including an exhausted zero budget", async () => {

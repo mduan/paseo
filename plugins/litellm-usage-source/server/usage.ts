@@ -124,7 +124,7 @@ export async function fetchUsage(
   try {
     const user = userSchema.parse(await get("/user/info"));
     const balances: UsageBalance[] = [];
-    const teamId = config.teamId ?? input.teamId;
+    const teamId = input.teamId;
     if (teamId) {
       const team = teamResponseSchema.parse(
         await get(`/team/info?${new URLSearchParams({ team_id: teamId })}`),
