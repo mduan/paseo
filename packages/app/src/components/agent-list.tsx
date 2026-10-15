@@ -314,34 +314,26 @@ function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
   const estimated = usage?.totalCostEstimated || usage?.paseoSubagentCostEstimated;
 
   return (
-    <View style={[styles.metaItem, styles.modelSummary]}>
-      <View style={styles.metaItem}>
-        <ProviderIcon
-          provider={agent.provider}
-          serverId={agent.serverId}
-          size={14}
-          uniProps={mutedIconMapping}
-        />
-        <Text style={styles.sessionMetaText} numberOfLines={1}>
-          {agent.model ?? t("sessions.filters.unknownModel")}
+    <View style={styles.metaItem}>
+      <ProviderIcon
+        provider={agent.provider}
+        serverId={agent.serverId}
+        size={14}
+        uniProps={mutedIconMapping}
+      />
+      <Text style={styles.sessionMetaText}>
+        {agent.model ?? t("sessions.filters.unknownModel")}
+        {agent.thinkingOptionId
+          ? ` · ${formatThinkingOptionLabel({ id: agent.thinkingOptionId })}`
+          : undefined}
+        {" · "}
+        <Text
+          accessibilityLabel={
+            estimated && cost ? t("sessions.filters.estimatedCost", { cost }) : undefined
+          }
+        >
+          {cost ? `${estimated ? "~" : ""}${cost}` : t("sessions.filters.costUnavailable")}
         </Text>
-      </View>
-      {agent.thinkingOptionId ? (
-        <>
-          <Text style={styles.sessionMetaSeparator}>·</Text>
-          <Text style={styles.sessionMetaText}>
-            {formatThinkingOptionLabel({ id: agent.thinkingOptionId })}
-          </Text>
-        </>
-      ) : null}
-      <Text style={styles.sessionMetaSeparator}>·</Text>
-      <Text
-        style={styles.sessionMetaText}
-        accessibilityLabel={
-          estimated && cost ? t("sessions.filters.estimatedCost", { cost }) : undefined
-        }
-      >
-        {cost ? `${estimated ? "~" : ""}${cost}` : t("sessions.filters.costUnavailable")}
       </Text>
     </View>
   );
@@ -658,9 +650,6 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1.5],
     maxWidth: "100%",
     flexShrink: 1,
-  },
-  modelSummary: {
-    gap: 3,
   },
   rowEnd: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2], flexShrink: 0 },
   activityTime: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
