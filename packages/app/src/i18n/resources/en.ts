@@ -313,7 +313,7 @@ export const en = {
       allProviders: "All providers",
       allModels: "All models",
       clear: "Clear filters",
-      updateHost: "Update the selected hosts to filter history",
+      updateHost: "Update the daemons on the selected hosts to filter history.",
       unknownModel: "Unknown model",
       costUnavailable: "Cost unavailable",
       estimatedCost: "Estimated cost: {{cost}}",
