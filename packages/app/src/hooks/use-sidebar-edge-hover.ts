@@ -3,8 +3,9 @@ import type { PointerEvent as RNPointerEvent } from "react-native";
 import { isWeb } from "@/constants/platform";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { hasActiveWebOverlay } from "@/lib/overlay-root";
+import { MIN_SIDEBAR_WIDTH } from "@/stores/panel-store";
 
-export const SIDEBAR_EDGE_WIDTH = 8;
+export const SIDEBAR_EDGE_WIDTH = MIN_SIDEBAR_WIDTH / 4;
 
 export function useSidebarEdgeHover({ enabled }: { enabled: boolean }) {
   const finePointer = useHasFinePointer();

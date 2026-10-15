@@ -1039,7 +1039,7 @@ export default function RootLayout() {
 const layoutStyles = StyleSheet.create((theme) => ({
   sidebarEdgeTrigger: {
     position: "absolute",
-    top: 0,
+    top: HEADER_INNER_HEIGHT,
     bottom: 0,
     left: 0,
     width: SIDEBAR_EDGE_WIDTH,

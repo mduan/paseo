@@ -23,8 +23,9 @@ async function dragSidebarTo(page: Page, width: number) {
   await page.mouse.move(startX - 10, y);
   await page.mouse.move(startX - 20, y);
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  await page.mouse.move(startX + width - sidebarBounds.width - 20, y, { steps: 15 });
-  await page.mouse.up();
+  const x = startX + width - sidebarBounds.width - 20;
+  await page.mouse.move(x, y, { steps: 15 });
+  return { x, y };
 }
 
 test("a collapsed sidebar slides over content and dismisses when the mouse leaves", async ({
@@ -42,7 +43,9 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
     const tabs = page.getByTestId("workspace-tabs-row").filter({ visible: true }).first();
     const contentBounds = await tabs.boundingBox();
 
-    await page.mouse.move(2, 300);
+    await page.mouse.move(51, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(49, 300);
     await expect(sidebar).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
     expect(
@@ -124,7 +127,7 @@ test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
   }
 });
 
-test("dragging below the minimum collapses the sidebar and preserves its saved width", async ({
+test("dragging below half the minimum collapses immediately and preserves the saved width", async ({
   page,
 }) => {
   const workspace = await seedWorkspace({ repoPrefix: "sidebar-collapse-" });
@@ -134,8 +137,23 @@ test("dragging below the minimum collapses the sidebar and preserves its saved w
     const sidebar = page.getByTestId("left-sidebar");
 
     await dragSidebarTo(page, 240);
+    await page.mouse.up();
     await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
     await dragSidebarTo(page, 190);
+    await expect(sidebar).toBeVisible();
+    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(200);
+    await page.mouse.up();
+    await expect(sidebar).toBeVisible();
+
+    await dragSidebarTo(page, 240);
+    await page.mouse.up();
+    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
+    const boundary = await dragSidebarTo(page, 100);
+    await expect(sidebar).toBeVisible();
+    await page.mouse.move(boundary.x - 1, boundary.y);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(400, boundary.y);
+    await page.mouse.up();
     await expect(sidebar).toBeHidden();
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("panel-state")))
@@ -145,7 +163,9 @@ test("dragging below the minimum collapses the sidebar and preserves its saved w
     await expect(sidebar).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
     expect((await sidebar.boundingBox())?.width).toBe(240);
-    await dragSidebarTo(page, 190);
+    await dragSidebarTo(page, 90);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.up();
     await expect(sidebar).toBeHidden();
 
     await page.mouse.move(600, 300);
@@ -153,6 +173,7 @@ test("dragging below the minimum collapses the sidebar and preserves its saved w
     await expect(sidebar).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
     await dragSidebarTo(page, 200);
+    await page.mouse.up();
     await expect(sidebar).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(200);
   } finally {

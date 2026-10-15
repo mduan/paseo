@@ -671,6 +671,7 @@ function DesktopSidebar({
 
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
+  const resizeCollapsed = useSharedValue(false);
   const revealProgress = useSharedValue(0);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
@@ -699,22 +700,26 @@ function DesktopSidebar({
         .onStart((event) => {
           startWidthRef.current = visibleSidebarWidth - event.absoluteX;
           resizeWidth.value = visibleSidebarWidth;
+          resizeCollapsed.value = false;
         })
         .onUpdate((event) => {
+          if (resizeCollapsed.value) return;
           const newWidth = startWidthRef.current + event.absoluteX;
+          if (newWidth < MIN_SIDEBAR_WIDTH / 2) {
+            resizeCollapsed.value = true;
+            resizeWidth.value = visibleSidebarWidth;
+            runOnJS(onCollapse)();
+            return;
+          }
           resizeWidth.value = resolveDesktopSidebarWidth({
             requestedWidth: newWidth,
             viewportWidth,
           });
         })
         .onEnd((event) => {
+          if (resizeCollapsed.value) return;
           const requestedWidth = startWidthRef.current + event.absoluteX;
-          if (requestedWidth < MIN_SIDEBAR_WIDTH) {
-            runOnJS(onCollapse)();
-            resizeWidth.value = visibleSidebarWidth;
-          } else {
-            runOnJS(setSidebarWidth)(resolveDesktopSidebarWidth({ requestedWidth, viewportWidth }));
-          }
+          runOnJS(setSidebarWidth)(resolveDesktopSidebarWidth({ requestedWidth, viewportWidth }));
         })
         .onFinalize(() => {
           scheduleOnRN(hideResizeGrip);
@@ -722,6 +727,7 @@ function DesktopSidebar({
     [
       hideResizeGrip,
       onCollapse,
+      resizeCollapsed,
       resizeWidth,
       setSidebarWidth,
       showResizeGrip,
