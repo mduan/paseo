@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { openSessions } from "../support/helpers/archive-tab";
@@ -38,6 +38,19 @@ async function expectChronologicalTitles(page: Page, titles: string[]): Promise<
   for (const [index, title] of titles.entries()) {
     await expect(rows.nth(index)).toContainText(title, { timeout: 30_000 });
   }
+}
+
+async function expectArchivedMetadata(row: Locator): Promise<void> {
+  const label = row.getByText("Archived", { exact: true });
+  const badge = label.locator("..");
+  const metadata = badge.locator("..");
+  const turns = metadata.getByText("0 turns", { exact: false });
+  await expect(turns).toBeVisible();
+  expect(
+    await badge.evaluate((element) => element === element.parentElement?.lastElementChild),
+  ).toBe(true);
+  const fontSize = await turns.evaluate((element) => getComputedStyle(element).fontSize);
+  await expect(label).toHaveCSS("font-size", fontSize);
 }
 
 // Searching across hosts merges each host's chronological matching sessions.
@@ -142,6 +155,11 @@ test.describe("History search across hosts", () => {
       await openSessions(page);
       await search(page, NONCE);
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
+      const archivedRow = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: archivedTitle });
+      await expectArchivedMetadata(archivedRow);
       const activeRow = page
         .getByRole("button")
         .and(page.getByTestId(/^agent-row-/))
@@ -241,6 +259,7 @@ test.describe("History search across hosts", () => {
         .click({ position: { x: 16, y: 16 } });
       await expect(page.getByTestId("sessions-filters-sheet-content")).not.toBeVisible();
       await expectChronologicalTitles(page, [archivedTitle]);
+      await expectArchivedMetadata(archivedRow);
       await page.getByTestId("sessions-display-trigger").click();
       await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
         "aria-checked",
@@ -250,10 +269,6 @@ test.describe("History search across hosts", () => {
       await page
         .getByRole("button", { name: "Bottom sheet backdrop" })
         .click({ position: { x: 16, y: 16 } });
-      const archivedRow = page
-        .getByRole("button")
-        .and(page.getByTestId(/^agent-row-/))
-        .filter({ hasText: archivedTitle });
       await expect(archivedRow.getByText("Archived", { exact: true })).toHaveCount(0);
       await reloadPreservingHostRegistry(page);
       await expectChronologicalTitles(page, [archivedTitle]);

@@ -115,38 +115,27 @@ function formatDateSectionLabel(t: TFunction, section: DateSectionKey): string {
 
 function SessionBadge({
   label,
-  icon,
   tone = "neutral",
 }: {
   label: string;
-  icon?: ReactElement;
   tone?: "neutral" | "warning" | "danger";
 }) {
   let variant: StatusBadgeVariant = "muted";
   if (tone === "warning") variant = "warning";
   else if (tone === "danger") variant = "error";
-  return <StatusBadge label={label} variant={variant} leading={icon} />;
+  return <StatusBadge label={label} variant={variant} />;
 }
 
 function SessionRowBadges({
-  agent,
-  archivedIcon,
   pendingPermissionCount,
   showAttention,
-  showStatus,
 }: {
-  agent: AggregatedAgent;
-  archivedIcon: ReactElement;
   pendingPermissionCount: number;
   showAttention: boolean;
-  showStatus: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <>
-      {showStatus && agent.archivedAt ? (
-        <SessionBadge label={t("agentList.badges.archived")} icon={archivedIcon} />
-      ) : null}
       {pendingPermissionCount > 0 ? (
         <SessionBadge
           label={t("agentList.badges.pending", { count: pendingPermissionCount })}
@@ -223,11 +212,8 @@ function SessionRow({
           />
           <View style={styles.rowEnd}>
             <SessionRowBadges
-              agent={agent}
-              archivedIcon={archivedIcon}
               pendingPermissionCount={pendingPermissionCount}
               showAttention={showAttention}
-              showStatus={fields.status}
             />
             {fields.lastActivity ? <AgentActivityTime date={agent.lastActivityAt} /> : null}
           </View>
@@ -235,6 +221,9 @@ function SessionRow({
         <View style={styles.rowMetaRow}>
           <SessionRowContext agent={agent} fields={fields} search={search} />
           <SessionRowModel agent={agent} fields={fields} />
+          {fields.status && agent.archivedAt ? (
+            <StatusBadge label={t("agentList.badges.archived")} leading={archivedIcon} size="xs" />
+          ) : null}
         </View>
       </View>
     </Pressable>
