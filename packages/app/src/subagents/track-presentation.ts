@@ -50,9 +50,13 @@ export function buildSubagentRowPresentationData(row: SubagentRow): SubagentRowP
 }
 
 export function formatProviderSubagentMeta(
-  descriptor?: Pick<ProviderSubagentDescriptorPayload, "turnCount" | "subtitle"> | null,
+  descriptor?: Pick<
+    ProviderSubagentDescriptorPayload,
+    "turnCount" | "subtitle" | "subtitleParts"
+  > | null,
 ): string {
-  return [formatTurnCount(descriptor?.turnCount), descriptor?.subtitle?.trim()]
+  const context = descriptor?.subtitleParts?.context ?? descriptor?.subtitle?.trim();
+  return [context, formatTurnCount(descriptor?.turnCount), descriptor?.subtitleParts?.usage]
     .filter(Boolean)
     .join(" · ");
 }

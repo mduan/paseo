@@ -99,7 +99,7 @@ export function observeReplayWorkflows(input: {
       observations.push({
         kind: "subtitle",
         id,
-        subtitle,
+        ...subtitle,
         ...(finishedAt ? { timestamp: finishedAt } : {}),
       });
     }

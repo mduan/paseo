@@ -34,6 +34,19 @@ describe("ProviderSubagentStore", () => {
     expect(store.get("parent", "child")?.turnCount).toBeUndefined();
   });
 
+  test("preserves the context and usage split through status updates", () => {
+    const store = new ProviderSubagentStore();
+    const subtitleParts = { context: "Explore · Haiku 4.5", usage: "24.4k tokens · ~$0.03" };
+    store.apply("parent", "claude", {
+      type: "upsert",
+      id: "child",
+      subtitle: "Explore · Haiku 4.5 · 24.4k tokens · ~$0.03",
+      subtitleParts,
+    });
+    store.apply("parent", "claude", { type: "upsert", id: "child", status: "completed" });
+    expect(store.list("parent")[0]?.subtitleParts).toEqual(subtitleParts);
+  });
+
   test("keeps provider children and their timelines scoped to the parent agent", () => {
     const subagents = new ProviderSubagentStore();
 

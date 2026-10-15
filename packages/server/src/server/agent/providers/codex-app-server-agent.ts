@@ -58,7 +58,10 @@ import { type CodexPriceList, type CodexPrices, getSharedCodexPriceList } from "
 import { CodexRolloutCost } from "./codex/rollout-cost.js";
 import { rollupProviderSubagentCosts } from "../provider-subagents/cost.js";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
-import { formatSubagentCosts } from "../provider-subagents/subtitle-format.js";
+import {
+  buildSubagentSubtitle,
+  formatSubagentCosts,
+} from "../provider-subagents/subtitle-format.js";
 import {
   mapCodexToolCallEnvelope,
   mapCodexToolCallFromThreadItem,
@@ -6395,20 +6398,22 @@ export class CodexAppServerAgentSession implements AgentSession {
     // A provider subtitle replaces the row's agent type, so it leads with it.
     const callId = this.subAgentCallIdByChildThreadId.get(threadId);
     const detail = callId ? this.subAgentCallsByCallId.get(callId)?.toolCall.detail : undefined;
-    const subtitle = [
-      detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
-      usage.model,
-      formatSubagentTokens(usage.tokens),
-      ...formatSubagentCosts({ ownCostUsd: usage.costUsd, subagentCostUsd }),
-    ]
-      .filter((part): part is string => part !== undefined)
-      .join(" · ");
-    if (!subtitle || subtitle === usage.subtitle) return;
-    usage.subtitle = subtitle;
+    const presentation = buildSubagentSubtitle({
+      context: [
+        detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
+        usage.model,
+      ],
+      usage: [
+        formatSubagentTokens(usage.tokens),
+        ...formatSubagentCosts({ ownCostUsd: usage.costUsd, subagentCostUsd }),
+      ],
+    });
+    if (!presentation || presentation.subtitle === usage.subtitle) return;
+    usage.subtitle = presentation.subtitle;
     this.emitEvent({
       type: "provider_subagent",
       provider: CODEX_PROVIDER,
-      event: { type: "upsert", id: threadId, subtitle },
+      event: { type: "upsert", id: threadId, ...presentation },
     });
   }
 

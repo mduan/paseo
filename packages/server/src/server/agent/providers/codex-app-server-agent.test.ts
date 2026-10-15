@@ -3348,10 +3348,12 @@ describe("Codex app-server provider", () => {
       { codexPriceList: new CodexPriceList({ logger: createTestLogger(), cacheFile: priceFile }) },
     );
     const subtitles: (string | null | undefined)[] = [];
+    const subtitleParts: unknown[] = [];
     const usages: AgentUsage[] = [];
     session.subscribe((event) => {
       if (event.type === "provider_subagent" && event.event.type === "upsert") {
         if (event.event.subtitle !== undefined) subtitles.push(event.event.subtitle);
+        if (event.event.subtitleParts) subtitleParts.push(event.event.subtitleParts);
       }
       if (event.type === "usage_updated") usages.push(event.usage);
     });
@@ -3371,6 +3373,10 @@ describe("Codex app-server provider", () => {
         expect(subtitles).toEqual([
           "Child · 42k tokens",
           "Child · gpt-6-luna · 42k tokens · ~$2.00",
+        ]);
+        expect(subtitleParts).toEqual([
+          { context: "Child", usage: "42k tokens" },
+          { context: "Child · gpt-6-luna", usage: "42k tokens · ~$2.00" },
         ]);
         expect(usages.at(-1)).toMatchObject({
           subagentCostUsd: 2,

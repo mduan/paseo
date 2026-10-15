@@ -1,4 +1,19 @@
-/** Subtitle parts that every provider formats the same way. */
+export function buildSubagentSubtitle({
+  context,
+  usage,
+}: {
+  context: readonly (string | undefined)[];
+  usage: readonly (string | undefined)[];
+}) {
+  const contextText = context.filter(Boolean).join(" · ");
+  const usageText = usage.filter(Boolean).join(" · ");
+  const subtitle = [contextText, usageText].filter(Boolean).join(" · ");
+  return subtitle
+    ? { subtitle, subtitleParts: { context: contextText, usage: usageText } }
+    : undefined;
+}
+
+export type ProviderSubagentSubtitle = NonNullable<ReturnType<typeof buildSubagentSubtitle>>;
 
 function formatSubagentCost(costUsd: number | undefined): string | undefined {
   if (typeof costUsd !== "number" || !Number.isFinite(costUsd) || costUsd < 0) return undefined;

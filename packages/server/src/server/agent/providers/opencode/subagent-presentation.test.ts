@@ -38,24 +38,37 @@ describe("buildOpenCodeSubagentSubtitle", () => {
         variant: "high",
         totalTokens: 16_484,
       }),
-    ).toBe("general · claude-sonnet-5 · High · 16.5k tokens");
+    ).toEqual({
+      subtitle: "general · claude-sonnet-5 · High · 16.5k tokens",
+      subtitleParts: { context: "general · claude-sonnet-5 · High", usage: "16.5k tokens" },
+    });
   });
 
   it("keeps raw model ids visible without a label table", () => {
-    expect(buildOpenCodeSubagentSubtitle({ modelId: "big-pickle" })).toBe("big-pickle");
+    expect(buildOpenCodeSubagentSubtitle({ modelId: "big-pickle" })).toMatchObject({
+      subtitle: "big-pickle",
+    });
   });
 
   it("capitalizes multi-word variants and maps xhigh", () => {
-    expect(buildOpenCodeSubagentSubtitle({ variant: "ultra-think" })).toBe("Ultra Think");
-    expect(buildOpenCodeSubagentSubtitle({ variant: "xhigh" })).toBe("Extra High");
+    expect(buildOpenCodeSubagentSubtitle({ variant: "ultra-think" })).toMatchObject({
+      subtitle: "Ultra Think",
+    });
+    expect(buildOpenCodeSubagentSubtitle({ variant: "xhigh" })).toMatchObject({
+      subtitle: "Extra High",
+    });
   });
 
   it("formats token counts below one thousand without abbreviation", () => {
-    expect(buildOpenCodeSubagentSubtitle({ totalTokens: 999 })).toBe("999 tokens");
+    expect(buildOpenCodeSubagentSubtitle({ totalTokens: 999 })).toMatchObject({
+      subtitle: "999 tokens",
+    });
   });
 
   it("omits facts that were not observed", () => {
-    expect(buildOpenCodeSubagentSubtitle({ agentName: "explore", totalTokens: 0 })).toBe("explore");
+    expect(buildOpenCodeSubagentSubtitle({ agentName: "explore", totalTokens: 0 })).toMatchObject({
+      subtitle: "explore",
+    });
     expect(buildOpenCodeSubagentSubtitle({})).toBeUndefined();
     expect(buildOpenCodeSubagentSubtitle({ agentName: "  " })).toBeUndefined();
   });
@@ -64,11 +77,13 @@ describe("buildOpenCodeSubagentSubtitle", () => {
 describe("foldOpenCodeSubagentPresentation", () => {
   it("returns the subtitle only when it changes", () => {
     const state: OpenCodeSubagentPresentationState = { facts: {} };
-    expect(foldOpenCodeSubagentPresentation(state, { agentName: "general" })).toBe("general");
+    expect(foldOpenCodeSubagentPresentation(state, { agentName: "general" })).toMatchObject({
+      subtitle: "general",
+    });
     expect(foldOpenCodeSubagentPresentation(state, { agentName: "general" })).toBeUndefined();
     expect(
       foldOpenCodeSubagentPresentation(state, { modelId: "claude-sonnet-5", totalTokens: 1_200 }),
-    ).toBe("general · claude-sonnet-5 · 1.2k tokens");
+    ).toMatchObject({ subtitle: "general · claude-sonnet-5 · 1.2k tokens" });
     expect(foldOpenCodeSubagentPresentation(state, { totalTokens: 1_200 })).toBeUndefined();
   });
 

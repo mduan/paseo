@@ -11,15 +11,22 @@ describe("buildClaudeSubagentSubtitle", () => {
         effort: "high",
         usage: { totalTokens: 16_484 },
       }),
-    ).toBe("general-purpose · Opus 5 · High · 16.5k tokens");
+    ).toEqual({
+      subtitle: "general-purpose · Opus 5 · High · 16.5k tokens",
+      subtitleParts: { context: "general-purpose · Opus 5 · High", usage: "16.5k tokens" },
+    });
   });
 
   it("uses the manifest label for dated and context-window model variants", () => {
-    expect(buildClaudeSubagentSubtitle({ model: "claude-opus-4-8[1m]" })).toBe("Opus 4.8 1M");
+    expect(buildClaudeSubagentSubtitle({ model: "claude-opus-4-8[1m]" })).toMatchObject({
+      subtitle: "Opus 4.8 1M",
+    });
   });
 
   it("keeps unknown compatible-provider model names visible", () => {
-    expect(buildClaudeSubagentSubtitle({ model: "glm-5.1" })).toBe("glm-5.1");
+    expect(buildClaudeSubagentSubtitle({ model: "glm-5.1" })).toMatchObject({
+      subtitle: "glm-5.1",
+    });
   });
 
   it("shows own cost and adds recursive total only when descendants have cost", () => {
@@ -30,15 +37,19 @@ describe("buildClaudeSubagentSubtitle", () => {
         costUsd: 1.844,
         subagentCostUsd: 0.5,
       }),
-    ).toBe("Explore · 2k tokens · ~$2.34");
-    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toBe("~$0.0012");
-    expect(buildClaudeSubagentSubtitle({ costUsd: 0, subagentCostUsd: 1 })).toBe("~$1.00");
+    ).toMatchObject({ subtitle: "Explore · 2k tokens · ~$2.34" });
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0.00123 })).toMatchObject({
+      subtitle: "~$0.0012",
+    });
+    expect(buildClaudeSubagentSubtitle({ costUsd: 0, subagentCostUsd: 1 })).toMatchObject({
+      subtitle: "~$1.00",
+    });
   });
 
   it("omits facts that were not observed", () => {
-    expect(buildClaudeSubagentSubtitle({ title: "Explore", usage: { totalTokens: 0 } })).toBe(
-      "Explore",
-    );
+    expect(
+      buildClaudeSubagentSubtitle({ title: "Explore", usage: { totalTokens: 0 } }),
+    ).toMatchObject({ subtitle: "Explore" });
     expect(buildClaudeSubagentSubtitle({})).toBeUndefined();
   });
 });

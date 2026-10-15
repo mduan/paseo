@@ -1,5 +1,9 @@
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
-import { formatSubagentCosts } from "../../../provider-subagents/subtitle-format.js";
+import {
+  buildSubagentSubtitle,
+  formatSubagentCosts,
+  type ProviderSubagentSubtitle,
+} from "../../../provider-subagents/subtitle-format.js";
 import { findClaudeModel } from "../models.js";
 
 export interface ClaudeSubagentUsage {
@@ -20,18 +24,17 @@ export interface ClaudeSubagentPresentationFacts {
 /** Build the complete compact subtitle Claude exposes to provider-neutral clients. */
 export function buildClaudeSubagentSubtitle(
   facts: ClaudeSubagentPresentationFacts,
-): string | undefined {
-  const parts = [
-    readPart(facts.title),
-    formatModel(facts.model),
-    formatEffort(facts.effort),
-    formatSubagentTokens(facts.usage?.totalTokens),
-    ...formatSubagentCosts({
-      ownCostUsd: facts.costUsd,
-      subagentCostUsd: facts.subagentCostUsd,
-    }),
-  ].filter((part): part is string => part !== undefined);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+): ProviderSubagentSubtitle | undefined {
+  return buildSubagentSubtitle({
+    context: [readPart(facts.title), formatModel(facts.model), formatEffort(facts.effort)],
+    usage: [
+      formatSubagentTokens(facts.usage?.totalTokens),
+      ...formatSubagentCosts({
+        ownCostUsd: facts.costUsd,
+        subagentCostUsd: facts.subagentCostUsd,
+      }),
+    ],
+  });
 }
 
 function readPart(value: string | undefined): string | undefined {

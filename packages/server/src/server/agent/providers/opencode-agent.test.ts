@@ -5744,11 +5744,13 @@ describe("OpenCode provider subagent contract", () => {
         id: "ses_child_facts",
         title: "general",
         subtitle: "general · claude-sonnet-5 · High",
+        subtitleParts: { context: "general · claude-sonnet-5 · High", usage: "" },
       },
       {
         type: "upsert",
         id: "ses_child_facts",
         subtitle: "general · claude-sonnet-5 · High · 16.5k tokens",
+        subtitleParts: { context: "general · claude-sonnet-5 · High", usage: "16.5k tokens" },
       },
     ]);
     // Presentation upserts must not carry status: they can never revert a finished child.
@@ -5830,6 +5832,7 @@ describe("OpenCode provider subagent contract", () => {
           type: "upsert",
           id: "ses_child_link_title",
           subtitle: "general · claude-sonnet-5",
+          subtitleParts: { context: "general · claude-sonnet-5", usage: "" },
         },
       }),
     );
@@ -5877,6 +5880,7 @@ describe("OpenCode provider subagent contract", () => {
           description: "Investigate flaky test",
           status: "running",
           subtitle: "explore · claude-sonnet-5 · High",
+          subtitleParts: { context: "explore · claude-sonnet-5 · High", usage: "" },
         },
       },
     ]);
@@ -5955,6 +5959,7 @@ describe("OpenCode provider subagent contract", () => {
         title: "explore",
         description: "Inspect repo",
         subtitle: "explore",
+        subtitleParts: { context: "explore", usage: "" },
       },
     });
   });
@@ -6008,6 +6013,7 @@ describe("OpenCode provider subagent contract", () => {
         title: "plan",
         description: "Draft the plan",
         subtitle: "plan",
+        subtitleParts: { context: "plan", usage: "" },
       },
     });
   });
@@ -6100,6 +6106,7 @@ describe("OpenCode provider subagent contract", () => {
             title: "explore",
             description: "Inspect alpha",
             subtitle: "explore",
+            subtitleParts: { context: "explore", usage: "" },
           },
         },
         {
@@ -6112,6 +6119,7 @@ describe("OpenCode provider subagent contract", () => {
             title: "explore",
             description: "Inspect beta",
             subtitle: "explore",
+            subtitleParts: { context: "explore", usage: "" },
           },
         },
       ]),
@@ -6409,6 +6417,7 @@ describe("OpenCode provider subagent contract", () => {
         description: "Chase the regression",
         status: "completed",
         subtitle: "claude-sonnet-5 · Max",
+        subtitleParts: { context: "claude-sonnet-5 · Max", usage: "" },
       },
     });
     await vi.waitFor(() =>
@@ -6420,6 +6429,7 @@ describe("OpenCode provider subagent contract", () => {
           id: "ses_child_hydrated_facts",
           title: "explore",
           subtitle: "explore · claude-sonnet-5 · Max · 1k tokens",
+          subtitleParts: { context: "explore · claude-sonnet-5 · Max", usage: "1k tokens" },
         },
       }),
     );

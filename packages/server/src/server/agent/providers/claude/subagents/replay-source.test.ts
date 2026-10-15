@@ -355,6 +355,7 @@ describe("replay runtime", () => {
       kind: "subtitle",
       id: TOOL_USE_ID,
       subtitle: "general-purpose · Opus 5 · High",
+      subtitleParts: { context: "general-purpose · Opus 5 · High", usage: "" },
     });
   });
 
@@ -376,6 +377,7 @@ describe("replay runtime", () => {
 
     expect(observations.find((o) => o.kind === "subtitle")).toMatchObject({
       subtitle: "general-purpose · Sonnet 5 · Low",
+      subtitleParts: { context: "general-purpose · Sonnet 5 · Low", usage: "" },
     });
   });
 
@@ -403,6 +405,7 @@ describe("replay runtime", () => {
     }).observations;
     expect(observations.find((o) => o.kind === "subtitle")).toMatchObject({
       subtitle: "general-purpose · glm-5.1",
+      subtitleParts: { context: "general-purpose · glm-5.1", usage: "" },
     });
   });
 });
@@ -460,6 +463,7 @@ describe("replay usage", () => {
       id: TOOL_USE_ID,
       // 2293 + 0 + 65024 + 1376 — the last turn's context, matching the live path's total_tokens.
       subtitle: "general-purpose · Opus 5 · 68.7k tokens",
+      subtitleParts: { context: "general-purpose · Opus 5", usage: "68.7k tokens" },
       timestamp: "2026-07-23T23:49:05.068Z",
     });
   });
@@ -478,7 +482,10 @@ describe("replay usage", () => {
           message: { content: "ignored" },
         },
       ]),
-    ).toMatchObject({ subtitle: "general-purpose · 16.4k tokens" });
+    ).toMatchObject({
+      subtitle: "general-purpose · 16.4k tokens",
+      subtitleParts: { context: "general-purpose", usage: "16.4k tokens" },
+    });
   });
 
   it("emits nothing for a transcript with no entries", () => {
@@ -493,7 +500,10 @@ describe("replay usage", () => {
         message: { content: [], usage: { input_tokens: 10 } },
       },
     ]);
-    expect(observation).toMatchObject({ subtitle: "general-purpose · 10 tokens" });
+    expect(observation).toMatchObject({
+      subtitle: "general-purpose · 10 tokens",
+      subtitleParts: { context: "general-purpose", usage: "10 tokens" },
+    });
   });
 
   it("omits totalTokens when no entry carries a usage block", () => {
@@ -518,7 +528,10 @@ describe("replay usage", () => {
         },
         { type: "assistant", timestamp: "2026-07-27T16:42:20.000Z", message: { content: [] } },
       ]),
-    ).toMatchObject({ subtitle: "general-purpose · 1k tokens" });
+    ).toMatchObject({
+      subtitle: "general-purpose · 1k tokens",
+      subtitleParts: { context: "general-purpose", usage: "1k tokens" },
+    });
   });
 
   it("only reports counters the transcript actually shows", () => {
@@ -636,8 +649,14 @@ describe("observeReplaySubagentCosts", () => {
         kind: "subtitle",
         id: "child",
         subtitle: "Explore · ~$0.75",
+        subtitleParts: { context: "Explore", usage: "~$0.75" },
       },
-      { kind: "subtitle", id: "grandchild", subtitle: "~$0.25" },
+      {
+        kind: "subtitle",
+        id: "grandchild",
+        subtitle: "~$0.25",
+        subtitleParts: { context: "", usage: "~$0.25" },
+      },
     ]);
   });
 });

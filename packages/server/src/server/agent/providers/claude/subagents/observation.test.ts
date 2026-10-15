@@ -92,12 +92,18 @@ describe("foldSubagentObservations", () => {
 describe("subtitle observations", () => {
   it("reports provider context without asserting a status", () => {
     const [event] = foldSubagentObservations([
-      { kind: "subtitle", id: "toolu_1", subtitle: "Explore · Opus 5 · High" },
+      {
+        kind: "subtitle",
+        id: "toolu_1",
+        subtitle: "Explore · Opus 5 · High",
+        subtitleParts: { context: "Explore · Opus 5 · High", usage: "" },
+      },
     ]);
     expect(event).toEqual({
       type: "upsert",
       id: "toolu_1",
       subtitle: "Explore · Opus 5 · High",
+      subtitleParts: { context: "Explore · Opus 5 · High", usage: "" },
     });
     expect(event).not.toHaveProperty("status");
   });
@@ -108,7 +114,12 @@ describe("subtitle observations", () => {
     for (const event of foldSubagentObservations([
       { kind: "declared", id: "toolu_1", title: "Explore" },
       { kind: "status", id: "toolu_1", status: "completed" },
-      { kind: "subtitle", id: "toolu_1", subtitle: "Explore · Opus 5 · 32.3k tokens" },
+      {
+        kind: "subtitle",
+        id: "toolu_1",
+        subtitle: "Explore · Opus 5 · 32.3k tokens",
+        subtitleParts: { context: "Explore · Opus 5", usage: "32.3k tokens" },
+      },
     ])) {
       const applied = store.apply("parent", "claude", event);
       if (applied.type === "upsert") descriptor = applied.subagent;
@@ -116,6 +127,7 @@ describe("subtitle observations", () => {
     expect(descriptor).toMatchObject({
       status: "completed",
       subtitle: "Explore · Opus 5 · 32.3k tokens",
+      subtitleParts: { context: "Explore · Opus 5", usage: "32.3k tokens" },
     });
   });
 
@@ -124,7 +136,12 @@ describe("subtitle observations", () => {
     let descriptor = null;
     for (const event of foldSubagentObservations([
       { kind: "declared", id: "toolu_1", title: "Explore", description: "Find the code" },
-      { kind: "subtitle", id: "toolu_1", subtitle: "Explore · Opus 5" },
+      {
+        kind: "subtitle",
+        id: "toolu_1",
+        subtitle: "Explore · Opus 5",
+        subtitleParts: { context: "Explore · Opus 5", usage: "" },
+      },
     ])) {
       const applied = store.apply("parent", "claude", event);
       if (applied.type === "upsert") descriptor = applied.subagent;
@@ -133,6 +150,7 @@ describe("subtitle observations", () => {
       title: "Explore",
       description: "Find the code",
       subtitle: "Explore · Opus 5",
+      subtitleParts: { context: "Explore · Opus 5", usage: "" },
       status: "running",
     });
   });

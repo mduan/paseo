@@ -2487,7 +2487,7 @@ function appendOpenCodeChildSessionDetected(
       ...(child.title && !presentation.descriptionFromLink ? { description: child.title } : {}),
       ...(status ? { status } : {}),
       ...(child.directory ? { cwd: child.directory } : {}),
-      ...(subtitle ? { subtitle } : {}),
+      ...subtitle,
     },
   });
   return true;
@@ -2566,7 +2566,7 @@ function appendOpenCodeSubAgentLinkPresentation(
       toolCallId: activity.toolCall.callId,
       ...(subAgentType ? { title: subAgentType } : {}),
       ...(description ? { description } : {}),
-      ...(subtitle ? { subtitle } : {}),
+      ...subtitle,
     },
   });
 }
@@ -4341,7 +4341,7 @@ class OpenCodeAgentSession implements AgentSession {
         type: "upsert",
         id: child.id,
         ...(title ? { title } : {}),
-        ...(subtitle ? { subtitle } : {}),
+        ...subtitle,
       },
     };
     this.recordProviderInternalEvent(event);
@@ -5368,7 +5368,7 @@ class OpenCodeAgentSession implements AgentSession {
         type: "upsert",
         id: sessionId,
         ...(title ? { title } : {}),
-        ...(subtitle ? { subtitle } : {}),
+        ...subtitle,
       },
     });
   }

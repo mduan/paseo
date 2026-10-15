@@ -4796,6 +4796,7 @@ export const ProviderSubagentDescriptorPayloadSchema = z.object({
   // Compact provider-owned context for the shared track. Providers choose what belongs here and
   // format it for display; clients must not parse provider-specific facts out of this string.
   subtitle: z.string().nullable().optional(),
+  subtitleParts: z.object({ context: z.string(), usage: z.string() }).optional(),
 });
 
 export type ProviderSubagentDescriptorPayload = z.infer<

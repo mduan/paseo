@@ -1,3 +1,4 @@
+import type { ProviderSubagentSubtitle } from "./subtitle-format.js";
 import type { AgentProvider, AgentTimelineItem } from "../agent-sdk-types.js";
 import { limitAgentTimelineItemContent } from "../agent-timeline-content.js";
 import { InMemoryAgentTimelineStore } from "../agent-timeline-store.js";
@@ -24,6 +25,7 @@ export interface ProviderSubagentDescriptor {
   cwd: string | null;
   subtitle: string | null;
   turnCount?: number;
+  subtitleParts?: ProviderSubagentSubtitle["subtitleParts"];
 }
 
 export type ProviderSubagentInputEvent =
@@ -40,6 +42,7 @@ export type ProviderSubagentInputEvent =
       toolCallId?: string | null;
       cwd?: string | null;
       subtitle?: string | null;
+      subtitleParts?: ProviderSubagentSubtitle["subtitleParts"];
       parentSubagentId?: string | null;
       timestamp?: string;
     }
@@ -115,7 +118,7 @@ export class ProviderSubagentStore {
       };
     }
 
-    const previous = this.descriptors.get(key);
+    const previous: Partial<ProviderSubagentDescriptor> = this.descriptors.get(key) ?? {};
     if (!this.timelines.has(key)) {
       this.timelines.initialize(key);
     }
@@ -124,15 +127,16 @@ export class ProviderSubagentStore {
       id: event.id,
       parentAgentId,
       provider,
-      title: stickyField(event.title, previous?.title),
-      description: stickyField(event.description, previous?.description),
-      status: event.status ?? previous?.status ?? "running",
-      createdAt: previous?.createdAt ?? timestamp,
+      title: stickyField(event.title, previous.title),
+      description: stickyField(event.description, previous.description),
+      status: event.status ?? previous.status ?? "running",
+      createdAt: previous.createdAt ?? timestamp,
       updatedAt: timestamp,
-      toolCallId: stickyField(event.toolCallId, previous?.toolCallId),
-      cwd: stickyField(event.cwd, previous?.cwd),
-      subtitle: stickyField(event.subtitle, previous?.subtitle),
-      parentSubagentId: stickyField(event.parentSubagentId, previous?.parentSubagentId),
+      toolCallId: stickyField(event.toolCallId, previous.toolCallId),
+      cwd: stickyField(event.cwd, previous.cwd),
+      subtitle: stickyField(event.subtitle, previous.subtitle),
+      subtitleParts: event.subtitleParts ?? previous.subtitleParts,
+      parentSubagentId: stickyField(event.parentSubagentId, previous.parentSubagentId),
     };
     this.descriptors.set(key, subagent);
     return { type: "upsert", subagent: this.withTurnCount(subagent) };
