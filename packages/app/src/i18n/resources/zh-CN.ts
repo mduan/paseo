@@ -281,6 +281,23 @@ export const zhCN: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "显示",
+      saveFailed: "无法保存历史记录偏好设置。请重试以保存当前选择。",
+      fields: {
+        project: "项目",
+        workspace: "工作区",
+        branch: "分支",
+        host: "主机",
+        provider: "提供商",
+        model: "模型",
+        effort: "思考强度",
+        turns: "轮次",
+        cost: "费用",
+        status: "状态",
+        lastActivity: "最近活动",
+      },
+    },
     filters: {
       title: "筛选",
       hosts: "主机",

@@ -6,24 +6,28 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ChevronLeft, Import } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { useMutation } from "@tanstack/react-query";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
+import { HistoryFilterBar, hasHistoryFilters } from "@/components/sessions/filters";
+import { HistoryDisplayMenu } from "@/components/sessions/display-menu";
 import {
-  HistoryFilterBar,
-  HistoryStatus,
-  hasHistoryFilters,
   EMPTY_HISTORY_FILTERS,
+  HistoryField,
+  HistoryStatus,
   type HistoryFilters,
-} from "@/components/sessions/filters";
+  type HistoryPreferences,
+} from "@/components/sessions/preferences";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import type { Theme } from "@/styles/theme";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
-import { useHosts } from "@/runtime/host-runtime";
+import { useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
+import { useAppSettings } from "@/hooks/use-settings";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
 /** Long enough that a typed word is one request, short enough to feel live. */
@@ -57,10 +61,26 @@ function SessionHostErrorsBanner({
   );
 }
 
+function HistoryPreferencesError({ visible, onRetry }: { visible: boolean; onRetry: () => void }) {
+  const { t } = useTranslation();
+  if (!visible) return null;
+  return (
+    <View style={styles.errorsBannerWrap}>
+      <View style={styles.errorsBanner} testID="sessions-preferences-error">
+        <Text style={styles.errorsBannerText}>{t("sessions.display.saveFailed")}</Text>
+        <Button variant="ghost" size="sm" onPress={onRetry}>
+          {t("common.actions.retry")}
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 export function SessionsScreen() {
   const isFocused = useIsFocused();
+  const { isLoading } = useAppSettings();
 
-  if (!isFocused) {
+  if (!isFocused || isLoading) {
     return <View style={styles.container} />;
   }
 
@@ -71,7 +91,29 @@ function SessionsScreenContent() {
   const { t } = useTranslation();
   const importSession = useImportSession();
   const hosts = useHosts();
-  const [filters, setFilters] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const hostsLoaded = useHostRegistryLoaded();
+  const { settings, updateSettings } = useAppSettings();
+  const { filters, fields } = settings.history;
+  const savePreferences = useMutation({
+    scope: { id: "history-preferences" },
+    mutationFn: (update: (current: HistoryPreferences) => HistoryPreferences) =>
+      updateSettings((current) => ({ history: update(current.history) })),
+  });
+  const { mutate: saveHistory } = savePreferences;
+  const setFilters = useCallback(
+    (next: HistoryFilters) => saveHistory((current) => ({ ...current, filters: next })),
+    [saveHistory],
+  );
+  const toggleField = useCallback(
+    (field: HistoryField) =>
+      saveHistory((current) => ({
+        ...current,
+        fields: { ...current.fields, [field]: !current.fields[field] },
+      })),
+    [saveHistory],
+  );
+  // Settings already update optimistically; retry must not replay a toggle.
+  const retrySave = useCallback(() => saveHistory((current) => current), [saveHistory]);
   const compact = useIsCompactFormFactor();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
@@ -108,13 +150,14 @@ function SessionsScreenContent() {
   const isSearching = isSearchSupported && search.length > 0;
 
   useEffect(() => {
+    if (!hostsLoaded) return;
     const hostsStillPresent = filters.hosts.filter((id) =>
       hosts.some((host) => host.serverId === id),
     );
     if (hostsStillPresent.length !== filters.hosts.length) {
-      setFilters((current) => ({ ...current, hosts: hostsStillPresent }));
+      setFilters({ ...filters, hosts: hostsStillPresent });
     }
-  }, [hosts, filters.hosts]);
+  }, [hosts, hostsLoaded, filters, setFilters]);
 
   const [isManualRefresh, setIsManualRefresh] = useState(false);
 
@@ -135,7 +178,7 @@ function SessionsScreenContent() {
   const handleClearFilters = useCallback(() => {
     setSearchInput("");
     setFilters(EMPTY_HISTORY_FILTERS);
-  }, []);
+  }, [setFilters]);
 
   const listFooterComponent = useMemo(() => {
     // COMPAT(historyPagination): old daemons return a truncated relevance page.
@@ -159,6 +202,16 @@ function SessionsScreenContent() {
     );
   }, [hasMore, isLoadingMore, isSearchTruncated, loadMore, t]);
 
+  const filterBar = (
+    <HistoryFilterBar
+      filters={filters}
+      options={filterOptions}
+      supported={isFilterSupported}
+      onChange={setFilters}
+    />
+  );
+  const displayMenu = <HistoryDisplayMenu fields={fields} onToggle={toggleField} />;
+
   return (
     <View style={styles.container}>
       <MenuHeader title={t("sessions.title")} />
@@ -177,23 +230,20 @@ function SessionsScreenContent() {
             </View>
           ) : null}
           {compact ? (
-            <HistoryFilterBar
-              filters={filters}
-              options={filterOptions}
-              supported={isFilterSupported}
-              onChange={setFilters}
-            />
+            <>
+              {filterBar}
+              {displayMenu}
+            </>
           ) : null}
         </View>
         {!compact ? (
-          <HistoryFilterBar
-            filters={filters}
-            options={filterOptions}
-            supported={isFilterSupported}
-            onChange={setFilters}
-          />
+          <View style={styles.searchRow}>
+            <View style={styles.searchField}>{filterBar}</View>
+            {displayMenu}
+          </View>
         ) : null}
       </View>
+      <HistoryPreferencesError visible={savePreferences.isError} onRetry={retrySave} />
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}
       {isInitialLoad ? (
         <View style={styles.loadingContainer}>
@@ -233,7 +283,7 @@ function SessionsScreenContent() {
           onRefresh={handleRefresh}
           listFooterComponent={listFooterComponent}
           showAttentionIndicator={false}
-          showHostColumn
+          fields={fields}
           search={isSearching ? search : undefined}
         />
       ) : null}

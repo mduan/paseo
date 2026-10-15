@@ -28,6 +28,8 @@ import { ProjectIconView } from "@/components/project-icon-view";
 import type { Theme } from "@/styles/theme";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+import type { HistoryFields } from "@/components/sessions/preferences";
+import { formatTurnCount } from "@/utils/format-turn-count";
 
 const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const refreshColorMapping = (theme: Theme) => ({
@@ -50,7 +52,7 @@ interface AgentListProps {
   onAgentSelect?: () => void;
   listFooterComponent?: ReactElement | null;
   showAttentionIndicator?: boolean;
-  showHostColumn?: boolean;
+  fields: HistoryFields;
   search?: string;
 }
 
@@ -131,16 +133,18 @@ function SessionRowBadges({
   archivedIcon,
   pendingPermissionCount,
   showAttention,
+  showStatus,
 }: {
   agent: AggregatedAgent;
   archivedIcon: ReactElement;
   pendingPermissionCount: number;
   showAttention: boolean;
+  showStatus: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <>
-      {agent.archivedAt ? (
+      {showStatus && agent.archivedAt ? (
         <SessionBadge label={t("agentList.badges.archived")} icon={archivedIcon} />
       ) : null}
       {pendingPermissionCount > 0 ? (
@@ -162,7 +166,7 @@ function SessionRow({
   isMobile,
   selectedAgentId,
   showAttentionIndicator,
-  showHostColumn,
+  fields,
   onPress,
   onLongPress,
 }: {
@@ -171,25 +175,17 @@ function SessionRow({
   isMobile: boolean;
   selectedAgentId?: string;
   showAttentionIndicator: boolean;
-  showHostColumn: boolean;
+  fields: HistoryFields;
   onPress: (agent: AggregatedAgent) => void;
   onLongPress: (agent: AggregatedAgent) => void;
 }) {
   const { t } = useTranslation();
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
-  const projectName = agent.projectPlacement?.projectName ?? "";
-  const branch = agent.projectPlacement?.checkout.currentBranch ?? "";
-  const workspaceName = agent.projectPlacement?.workspaceName ?? "";
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
-  const ranges = useMemo(
-    () => ({
-      workspace: findHighlightRanges(search ?? "", workspaceName),
-      title: findHighlightRanges(search ?? "", agent.title ?? ""),
-      branch: findHighlightRanges(search ?? "", branch),
-      project: findHighlightRanges(search ?? "", projectName),
-    }),
-    [search, workspaceName, agent.title, branch, projectName],
+  const titleRanges = useMemo(
+    () => findHighlightRanges(search ?? "", agent.title ?? ""),
+    [search, agent.title],
   );
 
   const pressableStyle = useCallback(
@@ -220,7 +216,7 @@ function SessionRow({
         <View style={styles.rowTitleRow}>
           <HighlightedText
             text={agent.title || t("agentList.fallbackTitle")}
-            ranges={ranges.title}
+            ranges={titleRanges}
             style={styles.sessionTitle}
             numberOfLines={isMobile ? 2 : 1}
             testID={`agent-row-title-${agent.serverId}-${agent.id}`}
@@ -231,73 +227,139 @@ function SessionRow({
               archivedIcon={archivedIcon}
               pendingPermissionCount={pendingPermissionCount}
               showAttention={showAttention}
+              showStatus={fields.status}
             />
-            <AgentActivityTime date={agent.lastActivityAt} />
+            {fields.lastActivity ? <AgentActivityTime date={agent.lastActivityAt} /> : null}
           </View>
         </View>
         <View style={styles.rowMetaRow}>
-          <View style={styles.metaItem}>
-            {projectName ? (
-              <View style={styles.metaItem}>
-                <ProjectIconView
-                  iconDataUri={null}
-                  initial={projectName.charAt(0).toUpperCase()}
-                  projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
-                  size={14}
-                  textStyle={styles.projectIconText}
-                />
-                <HighlightedText
-                  text={projectName}
-                  ranges={ranges.project}
-                  style={styles.sessionMetaText}
-                  numberOfLines={1}
-                  testID={`agent-row-project-${agent.serverId}-${agent.id}`}
-                />
-              </View>
-            ) : null}
-            {workspaceName ? (
-              <View style={styles.metaItem}>
-                <ThemedChevronRight size={12} uniProps={mutedIconMapping} />
-                <ThemedFolder size={14} uniProps={mutedIconMapping} />
-                <HighlightedText
-                  text={workspaceName}
-                  ranges={ranges.workspace}
-                  style={styles.sessionMetaText}
-                  numberOfLines={1}
-                  testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
-                />
-              </View>
-            ) : null}
-          </View>
-          {branch ? (
-            <View style={styles.metaItem}>
-              <Text style={styles.sessionMetaSeparator}>·</Text>
-              <ThemedBranch size={14} uniProps={mutedIconMapping} />
-              <HighlightedText
-                text={branch}
-                ranges={ranges.branch}
-                style={styles.sessionMetaText}
-                numberOfLines={1}
-                testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
-              />
-            </View>
-          ) : null}
-          {showHostColumn ? (
-            <View style={styles.metaItem}>
-              <ThemedServer size={14} uniProps={mutedIconMapping} />
-              <Text style={styles.sessionMetaText} numberOfLines={1}>
-                {agent.serverLabel}
-              </Text>
-            </View>
-          ) : null}
-          <SessionRowModel agent={agent} />
+          <SessionRowContext agent={agent} fields={fields} search={search} />
+          <SessionRowModel agent={agent} fields={fields} />
         </View>
       </View>
     </Pressable>
   );
 }
 
-function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
+function SessionRowContext({
+  agent,
+  fields,
+  search,
+}: {
+  agent: AggregatedAgent;
+  fields: HistoryFields;
+  search?: string;
+}) {
+  const projectName = agent.projectPlacement?.projectName ?? "";
+  const branch = agent.projectPlacement?.checkout.currentBranch ?? "";
+  const workspaceName = agent.projectPlacement?.workspaceName ?? "";
+  const showProject = fields.project && Boolean(projectName);
+  const showWorkspace = fields.workspace && Boolean(workspaceName);
+  const showBranch = fields.branch && Boolean(branch);
+  const showPlacement = showProject || showWorkspace;
+  const ranges = useMemo(
+    () => ({
+      workspace: findHighlightRanges(search ?? "", workspaceName),
+      branch: findHighlightRanges(search ?? "", branch),
+      project: findHighlightRanges(search ?? "", projectName),
+    }),
+    [search, workspaceName, branch, projectName],
+  );
+  return (
+    <>
+      {showPlacement ? (
+        <View style={styles.metaItem}>
+          {showProject ? (
+            <View style={styles.metaItem}>
+              <ProjectIconView
+                iconDataUri={null}
+                initial={projectName.charAt(0).toUpperCase()}
+                projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
+                size={14}
+                textStyle={styles.projectIconText}
+              />
+              <HighlightedText
+                text={projectName}
+                ranges={ranges.project}
+                style={styles.sessionMetaText}
+                numberOfLines={1}
+                testID={`agent-row-project-${agent.serverId}-${agent.id}`}
+              />
+            </View>
+          ) : null}
+          {showWorkspace ? (
+            <View style={styles.metaItem}>
+              {showProject ? <ThemedChevronRight size={12} uniProps={mutedIconMapping} /> : null}
+              <ThemedFolder size={14} uniProps={mutedIconMapping} />
+              <HighlightedText
+                text={workspaceName}
+                ranges={ranges.workspace}
+                style={styles.sessionMetaText}
+                numberOfLines={1}
+                testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      {showBranch ? (
+        <View style={styles.metaItem}>
+          {showPlacement ? <Text style={styles.sessionMetaSeparator}>·</Text> : null}
+          <ThemedBranch size={14} uniProps={mutedIconMapping} />
+          <HighlightedText
+            text={branch}
+            ranges={ranges.branch}
+            style={styles.sessionMetaText}
+            numberOfLines={1}
+            testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
+          />
+        </View>
+      ) : null}
+      {fields.host ? (
+        <View style={styles.metaItem}>
+          <ThemedServer size={14} uniProps={mutedIconMapping} />
+          <Text style={styles.sessionMetaText} numberOfLines={1}>
+            {agent.serverLabel}
+          </Text>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+function SessionRowModel({ agent, fields }: { agent: AggregatedAgent; fields: HistoryFields }) {
+  const { t } = useTranslation();
+  const model = fields.model ? (agent.model ?? t("sessions.filters.unknownModel")) : undefined;
+  const effort =
+    fields.effort && agent.thinkingOptionId
+      ? formatThinkingOptionLabel({ id: agent.thinkingOptionId })
+      : undefined;
+  const turns = fields.turns ? formatTurnCount(agent.turnCount) : undefined;
+  const label = [model, effort, turns].filter(Boolean).join(" · ");
+
+  if (!fields.provider && !label && !fields.cost) return null;
+
+  return (
+    <View style={styles.metaItem}>
+      {fields.provider ? (
+        <ProviderIcon
+          provider={agent.provider}
+          serverId={agent.serverId}
+          size={14}
+          uniProps={mutedIconMapping}
+        />
+      ) : null}
+      {label || fields.cost ? (
+        <Text style={styles.sessionMetaText}>
+          {label}
+          {fields.cost ? <SessionRowCost agent={agent} prefix={Boolean(label)} /> : null}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function SessionRowCost({ agent, prefix }: { agent: AggregatedAgent; prefix: boolean }) {
   const { t } = useTranslation();
   const usage = agent.lastUsage;
   const breakdown = resolveAgentCostBreakdown({
@@ -312,30 +374,17 @@ function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
       ? null
       : formatSessionCost(costValue);
   const estimated = usage?.totalCostEstimated || usage?.paseoSubagentCostEstimated;
-
   return (
-    <View style={styles.metaItem}>
-      <ProviderIcon
-        provider={agent.provider}
-        serverId={agent.serverId}
-        size={14}
-        uniProps={mutedIconMapping}
-      />
-      <Text style={styles.sessionMetaText}>
-        {agent.model ?? t("sessions.filters.unknownModel")}
-        {agent.thinkingOptionId
-          ? ` · ${formatThinkingOptionLabel({ id: agent.thinkingOptionId })}`
-          : undefined}
-        {" · "}
-        <Text
-          accessibilityLabel={
-            estimated && cost ? t("sessions.filters.estimatedCost", { cost }) : undefined
-          }
-        >
-          {cost ? `${estimated ? "~" : ""}${cost}` : t("sessions.filters.costUnavailable")}
-        </Text>
+    <>
+      {prefix ? " · " : undefined}
+      <Text
+        accessibilityLabel={
+          estimated && cost ? t("sessions.filters.estimatedCost", { cost }) : undefined
+        }
+      >
+        {cost ? `${estimated ? "~" : ""}${cost}` : t("sessions.filters.costUnavailable")}
       </Text>
-    </View>
+    </>
   );
 }
 
@@ -356,7 +405,7 @@ export function AgentList({
   onAgentSelect,
   listFooterComponent,
   showAttentionIndicator = true,
-  showHostColumn = false,
+  fields,
   search,
 }: AgentListProps) {
   const { t } = useTranslation();
@@ -462,7 +511,7 @@ export function AgentList({
           isMobile={isMobile}
           selectedAgentId={selectedAgentId}
           showAttentionIndicator={showAttentionIndicator}
-          showHostColumn={showHostColumn}
+          fields={fields}
           onPress={handleAgentPress}
           onLongPress={handleAgentLongPress}
         />
@@ -475,7 +524,7 @@ export function AgentList({
       search,
       selectedAgentId,
       showAttentionIndicator,
-      showHostColumn,
+      fields,
       t,
     ],
   );

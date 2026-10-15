@@ -281,6 +281,23 @@ export const ar: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "العرض",
+      saveFailed: "تعذّر حفظ تفضيلات السجل. أعد المحاولة لحفظ اختياراتك الحالية.",
+      fields: {
+        project: "المشروع",
+        workspace: "مساحة العمل",
+        branch: "الفرع",
+        host: "المضيف",
+        provider: "المزوّد",
+        model: "النموذج",
+        effort: "مستوى التفكير",
+        turns: "الأدوار",
+        cost: "التكلفة",
+        status: "الحالة",
+        lastActivity: "آخر نشاط",
+      },
+    },
     filters: {
       title: "عوامل التصفية",
       hosts: "المضيفون",

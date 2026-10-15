@@ -287,6 +287,24 @@ export const fr: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "Affichage",
+      saveFailed:
+        "Impossible d’enregistrer les préférences de l’historique. Réessayez pour enregistrer vos choix actuels.",
+      fields: {
+        project: "Projet",
+        workspace: "Espace de travail",
+        branch: "Branche",
+        host: "Hôte",
+        provider: "Fournisseur",
+        model: "Modèle",
+        effort: "Effort",
+        turns: "Tours",
+        cost: "Coût",
+        status: "Statut",
+        lastActivity: "Dernière activité",
+      },
+    },
     filters: {
       title: "Filtres",
       hosts: "Hôtes",

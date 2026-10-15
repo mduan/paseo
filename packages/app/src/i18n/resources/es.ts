@@ -286,6 +286,24 @@ export const es: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "Visualización",
+      saveFailed:
+        "No se pudieron guardar las preferencias del historial. Reintenta para guardar tus selecciones actuales.",
+      fields: {
+        project: "Proyecto",
+        workspace: "Espacio de trabajo",
+        branch: "Rama",
+        host: "Host",
+        provider: "Proveedor",
+        model: "Modelo",
+        effort: "Esfuerzo",
+        turns: "Turnos",
+        cost: "Costo",
+        status: "Estado",
+        lastActivity: "Última actividad",
+      },
+    },
     filters: {
       title: "Filtros",
       hosts: "Hosts",

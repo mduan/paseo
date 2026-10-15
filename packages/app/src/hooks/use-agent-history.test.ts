@@ -178,47 +178,52 @@ describe("fetchAgentHistoryPage", () => {
     });
   });
 
-  it("carries history filters, full-history choices, and display metadata", async () => {
-    const entry = historyEntry({
-      id: "metadata",
-      cwd: "/repo",
-      updatedAt: "2026-04-02T10:00:00.000Z",
-    });
-    entry.agent.model = "configured-model";
-    entry.agent.runtimeInfo = { provider: "codex", sessionId: null, model: "runtime-model" };
-    entry.agent.effectiveThinkingOptionId = "high";
-    entry.agent.lastUsage = { totalCostUsd: 0, totalCostEstimated: true };
-    const filterOptions = {
-      projects: [{ projectKey: "/older-project", projectName: "Older project" }],
-      models: [{ provider: "codex", model: "older-model" }],
-    };
-    const client = createClient([{ ...historyPayload({ entries: [entry] }), filterOptions }]);
-    const filter = {
-      includeArchived: true,
-      archived: true,
-      providers: ["codex"],
-      models: [{ provider: "codex", model: "runtime-model" }],
-    };
-    const page = await fetchAgentHistoryPage({
-      client,
-      serverId: "server-1",
-      cursor: null,
-      filter,
-      includeFilterOptions: true,
-    });
-    expect(client.calls[0]).toEqual({
-      filter,
-      includeFilterOptions: true,
-      sort: [{ key: "updated_at", direction: "desc" }],
-      page: { limit: 200 },
-    });
-    expect(page.filterOptions).toEqual(filterOptions);
-    expect(page.agents[0]).toMatchObject({
-      model: "runtime-model",
-      thinkingOptionId: "high",
-      lastUsage: { totalCostUsd: 0, totalCostEstimated: true },
-    });
-  });
+  it.each([undefined, 0, 1, 24])(
+    "carries history filters and display metadata with %s turns",
+    async (turnCount) => {
+      const entry = historyEntry({
+        id: "metadata",
+        cwd: "/repo",
+        updatedAt: "2026-04-02T10:00:00.000Z",
+      });
+      entry.agent.model = "configured-model";
+      entry.agent.runtimeInfo = { provider: "codex", sessionId: null, model: "runtime-model" };
+      entry.agent.effectiveThinkingOptionId = "high";
+      entry.agent.lastUsage = { totalCostUsd: 0, totalCostEstimated: true };
+      entry.agent.turnCount = turnCount;
+      const filterOptions = {
+        projects: [{ projectKey: "/older-project", projectName: "Older project" }],
+        models: [{ provider: "codex", model: "older-model" }],
+      };
+      const client = createClient([{ ...historyPayload({ entries: [entry] }), filterOptions }]);
+      const filter = {
+        includeArchived: true,
+        archived: true,
+        providers: ["codex"],
+        models: [{ provider: "codex", model: "runtime-model" }],
+      };
+      const page = await fetchAgentHistoryPage({
+        client,
+        serverId: "server-1",
+        cursor: null,
+        filter,
+        includeFilterOptions: true,
+      });
+      expect(client.calls[0]).toEqual({
+        filter,
+        includeFilterOptions: true,
+        sort: [{ key: "updated_at", direction: "desc" }],
+        page: { limit: 200 },
+      });
+      expect(page.filterOptions).toEqual(filterOptions);
+      expect(page.agents[0]).toMatchObject({
+        model: "runtime-model",
+        thinkingOptionId: "high",
+        lastUsage: { totalCostUsd: 0, totalCostEstimated: true },
+        turnCount,
+      });
+    },
+  );
 
   it("passes the cursor when fetching subsequent pages", async () => {
     const client = createClient([

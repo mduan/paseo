@@ -285,6 +285,24 @@ export const ptBR: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "Exibição",
+      saveFailed:
+        "Não foi possível salvar as preferências do histórico. Tente novamente para salvar suas escolhas atuais.",
+      fields: {
+        project: "Projeto",
+        workspace: "Espaço de trabalho",
+        branch: "Branch",
+        host: "Host",
+        provider: "Provedor",
+        model: "Modelo",
+        effort: "Esforço",
+        turns: "Turnos",
+        cost: "Custo",
+        status: "Status",
+        lastActivity: "Última atividade",
+      },
+    },
     filters: {
       title: "Filtros",
       hosts: "Hosts",

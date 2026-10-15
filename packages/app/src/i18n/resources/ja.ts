@@ -286,6 +286,23 @@ export const ja: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "表示",
+      saveFailed: "履歴の設定を保存できませんでした。再試行して現在の選択を保存してください。",
+      fields: {
+        project: "プロジェクト",
+        workspace: "ワークスペース",
+        branch: "ブランチ",
+        host: "ホスト",
+        provider: "プロバイダー",
+        model: "モデル",
+        effort: "思考レベル",
+        turns: "ターン数",
+        cost: "費用",
+        status: "状態",
+        lastActivity: "最終アクティビティ",
+      },
+    },
     filters: {
       title: "フィルター",
       hosts: "ホスト",

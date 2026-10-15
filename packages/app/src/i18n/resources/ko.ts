@@ -282,6 +282,23 @@ export const ko: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "표시",
+      saveFailed: "기록 설정을 저장하지 못했습니다. 다시 시도하여 현재 선택을 저장하세요.",
+      fields: {
+        project: "프로젝트",
+        workspace: "워크스페이스",
+        branch: "브랜치",
+        host: "호스트",
+        provider: "공급자",
+        model: "모델",
+        effort: "사고 수준",
+        turns: "턴 수",
+        cost: "비용",
+        status: "상태",
+        lastActivity: "최근 활동",
+      },
+    },
     filters: {
       title: "필터",
       hosts: "호스트",

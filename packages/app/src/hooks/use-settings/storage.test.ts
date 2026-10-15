@@ -25,6 +25,11 @@ import {
   SIDEBAR_ROW_ITEMS,
 } from "@/components/sidebar/display-preferences/row-items";
 import { DEFAULT_CONTENT_MAX_WIDTH, THEME_OPTIONS } from "@/styles/theme";
+import {
+  DEFAULT_HISTORY_PREFERENCES,
+  HistoryField,
+  HistoryStatus,
+} from "@/components/sessions/preferences";
 
 const LEGACY_SETTINGS_KEY = "@paseo:settings";
 
@@ -772,6 +777,63 @@ describe("saveAppSettings", () => {
     await saveAppSettings({ queryClient, updates: { sidebarRowItems }, deps });
 
     expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems).toEqual(sidebarRowItems);
+  });
+
+  it.each(Object.values(HistoryField))(
+    "persists the History %s field being switched off",
+    async (field) => {
+      const deps = makeDeps();
+      const queryClient = new QueryClient();
+      const fields = { ...DEFAULT_HISTORY_PREFERENCES.fields, [field]: false };
+      const filters = {
+        hosts: ["host-a", "host-b"],
+        projects: ["/repo"],
+        providers: ["codex"],
+        models: [
+          { provider: "codex", model: "gpt-5.4" },
+          { provider: "claude", model: null },
+        ],
+        status: HistoryStatus.Archived,
+      };
+
+      await saveAppSettings({ queryClient, updates: { history: { fields, filters } }, deps });
+
+      expect((await loadAppSettingsFromStorage(deps)).history).toEqual({ fields, filters });
+
+      await saveAppSettings({
+        queryClient,
+        updates: (current) => ({
+          history: { ...current.history, filters: DEFAULT_HISTORY_PREFERENCES.filters },
+        }),
+        deps,
+      });
+      expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+        fields,
+        filters: DEFAULT_HISTORY_PREFERENCES.filters,
+      });
+    },
+  );
+
+  it("restores valid History selections while defaulting missing and invalid fields", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          history: {
+            fields: { host: false, model: "hidden" },
+            filters: { hosts: ["host-a"], projects: "/invalid", status: "archived" },
+          },
+        }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).history).toEqual({
+      fields: { ...DEFAULT_HISTORY_PREFERENCES.fields, host: false },
+      filters: {
+        ...DEFAULT_HISTORY_PREFERENCES.filters,
+        hosts: ["host-a"],
+        status: HistoryStatus.Archived,
+      },
+    });
   });
 });
 

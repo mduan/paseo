@@ -278,6 +278,23 @@ export const en = {
     },
   },
   sessions: {
+    display: {
+      title: "Display",
+      saveFailed: "Couldn't save History preferences. Retry to save your current choices.",
+      fields: {
+        project: "Project",
+        workspace: "Workspace",
+        branch: "Branch",
+        host: "Host",
+        provider: "Provider",
+        model: "Model",
+        effort: "Effort",
+        turns: "Turns",
+        cost: "Cost",
+        status: "Status",
+        lastActivity: "Last activity",
+      },
+    },
     filters: {
       title: "Filters",
       hosts: "Hosts",

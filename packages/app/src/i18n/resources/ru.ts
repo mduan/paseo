@@ -285,6 +285,24 @@ export const ru: TranslationResources = {
     },
   },
   sessions: {
+    display: {
+      title: "Отображение",
+      saveFailed:
+        "Не удалось сохранить настройки истории. Повторите попытку, чтобы сохранить текущий выбор.",
+      fields: {
+        project: "Проект",
+        workspace: "Рабочее пространство",
+        branch: "Ветка",
+        host: "Хост",
+        provider: "Провайдер",
+        model: "Модель",
+        effort: "Уровень размышления",
+        turns: "Ходы",
+        cost: "Стоимость",
+        status: "Статус",
+        lastActivity: "Последняя активность",
+      },
+    },
     filters: {
       title: "Фильтры",
       hosts: "Хосты",

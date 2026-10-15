@@ -4,7 +4,11 @@ import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { openSessions } from "../support/helpers/archive-tab";
 import { createMockIdleAgent } from "../support/helpers/archive-tab";
-import { addConnectedHostAndReload, addOfflineHostAndReload } from "../support/helpers/hosts";
+import {
+  addConnectedHostAndReload,
+  addOfflineHostAndReload,
+  reloadPreservingHostRegistry,
+} from "../support/helpers/hosts";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
@@ -138,6 +142,11 @@ test.describe("History search across hosts", () => {
       await openSessions(page);
       await search(page, NONCE);
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
+      const activeRow = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: activeTitle });
+      await expect(activeRow).toContainText("0 turns");
       await expect(
         page
           .getByRole("button")
@@ -171,6 +180,55 @@ test.describe("History search across hosts", () => {
       await page.getByTestId('sessions-models-filter-item-["mock","e2e-fast-stream"]').click();
       await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [activeTitle]);
+      await selectHost(page, getServerId());
+      await page.getByTestId("sessions-display-trigger").click();
+      await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await page.screenshot({ path: testInfo.outputPath("history-display-menu.png") });
+      await page.getByTestId("sessions-display-model").click();
+      await page.getByTestId("sessions-display-cost").click();
+      await page.getByTestId("sessions-display-project").click();
+      await page.getByTestId("sessions-display-turns").click();
+      await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      await page.keyboard.press("Escape");
+      await expect(activeRow).not.toContainText("e2e-fast-stream");
+      await expect(activeRow).not.toContainText("Cost unavailable");
+      await expect(activeRow).not.toContainText("0 turns");
+      await expect(activeRow.getByTestId(/^agent-row-project-/)).toHaveCount(0);
+      await expect(activeRow.getByTestId(/^agent-row-workspace-/)).toBeVisible();
+      await activeRow.click();
+      await expect(page).toHaveURL(/\/workspace\//);
+      await openSessions(page);
+      await expectChronologicalTitles(page, [activeTitle]);
+      await expect(page.getByTestId("sessions-search-input")).toHaveValue("");
+      await expect(page.getByTestId("sessions-status-filter-trigger")).toContainText("Active");
+      await expect(activeRow).not.toContainText("e2e-fast-stream");
+      await reloadPreservingHostRegistry(page);
+      await expectChronologicalTitles(page, [activeTitle]);
+      await page.getByTestId("sessions-display-trigger").click();
+      await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      await page.getByTestId("sessions-display-turns").click();
+      await page.keyboard.press("Escape");
+      await expect(activeRow).toContainText("0 turns");
+      await page.getByTestId("sessions-projects-filter-trigger").click();
+      await expect(page.getByTestId(/^sessions-projects-filter-item-/)).toHaveCount(2);
+      await expect(page.getByTestId(/^sessions-projects-filter-item-/).nth(0)).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await expect(page.getByTestId(/^sessions-projects-filter-item-/).nth(1)).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await page.keyboard.press("Escape");
       await page.screenshot({ path: testInfo.outputPath("history-desktop.png") });
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(page.getByTestId("sessions-filters-trigger")).toHaveAttribute("role", "button");
@@ -183,10 +241,103 @@ test.describe("History search across hosts", () => {
         .click({ position: { x: 16, y: 16 } });
       await expect(page.getByTestId("sessions-filters-sheet-content")).not.toBeVisible();
       await expectChronologicalTitles(page, [archivedTitle]);
+      await page.getByTestId("sessions-display-trigger").click();
+      await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      await page.getByTestId("sessions-display-status").click();
+      await page
+        .getByRole("button", { name: "Bottom sheet backdrop" })
+        .click({ position: { x: 16, y: 16 } });
+      const archivedRow = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: archivedTitle });
+      await expect(archivedRow.getByText("Archived", { exact: true })).toHaveCount(0);
+      await reloadPreservingHostRegistry(page);
+      await expectChronologicalTitles(page, [archivedTitle]);
+      await expect(archivedRow).not.toContainText("Cost unavailable");
+      await page.getByTestId("sessions-filters-trigger").click();
+      await expect(page.getByTestId("sessions-status-filter-item-archived")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await page
+        .getByRole("button", { name: "Bottom sheet backdrop" })
+        .click({ position: { x: 16, y: 16 } });
       await page.screenshot({ path: testInfo.outputPath("history-compact.png") });
     } finally {
       await firstWorkspace.cleanup();
       await secondWorkspace.cleanup();
+    }
+  });
+
+  test("retries saving History choices after browser storage is full", async ({
+    page,
+  }, testInfo) => {
+    const workspace = await seedWorkspace({ repoPrefix: "history-save-retry-" });
+    const title = `${NONCE} Save preferences recovery`;
+    try {
+      await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title,
+      });
+      await gotoAppShell(page);
+      await openSessions(page);
+      const row = page
+        .getByRole("button")
+        .and(page.getByTestId(/^agent-row-/))
+        .filter({ hasText: title });
+      await expect(row).toContainText("e2e-fast-stream");
+      await page.getByTestId("sessions-display-trigger").click();
+      await page.evaluate(() => {
+        let size = 1024 * 1024;
+        let index = 0;
+        while (size > 0) {
+          try {
+            localStorage.setItem(`history-quota-${index}`, "x".repeat(size));
+            index += 1;
+          } catch (error) {
+            if (!(error instanceof DOMException) || error.name !== "QuotaExceededError")
+              throw error;
+            size = Math.floor(size / 2);
+          }
+        }
+        for (;;) {
+          try {
+            localStorage.setItem("history-quota-0", `${localStorage.getItem("history-quota-0")}x`);
+          } catch (error) {
+            if (!(error instanceof DOMException) || error.name !== "QuotaExceededError")
+              throw error;
+            break;
+          }
+        }
+      });
+      await page.getByTestId("sessions-display-model").click();
+      await page.keyboard.press("Escape");
+      const error = page.getByTestId("sessions-preferences-error");
+      await expect(error).toContainText("Couldn't save History preferences");
+      await expect(row).not.toContainText("e2e-fast-stream");
+      await page.screenshot({ path: testInfo.outputPath("history-save-error.png") });
+      await page.evaluate(() => {
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith("history-quota-")) localStorage.removeItem(key);
+        }
+      });
+      await error.getByRole("button", { name: "Retry", exact: true }).click();
+      await expect(error).toHaveCount(0);
+      await reloadPreservingHostRegistry(page);
+      await expect(row).toBeVisible();
+      await expect(row).not.toContainText("e2e-fast-stream");
+      await page.getByTestId("sessions-display-trigger").click();
+      await expect(page.getByTestId("sessions-display-model")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+    } finally {
+      await workspace.cleanup();
     }
   });
 

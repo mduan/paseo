@@ -29,28 +29,7 @@ import { ProjectIconView } from "@/components/project-icon-view";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHosts } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
-
-export enum HistoryStatus {
-  All = "all",
-  Active = "active",
-  Archived = "archived",
-}
-
-export type HistoryFilters = {
-  hosts: string[];
-  projects: string[];
-  providers: string[];
-  models: AgentHistoryFilterOptions["models"];
-  status: HistoryStatus;
-};
-
-export const EMPTY_HISTORY_FILTERS: HistoryFilters = {
-  hosts: [],
-  projects: [],
-  providers: [],
-  models: [],
-  status: HistoryStatus.All,
-};
+import { EMPTY_HISTORY_FILTERS, HistoryStatus, type HistoryFilters } from "./preferences";
 
 export function historyModelKey(model: AgentHistoryFilterOptions["models"][number]): string {
   return JSON.stringify([model.provider, model.model]);

@@ -5,6 +5,11 @@ import type { DesktopSettings } from "@/desktop/settings/desktop-settings";
 import type { AppLanguage } from "@/i18n/locales";
 import type { SidebarNavPreference } from "@/sidebar-nav/model";
 import {
+  DEFAULT_HISTORY_PREFERENCES,
+  HistoryPreferencesSchema,
+  type HistoryPreferences,
+} from "@/components/sessions/preferences";
+import {
   DEFAULT_USAGE_AUTO_REFRESH,
   DEFAULT_USAGE_PREFERENCES,
   UsageAutoRefresh,
@@ -107,6 +112,7 @@ export interface AppSettings {
   sidebarNavItems: SidebarNavPreference[];
   /** Sidebar footer items in display order; empty means the default order, all visible. */
   sidebarFooterItems: SidebarNavPreference[];
+  history: HistoryPreferences;
   /** How usage reads and which windows the sidebar summary shows. */
   usage: UsagePreferences;
   usageAutoRefresh: UsageAutoRefresh;
@@ -172,6 +178,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarNavItems: [],
   sidebarFooterItems: [],
+  history: DEFAULT_HISTORY_PREFERENCES,
   usage: DEFAULT_USAGE_PREFERENCES,
   usageAutoRefresh: DEFAULT_USAGE_AUTO_REFRESH,
   autoExpandReasoning: false,
@@ -274,6 +281,7 @@ const StoredAppSettingsSchema = z
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
+    history: HistoryPreferencesSchema.catch(DEFAULT_HISTORY_PREFERENCES),
     usage: UsagePreferencesSchema,
     usageAutoRefresh: z.enum(UsageAutoRefresh).catch(DEFAULT_USAGE_AUTO_REFRESH),
     autoExpandReasoning: z.boolean().catch(false),
