@@ -1,5 +1,6 @@
 import {
   buildSubagentSubtitle,
+  formatEffort as formatVariant,
   type ProviderSubagentSubtitle,
 } from "../../provider-subagents/subtitle-format.js";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
@@ -75,15 +76,4 @@ export function foldOpenCodeSubagentPresentation(
 function readPart(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function formatVariant(variant: string | undefined): string | undefined {
-  const normalized = readPart(variant);
-  if (!normalized) return undefined;
-  if (normalized === "xhigh") return "Extra High";
-  return normalized
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }

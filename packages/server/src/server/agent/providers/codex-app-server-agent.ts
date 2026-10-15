@@ -60,6 +60,7 @@ import { rollupProviderSubagentCosts } from "../provider-subagents/cost.js";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
 import {
   buildSubagentSubtitle,
+  formatEffort,
   formatSubagentCosts,
 } from "../provider-subagents/subtitle-format.js";
 import {
@@ -3489,6 +3490,7 @@ interface CodexSubAgentCallState {
 /** What a child thread's subtitle reports. Codex reports tokens per thread but no cost. */
 interface CodexSubAgentUsage {
   model?: string;
+  effort?: string;
   tokens?: number;
   costUsd?: number;
   rolloutCost?: Promise<CodexRolloutCost | undefined>;
@@ -6382,6 +6384,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       if (!rolloutCost || !prices) return;
       usage.costUsd = await rolloutCost.read({ prices, serviceTier: this.serviceTier });
       usage.model = rolloutCost.model;
+      usage.effort = rolloutCost.effort;
       if (this.subAgentUsageByThreadId.get(threadId) !== usage) return;
       this.refreshCostPresentation();
     } catch (error) {
@@ -6402,6 +6405,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       context: [
         detail?.type === "sub_agent" ? (detail.subAgentType ?? "Codex subagent") : undefined,
         usage.model,
+        formatEffort(usage.effort),
       ],
       usage: [
         formatSubagentTokens(usage.tokens),

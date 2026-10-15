@@ -3284,7 +3284,7 @@ describe("Codex app-server provider", () => {
     });
   });
 
-  test("reports a child's tokens and estimated cost in its subtitle", async () => {
+  test("reports a child's model, effort, tokens, and estimated cost", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "codex-child-cost-"));
     const rootRolloutPath = path.join(dir, "root-rollout.jsonl");
     const childRolloutPath = path.join(dir, "child-rollout.jsonl");
@@ -3296,7 +3296,7 @@ describe("Codex app-server provider", () => {
     writeFileSync(
       childRolloutPath,
       [
-        { type: "turn_context", payload: { model: "gpt-6-luna" } },
+        { type: "turn_context", payload: { model: "gpt-6-luna", effort: "low" } },
         {
           type: "event_msg",
           payload: {
@@ -3372,11 +3372,11 @@ describe("Codex app-server provider", () => {
       await vi.waitFor(() => {
         expect(subtitles).toEqual([
           "Child · 42k tokens",
-          "Child · gpt-6-luna · 42k tokens · ~$2.00",
+          "Child · gpt-6-luna · Low · 42k tokens · ~$2.00",
         ]);
         expect(subtitleParts).toEqual([
           { context: "Child", usage: "42k tokens" },
-          { context: "Child · gpt-6-luna", usage: "42k tokens · ~$2.00" },
+          { context: "Child · gpt-6-luna · Low", usage: "42k tokens · ~$2.00" },
         ]);
         expect(usages.at(-1)).toMatchObject({
           subagentCostUsd: 2,

@@ -1,6 +1,7 @@
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
 import {
   buildSubagentSubtitle,
+  formatEffort,
   formatSubagentCosts,
   type ProviderSubagentSubtitle,
 } from "../../../provider-subagents/subtitle-format.js";
@@ -46,15 +47,4 @@ function formatModel(modelId: string | undefined): string | undefined {
   const normalized = readPart(modelId);
   if (!normalized) return undefined;
   return findClaudeModel(normalized)?.label ?? normalized;
-}
-
-function formatEffort(effort: string | undefined): string | undefined {
-  const normalized = readPart(effort);
-  if (!normalized) return undefined;
-  if (normalized === "xhigh") return "Extra High";
-  return normalized
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
