@@ -206,8 +206,11 @@
       }
       .prompt {
         font-size: 14px;
-        margin: 0 0 9px;
+        margin: 8px 0 0;
         overflow-wrap: anywhere;
+      }
+      .prompt:first-child {
+        margin-top: 0;
       }
       .tray {
         display: flex;
@@ -329,22 +332,13 @@
         color: var(--muted);
         margin: 10px 1px 0;
       }
-      .variant-b .row-body {
-        display: flex;
-        gap: 14px;
-        align-items: center;
-      }
       .variant-b .image-attachment {
         width: 142px;
         height: 90px;
         flex-shrink: 0;
       }
       .variant-b .image-tray {
-        flex: 0 0 auto;
-        max-width: 48%;
-      }
-      .variant-b .image-tray + .details {
-        min-width: 0;
+        margin-bottom: 8px;
       }
       .variant-b .image-name {
         display: block;
@@ -356,9 +350,6 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
         width: 100%;
-      }
-      .variant-b .prompt {
-        margin-bottom: 8px;
       }
       .variant-c .summary {
         display: flex;
@@ -384,9 +375,6 @@
       }
       .variant-c .full-tray {
         padding-top: 10px;
-      }
-      .variant-c .prompt {
-        margin-bottom: 6px;
       }
       .catalog {
         max-width: 1060px;
@@ -552,13 +540,6 @@
         .switcher label {
           font-size: 11px;
         }
-        .variant-b .row-body {
-          display: block;
-        }
-        .variant-b .image-tray {
-          max-width: 100%;
-          margin-bottom: 10px;
-        }
       }
       .narrow .queue-row {
         grid-template-columns: 16px minmax(0, 1fr);
@@ -573,13 +554,6 @@
       }
       .narrow .app-header .branch {
         display: none;
-      }
-      .narrow .variant-b .row-body {
-        display: block;
-      }
-      .narrow .variant-b .image-tray {
-        max-width: 100%;
-        margin-bottom: 10px;
       }
     </style>
   </head>
@@ -816,21 +790,21 @@
           name: "Inline attachment tray",
           title: "A · Inline attachment tray",
           description:
-            "Recommended. Keep the current queue row and show attachments under its text. Image-only prompts show the image itself; other attachments use labeled pills.",
+            "Recommended. Show attachments above the prompt text, matching the composer and sent messages. Image-only prompts show the image itself; other attachments use labeled pills.",
         },
         {
           key: "B",
           name: "Preview-led rows",
           title: "B · Preview-led rows",
           description:
-            "Give image prompts a larger leading preview. Files and context use a list, with more room for names and source details.",
+            "Show larger image previews, followed by a file and context list, above the prompt text. Names and source details have more room.",
         },
         {
           key: "C",
           name: "Compact with disclosure",
           title: "C · Compact with disclosure",
           description:
-            "Show a small image thumbnail and an attachment count in each row. Expand the count to see every file and context item; clicking the thumbnail still opens the image.",
+            "Show a small image thumbnail and an attachment count above the prompt text. Expand the count to see every file and context item; clicking the thumbnail still opens the image.",
         },
       ];
       const params = new URLSearchParams(location.search);
@@ -853,13 +827,14 @@
         const images = row.attachments.filter((id) => attachments[id].kind === "image");
         const other = row.attachments.filter((id) => attachments[id].kind !== "image");
         const tray = `<div class="tray">${row.attachments.map(attachmentMarkup).join("")}</div>`;
-        let body = prompt + tray;
+        let body = (row.attachments.length ? tray : "") + prompt;
         if (variantIndex === 1)
-          body = `${images.length ? `<div class="tray image-tray">${images.map(attachmentMarkup).join("")}</div>` : ""}<div class="details">${prompt}${images.length && !row.text ? `<span class="image-name">${escapeHtml(attachments[images[0]].title)}${images.length > 1 ? ` + ${images.length - 1} more` : ""}</span>` : ""}<div class="tray">${other.map(attachmentMarkup).join("")}</div></div>`;
+          body = `${images.length ? `<div class="tray image-tray">${images.map(attachmentMarkup).join("")}</div>` : ""}${images.length && !row.text ? `<span class="image-name">${escapeHtml(attachments[images[0]].title)}${images.length > 1 ? ` + ${images.length - 1} more` : ""}</span>` : ""}${other.length ? `<div class="tray">${other.map(attachmentMarkup).join("")}</div>` : ""}${prompt}`;
         if (variantIndex === 2)
           body =
-            prompt +
-            `<div class="summary">${images.slice(0, 1).map(attachmentMarkup).join("")}${row.attachments.length ? `<button class="reveal" data-reveal="${index}" aria-expanded="false" aria-controls="tray-${index}">${row.attachments.length} attachment${row.attachments.length > 1 ? "s" : ""} ▾</button>` : ""}${!row.text && images.length === 1 ? `<span class="summary-label">${escapeHtml(attachments[images[0]].title)}</span>` : ""}</div><div class="full-tray" id="tray-${index}" hidden>${tray}</div>`;
+            (row.attachments.length
+              ? `<div class="summary">${images.slice(0, 1).map(attachmentMarkup).join("")}<button class="reveal" data-reveal="${index}" aria-expanded="false" aria-controls="tray-${index}">${row.attachments.length} attachment${row.attachments.length > 1 ? "s" : ""} ▾</button>${!row.text && images.length === 1 ? `<span class="summary-label">${escapeHtml(attachments[images[0]].title)}</span>` : ""}</div><div class="full-tray" id="tray-${index}" hidden>${tray}</div>`
+              : "") + prompt;
         return `<article class="queue-row" aria-label="Queued prompt ${index + 1}"><button class="grip" data-demo="Reorder" aria-label="Reorder queued prompt ${index + 1}">${icon("grip")}</button><div class="row-body">${body}</div><div class="actions"><button class="round" data-demo="Edit" aria-label="Edit queued prompt ${index + 1}">${icon("edit")}</button><button class="round send" data-demo="Send now" aria-label="Send queued prompt ${index + 1} now">${icon("up")}</button></div></article>`;
       }
       function render() {
