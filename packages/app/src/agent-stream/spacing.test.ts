@@ -37,6 +37,20 @@ function toolCallBlock(id: string): Extract<StreamItem, { kind: "tool_call" }> {
 }
 
 describe("getGapBetweenStreamItems", () => {
+  it("leaves space below the user message footer before an assistant response", () => {
+    const user: Extract<StreamItem, { kind: "user_message" }> = {
+      kind: "user_message",
+      id: "u",
+      text: "Hello",
+      timestamp: new Date("2026-05-01T00:00:00.000Z"),
+    };
+    const assistant = assistantBlock({ id: "a", blockGroupId: "g", blockIndex: 0 });
+
+    expect(getGapBetweenStreamItems(user, assistant)).toBe(16);
+    expect(getGapBetweenStreamItems(user, user)).toBe(4);
+    expect(getGapBetweenStreamItems(user, null)).toBe(0);
+  });
+
   it("spaces text between tool rows like the tool rows themselves", () => {
     const text = assistantBlock({ id: "a", blockGroupId: "g", blockIndex: 0 });
     const tool = toolCallBlock("t");
