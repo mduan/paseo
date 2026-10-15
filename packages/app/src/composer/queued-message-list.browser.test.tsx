@@ -7,6 +7,47 @@ import { QueuedMessageList } from "./queued-message-list";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "@/i18n/i18next";
 import { persistAttachmentFromDataUrl } from "@/attachments/service";
+import type { ComposerAttachment } from "@/attachments/types";
+import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
+
+const issueItem: ForgeSearchItem = {
+  kind: "issue",
+  number: 42,
+  title: "Sample issue",
+  url: "https://example.com/issues/42",
+  state: "open",
+  body: "Issue context",
+  labels: [],
+  baseRefName: null,
+  headRefName: null,
+};
+const changeRequestItem: ForgeSearchItem = {
+  ...issueItem,
+  kind: "change_request",
+  title: "Sample pull request",
+  url: "https://example.com/pull/42",
+};
+const externalAttachments: Extract<ComposerAttachment, { item: unknown }>[] = [
+  { kind: "forge_issue", item: issueItem },
+  { kind: "forge_change_request", item: changeRequestItem },
+  { kind: "github_issue", item: issueItem },
+  { kind: "github_pr", item: changeRequestItem },
+  {
+    kind: "plugin_resource",
+    pluginId: "notion",
+    sourceId: "pages",
+    sourceTitle: "Notion page",
+    sourceIcon: "FileText",
+    item: {
+      id: "notes",
+      identifier: "Design notes",
+      title: "Sample design notes",
+      url: "https://example.com/notes",
+      text: "Design context",
+      resourceType: "page",
+    },
+  },
+];
 
 const messages: QueuedComposerMessage[] = [
   { id: "first", text: "First queued message", attachments: [] },
@@ -19,7 +60,7 @@ let container: HTMLDivElement;
 const onReorder = vi.fn();
 const onEdit = vi.fn();
 const onSendNow = vi.fn();
-const onOpenImage = vi.fn();
+const onOpenAttachment = vi.fn();
 
 function render(queuedMessages = messages) {
   act(() => {
@@ -30,7 +71,7 @@ function render(queuedMessages = messages) {
           onReorder={onReorder}
           onEdit={onEdit}
           onSendNow={onSendNow}
-          onOpenImage={onOpenImage}
+          onOpenAttachment={onOpenAttachment}
           editLabel="Edit queued message"
           reorderLabel="Reorder queued message"
           sendNowLabel="Send queued message now"
@@ -91,6 +132,20 @@ afterEach(() => {
 });
 
 describe("queued message reordering", () => {
+  it.each(externalAttachments)(
+    "opens queued $kind attachments without editing or sending",
+    async (attachment) => {
+      render([{ id: "linked", text: "Review this context.", attachments: [attachment] }]);
+      await act(async () =>
+        userEvent.click(page.getByRole("button", { name: attachment.item.title })),
+      );
+      expect(onOpenAttachment).toHaveBeenCalledExactlyOnceWith(attachment);
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(onSendNow).not.toHaveBeenCalled();
+      expect(onReorder).not.toHaveBeenCalled();
+    },
+  );
+
   it("shows an image-only prompt and opens its image without sending or dragging", async () => {
     const metadata = await persistAttachmentFromDataUrl({
       dataUrl:
@@ -104,7 +159,7 @@ describe("queued message reordering", () => {
     await expect.poll(() => image.element().querySelector("img")?.naturalWidth).toBe(1);
     await act(async () => userEvent.click(image));
 
-    expect(onOpenImage).toHaveBeenCalledExactlyOnceWith(metadata);
+    expect(onOpenAttachment).toHaveBeenCalledExactlyOnceWith({ kind: "image", metadata });
     expect(onSendNow).not.toHaveBeenCalled();
     expect(onReorder).not.toHaveBeenCalled();
     await expect

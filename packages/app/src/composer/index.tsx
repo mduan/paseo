@@ -2333,13 +2333,20 @@ function ComposerContentImpl({
         onEdit={handleEditQueuedMessage}
         onReorder={handleReorderQueuedMessages}
         onSendNow={handleSendQueuedNow}
-        onOpenImage={setLightboxMetadata}
+        onOpenAttachment={handleOpenAttachment}
         editLabel={t("composer.attachments.editQueuedMessage")}
         reorderLabel={t("composer.attachments.reorderQueuedMessage")}
         sendNowLabel={t("composer.attachments.sendQueuedMessageNow")}
       />
     ),
-    [handleEditQueuedMessage, handleReorderQueuedMessages, handleSendQueuedNow, queuedMessages, t],
+    [
+      handleEditQueuedMessage,
+      handleReorderQueuedMessages,
+      handleSendQueuedNow,
+      handleOpenAttachment,
+      queuedMessages,
+      t,
+    ],
   );
 
   const autocompleteConfiguration = useMemo(

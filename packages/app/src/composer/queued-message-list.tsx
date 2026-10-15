@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { ArrowUp, GripVertical, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { AttachmentMetadata, ComposerAttachment } from "@/attachments/types";
+import type { ComposerAttachment } from "@/attachments/types";
 import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import {
   AttachmentFrame,
@@ -11,6 +11,7 @@ import {
   AttachmentThumbnail,
 } from "@/components/attachment-pill";
 import { DraggableList } from "@/components/draggable-list";
+import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
 import type { DraggableRenderItemInfo } from "@/components/draggable-list.types";
 import { isNative, isWeb } from "@/constants/platform";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
@@ -21,7 +22,7 @@ type QueuedMessageListProps = Readonly<{
   onEdit: (id: string) => void;
   onReorder: (messages: QueuedComposerMessage[]) => void;
   onSendNow: (id: string) => void;
-  onOpenImage: (metadata: AttachmentMetadata) => void;
+  onOpenAttachment: (attachment: ComposerAttachment) => void;
   editLabel: string;
   reorderLabel: string;
   sendNowLabel: string;
@@ -36,7 +37,7 @@ export function QueuedMessageList({
   onEdit,
   onReorder,
   onSendNow,
-  onOpenImage,
+  onOpenAttachment,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -60,13 +61,13 @@ export function QueuedMessageList({
         dragHandleProps={dragHandleProps}
         onEdit={onEdit}
         onSendNow={onSendNow}
-        onOpenImage={onOpenImage}
+        onOpenAttachment={onOpenAttachment}
         editLabel={editLabel}
         reorderLabel={reorderLabel}
         sendNowLabel={sendNowLabel}
       />
     ),
-    [editLabel, onEdit, onOpenImage, onSendNow, reorderLabel, sendNowLabel],
+    [editLabel, onEdit, onOpenAttachment, onSendNow, reorderLabel, sendNowLabel],
   );
 
   if (!queuedMessages.length) return null;
@@ -99,7 +100,7 @@ function QueuedMessageRow({
   dragHandleProps,
   onEdit,
   onSendNow,
-  onOpenImage,
+  onOpenAttachment,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -134,7 +135,7 @@ function QueuedMessageRow({
           <View style={styles.attachmentTray} testID="queued-message-attachments">
             {item.attachments.map((attachment) => (
               <View key={JSON.stringify(attachment)} style={styles.attachment}>
-                <QueuedAttachment attachment={attachment} onOpenImage={onOpenImage} />
+                <QueuedAttachment attachment={attachment} onOpenAttachment={onOpenAttachment} />
               </View>
             ))}
           </View>
@@ -169,28 +170,40 @@ function QueuedMessageRow({
 
 type QueuedAttachmentProps = Readonly<{
   attachment: ComposerAttachment;
-  onOpenImage: QueuedMessageListProps["onOpenImage"];
+  onOpenAttachment: QueuedMessageListProps["onOpenAttachment"];
 }>;
 
-function QueuedAttachment({ attachment, onOpenImage }: QueuedAttachmentProps) {
+function QueuedAttachment({ attachment, onOpenAttachment }: QueuedAttachmentProps) {
   const { t } = useTranslation();
-  const handleOpenImage = useCallback(() => {
-    if (attachment.kind === "image") onOpenImage(attachment.metadata);
-  }, [attachment, onOpenImage]);
+  const handleOpen = useCallback(() => {
+    onOpenAttachment(attachment);
+  }, [attachment, onOpenAttachment]);
 
   if (attachment.kind === "image") {
     return (
       <AttachmentFrame
-        onPress={handleOpenImage}
+        onPress={handleOpen}
         accessibilityLabel={t("composer.attachments.openImage")}
       >
         <AttachmentThumbnail metadata={attachment.metadata} />
       </AttachmentFrame>
     );
   }
+  if (attachment.kind === "review") {
+    return (
+      <ReviewAttachmentPill
+        attachment={attachment.attachment}
+        testID="queued-review-attachment-pill"
+      />
+    );
+  }
   const content = getComposerAttachmentPillContent(attachment, t);
+  const opensLink = "item" in attachment;
   return (
-    <AttachmentFrame>
+    <AttachmentFrame
+      onPress={opensLink ? handleOpen : undefined}
+      accessibilityLabel={content.title}
+    >
       <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
     </AttachmentFrame>
   );
