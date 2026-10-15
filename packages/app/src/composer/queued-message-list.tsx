@@ -2,6 +2,14 @@ import { useCallback, useMemo, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ArrowUp, GripVertical, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { useTranslation } from "react-i18next";
+import type { AttachmentMetadata, ComposerAttachment } from "@/attachments/types";
+import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
+import {
+  AttachmentFrame,
+  AttachmentLabel,
+  AttachmentThumbnail,
+} from "@/components/attachment-pill";
 import { DraggableList } from "@/components/draggable-list";
 import type { DraggableRenderItemInfo } from "@/components/draggable-list.types";
 import { isNative, isWeb } from "@/constants/platform";
@@ -13,6 +21,7 @@ type QueuedMessageListProps = Readonly<{
   onEdit: (id: string) => void;
   onReorder: (messages: QueuedComposerMessage[]) => void;
   onSendNow: (id: string) => void;
+  onOpenImage: (metadata: AttachmentMetadata) => void;
   editLabel: string;
   reorderLabel: string;
   sendNowLabel: string;
@@ -27,6 +36,7 @@ export function QueuedMessageList({
   onEdit,
   onReorder,
   onSendNow,
+  onOpenImage,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -50,12 +60,13 @@ export function QueuedMessageList({
         dragHandleProps={dragHandleProps}
         onEdit={onEdit}
         onSendNow={onSendNow}
+        onOpenImage={onOpenImage}
         editLabel={editLabel}
         reorderLabel={reorderLabel}
         sendNowLabel={sendNowLabel}
       />
     ),
-    [editLabel, onEdit, onSendNow, reorderLabel, sendNowLabel],
+    [editLabel, onEdit, onOpenImage, onSendNow, reorderLabel, sendNowLabel],
   );
 
   if (!queuedMessages.length) return null;
@@ -88,6 +99,7 @@ function QueuedMessageRow({
   dragHandleProps,
   onEdit,
   onSendNow,
+  onOpenImage,
   editLabel,
   reorderLabel,
   sendNowLabel,
@@ -117,9 +129,22 @@ function QueuedMessageRow({
       >
         <ThemedGripVertical size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
       </DragHandle>
-      <Text style={styles.queueText} numberOfLines={2} ellipsizeMode="tail">
-        {item.text}
-      </Text>
+      <View style={styles.queueContent}>
+        {item.attachments.length > 0 ? (
+          <View style={styles.attachmentTray} testID="queued-message-attachments">
+            {item.attachments.map((attachment) => (
+              <View key={JSON.stringify(attachment)} style={styles.attachment}>
+                <QueuedAttachment attachment={attachment} onOpenImage={onOpenImage} />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {item.text ? (
+          <Text style={styles.queueText} numberOfLines={2} ellipsizeMode="tail">
+            {item.text}
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.queueActions}>
         <Pressable
           onPress={handleEdit}
@@ -139,6 +164,35 @@ function QueuedMessageRow({
         </Pressable>
       </View>
     </View>
+  );
+}
+
+type QueuedAttachmentProps = Readonly<{
+  attachment: ComposerAttachment;
+  onOpenImage: QueuedMessageListProps["onOpenImage"];
+}>;
+
+function QueuedAttachment({ attachment, onOpenImage }: QueuedAttachmentProps) {
+  const { t } = useTranslation();
+  const handleOpenImage = useCallback(() => {
+    if (attachment.kind === "image") onOpenImage(attachment.metadata);
+  }, [attachment, onOpenImage]);
+
+  if (attachment.kind === "image") {
+    return (
+      <AttachmentFrame
+        onPress={handleOpenImage}
+        accessibilityLabel={t("composer.attachments.openImage")}
+      >
+        <AttachmentThumbnail metadata={attachment.metadata} />
+      </AttachmentFrame>
+    );
+  }
+  const content = getComposerAttachmentPillContent(attachment, t);
+  return (
+    <AttachmentFrame>
+      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
+    </AttachmentFrame>
   );
 }
 
@@ -165,8 +219,20 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  queueText: {
+  queueContent: {
     flex: 1,
+    minWidth: 0,
+    gap: theme.spacing[2],
+  },
+  attachmentTray: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  attachment: {
+    maxWidth: "100%",
+  },
+  queueText: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
   },

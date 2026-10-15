@@ -226,6 +226,47 @@ test.describe("Composer attachments", () => {
     }
   });
 
+  test("shows queued attachments above text and expands image-only prompts", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const agent = await startRunningMockAgent(page, {
+      prefix: "attach-queue-preview-",
+      model: "one-minute-stream",
+      prompt: "Stay running while attachments queue.",
+    });
+    try {
+      await attachImageFromMenu(page, TEST_IMAGE);
+      await sendDraftToQueue(page);
+      const trays = page.getByTestId("queued-message-attachments");
+      await expect(trays).toHaveCount(1);
+      await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
+      await openImageLightbox(page);
+      await closeImageLightbox(page);
+
+      await attachFileFromMenu(page, TEST_JSON);
+      await fillComposerDraft(page, "Use the attached configuration.");
+      await sendDraftToQueue(page);
+      await expect(trays).toHaveCount(2);
+      const file = trays.nth(1).getByText(TEST_JSON.name);
+      await expect(file).toBeVisible();
+      const text = page.getByText("Use the attached configuration.", { exact: true });
+      const fileBounds = await file.boundingBox();
+      const textBounds = await text.boundingBox();
+      expect(fileBounds!.y + fileBounds!.height).toBeLessThan(textBounds!.y);
+      await expectComposerDraft(page, "");
+      await page.screenshot({ path: testInfo.outputPath("queued-attachments-desktop.png") });
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(file).toBeVisible();
+      await openImageLightbox(page);
+      await closeImageLightbox(page);
+      await page.screenshot({ path: testInfo.outputPath("queued-attachments-compact.png") });
+    } finally {
+      await agent.cleanup();
+    }
+  });
+
   test("Escape interrupt cancels the running agent and preserves composer draft", async ({
     page,
   }) => {

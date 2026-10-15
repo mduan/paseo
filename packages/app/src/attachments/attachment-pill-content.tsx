@@ -10,16 +10,58 @@ import {
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
-import type { WorkspaceComposerAttachment } from "@/attachments/types";
+import type { ComposerAttachment, WorkspaceComposerAttachment } from "@/attachments/types";
 import { getFileTypeLabel } from "@/attachments/file-types";
-import { isPullRequestContextAttachment } from "@/attachments/workspace-attachment-utils";
+import {
+  isPullRequestContextAttachment,
+  isWorkspaceAttachment,
+} from "@/attachments/workspace-attachment-utils";
+import { getWorkspaceFileAttachmentSubtitle } from "@/attachments/workspace-file";
 import { getForgePresentation } from "@/git/forge";
+import { resolvePluginIcon } from "@/plugins/icons";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
 export interface AttachmentPillContent {
   icon: ReactNode;
   title: string;
   subtitle: string;
+}
+
+export function getComposerAttachmentPillContent(
+  attachment: Exclude<ComposerAttachment, { kind: "image" }>,
+  t: TFunction,
+): AttachmentPillContent {
+  if (isWorkspaceAttachment(attachment)) {
+    return getWorkspaceAttachmentPillContent(attachment, t);
+  }
+  if (attachment.kind === "file") {
+    return getAgentAttachmentPillContent(attachment.attachment, t);
+  }
+  if (attachment.kind === "workspace_file") {
+    return {
+      icon: attachmentFileIcon,
+      title: attachment.path.split("/").pop() ?? attachment.path,
+      subtitle: getWorkspaceFileAttachmentSubtitle(attachment),
+    };
+  }
+  if (attachment.kind === "plugin_resource") {
+    const Icon = resolvePluginIcon(attachment.sourceIcon);
+    return {
+      icon: <ThemedResourceIcon Icon={Icon} uniProps={iconForegroundMutedMapping} />,
+      title: attachment.item.title,
+      subtitle: `${attachment.sourceTitle} ${attachment.item.identifier}`,
+    };
+  }
+  const item = attachment.item;
+  const presentation = getForgePresentation(item.forge ?? "github");
+  const isChangeRequest = item.kind === "change_request";
+  const kind = isChangeRequest ? presentation.changeRequestAbbrev : "Issue";
+  const prefix = isChangeRequest ? presentation.numberPrefix : presentation.issueNumberPrefix;
+  return {
+    icon: isChangeRequest ? attachmentGithubPrIcon : attachmentGithubIssueIcon,
+    title: item.title,
+    subtitle: `${kind} ${prefix}${item.number}`,
+  };
 }
 
 function getReviewSubtitle(count: number, t: TFunction): string {
@@ -145,6 +187,18 @@ const ThemedAttachmentGitPullRequest = withUnistyles(GitPullRequest);
 const ThemedAttachmentCircleDot = withUnistyles(CircleDot);
 const ThemedAttachmentMessageSquareCode = withUnistyles(MessageSquareCode);
 const ThemedAttachmentMousePointer = withUnistyles(MousePointer2);
+
+function ResourceIcon({
+  Icon,
+  color = "",
+}: {
+  Icon: ReturnType<typeof resolvePluginIcon>;
+  color?: string;
+}) {
+  return <Icon size={ICON_SIZE.sm} color={color} />;
+}
+
+const ThemedResourceIcon = withUnistyles(ResourceIcon);
 
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 

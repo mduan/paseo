@@ -1,24 +1,9 @@
-import { useCallback, useMemo } from "react";
-import { withUnistyles } from "react-native-unistyles";
+import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { AttachmentLabel, AttachmentPill } from "@/components/attachment-pill";
+import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
 import type { ComposerAttachment } from "@/attachments/types";
-import { ICON_SIZE, type Theme } from "@/styles/theme";
-import { resolvePluginIcon } from "../icons";
 import type { PluginResourceComposerAttachment } from "./model";
-
-const iconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-
-function ResourceIcon({
-  Icon,
-  color = "",
-}: {
-  Icon: ReturnType<typeof resolvePluginIcon>;
-  color?: string;
-}) {
-  return <Icon size={ICON_SIZE.sm} color={color} />;
-}
-
-const ThemedResourceIcon = withUnistyles(ResourceIcon);
 
 interface PluginResourceAttachmentPillProps {
   attachment: PluginResourceComposerAttachment;
@@ -39,13 +24,10 @@ export function PluginResourceAttachmentPill({
   openLabel,
   removeLabel,
 }: PluginResourceAttachmentPillProps) {
-  const Icon = resolvePluginIcon(attachment.sourceIcon);
+  const { t } = useTranslation();
+  const content = getComposerAttachmentPillContent(attachment, t);
   const handleOpen = useCallback(() => onOpen(attachment), [attachment, onOpen]);
   const handleRemove = useCallback(() => onRemove(index), [index, onRemove]);
-  const icon = useMemo(
-    () => <ThemedResourceIcon Icon={Icon} uniProps={iconColorMapping} />,
-    [Icon],
-  );
   return (
     <AttachmentPill
       testID="composer-plugin-resource-attachment-pill"
@@ -55,11 +37,7 @@ export function PluginResourceAttachmentPill({
       removeAccessibilityLabel={removeLabel(attachment.sourceTitle, attachment.item.identifier)}
       disabled={disabled}
     >
-      <AttachmentLabel
-        icon={icon}
-        title={attachment.item.title}
-        subtitle={`${attachment.sourceTitle} ${attachment.item.identifier}`}
-      />
+      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
     </AttachmentPill>
   );
 }
