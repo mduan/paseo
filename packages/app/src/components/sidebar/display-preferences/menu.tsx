@@ -542,10 +542,10 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Three groups: workspace details, the trailing slot, and project header counts. Picking the
+ * Three groups: project header counts, workspace details, and the trailing slot. Picking the
  * trailing choice already showing empties the slot and gives the width back to the title.
  *
- * CI is the one item above the separator with three answers rather than two, so it opens a page
+ * CI is the one workspace detail with three answers rather than two, so it opens a page
  * instead of ticking, and it goes last: a row that navigates does not belong in the middle of a
  * column you are running down with your eyes ticking things on and off.
  */
@@ -557,6 +557,16 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
   );
   return (
     <>
+      <MenuItem
+        leading={countIcon}
+        selected={preferences.showWorkspaceCount}
+        closeOnSelect={false}
+        onSelect={preferences.toggleWorkspaceCount}
+        testID="sidebar-show-workspace-count"
+      >
+        {t("sidebar.display.show.workspaceCount")}
+      </MenuItem>
+      <MenuSeparator />
       {SIDEBAR_ROW_ITEMS.map((item) => (
         <OptionItem
           key={item}
@@ -583,16 +593,6 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
           testID={`sidebar-workspace-trailing-${choice}`}
         />
       ))}
-      <MenuSeparator />
-      <MenuItem
-        leading={countIcon}
-        selected={preferences.showWorkspaceCount}
-        closeOnSelect={false}
-        onSelect={preferences.toggleWorkspaceCount}
-        testID="sidebar-show-workspace-count"
-      >
-        {t("sidebar.display.show.workspaceCount")}
-      </MenuItem>
     </>
   );
 }
