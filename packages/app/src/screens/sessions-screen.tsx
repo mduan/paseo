@@ -17,6 +17,7 @@ import { HistoryDisplayMenu } from "@/components/sessions/display-menu";
 import {
   EMPTY_HISTORY_FILTERS,
   HistoryField,
+  HistoryAgentType,
   HistoryStatus,
   type HistoryFilters,
   type HistoryPreferences,
@@ -117,6 +118,9 @@ function SessionsScreenContent() {
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const filter = useMemo(
     () => ({
+      ...(filters.agentType === HistoryAgentType.All
+        ? {}
+        : { isSubagent: filters.agentType === HistoryAgentType.Subagent }),
       projectKeys: filters.projects,
       providers: filters.providers,
       models: filters.models,
@@ -125,7 +129,7 @@ function SessionsScreenContent() {
         ? {}
         : { archived: filters.status === HistoryStatus.Archived }),
     }),
-    [filters.projects, filters.providers, filters.models, filters.status],
+    [filters.projects, filters.providers, filters.models, filters.status, filters.agentType],
   );
   const {
     agents,
@@ -135,6 +139,7 @@ function SessionsScreenContent() {
     isError,
     isSearchSupported,
     isFilterSupported,
+    isAgentTypeFilterSupported,
     filterOptions,
     isSearchTruncated,
     hostErrors,
@@ -205,6 +210,7 @@ function SessionsScreenContent() {
       filters={filters}
       options={filterOptions}
       supported={isFilterSupported}
+      agentTypeSupported={isAgentTypeFilterSupported}
       onChange={setFilters}
     />
   );

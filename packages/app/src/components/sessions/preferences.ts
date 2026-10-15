@@ -7,7 +7,14 @@ export enum HistoryStatus {
   Archived = "archived",
 }
 
+export enum HistoryAgentType {
+  All = "all",
+  Main = "main",
+  Subagent = "subagent",
+}
+
 export enum HistoryField {
+  Subagent = "subagent",
   Project = "project",
   Workspace = "workspace",
   Branch = "branch",
@@ -22,6 +29,7 @@ export enum HistoryField {
 }
 
 const HistoryFieldsSchema = z.object({
+  subagent: z.boolean().catch(true),
   project: z.boolean().catch(true),
   workspace: z.boolean().catch(true),
   branch: z.boolean().catch(true),
@@ -36,6 +44,7 @@ const HistoryFieldsSchema = z.object({
 });
 
 const HistoryFiltersSchema = z.object({
+  agentType: z.enum(HistoryAgentType).catch(HistoryAgentType.All),
   hosts: z.array(z.string()).catch([]),
   projects: z.array(z.string()).catch([]),
   providers: z.array(z.string()).catch([]),

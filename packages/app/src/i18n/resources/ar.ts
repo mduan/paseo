@@ -285,6 +285,7 @@ export const ar: TranslationResources = {
       title: "العرض",
       saveFailed: "تعذّر حفظ تفضيلات السجل. أعد المحاولة لحفظ اختياراتك الحالية.",
       fields: {
+        subagent: "شارة الوكيل الفرعي",
         project: "المشروع",
         workspace: "مجلد",
         branch: "الفرع",
@@ -299,6 +300,11 @@ export const ar: TranslationResources = {
       },
     },
     filters: {
+      agentType: "نوع الوكيل",
+      allAgents: "جميع الوكلاء",
+      mainAgents: "الوكلاء الرئيسيون",
+      subagents: "الوكلاء الفرعيون",
+
       title: "عوامل التصفية",
       hosts: "المضيفون",
       projects: "المشاريع",
@@ -344,6 +350,7 @@ export const ar: TranslationResources = {
       closed: "مغلق",
     },
     badges: {
+      subagent: "وكيل فرعي",
       archived: "مؤرشف",
       pending: "{{count}}معلق",
       attention: "انتباه",

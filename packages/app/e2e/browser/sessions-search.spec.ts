@@ -117,6 +117,7 @@ test.describe("History search", () => {
   let client: Awaited<ReturnType<typeof connectSeedClient>>;
   let tempRepo: { path: string; cleanup: () => Promise<void> };
   let projectId: string;
+  let workspaceId: string;
 
   test.describe.configure({ timeout: 300_000 });
 
@@ -131,7 +132,7 @@ test.describe("History search", () => {
       throw new Error(created.error ?? `Failed to create workspace ${tempRepo.path}`);
     }
     projectId = created.workspace.projectId;
-    const workspaceId = created.workspace.id;
+    workspaceId = created.workspace.id;
 
     for (const title of [TITLES.terminal, TITLES.billing, TITLES.unbilled]) {
       await createMockIdleAgent(client, { cwd: tempRepo.path, workspaceId, title });
@@ -148,6 +149,91 @@ test.describe("History search", () => {
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
   ]) {
+    test(`filters agent types and toggles subagent badges at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      const nonce = `agenttype${randomUUID().replaceAll("-", "").slice(0, 8)}`;
+      const parent = await createMockIdleAgent(client, {
+        cwd: tempRepo.path,
+        workspaceId,
+        title: `${nonce} parent`,
+      });
+      const child = await client.createAgent({
+        provider: "mock",
+        model: "e2e-fast-stream",
+        modeId: "load-test",
+        cwd: tempRepo.path,
+        workspaceId,
+        title: `${nonce} child`,
+        labels: { "paseo.parent-agent-id": parent.id },
+      });
+      await client.waitForAgentUpsert(child.id, (agent) => agent.status === "idle", 30_000);
+      await client.archiveAgent(child.id);
+      await resetSeededPageState(page);
+      await openSessions(page);
+      await page.setViewportSize(viewport);
+      await search(page, nonce);
+      const rows = rowTitles(page).filter({ hasText: nonce });
+      const childRow = rows.filter({ hasText: `${nonce} child` });
+      await expect(rows).toHaveCount(2);
+      await expect(childRow.getByText("Subagent", { exact: true })).toBeVisible();
+      await expect(childRow.getByText("Archived", { exact: true })).toBeVisible();
+      expect(
+        await childRow
+          .getByText("Subagent", { exact: true })
+          .evaluate((element) => element.parentElement?.nextElementSibling?.textContent),
+      ).toBe("Archived");
+      await expect(
+        rows.filter({ hasText: `${nonce} parent` }).getByText("Subagent", { exact: true }),
+      ).toHaveCount(0);
+
+      const compact = viewport.width < 600;
+      async function closeMenu() {
+        if (compact) {
+          await page
+            .getByRole("button", { name: "Bottom sheet backdrop" })
+            .click({ position: { x: 16, y: 16 } });
+        } else {
+          await page.keyboard.press("Escape");
+        }
+      }
+      async function selectType(type: string) {
+        await page
+          .getByTestId(compact ? "sessions-filters-trigger" : "sessions-agentType-filter-trigger")
+          .click();
+        await page.getByTestId(`sessions-agentType-filter-${type}`).click();
+        if (compact && type !== "all") await closeMenu();
+      }
+      await selectType("item-main");
+      await expect(rows).toHaveCount(1);
+      await expect(rows.first()).toContainText(`${nonce} parent`);
+      await selectType("item-subagent");
+      await expect(rows).toHaveCount(1);
+      await expect(childRow).toBeVisible();
+
+      await page.getByTestId("sessions-display-trigger").click();
+      await page.getByTestId("sessions-display-subagent").click();
+      await closeMenu();
+      await expect(childRow.getByText("Subagent", { exact: true })).toHaveCount(0);
+      await expect(childRow.getByText("Archived", { exact: true })).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId("sessions-search-input")).toBeVisible();
+      await search(page, nonce);
+      await expect(rows).toHaveCount(1);
+      await expect(childRow).toBeVisible();
+      await expect(childRow.getByText("Subagent", { exact: true })).toHaveCount(0);
+      await page.getByTestId("sessions-display-trigger").click();
+      await expect(page.getByTestId("sessions-display-subagent")).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      await page.getByTestId("sessions-display-subagent").click();
+      await closeMenu();
+      await expect(childRow.getByText("Subagent", { exact: true })).toBeVisible();
+      await selectType("all");
+      await expect(rows).toHaveCount(2);
+    });
+
     test(`filters chronological history and highlights matches at ${viewport.width}px`, async ({
       page,
     }) => {

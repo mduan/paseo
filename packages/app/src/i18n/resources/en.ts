@@ -282,6 +282,7 @@ export const en = {
       title: "Display",
       saveFailed: "Couldn't save History preferences. Retry to save your current choices.",
       fields: {
+        subagent: "Subagent badge",
         project: "Project",
         workspace: "Folder",
         branch: "Branch",
@@ -296,6 +297,11 @@ export const en = {
       },
     },
     filters: {
+      agentType: "Agent type",
+      allAgents: "All agents",
+      mainAgents: "Main agents",
+      subagents: "Subagents",
+
       title: "Filters",
       hosts: "Hosts",
       projects: "Projects",
@@ -341,6 +347,7 @@ export const en = {
       closed: "Closed",
     },
     badges: {
+      subagent: "Subagent",
       archived: "Archived",
       pending: "{{count}} pending",
       attention: "Attention",

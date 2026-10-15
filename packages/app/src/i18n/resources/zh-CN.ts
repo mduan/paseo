@@ -285,6 +285,7 @@ export const zhCN: TranslationResources = {
       title: "显示",
       saveFailed: "无法保存历史记录偏好设置。请重试以保存当前选择。",
       fields: {
+        subagent: "子代理标签",
         project: "项目",
         workspace: "文件夹",
         branch: "分支",
@@ -299,6 +300,11 @@ export const zhCN: TranslationResources = {
       },
     },
     filters: {
+      agentType: "代理类型",
+      allAgents: "所有代理",
+      mainAgents: "主代理",
+      subagents: "子代理",
+
       title: "筛选",
       hosts: "主机",
       projects: "项目",
@@ -344,6 +350,7 @@ export const zhCN: TranslationResources = {
       closed: "已关闭",
     },
     badges: {
+      subagent: "子代理",
       archived: "已归档",
       pending: "{{count}} 个待处理",
       attention: "需要注意",

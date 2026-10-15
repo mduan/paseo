@@ -28,6 +28,7 @@ import { DEFAULT_CONTENT_MAX_WIDTH, THEME_OPTIONS } from "@/styles/theme";
 import {
   DEFAULT_HISTORY_PREFERENCES,
   HistoryField,
+  HistoryAgentType,
   HistoryStatus,
 } from "@/components/sessions/preferences";
 
@@ -794,6 +795,7 @@ describe("saveAppSettings", () => {
           { provider: "claude", model: null },
         ],
         status: HistoryStatus.Archived,
+        agentType: HistoryAgentType.Subagent,
       };
 
       await saveAppSettings({ queryClient, updates: { history: { fields, filters } }, deps });

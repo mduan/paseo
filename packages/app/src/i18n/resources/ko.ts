@@ -286,6 +286,7 @@ export const ko: TranslationResources = {
       title: "표시",
       saveFailed: "기록 설정을 저장하지 못했습니다. 다시 시도하여 현재 선택을 저장하세요.",
       fields: {
+        subagent: "하위 에이전트 배지",
         project: "프로젝트",
         workspace: "폴더",
         branch: "브랜치",
@@ -300,6 +301,11 @@ export const ko: TranslationResources = {
       },
     },
     filters: {
+      agentType: "에이전트 유형",
+      allAgents: "모든 에이전트",
+      mainAgents: "메인 에이전트",
+      subagents: "하위 에이전트",
+
       title: "필터",
       hosts: "호스트",
       projects: "프로젝트",
@@ -345,6 +351,7 @@ export const ko: TranslationResources = {
       closed: "종료됨",
     },
     badges: {
+      subagent: "하위 에이전트",
       archived: "보관됨",
       pending: "대기 {{count}}개",
       attention: "주의",

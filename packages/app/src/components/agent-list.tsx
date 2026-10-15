@@ -11,13 +11,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { isDelegatedAgent } from "@getpaseo/protocol/agent-labels";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
-import { Archive, ChevronRight, Folder, GitBranch, Server } from "lucide-react-native";
+import { Archive, ChevronRight, Folder, GitBranch, Network, Server } from "lucide-react-native";
 import { useProviderIcon } from "@/components/provider-icons";
 import { WorkspaceTabIcon } from "@/screens/workspace/workspace-tab-presentation";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -43,6 +44,7 @@ const refreshColorMapping = (theme: Theme) => ({
   colors: [theme.colors.foregroundMuted],
 });
 const ThemedArchive = withUnistyles(Archive);
+const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedBranch = withUnistyles(GitBranch);
 const ThemedServer = withUnistyles(Server);
@@ -182,6 +184,7 @@ function SessionRow({
   const handlePress = useCallback(() => onPress(agent), [onPress, agent]);
   const handleLongPress = useCallback(() => onLongPress(agent), [onLongPress, agent]);
 
+  const subagentIcon = useMemo(() => <ThemedNetwork size={12} uniProps={mutedIconMapping} />, []);
   const archivedIcon = useMemo(() => <ThemedArchive size={12} uniProps={mutedIconMapping} />, []);
   const showAttention = showAttentionIndicator && Boolean(agent.requiresAttention);
 
@@ -221,6 +224,14 @@ function SessionRow({
           <View style={styles.rowMetaRow}>
             <SessionRowContext agent={agent} fields={fields} search={search} />
             <SessionRowModel agent={agent} fields={fields} />
+            {fields.subagent && isDelegatedAgent(agent) ? (
+              <StatusBadge
+                label={t("agentList.badges.subagent")}
+                leading={subagentIcon}
+                size="xs"
+                style={styles.archivedBadge}
+              />
+            ) : null}
             {fields.status && agent.archivedAt ? (
               <StatusBadge
                 label={t("agentList.badges.archived")}

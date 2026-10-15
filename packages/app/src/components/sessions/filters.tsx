@@ -6,6 +6,7 @@ import {
   Bot,
   Cpu,
   PanelsTopLeft,
+  Network,
   Server,
   SlidersHorizontal,
   X,
@@ -32,7 +33,12 @@ import { ProjectIconView } from "@/components/project-icon-view";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHosts } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
-import { EMPTY_HISTORY_FILTERS, HistoryStatus, type HistoryFilters } from "./preferences";
+import {
+  EMPTY_HISTORY_FILTERS,
+  HistoryStatus,
+  HistoryAgentType,
+  type HistoryFilters,
+} from "./preferences";
 
 export function historyModelKey(model: AgentHistoryFilterOptions["models"][number]): string {
   return JSON.stringify([model.provider, model.model]);
@@ -47,6 +53,7 @@ const ThemedArchive = withUnistyles(Archive);
 const ThemedBot = withUnistyles(Bot);
 const ThemedCpu = withUnistyles(Cpu);
 const ThemedPanels = withUnistyles(PanelsTopLeft);
+const ThemedNetwork = withUnistyles(Network);
 const ThemedServer = withUnistyles(Server);
 const ThemedSliders = withUnistyles(SlidersHorizontal);
 
@@ -76,6 +83,13 @@ function FilterItems({
 }) {
   const select = useCallback(
     (id: string) => {
+      if (group.id === "agentType") {
+        let agentType = HistoryAgentType.All;
+        if (id === HistoryAgentType.Main) agentType = HistoryAgentType.Main;
+        if (id === HistoryAgentType.Subagent) agentType = HistoryAgentType.Subagent;
+        onChange({ ...filters, agentType });
+        return;
+      }
       if (group.id === "status") {
         let status = HistoryStatus.All;
         if (id === HistoryStatus.Active) status = HistoryStatus.Active;
@@ -135,7 +149,8 @@ export function hasHistoryFilters(filters: HistoryFilters): boolean {
     filters.projects.length > 0 ||
     filters.providers.length > 0 ||
     filters.models.length > 0 ||
-    filters.status !== HistoryStatus.All
+    filters.status !== HistoryStatus.All ||
+    filters.agentType !== HistoryAgentType.All
   );
 }
 
@@ -151,11 +166,13 @@ export function HistoryFilterBar({
   filters,
   options,
   supported,
+  agentTypeSupported,
   onChange,
 }: {
   filters: HistoryFilters;
   options: AgentHistoryFilterOptions;
   supported: boolean;
+  agentTypeSupported: boolean;
   onChange: (filters: HistoryFilters) => void;
 }) {
   const { t } = useTranslation();
@@ -232,6 +249,18 @@ export function HistoryFilterBar({
           })),
       },
       {
+        id: "agentType",
+        title: t("sessions.filters.agentType"),
+        all: t("sessions.filters.allAgents"),
+        selected: filters.agentType === HistoryAgentType.All ? [] : [filters.agentType],
+        icon: <ThemedNetwork size={14} uniProps={mutedIconMapping} />,
+        disabled: !supported || !agentTypeSupported,
+        options: [
+          { id: HistoryAgentType.Main, label: t("sessions.filters.mainAgents") },
+          { id: HistoryAgentType.Subagent, label: t("sessions.filters.subagents") },
+        ],
+      },
+      {
         id: "status",
         title: t("sessions.filters.status"),
         all: t("sessions.filters.allSessions"),
@@ -244,7 +273,7 @@ export function HistoryFilterBar({
         ],
       },
     ];
-  }, [filters, hosts, options, supported, t]);
+  }, [filters, hosts, options, supported, agentTypeSupported, t]);
   const activeCount = groups.filter((group) => !group.disabled && group.selected.length).length;
 
   const clear = useCallback(() => onChange(EMPTY_HISTORY_FILTERS), [onChange]);
@@ -315,7 +344,7 @@ export function HistoryFilterBar({
                 group={group}
                 filters={filters}
                 options={options}
-                closeOnSelect={group.id === "status"}
+                closeOnSelect={group.id === "status" || group.id === "agentType"}
                 onChange={onChange}
               />
             )}
