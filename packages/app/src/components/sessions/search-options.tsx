@@ -141,7 +141,14 @@ export function HistorySearchField({
 
 const styles = StyleSheet.create((theme) => ({
   field: { gap: theme.spacing[2] },
-  options: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+  options: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+    borderLeftWidth: theme.borderWidth[1],
+    borderLeftColor: theme.colors.border,
+    paddingLeft: theme.spacing[2],
+  },
   symbol: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   wholeWord: { textDecorationLine: "underline" },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
