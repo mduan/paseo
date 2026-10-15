@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
@@ -12,7 +13,12 @@ import { SPACING } from "@/styles/theme";
 import { WindowChromeRootRegion } from "@/utils/desktop-window";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
 import type { ViewportSize } from "@/components/zoomable-viewport/geometry";
-import { useGlobalWebOverlayLayer, useWebOverlayRegistration } from "@/lib/overlay-root";
+import {
+  getOverlayRoot,
+  OverlayLayerProvider,
+  useGlobalWebOverlayLayer,
+  useWebOverlayRegistration,
+} from "@/lib/overlay-root";
 
 export type ImageLightboxSource =
   | { type: "attachment"; metadata: AttachmentMetadata }
@@ -88,11 +94,23 @@ export function AttachmentLightbox({ source, onClose }: AttachmentLightboxProps)
 
   const hasError = errored || !url;
 
-  return (
-    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={onClose}>
-      <ModalRoot style={styles.root}>
+  const content = (
+    <OverlayLayerProvider layer={modalLayer}>
+      <ModalRoot
+        style={[
+          styles.root,
+          isWeb ? styles.webOverlay : null,
+          isWeb ? { zIndex: modalLayer } : null,
+        ]}
+      >
         <WindowChromeRootRegion corners="both">
-          <View ref={setWebOverlayScope} style={styles.root}>
+          <View
+            ref={setWebOverlayScope}
+            style={styles.root}
+            role={isWeb ? "dialog" : undefined}
+            aria-modal={isWeb ? true : undefined}
+            tabIndex={isWeb ? -1 : undefined}
+          >
             <Pressable
               testID="attachment-lightbox-backdrop"
               accessibilityRole="button"
@@ -122,6 +140,14 @@ export function AttachmentLightbox({ source, onClose }: AttachmentLightboxProps)
           </View>
         </WindowChromeRootRegion>
       </ModalRoot>
+    </OverlayLayerProvider>
+  );
+
+  if (isWeb) return createPortal(content, getOverlayRoot());
+
+  return (
+    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={onClose}>
+      {content}
     </Modal>
   );
 }
@@ -131,6 +157,11 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minHeight: 0,
     minWidth: 0,
+  },
+  webOverlay: {
+    position: "absolute",
+    inset: 0,
+    pointerEvents: "auto",
   },
   backdrop: {
     position: "absolute",
