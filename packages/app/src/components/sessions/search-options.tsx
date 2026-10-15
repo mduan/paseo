@@ -86,6 +86,7 @@ function SearchOptionButton({
 function HistorySearchOptions(props: SearchOptionsProps) {
   return (
     <View style={styles.options}>
+      <View style={styles.separator} />
       {OPTIONS.map(({ option, label }) => (
         <SearchOptionButton key={option} option={option} label={label} {...props} />
       ))}
@@ -145,9 +146,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
-    borderLeftWidth: theme.borderWidth[1],
-    borderLeftColor: theme.colors.border,
-    paddingLeft: theme.spacing[2],
+  },
+  separator: {
+    width: theme.borderWidth[1],
+    height: theme.spacing[4],
+    marginRight: theme.spacing[1],
+    backgroundColor: theme.colors.border,
   },
   symbol: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   wholeWord: { textDecorationLine: "underline" },
