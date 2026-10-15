@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   type AgentHistorySearchCandidate,
-  matchesAgentHistoryQuery,
+  createAgentHistorySearch,
 } from "./agent-history-search.js";
+
+function matchesAgentHistoryQuery(query: string, entry: AgentHistorySearchCandidate): boolean {
+  return createAgentHistorySearch({ query })(entry);
+}
 
 function candidate(input: {
   title?: string | null;
@@ -93,6 +97,21 @@ describe("matchesAgentHistoryQuery", () => {
     expect(matchesAgentHistoryQuery("rain", candidate({ branch: "main" }))).toBe(false);
   });
 
+  it("applies options to all four metadata fields", () => {
+    const search = createAgentHistorySearch({
+      query: "^Bill$",
+      options: { regex: true, caseSensitive: true },
+    });
+    for (const field of ["title", "workspaceName", "branch", "projectName"] as const) {
+      expect(search(candidate({ [field]: "Bill" }))).toBe(true);
+      expect(search(candidate({ [field]: "bill" }))).toBe(false);
+    }
+    expect(
+      createAgentHistorySearch({ query: "bill", options: { wholeWord: true } })(
+        candidate({ title: "billing" }),
+      ),
+    ).toBe(false);
+  });
   it("keeps candidates for a blank query", () => {
     expect(matchesAgentHistoryQuery("   ", candidate({ title: "anything" }))).toBe(true);
   });

@@ -327,6 +327,14 @@ export const ko: TranslationResources = {
     noMatches: "일치하는 세션이 없습니다",
     tooManyMatches: "일치 항목이 너무 많습니다 — 검색 범위를 좁히세요",
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
+    searchOptions: {
+      caseSensitive: "대소문자 구분",
+      wholeWord: "단어 단위로 검색",
+      regex: "정규식 사용",
+      wholeWordRegex: "정규식 모드에서는 단어 단위 검색을 사용할 수 없습니다.",
+      invalidRegex: "잘못된 정규식입니다. 패턴을 수정하여 검색하세요.",
+      updateHost: "검색 옵션을 사용하려면 연결된 호스트를 업데이트하세요.",
+    },
     searchPlaceholder: "기록 검색",
     actions: {
       loadMore: "더 불러오기",

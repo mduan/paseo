@@ -1,3 +1,4 @@
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { AgentHistoryFilterOptions } from "@getpaseo/protocol/messages";
 import type {
   DaemonClient,
@@ -34,6 +35,8 @@ export interface AgentHistoryResult {
   isLoadingMore: boolean;
   /** False when any target host predates search; the screen hides the field. */
   isSearchSupported: boolean;
+  isSearchOptionsSupported: boolean;
+  isSearchPaused: boolean;
   isFilterSupported: boolean;
   isAgentTypeFilterSupported: boolean;
   filterOptions: AgentHistoryFilterOptions;
@@ -87,11 +90,13 @@ export async function fetchAgentHistoryPage(input: {
   serverId: string;
   cursor: string | null;
   search?: string;
+  searchOptions?: SearchOptions;
   filter?: FetchAgentHistoryOptions["filter"];
   includeFilterOptions?: boolean;
 }): Promise<AgentHistoryPage> {
   const payload = await input.client.fetchAgentHistory({
     ...(input.search ? { search: input.search } : {}),
+    ...(input.searchOptions ? { searchOptions: input.searchOptions } : {}),
     ...(input.filter ? { filter: input.filter } : {}),
     ...(input.includeFilterOptions ? { includeFilterOptions: true } : {}),
     sort: AGENT_HISTORY_SORT,
@@ -189,6 +194,7 @@ export async function fetchAgentHistoryBatch(input: {
   hosts: readonly AgentHistoryHost[];
   cursorByServerId: AgentHistoryCursorByServerId | null;
   search?: string;
+  searchOptions?: SearchOptions;
   filter?: FetchAgentHistoryOptions["filter"];
   includeFilterOptions?: boolean;
 }): Promise<AgentHistoryBatchPage> {
@@ -207,6 +213,7 @@ export async function fetchAgentHistoryBatch(input: {
         filter: input.filter,
         includeFilterOptions: input.includeFilterOptions && !input.cursorByServerId,
         ...(input.search ? { search: input.search } : {}),
+        ...(input.searchOptions ? { searchOptions: input.searchOptions } : {}),
       });
       return { host, page };
     }),
@@ -254,6 +261,7 @@ export function useAgentHistory(options: {
   serverIds?: readonly string[];
   enabled?: boolean;
   search?: string;
+  searchOptions?: SearchOptions;
   filter?: FetchAgentHistoryOptions["filter"];
 }): AgentHistoryResult {
   const { t } = useTranslation();
@@ -336,6 +344,19 @@ export function useAgentHistory(options: {
       [targetServerIds],
     ),
   );
+  // COMPAT(agentHistorySearchOptions): added in v0.11.0-fork.19, remove gate after 2027-04-15.
+  const isSearchOptionsSupported = useSessionStore(
+    useCallback(
+      (state) =>
+        targetServerIds.length > 0 &&
+        targetServerIds.every(
+          (id) => state.sessions[id]?.serverInfo?.features?.agentHistorySearchOptions === true,
+        ),
+      [targetServerIds],
+    ),
+  );
+  const hasSearchOptions = Object.values(options.searchOptions ?? {}).some(Boolean);
+  const canSearch = !hasSearchOptions || isSearchOptionsSupported;
   const filter = useMemo(() => {
     if (!isFilterSupported || !options.filter) return undefined;
     return {
@@ -344,19 +365,23 @@ export function useAgentHistory(options: {
     };
   }, [isFilterSupported, isAgentTypeFilterSupported, options.filter]);
   const search = useMemo(() => {
-    const trimmed = options.search?.trim() ?? "";
+    const trimmed = options.searchOptions?.regex
+      ? (options.search ?? "")
+      : (options.search?.trim() ?? "");
     return isSearchSupported ? trimmed : "";
-  }, [isSearchSupported, options.search]);
+  }, [isSearchSupported, options.search, options.searchOptions?.regex]);
   const queryKey = useMemo(
     () => [
       ...(targetServerIds.length === 1
         ? agentHistoryQueryKey(targetServerIds[0])
         : allAgentHistoryQueryKey(targetServerIds)),
       search,
+      options.searchOptions,
+      canSearch,
       filter,
       isFilterSupported,
     ],
-    [search, filter, isFilterSupported, targetServerIds],
+    [search, options.searchOptions, canSearch, filter, isFilterSupported, targetServerIds],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
@@ -371,7 +396,7 @@ export function useAgentHistory(options: {
     AgentHistoryCursorByServerId | null
   >({
     queryKey,
-    enabled: Boolean(enabled && targetHosts.length > 0),
+    enabled: Boolean(enabled && canSearch && targetHosts.length > 0),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
     initialPageParam: null,
@@ -386,6 +411,7 @@ export function useAgentHistory(options: {
         filter,
         includeFilterOptions: isFilterSupported,
         ...(search ? { search } : {}),
+        ...(hasSearchOptions ? { searchOptions: options.searchOptions } : {}),
       });
     },
   });
@@ -402,18 +428,18 @@ export function useAgentHistory(options: {
   } = historyQuery;
 
   const refreshAll = useCallback(async () => {
-    if (!enabled || targetHosts.length === 0) {
+    if (!enabled || !canSearch || targetHosts.length === 0) {
       return;
     }
     await refetch();
-  }, [enabled, refetch, targetHosts.length]);
+  }, [enabled, canSearch, refetch, targetHosts.length]);
 
   const loadMore = useCallback(() => {
-    if (!enabled || targetHosts.length === 0 || !hasNextPage || isFetchingNextPage) {
+    if (!enabled || !canSearch || targetHosts.length === 0 || !hasNextPage || isFetchingNextPage) {
       return;
     }
     void fetchNextPage();
-  }, [enabled, fetchNextPage, hasNextPage, isFetchingNextPage, targetHosts.length]);
+  }, [enabled, canSearch, fetchNextPage, hasNextPage, isFetchingNextPage, targetHosts.length]);
 
   const agents = useMemo(() => {
     const pages = data?.pages ?? [];
@@ -461,6 +487,8 @@ export function useAgentHistory(options: {
     hasMore: hasNextPage,
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
+    isSearchOptionsSupported,
+    isSearchPaused: !enabled || !canSearch,
     isFilterSupported,
     isAgentTypeFilterSupported,
     filterOptions,

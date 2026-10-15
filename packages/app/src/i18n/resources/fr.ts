@@ -333,6 +333,14 @@ export const fr: TranslationResources = {
     noMatches: "Aucune séance correspondante",
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : Impossible de charger l'historique",
+    searchOptions: {
+      caseSensitive: "Respecter la casse",
+      wholeWord: "Mot entier",
+      regex: "Utiliser une expression régulière",
+      wholeWordRegex: "La recherche de mots entiers est indisponible en mode regex.",
+      invalidRegex: "Expression régulière non valide. Corrigez le motif pour rechercher.",
+      updateHost: "Mettez à jour les hôtes connectés pour utiliser les options de recherche.",
+    },
     searchPlaceholder: "Rechercher dans l'historique",
     actions: {
       loadMore: "Charger plus",

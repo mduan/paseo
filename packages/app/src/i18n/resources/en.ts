@@ -323,6 +323,14 @@ export const en = {
     noMatches: "No sessions match",
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
+    searchOptions: {
+      caseSensitive: "Match case",
+      wholeWord: "Match whole word",
+      regex: "Use regular expression",
+      wholeWordRegex: "Whole-word matching is unavailable in regex mode.",
+      invalidRegex: "Invalid regular expression. Correct the pattern to search.",
+      updateHost: "Update connected hosts to use search options.",
+    },
     searchPlaceholder: "Search history",
     actions: {
       loadMore: "Load more",

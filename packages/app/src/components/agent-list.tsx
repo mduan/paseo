@@ -32,7 +32,7 @@ import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { ProjectIconView } from "@/components/project-icon-view";
 import type { Theme } from "@/styles/theme";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+import type { TextSearch } from "@getpaseo/protocol/search/query";
 import type { HistoryFields } from "@/components/sessions/preferences";
 import { formatTurnCount } from "@/utils/format-turn-count";
 import { pathBaseName } from "@/utils/path";
@@ -59,7 +59,7 @@ interface AgentListProps {
   listFooterComponent?: ReactElement | null;
   showAttentionIndicator?: boolean;
   fields: HistoryFields;
-  search?: string;
+  search?: TextSearch;
 }
 
 type DateSectionKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older";
@@ -153,7 +153,7 @@ function SessionRow({
   onLongPress,
 }: {
   agent: AggregatedAgent;
-  search?: string;
+  search?: TextSearch;
   isMobile: boolean;
   selectedAgentId?: string;
   showAttentionIndicator: boolean;
@@ -165,10 +165,7 @@ function SessionRow({
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
-  const titleRanges = useMemo(
-    () => findHighlightRanges(search ?? "", agent.title ?? ""),
-    [search, agent.title],
-  );
+  const titleRanges = useMemo(() => search?.ranges(agent.title ?? "") ?? [], [search, agent.title]);
 
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -296,7 +293,7 @@ function SessionRowContext({
 }: {
   agent: AggregatedAgent;
   fields: HistoryFields;
-  search?: string;
+  search?: TextSearch;
 }) {
   const placement = resolveProjectPlacement({
     projectPlacement: agent.projectPlacement,
@@ -310,9 +307,9 @@ function SessionRowContext({
   const showBranch = fields.branch && Boolean(branch);
   const ranges = useMemo(
     () => ({
-      workspace: findHighlightRanges(search ?? "", folderName),
-      branch: findHighlightRanges(search ?? "", branch),
-      project: findHighlightRanges(search ?? "", projectName),
+      workspace: search?.ranges(folderName) ?? [],
+      branch: search?.ranges(branch) ?? [],
+      project: search?.ranges(projectName) ?? [],
     }),
     [search, folderName, branch, projectName],
   );

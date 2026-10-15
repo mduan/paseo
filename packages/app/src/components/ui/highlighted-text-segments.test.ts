@@ -1,11 +1,16 @@
+import { createTextSearch } from "@getpaseo/protocol/search/query";
 import { describe, expect, it } from "vitest";
-import { findHighlightRanges, toHighlightSegments } from "./highlighted-text-segments";
+import { toHighlightSegments } from "./highlighted-text-segments";
 
 /** What the eye sees, written back out with the marked runs bracketed. */
 function marked(text: string, ranges: { start: number; length: number }[]): string {
   return toHighlightSegments(text, ranges)
     .map((segment) => (segment.marked ? `[${segment.text}]` : segment.text))
     .join("");
+}
+
+function findHighlightRanges(query: string, text: string) {
+  return createTextSearch({ query }).ranges(text);
 }
 
 describe("toHighlightSegments", () => {

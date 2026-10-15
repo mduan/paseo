@@ -331,6 +331,14 @@ export const ja: TranslationResources = {
     noMatches: "一致するセッションはありません",
     tooManyMatches: "一致が多すぎます — 検索条件を絞ってください",
     hostLoadFailed: "{{host}}: 履歴を読み込めませんでした",
+    searchOptions: {
+      caseSensitive: "大文字と小文字を区別",
+      wholeWord: "単語全体に一致",
+      regex: "正規表現を使用",
+      wholeWordRegex: "正規表現モードでは単語全体の一致は使用できません。",
+      invalidRegex: "無効な正規表現です。パターンを修正して検索してください。",
+      updateHost: "検索オプションを使うには接続先のホストを更新してください。",
+    },
     searchPlaceholder: "履歴を検索",
     actions: {
       loadMore: "さらに読み込む",

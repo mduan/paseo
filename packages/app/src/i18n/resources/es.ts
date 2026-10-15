@@ -332,6 +332,14 @@ export const es: TranslationResources = {
     noMatches: "No hay sesiones que coincidan",
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
+    searchOptions: {
+      caseSensitive: "Distinguir mayúsculas y minúsculas",
+      wholeWord: "Coincidir con la palabra completa",
+      regex: "Usar expresión regular",
+      wholeWordRegex: "La coincidencia de palabras completas no está disponible en modo regex.",
+      invalidRegex: "Expresión regular no válida. Corrige el patrón para buscar.",
+      updateHost: "Actualiza los hosts conectados para usar las opciones de búsqueda.",
+    },
     searchPlaceholder: "Buscar en el historial",
     actions: {
       loadMore: "Cargar más",

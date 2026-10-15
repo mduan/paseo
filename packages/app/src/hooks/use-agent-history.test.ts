@@ -354,10 +354,12 @@ describe("fetchAgentHistoryPage", () => {
       client,
       serverId: "server-1",
       cursor: null,
-      search: "stripe",
+      search: " stripe ",
+      searchOptions: { regex: true, caseSensitive: true },
     });
 
-    expect(client.calls[0]?.search).toBe("stripe");
+    expect(client.calls[0]?.search).toBe(" stripe ");
+    expect(client.calls[0]?.searchOptions).toEqual({ regex: true, caseSensitive: true });
     expect(page.agents.map((agent) => agent.id)).toEqual(["match"]);
   });
 
@@ -631,6 +633,7 @@ describe("fetchAgentHistoryPage", () => {
       ] satisfies AgentHistoryHost[],
       cursorByServerId: { "server-b": "cursor-b" },
       search: "match",
+      searchOptions: { wholeWord: true },
     });
 
     expect(page.agents.map((agent) => agent.id)).toEqual(["next-b"]);
@@ -640,6 +643,7 @@ describe("fetchAgentHistoryPage", () => {
         sort: [{ key: "updated_at", direction: "desc" }],
         page: { limit: 200, cursor: "cursor-b" },
         search: "match",
+        searchOptions: { wholeWord: true },
       } satisfies FetchAgentHistoryOptions,
     ]);
   });

@@ -1,4 +1,11 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type ReactElement,
+} from "react";
 import { Pressable, View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -28,6 +35,9 @@ export interface SearchFieldProps {
   testID?: string;
   clearTestID?: string;
   fullWidth?: boolean;
+  autoFocus?: boolean;
+  invalid?: boolean;
+  trailing?: ReactNode;
 }
 
 /**
@@ -46,6 +56,9 @@ export function SearchField({
   testID,
   clearTestID,
   fullWidth = false,
+  autoFocus = false,
+  invalid = false,
+  trailing,
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -57,11 +70,17 @@ export function SearchField({
   const handleClear = useCallback(() => {
     inputRef.current?.replaceText("");
     onChangeText("");
+    inputRef.current?.focus();
   }, [onChangeText]);
 
   return (
     <View
-      style={[styles.field, fullWidth && styles.fieldFullWidth, isFocused && styles.fieldFocused]}
+      style={[
+        styles.field,
+        fullWidth && styles.fieldFullWidth,
+        isFocused && styles.fieldFocused,
+        invalid && styles.fieldInvalid,
+      ]}
     >
       <ThemedSearch size={14} uniProps={mutedColorMapping} />
       <ThemedTextInput
@@ -73,6 +92,8 @@ export function SearchField({
         onBlur={handleBlur}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
+        autoFocus={autoFocus}
+        aria-invalid={invalid}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
@@ -89,6 +110,7 @@ export function SearchField({
           <ThemedX size={14} uniProps={mutedColorMapping} />
         </Pressable>
       ) : null}
+      {trailing}
     </View>
   );
 }
@@ -114,6 +136,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.borderAccent,
     backgroundColor: theme.colors.surface2,
   },
+  fieldInvalid: { borderColor: theme.colors.statusDanger },
   fieldFullWidth: { maxWidth: "100%" },
   input: {
     flex: 1,

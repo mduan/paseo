@@ -5008,6 +5008,8 @@ test("fetches paginated agent history separately from active agents", async () =
   await connectPromise;
 
   const promise = client.fetchAgentHistory({
+    search: " bill ",
+    searchOptions: { regex: true, caseSensitive: true, wholeWord: true },
     page: { limit: 25, cursor: "cursor-1" },
     sort: [{ key: "updated_at", direction: "desc" }],
   });
@@ -5015,6 +5017,8 @@ test("fetches paginated agent history separately from active agents", async () =
   expect(mock.sent).toHaveLength(1);
   const request = parseSentFrame(mock.sent[0]);
   expect(request.type).toBe("fetch_agent_history_request");
+  expect(request.search).toBe(" bill ");
+  expect(request.searchOptions).toEqual({ regex: true, caseSensitive: true, wholeWord: true });
   expect(request.page).toEqual({ limit: 25, cursor: "cursor-1" });
 
   mock.triggerMessage(
