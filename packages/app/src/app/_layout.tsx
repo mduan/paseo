@@ -37,6 +37,7 @@ import { LeftSidebar } from "@/components/left-sidebar";
 import { WindowSidebarMenuToggle } from "@/components/headers/menu-header";
 import { DesktopWindowControls } from "@/components/desktop/window-controls";
 import { SidebarModelProvider } from "@/components/sidebar/sidebar-model";
+import { DesktopSidebarSurface } from "@/components/sidebar/desktop-surface";
 import { WorkspacePinShortcutHandler } from "@/components/workspace-pin-shortcut-handler";
 import { WorkspaceRenameHost } from "@/components/workspace-rename-host";
 import { CompactExplorerSidebarHost } from "@/components/compact-explorer-sidebar-host";
@@ -88,6 +89,7 @@ import { UpdateCalloutSource } from "@/desktop/updates/update-callout-source";
 import { useActiveWorktreeNewAction } from "@/hooks/use-active-worktree-new-action";
 import { useGlobalNewWorkspaceAction } from "@/hooks/use-global-new-workspace-action";
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
+import { SIDEBAR_EDGE_WIDTH, useSidebarEdgeHover } from "@/hooks/use-sidebar-edge-hover";
 import { useFaviconStatus } from "@/hooks/use-favicon-status";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { resolveExplorerSidebarPresentation } from "@/workspace-tabs/explorer-sidebar";
@@ -533,6 +535,13 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     }),
   });
   const hasTopLeftWindowControls = useHasWindowChromeObstruction("top-left");
+  const sidebarOverlayEnabled = resolveDesktopSidebarVisibility({
+    chromeEnabled,
+    isCompactLayout,
+    isMounted: desktopSidebarMounted,
+    isOpen: !desktopSidebarVisible,
+    canShare: true,
+  });
   const appChromeLayout = resolveDesktopAppChromeLayout({
     desktopSidebarRendered: desktopSidebarVisible,
     hasTopLeftWindowControls,
@@ -542,6 +551,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     <SidebarChrome
       mounted={isCompactLayout ? chromeEnabled : desktopSidebarMounted}
       visible={isCompactLayout ? chromeEnabled : desktopSidebarVisible}
+      overlay={sidebarOverlayEnabled}
       keyboardShortcutsEnabled={keyboardShortcutsEnabled}
     />
   );
@@ -552,7 +562,9 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   const workspaceChrome = (
     <View style={rowStyle}>
       {!isCompactLayout ? (
-        <WindowChromeRegion corners={appChromeLayout.sidebarCorners}>
+        <WindowChromeRegion
+          corners={sidebarOverlayEnabled ? "top-left" : appChromeLayout.sidebarCorners}
+        >
           {themedSidebarChrome}
         </WindowChromeRegion>
       ) : null}
@@ -632,19 +644,43 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
 function SidebarChrome({
   mounted,
   visible,
+  overlay,
   keyboardShortcutsEnabled,
 }: {
   mounted: boolean;
   visible: boolean;
+  overlay: boolean;
   keyboardShortcutsEnabled: boolean;
 }) {
   const isCompactLayout = useIsCompactFormFactor();
   const isMobileActive = useIsMobilePanelActive("agent-list");
-  const isDesktopOpen = usePanelStore((state) => state.desktop.agentListOpen);
-  const active = visible && (isCompactLayout ? isMobileActive : isDesktopOpen);
+  const closeDesktopAgentList = usePanelStore((state) => state.closeDesktopAgentList);
+  const { revealed, canReveal, revealOnPointerMove, dismiss, dismissOnMouseLeave } =
+    useSidebarEdgeHover({ enabled: overlay });
+  const collapseSidebar = useCallback(() => {
+    dismiss();
+    closeDesktopAgentList();
+  }, [closeDesktopAgentList, dismiss]);
+  const desktopActive = visible || revealed;
+  const active = isCompactLayout ? visible && isMobileActive : desktopActive;
+  const sidebar = mounted ? (
+    <LeftSidebar active={active} overlay={overlay} onCollapse={collapseSidebar} />
+  ) : null;
+  const desktopSidebar = (
+    <DesktopSidebarSurface overlay={overlay} onDismiss={dismissOnMouseLeave}>
+      {canReveal ? (
+        <View
+          testID="sidebar-edge-trigger"
+          style={layoutStyles.sidebarEdgeTrigger}
+          onPointerMove={revealOnPointerMove}
+        />
+      ) : null}
+      {sidebar}
+    </DesktopSidebarSurface>
+  );
   return (
     <SidebarModelProvider active={active}>
-      {mounted ? <LeftSidebar active={active} /> : null}
+      {isCompactLayout ? sidebar : desktopSidebar}
       <WorkspaceShortcutTargetsSubscriber enabled={keyboardShortcutsEnabled} />
     </SidebarModelProvider>
   );
@@ -1001,6 +1037,14 @@ export default function RootLayout() {
 }
 
 const layoutStyles = StyleSheet.create((theme) => ({
+  sidebarEdgeTrigger: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: SIDEBAR_EDGE_WIDTH,
+    pointerEvents: "auto",
+  },
   surfaceFill: {
     flex: 1,
     backgroundColor: theme.colors.surface0,
