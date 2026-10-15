@@ -1037,6 +1037,8 @@ export const ko: TranslationResources = {
         failedRefresh: "Git 상태를 새로고침하지 못했습니다.",
         seeUncommittedChanges: "커밋되지 않은 변경 사항 보기",
         seeCommittedChanges: "커밋된 변경 사항 보기",
+        fetchingHistory: "기록을 가져오는 중…",
+        fetchMoreHistory: "기록을 더 가져오고 다시 시도",
         checkingRepository: "저장소 확인 중...",
         notRepository: "Git 저장소가 아닙니다",
         diffMode: "Diff 모드",

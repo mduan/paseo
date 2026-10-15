@@ -2266,6 +2266,7 @@ export const SubscribeCheckoutDiffRequestSchema = z.object({
 
 export const CheckoutDiffGetRequestSchema = z.object({
   type: z.literal("checkout.diff.get.request"),
+  deepenHistory: z.boolean().optional(),
   cwd: z.string(),
   compare: CheckoutDiffCompareSchema,
   requestId: z.string(),
@@ -3762,6 +3763,7 @@ export const ServerInfoStatusPayloadSchema = z
         agentHistoryAgentTypeFilter: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
+        checkoutHistoryRecovery: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
         workspaceMultiplicity: z.boolean().optional(),
         // COMPAT(projectRemove): added in v0.1.97, drop the gate when floor >= v0.1.97.
@@ -5543,7 +5545,13 @@ export const CheckoutStatusUpdateSchema = z.object({
     .and(CheckoutStatusUpdateMetadataSchema),
 });
 
+export enum CheckoutDiffHistoryStatus {
+  Fetching = "fetching",
+  NeedsMoreHistory = "needs_more_history",
+}
+
 const CheckoutDiffSubscriptionPayloadSchema = z.object({
+  historyStatus: z.enum(CheckoutDiffHistoryStatus).optional(),
   subscriptionId: z.string(),
   cwd: z.string(),
   files: z.array(ParsedDiffFileSchema),

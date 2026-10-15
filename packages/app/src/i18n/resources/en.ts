@@ -1038,6 +1038,8 @@ export const en = {
         failedRefresh: "Failed to refresh git state.",
         seeUncommittedChanges: "See uncommitted changes",
         seeCommittedChanges: "See committed changes",
+        fetchingHistory: "Fetching history…",
+        fetchMoreHistory: "Fetch more history and retry",
         checkingRepository: "Checking repository...",
         notRepository: "Not a git repository",
         diffMode: "Diff mode",

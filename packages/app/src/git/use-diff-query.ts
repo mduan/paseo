@@ -1,9 +1,13 @@
 import { shareCheckoutDiff } from "./diff-sharing";
 import { useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckoutDiffHistoryStatus } from "@getpaseo/protocol/messages";
+import { useTranslation } from "react-i18next";
+import { useHostFeature } from "@/runtime/host-features";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useReplicaQuery } from "@/data/query";
 import { checkoutDiffPushRoute } from "@/data/push-router";
-import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import type { ParsedDiffFile, SubscribeCheckoutDiffResponse } from "@getpaseo/protocol/messages";
 import { checkoutDiffQueryKey } from "@/git/query-keys";
 import { usePendingCheckoutSwitch } from "@/git/pending-switch-store";
@@ -113,13 +117,41 @@ export function useCheckoutDiffQuery({
     }),
   });
 
-  const result = deriveCheckoutDiffResult(query.data ?? null);
+  const { t } = useTranslation();
+  const client = useHostRuntimeClient(serverId);
+  const historyRecoverySupported = useHostFeature(serverId, "checkoutHistoryRecovery");
+  const queryClient = useQueryClient();
+  const retry = useMutation({
+    mutationKey: [...queryKey, "deepen-history"],
+    mutationFn: async () => {
+      if (!client) throw new Error(t("common.errors.daemonClientUnavailable"));
+      const payload = await client.deepenCheckoutHistory({ cwd, compare: normalizedCompare });
+      return { payload, queryKey };
+    },
+    onSuccess: (result) => queryClient.setQueryData(result.queryKey, result.payload),
+  });
+  const derived = deriveCheckoutDiffResult(query.data ?? null);
+  const result = {
+    ...derived,
+    isLoading: derived.isLoading || retry.isPending,
+    historyStatus: retry.isPending ? CheckoutDiffHistoryStatus.Fetching : derived.historyStatus,
+    payloadError:
+      retry.error && derived.historyStatus === CheckoutDiffHistoryStatus.NeedsMoreHistory
+        ? { code: "UNKNOWN" as const, message: retry.error.message }
+        : derived.payloadError,
+    retryHistory:
+      historyRecoverySupported &&
+      derived.historyStatus === CheckoutDiffHistoryStatus.NeedsMoreHistory
+        ? () => retry.mutate()
+        : undefined,
+  };
   // While a switch runs, the diff on screen belongs to the checkout being left.
   return isSwitchingCheckout ? { ...result, isLoading: true } : result;
 }
 
 export interface CheckoutDiffResult {
   files: ParsedDiffFile[];
+  historyStatus?: CheckoutDiffHistoryStatus;
   payloadError: CheckoutDiffQueryPayload["error"];
   diffTooLarge: boolean;
   isLoading: boolean;
@@ -141,9 +173,10 @@ export function deriveCheckoutDiffResult(
   const payloadError = payload?.error ?? null;
   return {
     files: payload?.files ?? [],
+    historyStatus: payload?.historyStatus,
     payloadError,
     diffTooLarge: payload?.diffTooLarge === true,
-    isLoading: payload === null,
+    isLoading: payload === null || payload.historyStatus === CheckoutDiffHistoryStatus.Fetching,
     isFetching: false,
     isError: Boolean(payloadError),
     error: null,

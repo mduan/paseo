@@ -30,6 +30,7 @@ export function shareCheckoutDiff(previous: unknown, incoming: unknown): DiffPay
     error === old.error &&
     old.cwd === next.cwd &&
     old.requestId === next.requestId &&
+    old.historyStatus === next.historyStatus &&
     old.diffTooLarge === next.diffTooLarge
     ? old
     : { ...next, files, error };

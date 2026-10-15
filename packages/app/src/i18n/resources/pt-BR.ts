@@ -1054,6 +1054,8 @@ export const ptBR: TranslationResources = {
         failedRefresh: "Falha ao atualizar estado do git.",
         seeUncommittedChanges: "Ver alterações sem commit",
         seeCommittedChanges: "Ver alterações com commit",
+        fetchingHistory: "Buscando histórico…",
+        fetchMoreHistory: "Buscar mais histórico e tentar novamente",
         checkingRepository: "Verificando repositório...",
         notRepository: "Não é um repositório git",
         diffMode: "Modo de diff",

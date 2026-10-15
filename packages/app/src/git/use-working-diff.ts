@@ -136,6 +136,8 @@ export function useWorkingDiff({
           diffPayloadError: turnDiff.payloadError,
           diffTooLarge: turnDiff.diffTooLarge,
           isDiffLoading: turnDiff.isLoading,
+          historyStatus: undefined,
+          retryHistory: undefined,
           reviewActions: turnDiff.snapshot ? reviewActions : undefined,
         }
       : {
@@ -145,6 +147,8 @@ export function useWorkingDiff({
           diffPayloadError: checkoutDiff.payloadError,
           diffTooLarge: checkoutDiff.diffTooLarge,
           isDiffLoading: checkoutDiff.isLoading,
+          historyStatus: checkoutDiff.historyStatus,
+          retryHistory: checkoutDiff.retryHistory,
           reviewActions,
         }),
   };

@@ -1,3 +1,5 @@
+import { createShallowGitClone } from "../../../server/src/test-utils/shallow-git-repo";
+import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -9,7 +11,11 @@ import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { getServerId } from "../support/helpers/server-id";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
-import { openChangesPanel, waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
+import {
+  openChangesPanel,
+  openChangesTreePanel,
+  waitForWorkspaceTabsVisible,
+} from "../support/helpers/workspace-tabs";
 import { fillComposerDraft, sendDraftToQueue } from "../support/helpers/composer";
 
 interface DirtyWorkspace {
@@ -262,6 +268,76 @@ test.afterEach(async () => {
   for (const task of cleanupTasks.splice(0)) {
     await task.run();
   }
+});
+
+async function createShallowWorkspace(input: { baseCommits: number; brokenRemote?: boolean }) {
+  const repo = await createTempGitRepo("changes-shallow-");
+  const clonePath = path.join(repo.path, "shallow");
+  createShallowGitClone({ sourcePath: repo.path, clonePath, baseCommits: input.baseCommits });
+  if (input.brokenRemote) {
+    execFileSync("git", ["remote", "set-url", "origin", path.join(repo.path, "missing-remote")], {
+      cwd: clonePath,
+    });
+  }
+  const client = await connectSeedClient();
+  cleanupTasks.push({
+    run: async () => {
+      await client.close();
+      await repo.cleanup();
+    },
+  });
+  const created = await client.createWorkspace({ source: { kind: "directory", path: clonePath } });
+  if (!created.workspace) throw new Error(created.error ?? "Failed to create shallow workspace");
+  return { id: created.workspace.id, repoPath: clonePath, sourcePath: repo.path };
+}
+
+test("Changes automatically recovers shallow history", async ({ page }) => {
+  const workspace = await createShallowWorkspace({ baseCommits: 10 });
+  await openWorkspaceChangesSurface(page, workspace, 90_000);
+  const panel = page.getByTestId("working-diff-panel").filter({ visible: true });
+  await expect(panel.getByTestId("diff-file-0")).toHaveAccessibleName("feature.txt, +1, -0");
+  await expect(page.getByTestId("changes-deepen-history")).toHaveCount(0);
+});
+
+test("Changes offers another bounded fetch when shallow history is still insufficient", async ({
+  page,
+}) => {
+  const workspace = await createShallowWorkspace({ baseCommits: 600 });
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.id));
+  await waitForWorkspaceTabsVisible(page);
+  await openChangesTreePanel(page);
+  const tree = page.getByTestId("changes-tree-panel").filter({ visible: true });
+  await expect(
+    tree.getByText("Git couldn't find shared history. Fetch more history to compare this branch."),
+  ).toBeVisible();
+  await tree.getByTestId("changes-deepen-history").click();
+  await openChangesPanel(page);
+  const panel = page.getByTestId("working-diff-panel").filter({ visible: true });
+  await expect(panel.getByTestId("diff-file-0")).toHaveAccessibleName("feature.txt, +1, -0");
+  await expect(tree.getByTestId("changes-deepen-history")).toHaveCount(0);
+});
+
+test("Changes keeps a failed shallow history fetch visible and lets the user retry", async ({
+  page,
+}) => {
+  const workspace = await createShallowWorkspace({ baseCommits: 10, brokenRemote: true });
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.id));
+  await waitForWorkspaceTabsVisible(page);
+  await openChangesTreePanel(page);
+  const tree = page.getByTestId("changes-tree-panel").filter({ visible: true });
+  await expect(tree.getByText(/missing-remote/)).toBeVisible();
+  const retry = tree.getByTestId("changes-deepen-history");
+  await expect(retry).toBeVisible();
+  execFileSync("git", ["remote", "set-url", "origin", pathToFileURL(workspace.sourcePath).href], {
+    cwd: workspace.repoPath,
+  });
+  await retry.click();
+  await openChangesPanel(page);
+  const panel = page.getByTestId("working-diff-panel").filter({ visible: true });
+  await expect(panel.getByTestId("diff-file-0")).toHaveAccessibleName("feature.txt, +1, -0");
+  await expect(retry).toHaveCount(0);
 });
 
 test("Changes opens the populated committed comparison for a clean checkout", async ({ page }) => {

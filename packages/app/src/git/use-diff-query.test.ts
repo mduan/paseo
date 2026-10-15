@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CheckoutDiffHistoryStatus } from "@getpaseo/protocol/messages";
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import { deriveCheckoutDiffResult } from "./use-diff-query";
 
@@ -52,6 +53,15 @@ describe("deriveCheckoutDiffResult", () => {
     expect(result.files).toEqual(files);
   });
 
+  it("shows loading while the daemon fetches history", () => {
+    const result = deriveCheckoutDiffResult({
+      ...createPayload([]),
+      historyStatus: CheckoutDiffHistoryStatus.Fetching,
+    });
+    expect(result.isLoading).toBe(true);
+    expect(result.historyStatus).toBe(CheckoutDiffHistoryStatus.Fetching);
+  });
+
   it("surfaces a payload error and the too-large flag", () => {
     const error = { code: "NOT_GIT_REPO", message: "not a git repository" } as const;
 
@@ -60,6 +70,7 @@ describe("deriveCheckoutDiffResult", () => {
     expect(result).toEqual({
       files: [],
       payloadError: error,
+      historyStatus: undefined,
       diffTooLarge: true,
       isLoading: false,
       isFetching: false,

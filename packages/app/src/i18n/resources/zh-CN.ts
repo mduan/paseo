@@ -1022,6 +1022,8 @@ export const zhCN: TranslationResources = {
         failedRefresh: "刷新 git 状态失败。",
         seeUncommittedChanges: "查看未 commit 的变更",
         seeCommittedChanges: "查看已 commit 的变更",
+        fetchingHistory: "正在获取历史记录…",
+        fetchMoreHistory: "获取更多历史记录并重试",
         checkingRepository: "正在检查 repository...",
         notRepository: "不是 git repository",
         diffMode: "Diff 模式",

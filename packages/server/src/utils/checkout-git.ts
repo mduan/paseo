@@ -32,6 +32,7 @@ import {
 } from "../services/forge-cli-command.js";
 import { parseGitRevParsePath, resolveGitRevParsePath } from "./git-rev-parse-path.js";
 import { runGitCommand, type RunGitCommand } from "./run-git-command.js";
+import { resolveCheckoutMergeBase } from "./checkout-history.js";
 import { readGitFileContents } from "./git-file-contents.js";
 import { isPaseoOwnedWorktreeCwd, resolvePaseoWorktreesBaseRoot } from "./worktree.js";
 import {
@@ -3527,11 +3528,7 @@ async function resolveCheckoutDiffRefs(
     return null;
   }
   const bestBaseRef = await resolveBestComparisonBaseRef(cwd, baseRef);
-  const { stdout } = await runGitCommand(["merge-base", bestBaseRef, "HEAD"], {
-    cwd,
-    envOverlay: READ_ONLY_GIT_ENV,
-  });
-  const mergeBase = stdout.trim();
+  const mergeBase = await resolveCheckoutMergeBase({ cwd, baseRef: bestBaseRef });
   if (compare.includeUncommitted) {
     return {
       baseRef: mergeBase,
