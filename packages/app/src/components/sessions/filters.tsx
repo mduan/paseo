@@ -352,8 +352,8 @@ const styles = StyleSheet.create((theme) => ({
   clearGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
-    marginLeft: theme.spacing[2],
+    gap: theme.spacing[1],
+    marginLeft: theme.spacing[1],
   },
   clearDivider: {
     width: theme.borderWidth[1],
