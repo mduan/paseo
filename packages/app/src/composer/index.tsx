@@ -131,6 +131,7 @@ import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attach
 import { droppedItemsToSelectedFiles } from "@/composer/attachments/drop";
 import { getFileTypeLabel } from "@/attachments/file-types";
 import { getComposerAttachmentPillContent } from "@/attachments/attachment-pill-content";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
 import { Combobox, ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
 import {
   AttachmentFrame,
@@ -487,7 +488,6 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
         attachment={attachment}
         index={index}
         disabled={disabled}
-        onOpen={onOpen}
         onRemove={onRemove}
         openLabel={labels.openGithub}
         removeLabel={labels.removeGithub}
@@ -500,7 +500,6 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
       attachment={attachment}
       index={index}
       disabled={disabled}
-      onOpen={onOpen}
       onRemove={onRemove}
       openLabel={labels.openGithub}
       removeLabel={labels.removeGithub}
@@ -728,7 +727,6 @@ interface GithubAttachmentPillProps {
   >;
   index: number;
   disabled: boolean;
-  onOpen: (attachment: ComposerAttachment) => void;
   onRemove: (index: number) => void;
   openLabel: (kind: string, numberLabel: string) => string;
   removeLabel: (kind: string, numberLabel: string) => string;
@@ -738,7 +736,6 @@ function GithubAttachmentPill({
   attachment,
   index,
   disabled,
-  onOpen,
   onRemove,
   openLabel,
   removeLabel,
@@ -750,23 +747,19 @@ function GithubAttachmentPill({
   const isChangeRequest = item.kind === "change_request";
   const kindLabel = isChangeRequest ? presentation.changeRequestAbbrev : "issue";
   const numberPrefix = isChangeRequest ? presentation.numberPrefix : presentation.issueNumberPrefix;
-  const handleOpen = useCallback(() => {
-    onOpen(attachment);
-  }, [onOpen, attachment]);
   const handleRemove = useCallback(() => {
     onRemove(index);
   }, [onRemove, index]);
   return (
-    <AttachmentPill
+    <LinkAttachmentPill
       testID="composer-github-attachment-pill"
-      onOpen={handleOpen}
+      url={item.url}
+      content={content}
       onRemove={handleRemove}
-      openAccessibilityLabel={openLabel(kindLabel, `${numberPrefix}${item.number}`)}
+      accessibilityLabel={openLabel(kindLabel, `${numberPrefix}${item.number}`)}
       removeAccessibilityLabel={removeLabel(kindLabel, `${numberPrefix}${item.number}`)}
       disabled={disabled}
-    >
-      <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
-    </AttachmentPill>
+    />
   );
 }
 

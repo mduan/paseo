@@ -9,6 +9,7 @@ import { i18n } from "@/i18n/i18next";
 import { persistAttachmentFromDataUrl } from "@/attachments/service";
 import type { ComposerAttachment } from "@/attachments/types";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
+import { ReducedMotionConfig, ReduceMotion } from "react-native-reanimated";
 
 const issueItem: ForgeSearchItem = {
   kind: "issue",
@@ -66,6 +67,7 @@ function render(queuedMessages = messages) {
   act(() => {
     root.render(
       <I18nextProvider i18n={i18n}>
+        <ReducedMotionConfig mode={ReduceMotion.Always} />
         <QueuedMessageList
           queuedMessages={queuedMessages}
           onReorder={onReorder}
@@ -132,19 +134,23 @@ afterEach(() => {
 });
 
 describe("queued message reordering", () => {
-  it.each(externalAttachments)(
-    "opens queued $kind attachments without editing or sending",
-    async (attachment) => {
-      render([{ id: "linked", text: "Review this context.", attachments: [attachment] }]);
-      await act(async () =>
-        userEvent.click(page.getByRole("button", { name: attachment.item.title })),
-      );
-      expect(onOpenAttachment).toHaveBeenCalledExactlyOnceWith(attachment);
-      expect(onEdit).not.toHaveBeenCalled();
-      expect(onSendNow).not.toHaveBeenCalled();
-      expect(onReorder).not.toHaveBeenCalled();
-    },
-  );
+  it.each(externalAttachments)("shows queued $kind link previews", async (attachment) => {
+    render([{ id: "linked", text: "Review this context.", attachments: [attachment] }]);
+    await act(async () =>
+      userEvent.hover(page.getByRole("button", { name: attachment.item.title })),
+    );
+    const link = page.getByRole("link", { name: attachment.item.url, exact: true });
+    await expect.element(link).toBeVisible();
+    expect(link.element().getAttribute("href")).toBe(attachment.item.url);
+    await act(async () =>
+      userEvent.click(page.getByRole("button", { name: attachment.item.title })),
+    );
+    await expect.element(link).toBeVisible();
+    expect(onOpenAttachment).not.toHaveBeenCalled();
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onSendNow).not.toHaveBeenCalled();
+    expect(onReorder).not.toHaveBeenCalled();
+  });
 
   it("shows an image-only prompt and opens its image without sending or dragging", async () => {
     const metadata = await persistAttachmentFromDataUrl({

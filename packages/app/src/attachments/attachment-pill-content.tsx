@@ -15,6 +15,7 @@ import { getFileTypeLabel } from "@/attachments/file-types";
 import {
   isPullRequestContextAttachment,
   isWorkspaceAttachment,
+  getPullRequestContextSubtitle,
 } from "@/attachments/workspace-attachment-utils";
 import { getWorkspaceFileAttachmentSubtitle } from "@/attachments/workspace-file";
 import { getForgePresentation } from "@/git/forge";
@@ -70,22 +71,6 @@ function getReviewSubtitle(count: number, t: TFunction): string {
     : t("message.attachments.commentsMany", { count });
 }
 
-function getPullRequestContextSubtitle(attachment: WorkspaceComposerAttachment): string {
-  if (
-    attachment.kind === "forge.change_request_check" ||
-    attachment.kind === "github.pull_request_check"
-  ) {
-    return "Check logs";
-  }
-  if (
-    attachment.kind === "forge.change_request_comment" ||
-    attachment.kind === "github.pull_request_comment"
-  ) {
-    return "Comment";
-  }
-  return "Review";
-}
-
 function getTextAttachmentSubtitle(
   attachment: Extract<AgentAttachment, { type: "text" }>,
   t: TFunction,
@@ -131,9 +116,13 @@ export function getAgentAttachmentPillContent(
     case "text":
       if (attachment.externalResource) {
         return {
-          icon: attachmentGithubIssueIcon,
+          icon:
+            attachment.externalResource.provider === "forge"
+              ? attachmentFileIcon
+              : attachmentGithubIssueIcon,
           title: attachment.externalResource.title,
-          subtitle: `${attachment.externalResource.providerLabel} ${attachment.externalResource.identifier}`,
+          subtitle:
+            `${attachment.externalResource.providerLabel} ${attachment.externalResource.identifier}`.trim(),
         };
       }
       return {

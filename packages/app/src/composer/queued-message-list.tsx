@@ -12,6 +12,8 @@ import {
 } from "@/components/attachment-pill";
 import { DraggableList } from "@/components/draggable-list";
 import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
+import { LinkAttachmentPill } from "@/components/link-attachment-pill";
+import { getAttachmentLink } from "@/attachments/link";
 import type { DraggableRenderItemInfo } from "@/components/draggable-list.types";
 import { isNative, isWeb } from "@/constants/platform";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
@@ -198,12 +200,12 @@ function QueuedAttachment({ attachment, onOpenAttachment }: QueuedAttachmentProp
     );
   }
   const content = getComposerAttachmentPillContent(attachment, t);
-  const opensLink = "item" in attachment;
+  const url = getAttachmentLink(attachment);
+  if (url) {
+    return <LinkAttachmentPill url={url} content={content} />;
+  }
   return (
-    <AttachmentFrame
-      onPress={opensLink ? handleOpen : undefined}
-      accessibilityLabel={content.title}
-    >
+    <AttachmentFrame>
       <AttachmentLabel icon={content.icon} title={content.title} subtitle={content.subtitle} />
     </AttachmentFrame>
   );

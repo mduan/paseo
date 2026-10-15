@@ -5,6 +5,7 @@ import {
   userAttachmentsOnly,
   workspaceAttachmentToSubmitAttachment,
 } from "./workspace-attachment-utils";
+import { getAttachmentLink } from "./link";
 
 function contextAttachment(
   overrides: Partial<PullRequestContextAttachment> = {},
@@ -52,6 +53,36 @@ describe("workspace attachment utilities", () => {
       mimeType: "text/plain",
       title: "Comment · octocat",
       text: "GitHub pull request comment\n\nLooks good.",
+      externalResource: {
+        provider: "forge",
+        providerLabel: "Comment",
+        resourceType: "github.pull_request_comment",
+        id: "comment-1",
+        identifier: "",
+        title: "Comment · octocat",
+        url: "https://github.com/getpaseo/paseo/pull/42#issuecomment-1",
+      },
     });
   });
+
+  it("preserves the same link when PR context is sent", () => {
+    const context = contextAttachment();
+    const sent = workspaceAttachmentToSubmitAttachment(context)!;
+    expect(getAttachmentLink(context)).toBe(context.url);
+    expect(getAttachmentLink(sent)).toBe(context.url);
+  });
+
+  it.each([undefined, "", "javascript:alert(1)", "file:///etc/passwd", "data:text/plain,test"])(
+    "keeps missing or unsafe context URLs out of link previews: %s",
+    (url) => {
+      const context = contextAttachment({ url });
+      expect(getAttachmentLink(context)).toBeUndefined();
+      expect(workspaceAttachmentToSubmitAttachment(context)).toEqual({
+        type: "text",
+        mimeType: "text/plain",
+        title: context.title,
+        text: context.text,
+      });
+    },
+  );
 });

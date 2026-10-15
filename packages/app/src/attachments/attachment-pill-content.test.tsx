@@ -5,6 +5,7 @@ import {
   getAgentAttachmentPillContent,
   getComposerAttachmentPillContent,
 } from "./attachment-pill-content";
+import { workspaceAttachmentToSubmitAttachment } from "./workspace-attachment-utils";
 
 type ComposerPillCase = Readonly<{
   attachment: Exclude<ComposerAttachment, { kind: "image" }>;
@@ -166,6 +167,21 @@ describe("composer attachment pill content", () => {
 });
 
 describe("agent attachment pill content", () => {
+  it("keeps sent PR context labels when a source link is preserved", () => {
+    const attachment = workspaceAttachmentToSubmitAttachment({
+      kind: "forge.change_request_comment",
+      id: "comment",
+      title: "Review feedback",
+      text: "Keep the URL visible.",
+      url: "https://example.com/pull/42#comment-1",
+    })!;
+    const content = getAgentAttachmentPillContent(attachment, i18n.t);
+    expect({ title: content.title, subtitle: content.subtitle }).toEqual({
+      title: "Review feedback",
+      subtitle: "Comment",
+    });
+  });
+
   it("presents external resources with their provider identity", () => {
     const content = getAgentAttachmentPillContent(
       {
