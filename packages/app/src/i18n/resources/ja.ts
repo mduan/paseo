@@ -291,7 +291,7 @@ export const ja: TranslationResources = {
       saveFailed: "履歴の設定を保存できませんでした。再試行して現在の選択を保存してください。",
       fields: {
         project: "プロジェクト",
-        workspace: "ワークスペース",
+        workspace: "フォルダー",
         branch: "ブランチ",
         host: "ホスト",
         provider: "プロバイダー",

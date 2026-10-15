@@ -286,7 +286,7 @@ export const zhCN: TranslationResources = {
       saveFailed: "无法保存历史记录偏好设置。请重试以保存当前选择。",
       fields: {
         project: "项目",
-        workspace: "工作区",
+        workspace: "文件夹",
         branch: "分支",
         host: "主机",
         provider: "提供商",

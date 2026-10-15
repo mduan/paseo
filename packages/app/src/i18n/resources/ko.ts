@@ -287,7 +287,7 @@ export const ko: TranslationResources = {
       saveFailed: "기록 설정을 저장하지 못했습니다. 다시 시도하여 현재 선택을 저장하세요.",
       fields: {
         project: "프로젝트",
-        workspace: "워크스페이스",
+        workspace: "폴더",
         branch: "브랜치",
         host: "호스트",
         provider: "공급자",

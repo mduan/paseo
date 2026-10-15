@@ -291,7 +291,7 @@ export const ptBR: TranslationResources = {
         "Não foi possível salvar as preferências do histórico. Tente novamente para salvar suas escolhas atuais.",
       fields: {
         project: "Projeto",
-        workspace: "Espaço de trabalho",
+        workspace: "Pasta",
         branch: "Branch",
         host: "Host",
         provider: "Provedor",
