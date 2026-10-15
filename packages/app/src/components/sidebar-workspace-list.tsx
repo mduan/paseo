@@ -1,3 +1,4 @@
+import { useAppSettings } from "@/hooks/use-settings";
 import { WorkspaceHoverCard } from "@/components/workspace-hover-card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
@@ -443,6 +444,9 @@ function ProjectRowTrailingActions({
   onRemoveProject?: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
 }) {
+  const {
+    settings: { sidebarShowWorkspaceCount },
+  } = useAppSettings();
   const { showKebab: actionsVisible, menuProps } = useOpenKebabMenuVisibility(
     isHovered || platformIsNative || isMobileBreakpoint,
   );
@@ -455,20 +459,22 @@ function ProjectRowTrailingActions({
   );
   return (
     <View style={styles.projectTrailingActions}>
-      <View
-        style={[
-          styles.projectWorkspaceCountOverlay,
-          actionsVisible && styles.projectKebabButtonHidden,
-        ]}
-        pointerEvents="none"
-        testID={`sidebar-project-workspace-count-${projectViewKey}`}
-      >
-        <StatusBadge
-          label={String(workspaceCount)}
-          size="xs"
-          style={styles.projectWorkspaceCount}
-        />
-      </View>
+      {sidebarShowWorkspaceCount ? (
+        <View
+          style={[
+            styles.projectWorkspaceCountOverlay,
+            actionsVisible && styles.projectKebabButtonHidden,
+          ]}
+          pointerEvents="none"
+          testID={`sidebar-project-workspace-count-${projectViewKey}`}
+        >
+          <StatusBadge
+            label={String(workspaceCount)}
+            size="xs"
+            style={styles.projectWorkspaceCount}
+          />
+        </View>
+      ) : null}
       {worktreeTarget ? (
         <NewWorktreeButton
           displayName={displayName}

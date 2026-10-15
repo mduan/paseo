@@ -1209,6 +1209,7 @@ export const ko: TranslationResources = {
         labels: "레이블",
         diff: "Diff 통계",
         timestamp: "마지막 활동",
+        workspaceCount: "워크스페이스 수",
       },
       checks: {
         iconAndText: "아이콘 및 텍스트",

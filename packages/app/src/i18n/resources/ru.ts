@@ -1220,6 +1220,7 @@ export const ru: TranslationResources = {
         labels: "Метки",
         diff: "Статистика изменений",
         timestamp: "Последняя активность",
+        workspaceCount: "Количество рабочих пространств",
       },
       checks: {
         iconAndText: "Значок и текст",

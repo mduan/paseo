@@ -1202,6 +1202,7 @@ export const ar: TranslationResources = {
         labels: "التسميات",
         diff: "إحصائيات الفروق",
         timestamp: "آخر نشاط",
+        workspaceCount: "عدد مساحات العمل",
       },
       checks: {
         iconAndText: "أيقونة ونص",

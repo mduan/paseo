@@ -1238,6 +1238,7 @@ export const fr: TranslationResources = {
         labels: "Libellés",
         diff: "Statistiques de diff",
         timestamp: "Dernière activité",
+        workspaceCount: "Nombre d’espaces de travail",
       },
       checks: {
         iconAndText: "Icône et texte",
