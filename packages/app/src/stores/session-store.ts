@@ -102,6 +102,7 @@ export interface Agent {
   projectPlacement?: ProjectPlacementPayload | null;
   latestTurnDiffAt?: string;
   lastAssistantPreview?: string;
+  turnCount?: number;
 }
 
 export interface WorkspaceDescriptor {

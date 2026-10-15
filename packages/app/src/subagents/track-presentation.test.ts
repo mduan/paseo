@@ -216,11 +216,19 @@ describe("buildSubagentRowPresentationData for provider rows", () => {
       title: "title" in overrides ? (overrides.title ?? null) : "general-purpose",
       description: overrides.description ?? null,
       subtitle: overrides.subtitle ?? null,
+      turnCount: overrides.turnCount,
       status: overrides.status ?? "running",
       requiresAttention: false,
       createdAt: overrides.createdAt ?? new Date("2026-07-26T00:00:00.000Z"),
     };
   }
+
+  it("shows native turn counts alongside the provider's cost subtitle", () => {
+    const presentation = buildSubagentRowPresentationData(
+      providerRow({ turnCount: 2, subtitle: "Opus · ~$1.00" }),
+    );
+    expect(presentation.subtitle).toBe("2 turns · Opus · ~$1.00");
+  });
 
   it("names the row after the task and demotes the subagent type", () => {
     const presentation = buildSubagentRowPresentationData(

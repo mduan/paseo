@@ -1,3 +1,5 @@
+import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
+import { formatTurnCount } from "@/utils/format-turn-count";
 import type { TFunction } from "i18next";
 import type { ComposerTrackPillSegment } from "@/composer/tracks";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -30,19 +32,29 @@ export function buildSubagentRowPresentationData(row: SubagentRow): SubagentRowP
   const title = resolveRowLabel(row.title);
   const label = description ?? title;
   const providerSubtitle = row.kind === "provider" ? resolveRowLabel(row.subtitle) : null;
-  const subtitle = providerSubtitle ?? (description ? title : null);
+  const context = providerSubtitle ?? (description ? title : null);
+  let subtitle = context ?? "";
+  if (row.kind === "provider") subtitle = formatProviderSubagentMeta({ ...row, subtitle });
   const status = presentationStatus(row);
   return {
     key: `${row.kind}_subagent_${row.id}`,
     kind: "agent",
     label: label ?? "",
-    subtitle: subtitle ?? "",
+    subtitle,
     titleState: label ? "ready" : "loading",
     statusBucket: deriveSidebarStateBucket({
       status,
       requiresAttention: false,
     }),
   };
+}
+
+export function formatProviderSubagentMeta(
+  descriptor?: Pick<ProviderSubagentDescriptorPayload, "turnCount" | "subtitle"> | null,
+): string {
+  return [formatTurnCount(descriptor?.turnCount), descriptor?.subtitle?.trim()]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 type ActiveStatusBucket = Exclude<SidebarStateBucket, "done">;

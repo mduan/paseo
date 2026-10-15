@@ -84,6 +84,7 @@ const STORED_AGENT_SCHEMA = z.object({
   persistence: PERSISTENCE_HANDLE_SCHEMA,
   lastError: z.string().nullable().optional(),
   lastAssistantPreview: z.string().optional(),
+  turnCount: z.number().int().nonnegative().optional(),
   // Kept so the session cost survives a daemon restart.
   lastUsage: STORED_USAGE_SCHEMA.optional(),
   requiresAttention: z.boolean().optional(),

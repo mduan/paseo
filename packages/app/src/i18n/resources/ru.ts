@@ -27,6 +27,10 @@ export const ru: TranslationResources = {
     total: "Совпадений: {{total}}",
   },
   common: {
+    turns: {
+      one: "{{count}} ход",
+      other: "{{count}} ходов",
+    },
     bottomSheetBackdrop: "Фон нижней панели",
     back: "Назад",
     loading: "Загрузка...",
@@ -642,7 +646,6 @@ export const ru: TranslationResources = {
     },
     tabs: {
       loading: "Загрузка...",
-      effort: "Усилие: {{effort}}",
       modified: "Несохранённые изменения",
       loadingAgentTitle: "Загрузка названия агента",
       fallback: {

@@ -62,6 +62,7 @@ import { buildArchivedAgentRecord, type ArchivedStoredAgentRecord } from "./agen
 import type { StoredAgentRecord, AgentStorage } from "./agent-storage.js";
 import type { AgentOwner } from "./agent-owner.js";
 import {
+  countTimelineTurns,
   InMemoryAgentTimelineStore,
   type SeedAgentTimelineOptions,
 } from "./agent-timeline-store.js";
@@ -443,6 +444,7 @@ interface ManagedAgentBase {
   lastError?: string;
   /** The start of the last assistant message as plain text, saved at each turn end. */
   lastAssistantPreview?: string;
+  turnCount?: number;
   attention: AttentionState;
   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
   finalizedForegroundTurnIds: Set<string>;
@@ -1474,6 +1476,7 @@ export class AgentManager {
       ...options,
       persistence: handle,
       lastUsage: record?.lastUsage,
+      turnCount: record?.turnCount,
       restoring: true,
     });
   }
@@ -1667,6 +1670,7 @@ export class AgentManager {
     const rehydrateFromDisk = options?.rehydrateFromDisk ?? false;
     const preservedHistoryPrimed = existing.historyPrimed;
     const preservedLastUsage = existing.lastUsage;
+    let turnCount = existing.turnCount;
     const preservedLastError = existing.lastError;
     const preservedAttention = existing.attention;
     const handle = existing.persistence;
@@ -1721,6 +1725,7 @@ export class AgentManager {
       this.assertAcceptingAgentRegistrations();
 
       if (rehydrateFromDisk) {
+        turnCount = undefined;
         // Wipe the in-memory timeline so registerSession mints a new epoch and
         // hydrateTimelineFromProvider re-streams the freshly read provider history.
         this.timelineStore.delete(agentId);
@@ -1740,6 +1745,7 @@ export class AgentManager {
         lastUserMessageAt: existing.lastUserMessageAt,
         historyPrimed: rehydrateFromDisk ? false : preservedHistoryPrimed,
         lastUsage: preservedLastUsage,
+        turnCount,
         lastError: preservedLastError,
         attention: preservedAttention,
         restoring: true,
@@ -2055,6 +2061,7 @@ export class AgentManager {
         historyPrimed: true,
         lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
         lastUsage: record.lastUsage,
+        turnCount: record.turnCount,
         lastError: record.lastError ?? undefined,
         lastAssistantPreview: record.lastAssistantPreview,
         attention,
@@ -2946,6 +2953,7 @@ export class AgentManager {
   }
 
   private openActiveTurn(agent: ActiveManagedAgent, turnId: string, startedAt: Date): void {
+    if (agent.activeTurnId !== turnId && agent.turnCount !== undefined) agent.turnCount += 1;
     agent.activeTurnId = turnId;
     agent.activeTurnStartedAt = startedAt;
   }
@@ -3433,8 +3441,12 @@ export class AgentManager {
     options?: HydrateTimelineOptions,
   ): Promise<void> {
     const agent = this.requireSessionAgent(agentId);
+    const previousTurnCount = agent.turnCount;
     await this.hydrateTimelineFromLegacyProviderHistory(agent, options);
-    if (this.refreshLastAssistantPreview(agent)) {
+    if (agent.turnCount === undefined) {
+      agent.turnCount = countTimelineTurns(await this.getTimelineRows(agentId));
+    }
+    if (this.refreshLastAssistantPreview(agent) || previousTurnCount !== agent.turnCount) {
       this.emitState(agent);
     }
   }
@@ -3760,6 +3772,7 @@ export class AgentManager {
       persistence?: AgentPersistenceHandle;
       historyPrimed?: boolean;
       lastUsage?: AgentUsage;
+      turnCount?: number;
       lastError?: string;
       attention?: AttentionState;
       /**
@@ -3828,6 +3841,7 @@ export class AgentManager {
         }
         this.refreshSessionPersistence(managed);
       }
+      this.initializeTurnCount({ agent: managed, durableTimelineHasRows });
       await this.refreshRuntimeInfo(managed, { emit: false });
       this.assertAgentRegistrationActive(managed);
       await this.persistSnapshot(managed, {
@@ -3946,6 +3960,7 @@ export class AgentManager {
           labels?: Record<string, string>;
           historyPrimed?: boolean;
           lastUsage?: AgentUsage;
+          turnCount?: number;
           lastError?: string;
           attention?: AttentionState;
           persistence?: AgentPersistenceHandle;
@@ -3987,11 +4002,23 @@ export class AgentManager {
       historyPrimed: options?.historyPrimed ?? durableTimelineHasRows,
       lastUserMessageAt: options?.lastUserMessageAt ?? null,
       lastUsage: options?.lastUsage,
+      turnCount: options?.turnCount,
       lastError: options?.lastError,
       attention: resolveInitialAttention(options?.attention),
       internal: config.internal ?? false,
       labels: options?.labels ?? {},
     } as ActiveManagedAgent;
+  }
+
+  private initializeTurnCount({
+    agent,
+    durableTimelineHasRows,
+  }: {
+    agent: ActiveManagedAgent;
+    durableTimelineHasRows: boolean;
+  }): void {
+    if (agent.turnCount !== undefined || !agent.historyPrimed || durableTimelineHasRows) return;
+    agent.turnCount = countTimelineTurns(this.timelineStore.getRows(agent.id));
   }
 
   private async loadCommittedTimelineSeed(
@@ -4343,11 +4370,10 @@ export class AgentManager {
       }
     }
     for (const event of historyEvents) {
-      const row = this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
+      const row = this.recordTimeline(agent.id, event.item, {
+        timestamp: event.timestamp,
+        turnId: event.turnId,
+      });
       if (broadcastTimeline) {
         this.dispatchStream(agent.id, event, {
           seq: row.seq,
@@ -4356,6 +4382,7 @@ export class AgentManager {
         });
       }
     }
+    agent.turnCount = countTimelineTurns(this.timelineStore.getRows(agent.id));
     this.touchUpdatedAt(agent);
     this.emitState(agent);
   }
@@ -4416,11 +4443,10 @@ export class AgentManager {
       }
     }
     for (const event of historyEvents) {
-      const row = this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
+      const row = this.recordTimeline(agent.id, event.item, {
+        timestamp: event.timestamp,
+        turnId: event.turnId,
+      });
       if (deferredBroadcast) {
         timelineEvents.push({ event, row });
       } else if (broadcast) {
@@ -4432,6 +4458,8 @@ export class AgentManager {
       }
     }
     agent.historyPrimed = true;
+    // Provider compaction can discard old prompts; retain the saved count on ordinary resume.
+    agent.turnCount ??= countTimelineTurns(this.timelineStore.getRows(agent.id));
 
     if (typeof broadcast !== "function" || !broadcast()) {
       return;
@@ -4747,11 +4775,10 @@ export class AgentManager {
     }
 
     if (options?.fromHistory) {
-      this.recordTimeline(
-        agent.id,
-        event.item,
-        event.timestamp ? { timestamp: event.timestamp } : undefined,
-      );
+      this.recordTimeline(agent.id, event.item, {
+        timestamp: event.timestamp,
+        turnId: event.turnId,
+      });
       flags.shouldDispatchEvent = false;
       flags.shouldNotifyWaiters = false;
       return;
@@ -5418,6 +5445,18 @@ export class AgentManager {
   }
 
   private dispatch(event: AgentManagerEvent): void {
+    if (
+      event.type === "provider_subagent" &&
+      event.event.type === "timeline" &&
+      event.event.row.item.type === "user_message"
+    ) {
+      const subagent = this.providerSubagents.get(
+        event.event.parentAgentId,
+        event.event.subagentId,
+      );
+      if (subagent)
+        this.dispatch({ type: "provider_subagent", event: { type: "upsert", subagent } });
+    }
     for (const subscriber of this.subscribers) {
       if (
         subscriber.agentId &&

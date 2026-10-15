@@ -27,6 +27,10 @@ export const fr: TranslationResources = {
     total: "{{total}} résultats",
   },
   common: {
+    turns: {
+      one: "{{count}} tour",
+      other: "{{count}} tours",
+    },
     bottomSheetBackdrop: "Arrière-plan du panneau inférieur",
     back: "Dos",
     loading: "Chargement...",
@@ -641,7 +645,6 @@ export const fr: TranslationResources = {
     },
     tabs: {
       loading: "Chargement...",
-      effort: "Effort {{effort}}",
       modified: "Modifications non enregistrées",
       loadingAgentTitle: "Titre d'agent de chargement",
       fallback: {

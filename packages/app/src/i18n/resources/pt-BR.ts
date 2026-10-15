@@ -27,6 +27,10 @@ export const ptBR: TranslationResources = {
     total: "{{total}} correspondências",
   },
   common: {
+    turns: {
+      one: "{{count}} turno",
+      other: "{{count}} turnos",
+    },
     bottomSheetBackdrop: "Fundo do painel inferior",
     back: "Voltar",
     loading: "Carregando...",
@@ -640,7 +644,6 @@ export const ptBR: TranslationResources = {
     },
     tabs: {
       loading: "Carregando...",
-      effort: "Esforço {{effort}}",
       modified: "Alterações não salvas",
       loadingAgentTitle: "Carregando título do agente",
       fallback: {

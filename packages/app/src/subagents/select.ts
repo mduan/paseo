@@ -34,6 +34,7 @@ export interface ProviderSubagentRow {
   description: string | null;
   /** Compact provider-owned context. The app displays it without interpreting its contents. */
   subtitle: string | null;
+  turnCount?: number;
   status: ProviderSubagentDescriptorPayload["status"];
   requiresAttention: boolean;
   createdAt: Date;
@@ -177,6 +178,7 @@ export function selectProviderSubagentsForParent(
       title: subagent.title,
       description: subagent.description,
       subtitle: subagent.subtitle ?? null,
+      turnCount: subagent.turnCount,
       status: subagent.status,
       requiresAttention: subagent.status === "failed",
       createdAt: new Date(subagent.createdAt),

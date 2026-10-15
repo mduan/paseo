@@ -260,6 +260,7 @@ const StoredAgentSnapshotSchema = z.strictObject({
   attentionTimestamp: IsoDateSchema.nullable().optional(),
   archivedAt: IsoDateSchema.nullable().optional(),
   lastAssistantPreview: z.string().optional(),
+  turnCount: z.number().int().nonnegative().optional(),
   runtimeInfo: AgentRuntimeInfoSchema.optional(),
   lastUsage: AgentUsageSchema.optional(),
 });
@@ -682,6 +683,7 @@ function serializeAgent(agent: Agent): StoredAgent {
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
     lastAssistantPreview: agent.lastAssistantPreview,
+    turnCount: agent.turnCount,
     runtimeInfo: agent.runtimeInfo,
     lastUsage: agent.lastUsage,
   };

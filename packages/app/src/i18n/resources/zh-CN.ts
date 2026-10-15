@@ -26,6 +26,10 @@ export const zhCN: TranslationResources = {
     total: "{{total}} 个匹配项",
   },
   common: {
+    turns: {
+      one: "{{count}} 轮",
+      other: "{{count}} 轮",
+    },
     bottomSheetBackdrop: "底部面板背景",
     back: "返回",
     loading: "加载中...",
@@ -635,7 +639,6 @@ export const zhCN: TranslationResources = {
     },
     tabs: {
       loading: "正在加载...",
-      effort: "推理强度 {{effort}}",
       modified: "未保存的更改",
       loadingAgentTitle: "正在加载 Agent 标题",
       fallback: {

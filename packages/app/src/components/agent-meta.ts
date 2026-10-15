@@ -1,3 +1,4 @@
+import { formatTurnCount } from "@/utils/format-turn-count";
 import type { AgentUsage } from "@getpaseo/protocol/agent-types";
 import { formatSubagentTokens } from "@getpaseo/protocol/subagent-format";
 import { formatSessionCost } from "@/components/agent-cost";
@@ -10,6 +11,7 @@ export interface AgentMetaParts {
   model?: string;
   effort?: string;
   tokens?: string;
+  turns?: string;
   cost?: string;
 }
 
@@ -33,17 +35,20 @@ function formatAgentCost(usage: AgentUsage | null | undefined): string | undefin
   return usage.totalCostEstimated || usage.paseoSubagentCostEstimated ? `~${total}` : total;
 }
 
-/** Model, effort, tokens, and cost; each part is undefined when the agent doesn't report it. */
+/** Model, effort, turns, tokens, and cost; each part is undefined when the agent doesn't report it. */
 export function buildAgentMetaParts({
   selection,
   usage,
+  turnCount,
 }: {
   selection: AgentModelSelection;
   usage: AgentUsage | null | undefined;
+  turnCount?: number;
 }): AgentMetaParts {
   return {
     model: selection.activeModelId ? selection.displayModel : undefined,
     effort: selection.selectedThinkingId ? selection.displayThinking : undefined,
+    turns: formatTurnCount(turnCount),
     tokens: formatSubagentTokens(usage?.contextWindowUsedTokens),
     cost: formatAgentCost(usage),
   };
@@ -66,5 +71,5 @@ export function useAgentMetaParts({
     runtimeThinkingOptionId: agent?.runtimeInfo?.thinkingOptionId,
     explicitThinkingOptionId: agent?.thinkingOptionId,
   });
-  return buildAgentMetaParts({ selection, usage: agent?.lastUsage });
+  return buildAgentMetaParts({ selection, usage: agent?.lastUsage, turnCount: agent?.turnCount });
 }

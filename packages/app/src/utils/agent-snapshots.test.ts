@@ -18,6 +18,7 @@ function createSnapshot(
     lastUserMessageAt: input.lastUserMessageAt ?? null,
     status: input.status ?? "idle",
     activeTurn: input.activeTurn,
+    turnCount: input.turnCount,
     capabilities: input.capabilities ?? {
       supportsStreaming: true,
       supportsSessionPersistence: true,
@@ -36,6 +37,15 @@ function createSnapshot(
 }
 
 describe("normalizeAgentSnapshot", () => {
+  it("round-trips known and unknown turn counts", () => {
+    for (const turnCount of [undefined, 0, 12]) {
+      const snapshot = createSnapshot({ turnCount });
+      const agent = normalizeAgentSnapshot(snapshot, "server-1");
+      expect(agent.turnCount).toBe(turnCount);
+      expect(projectAgentSnapshot(agent).turnCount).toBe(turnCount);
+    }
+  });
+
   it("round-trips identified active turns through the canonical snapshot boundary", () => {
     const snapshot = createSnapshot({
       status: "running",

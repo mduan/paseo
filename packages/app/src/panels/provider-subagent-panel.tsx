@@ -1,3 +1,4 @@
+import { formatProviderSubagentMeta } from "@/subagents/track-presentation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -200,7 +201,7 @@ function ProviderSubagentPanel() {
   const firstTimelineSeq = timeline?.cursor?.startSeq ?? null;
   const progressKey =
     timeline?.epoch && firstTimelineSeq !== null ? `${timeline.epoch}:${firstTimelineSeq}` : null;
-  const subtitle = descriptor?.subtitle?.trim();
+  const subtitle = formatProviderSubagentMeta(descriptor);
 
   const streamContext = useMemo<AgentScreenAgent>(
     () => ({

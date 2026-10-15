@@ -1,3 +1,4 @@
+import { formatTurnCount } from "@/utils/format-turn-count";
 import { Pressable, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -10,6 +11,7 @@ interface ContextWindowMeterProps {
   maxTokens: number | null;
   usedTokens: number | null;
   totalCostUsd?: number | null;
+  turnCount?: number;
   subagentCostUsd?: number | null;
   /** Sum of direct Paseo children's totals, shown as part of the subagents' cost. */
   paseoSubagentCostUsd?: number | null;
@@ -150,6 +152,7 @@ function ContextWindowCostDetails({
 }
 
 export function ContextWindowMeter({
+  turnCount,
   maxTokens,
   usedTokens,
   totalCostUsd,
@@ -256,6 +259,9 @@ export function ContextWindowMeter({
           <Text style={styles.tooltipText}>
             {t("contextWindow.used", { percentage: roundedPercentage })}
           </Text>
+          {turnCount !== undefined ? (
+            <Text style={styles.tooltipDetail}>{formatTurnCount(turnCount)}</Text>
+          ) : null}
           <Text style={styles.tooltipDetail}>
             {t("contextWindow.tokens", {
               used: formatTokenCount(usedTokens),
