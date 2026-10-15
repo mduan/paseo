@@ -10,11 +10,17 @@ import {
   View,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
+import { WindowSidebarMenuToggle } from "@/components/headers/menu-header";
 import { resolveDesktopSidebarWidth } from "@/components/desktop-sidebar-layout";
 import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
@@ -111,9 +117,12 @@ interface MobileSidebarProps extends SidebarSharedProps {
 interface DesktopSidebarProps extends SidebarSharedProps {
   insetsTop: number;
   active: boolean;
+  overlay: boolean;
 }
 
-export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boolean }) {
+type LeftSidebarProps = Pick<DesktopSidebarProps, "active" | "overlay">;
+
+export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSidebarProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -259,6 +268,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
           {...sharedProps}
           insetsTop={insets.top}
           active={active}
+          overlay={overlay}
           handleOpenProject={handleOpenProjectDesktop}
           handleImportSession={openImportSession}
           handleSettings={handleSettingsDesktop}
@@ -640,6 +650,7 @@ function DesktopSidebar({
   handleOpenHostSettings,
   insetsTop,
   active,
+  overlay,
 }: DesktopSidebarProps) {
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
@@ -653,6 +664,7 @@ function DesktopSidebar({
 
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
+  const revealProgress = useSharedValue(active ? 1 : 0);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
   const hideResizeGrip = useCallback(() => setResizePressed(false), []);
@@ -660,6 +672,10 @@ function DesktopSidebar({
   useEffect(() => {
     resizeWidth.value = visibleSidebarWidth;
   }, [resizeWidth, visibleSidebarWidth]);
+
+  useEffect(() => {
+    revealProgress.value = withTiming(active ? 1 : 0, { duration: 160 });
+  }, [active, revealProgress]);
 
   const resizeGesture = useMemo(
     () =>
@@ -669,24 +685,24 @@ function DesktopSidebar({
           scheduleOnRN(showResizeGrip);
         })
         // Horizontal intent only, so a finger dragging down the touch grip scrolls
-        // the workspace list instead of resizing. Anchoring the start width to the
-        // activation translation keeps the extra threshold from jumping the edge.
+        // the workspace list instead of resizing. Anchor at activation so the
+        // intent threshold does not jump the edge.
         .activeOffsetX([-SIDEBAR_RESIZE_ACTIVATION_OFFSET, SIDEBAR_RESIZE_ACTIVATION_OFFSET])
         .failOffsetY([-SIDEBAR_RESIZE_FAIL_OFFSET, SIDEBAR_RESIZE_FAIL_OFFSET])
         .onStart((event) => {
-          startWidthRef.current = visibleSidebarWidth - event.translationX;
+          startWidthRef.current = visibleSidebarWidth - event.absoluteX;
           resizeWidth.value = visibleSidebarWidth;
         })
         .onUpdate((event) => {
-          // Dragging right (positive translationX) increases width
-          const newWidth = startWidthRef.current + event.translationX;
+          const newWidth = startWidthRef.current + event.absoluteX;
           resizeWidth.value = resolveDesktopSidebarWidth({
             requestedWidth: newWidth,
             viewportWidth,
           });
         })
-        .onEnd(() => {
-          runOnJS(setSidebarWidth)(resizeWidth.value);
+        .onEnd((event) => {
+          const requestedWidth = startWidthRef.current + event.absoluteX;
+          runOnJS(setSidebarWidth)(resolveDesktopSidebarWidth({ requestedWidth, viewportWidth }));
         })
         .onFinalize(() => {
           scheduleOnRN(hideResizeGrip);
@@ -701,17 +717,18 @@ function DesktopSidebar({
     ],
   );
 
-  const resizeAnimatedStyle = useAnimatedStyle(() => ({
-    width: resizeWidth.value,
-  }));
+  const resizeAnimatedStyle = useAnimatedStyle(() => {
+    const isVisible = active || revealProgress.value > 0;
+    return {
+      width: resizeWidth.value,
+      transform: [{ translateX: (revealProgress.value - 1) * resizeWidth.value }],
+      display: isVisible ? ("flex" as const) : ("none" as const),
+    };
+  });
 
   const desktopSidebarStyle = useMemo(
-    () => [
-      staticStyles.desktopSidebar,
-      !active && staticStyles.desktopSidebarHidden,
-      resizeAnimatedStyle,
-    ],
-    [active, resizeAnimatedStyle],
+    () => [staticStyles.desktopSidebar, resizeAnimatedStyle],
+    [resizeAnimatedStyle],
   );
   const desktopSidebarBorderStyle = useMemo(
     () => [styles.desktopSidebarBorder, { flex: 1, paddingTop: insetsTop }],
@@ -723,6 +740,7 @@ function DesktopSidebar({
   );
   return (
     <Animated.View
+      testID="left-sidebar"
       accessibilityElementsHidden={!active}
       importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       pointerEvents={active ? "auto" : "none"}
@@ -730,9 +748,18 @@ function DesktopSidebar({
     >
       <View style={desktopSidebarBorderStyle}>
         <View style={styles.sidebarDragArea}>
-          {ownsTopLeft || DEV_BUILD_LABEL ? (
+          {ownsTopLeft || DEV_BUILD_LABEL || overlay ? (
             <View style={styles.desktopChromeRow}>
               <TitlebarDragRegion />
+              {overlay ? (
+                <WindowChromeSafeArea
+                  placement="inline"
+                  horizontalPadding={12}
+                  style={styles.overlaySidebarToggle}
+                >
+                  <WindowSidebarMenuToggle />
+                </WindowChromeSafeArea>
+              ) : null}
               {DEV_BUILD_LABEL ? (
                 <View
                   pointerEvents="none"
@@ -829,9 +856,6 @@ const staticStyles = RNStyleSheet.create({
   desktopSidebar: {
     position: "relative" as const,
   },
-  desktopSidebarHidden: {
-    display: "none",
-  },
 });
 
 const styles = StyleSheet.create((theme) => ({
@@ -908,6 +932,13 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[3],
     borderBottomWidth: theme.borderWidth[1],
     borderBottomColor: "transparent",
+  },
+  overlaySidebarToggle: {
+    position: "absolute",
+    left: 0,
+    height: HEADER_INNER_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
   },
   devBuildBadge: {
     maxWidth: "60%",
