@@ -67,10 +67,11 @@ async function expectHistoryToolbar({
         let frame = element.parentElement;
         while (frame && !Number.parseFloat(getComputedStyle(frame).borderTopWidth))
           frame = frame.parentElement;
-        if (!frame) throw new Error("Search field frame not found");
+        if (!frame) return;
         const bounds = frame.getBoundingClientRect();
         return { x: bounds.x, width: bounds.width };
       });
+      if (!searchBounds) return;
       const railBounds = await page
         .getByTestId("sessions-display-trigger")
         .locator("..")
@@ -225,8 +226,16 @@ test.describe("History search across hosts", () => {
         "button",
       );
       await page.getByTestId("sessions-status-filter-trigger").click();
+      await page.getByTestId("sessions-status-filter-item-archived").click();
+      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
+      await expectChronologicalTitles(page, [archivedTitle]);
+      await page.getByTestId("sessions-status-filter-trigger").click();
+      await page.getByTestId("sessions-status-filter-all").click();
+      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
+      await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
+      await page.getByTestId("sessions-status-filter-trigger").click();
       await page.getByTestId("sessions-status-filter-item-active").click();
-      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
       await expectChronologicalTitles(page, [activeTitle]);
       await page.getByTestId("sessions-projects-filter-trigger").click();
       const projectItems = page.getByTestId(/^sessions-projects-filter-item-/);

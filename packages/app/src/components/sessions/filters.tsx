@@ -65,10 +65,12 @@ function FilterItem({
   label,
   leading,
   selected,
+  closeOnSelect,
   testID,
   onSelect,
 }: FilterOption & {
   selected: boolean;
+  closeOnSelect: boolean;
   testID: string;
   onSelect: (id: string) => void;
 }) {
@@ -77,7 +79,7 @@ function FilterItem({
     <MenuItem
       selected={selected}
       leading={leading}
-      closeOnSelect={false}
+      closeOnSelect={closeOnSelect}
       onSelect={handleSelect}
       testID={testID}
     >
@@ -90,11 +92,13 @@ function FilterItems({
   group,
   filters,
   options,
+  closeOnSelect = false,
   onChange,
 }: {
   group: FilterGroup;
   filters: HistoryFilters;
   options: AgentHistoryFilterOptions;
+  closeOnSelect?: boolean;
   onChange: (filters: HistoryFilters) => void;
 }) {
   const select = useCallback(
@@ -127,6 +131,7 @@ function FilterItems({
         id=""
         label={group.all}
         selected={!group.selected.length}
+        closeOnSelect={closeOnSelect}
         onSelect={select}
         testID={`sessions-${group.id}-filter-all`}
       />
@@ -135,6 +140,7 @@ function FilterItems({
           key={option.id}
           {...option}
           selected={group.selected.includes(option.id)}
+          closeOnSelect={closeOnSelect}
           onSelect={select}
           testID={`sessions-${group.id}-filter-item-${option.id}`}
         />
@@ -325,7 +331,13 @@ export function HistoryFilterBar({
             {group.disabled ? (
               <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text>
             ) : (
-              <FilterItems group={group} filters={filters} options={options} onChange={onChange} />
+              <FilterItems
+                group={group}
+                filters={filters}
+                options={options}
+                closeOnSelect={group.id === "status"}
+                onChange={onChange}
+              />
             )}
           </MenuSurface>
         </MenuRoot>
