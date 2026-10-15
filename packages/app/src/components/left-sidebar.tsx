@@ -665,8 +665,6 @@ function DesktopSidebar({
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
   const revealProgress = useSharedValue(active ? 1 : 0);
-  const [isPresented, setIsPresented] = useState(active);
-  const isRendered = active || isPresented;
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
   const hideResizeGrip = useCallback(() => setResizePressed(false), []);
@@ -676,10 +674,7 @@ function DesktopSidebar({
   }, [resizeWidth, visibleSidebarWidth]);
 
   useEffect(() => {
-    if (active) setIsPresented(true);
-    revealProgress.value = withTiming(active ? 1 : 0, { duration: 160 }, (finished) => {
-      if (finished && !active) runOnJS(setIsPresented)(false);
-    });
+    revealProgress.value = withTiming(active ? 1 : 0, { duration: 160 });
   }, [active, revealProgress]);
 
   const resizeGesture = useMemo(
@@ -722,18 +717,18 @@ function DesktopSidebar({
     ],
   );
 
-  const resizeAnimatedStyle = useAnimatedStyle(() => ({
-    width: resizeWidth.value,
-    transform: [{ translateX: (revealProgress.value - 1) * resizeWidth.value }],
-  }));
+  const resizeAnimatedStyle = useAnimatedStyle(() => {
+    const isVisible = active || revealProgress.value > 0;
+    return {
+      width: resizeWidth.value,
+      transform: [{ translateX: (revealProgress.value - 1) * resizeWidth.value }],
+      display: isVisible ? ("flex" as const) : ("none" as const),
+    };
+  });
 
   const desktopSidebarStyle = useMemo(
-    () => [
-      staticStyles.desktopSidebar,
-      !isRendered && staticStyles.desktopSidebarHidden,
-      resizeAnimatedStyle,
-    ],
-    [isRendered, resizeAnimatedStyle],
+    () => [staticStyles.desktopSidebar, resizeAnimatedStyle],
+    [resizeAnimatedStyle],
   );
   const desktopSidebarBorderStyle = useMemo(
     () => [styles.desktopSidebarBorder, { flex: 1, paddingTop: insetsTop }],
@@ -860,9 +855,6 @@ const workspacesSectionHeaderElement = <WorkspacesSectionHeader />;
 const staticStyles = RNStyleSheet.create({
   desktopSidebar: {
     position: "relative" as const,
-  },
-  desktopSidebarHidden: {
-    display: "none",
   },
 });
 
