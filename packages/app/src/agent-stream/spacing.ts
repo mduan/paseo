@@ -13,7 +13,7 @@ const ROW_GAP = SPACING[1];
 /** Text between tool rows sits at the same spacing as the rows themselves. */
 export function getGapBetweenStreamItems(item: StreamItem, belowItem: StreamItem | null): number {
   if (item.kind === "user_message") {
-    if (!belowItem || belowItem.kind === "assistant_message") return 0;
+    if (!belowItem) return 0;
     return belowItem.kind === "user_message" ? SPACING[1] : SPACING[4];
   }
   if (isToolSequenceItem(item) && belowItem?.kind === "assistant_message") {
