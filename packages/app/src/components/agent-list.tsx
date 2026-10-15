@@ -235,8 +235,7 @@ function SessionRow({
             <AgentActivityTime date={agent.lastActivityAt} />
           </View>
         </View>
-        <SessionRowModel agent={agent} />
-        <View style={styles.rowMetaRow}>
+        <View style={[styles.rowMetaRow, styles.contextRow]}>
           {projectName ? (
             <View style={styles.metaItem}>
               <ProjectIconView
@@ -290,6 +289,7 @@ function SessionRow({
             </View>
           ) : null}
         </View>
+        <SessionRowModel agent={agent} />
       </View>
     </Pressable>
   );
@@ -621,6 +621,9 @@ const styles = StyleSheet.create((theme) => ({
     flexWrap: "wrap",
     gap: theme.spacing[1],
     marginTop: theme.spacing[1.5],
+  },
+  contextRow: {
+    columnGap: theme.spacing[3],
   },
   rowSelected: {
     backgroundColor: theme.colors.surface2,
