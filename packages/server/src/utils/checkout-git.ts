@@ -3527,14 +3527,19 @@ async function resolveCheckoutDiffRefs(
     return null;
   }
   const bestBaseRef = await resolveBestComparisonBaseRef(cwd, baseRef);
+  const { stdout } = await runGitCommand(["merge-base", bestBaseRef, "HEAD"], {
+    cwd,
+    envOverlay: READ_ONLY_GIT_ENV,
+  });
+  const mergeBase = stdout.trim();
   if (compare.includeUncommitted) {
     return {
-      baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
+      baseRef: mergeBase,
       includeUntracked: true,
     };
   }
   return {
-    baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
+    baseRef: mergeBase,
     // Pin HEAD so expanding context later reads the commit that was diffed.
     targetRef: (await tryResolveCommit(cwd, "HEAD")) ?? "HEAD",
     includeUntracked: false,

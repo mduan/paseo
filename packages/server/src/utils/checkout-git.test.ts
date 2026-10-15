@@ -1564,6 +1564,23 @@ const x = 1;
     expect(diff.diff).not.toContain("base-only.txt");
   });
 
+  it.each([false, true])(
+    "rejects unrelated branch histories instead of comparing base tips (includeUncommitted: %s)",
+    async (includeUncommitted) => {
+      execFileSync("git", ["checkout", "--orphan", "unrelated"], { cwd: repoDir });
+      execFileSync("git", ["rm", "-rf", "."], { cwd: repoDir });
+      execFileSync(
+        "git",
+        ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "unrelated history"],
+        { cwd: repoDir },
+      );
+
+      await expect(
+        getCheckoutDiff(repoDir, { mode: "base", baseRef: "main", includeUncommitted }),
+      ).rejects.toThrow(/merge-base/);
+    },
+  );
+
   it("does not throw on large diffs (marks file as too_large)", async () => {
     const large = Array.from({ length: 200_000 }, (_, i) => `line ${i}`).join("\n") + "\n";
     writeFileSync(join(repoDir, "file.txt"), large);
