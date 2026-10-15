@@ -226,6 +226,15 @@ test("a hover-revealed sidebar stays open across its workspace hover card", asyn
     await row.hover();
     const card = page.getByTestId("workspace-hover-card");
     await expect(card).toBeVisible();
+    await expect
+      .poll(() =>
+        card.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const target = document.elementFromPoint(bounds.left + 2, bounds.top + 20);
+          return element.contains(target);
+        }),
+      )
+      .toBe(true);
     const rowBounds = await row.boundingBox();
     const cardBounds = await card.boundingBox();
     if (!rowBounds || !cardBounds) throw new Error("Workspace hover targets have no bounds");
