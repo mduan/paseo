@@ -30,7 +30,7 @@ import { formatSessionCost, resolveAgentCostBreakdown } from "@/components/agent
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { ProjectIconView } from "@/components/project-icon-view";
 import type { Theme } from "@/styles/theme";
-import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import type { HistoryFields } from "@/components/sessions/preferences";
 import { formatTurnCount } from "@/utils/format-turn-count";
@@ -49,7 +49,6 @@ const ThemedRefreshControl = withUnistyles(RefreshControl);
 
 interface AgentListProps {
   agents: AggregatedAgent[];
-  showCheckoutInfo?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
   selectedAgentId?: string;
@@ -117,19 +116,6 @@ function formatDateSectionLabel(t: TFunction, section: DateSectionKey): string {
   }
 }
 
-function SessionBadge({
-  label,
-  tone = "neutral",
-}: {
-  label: string;
-  tone?: "neutral" | "warning" | "danger";
-}) {
-  let variant: StatusBadgeVariant = "muted";
-  if (tone === "warning") variant = "warning";
-  else if (tone === "danger") variant = "error";
-  return <StatusBadge label={label} variant={variant} />;
-}
-
 function SessionRowBadges({
   pendingPermissionCount,
   showAttention,
@@ -141,13 +127,13 @@ function SessionRowBadges({
   return (
     <>
       {pendingPermissionCount > 0 ? (
-        <SessionBadge
+        <StatusBadge
           label={t("agentList.badges.pending", { count: pendingPermissionCount })}
-          tone="warning"
+          variant="warning"
         />
       ) : null}
       {showAttention ? (
-        <SessionBadge label={t("agentList.badges.attention")} tone="danger" />
+        <StatusBadge label={t("agentList.badges.attention")} variant="error" />
       ) : null}
     </>
   );

@@ -61,34 +61,6 @@ type FilterGroup = {
   disabled?: boolean;
 };
 
-function FilterItem({
-  id,
-  label,
-  leading,
-  selected,
-  closeOnSelect,
-  testID,
-  onSelect,
-}: FilterOption & {
-  selected: boolean;
-  closeOnSelect: boolean;
-  testID: string;
-  onSelect: (id: string) => void;
-}) {
-  const handleSelect = useCallback(() => onSelect(id), [id, onSelect]);
-  return (
-    <MenuItem
-      selected={selected}
-      leading={leading}
-      closeOnSelect={closeOnSelect}
-      onSelect={handleSelect}
-      testID={testID}
-    >
-      {label}
-    </MenuItem>
-  );
-}
-
 function FilterItems({
   group,
   filters,
@@ -126,25 +98,32 @@ function FilterItems({
     },
     [filters, group.id, group.selected, onChange, options.models],
   );
+  const selectAll = useCallback(() => select(""), [select]);
+  const items = useMemo(
+    () => group.options.map((option) => ({ ...option, onSelect: () => select(option.id) })),
+    [group.options, select],
+  );
   return (
     <>
-      <FilterItem
-        id=""
-        label={group.all}
+      <MenuItem
         selected={!group.selected.length}
         closeOnSelect
-        onSelect={select}
+        onSelect={selectAll}
         testID={`sessions-${group.id}-filter-all`}
-      />
-      {group.options.map((option) => (
-        <FilterItem
+      >
+        {group.all}
+      </MenuItem>
+      {items.map((option) => (
+        <MenuItem
           key={option.id}
-          {...option}
+          leading={option.leading}
           selected={group.selected.includes(option.id)}
           closeOnSelect={closeOnSelect}
-          onSelect={select}
+          onSelect={option.onSelect}
           testID={`sessions-${group.id}-filter-item-${option.id}`}
-        />
+        >
+          {option.label}
+        </MenuItem>
       ))}
     </>
   );

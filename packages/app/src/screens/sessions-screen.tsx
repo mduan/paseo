@@ -269,7 +269,6 @@ function SessionsScreenContent() {
       {showResults && agents.length > 0 ? (
         <AgentList
           agents={agents}
-          showCheckoutInfo={false}
           isRefreshing={isManualRefresh}
           onRefresh={handleRefresh}
           listFooterComponent={listFooterComponent}
