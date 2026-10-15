@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
@@ -279,6 +280,8 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
           row={row}
           serverId={serverId}
           presentation={presentation}
+          {...kebab.menuProps}
+          hasMenu={hasMenu}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
@@ -310,7 +313,7 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                   </Text>
                   {kebab.showKebab && row.tabId ? (
                     <WorkspaceSessionKebab
-                      {...kebab.menuProps}
+                      open={kebab.menuProps.open}
                       layoutKey={layoutKey}
                       tabId={row.tabId}
                       label={presentation.label}
@@ -340,6 +343,9 @@ function SessionRowHoverTarget({
   row,
   serverId,
   presentation,
+  hasMenu,
+  open,
+  onOpenChange,
   onPointerEnter,
   onPointerLeave,
   children,
@@ -347,41 +353,49 @@ function SessionRowHoverTarget({
   row: WorkspaceSessionRow;
   serverId: string;
   presentation: WorkspaceTabPresentation;
+  hasMenu: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   children: ReactElement;
 }) {
   return (
-    <View
-      style={styles.hoverTarget}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-    >
-      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false} interactive>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="start"
-          offset={8}
-          maxWidth={360}
-          style={styles.tooltipCard}
-        >
-          {/* The icon sits inline in the title so a wrapping name continues under it. */}
-          <Text style={styles.tooltipTitle}>
-            <View style={styles.tooltipIconSlot}>
-              <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
-            </View>
-            {presentation.label}
-          </Text>
-          {row.target.kind === "agent" ? (
-            <>
-              <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
-              <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
-            </>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
-    </View>
+    <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
+      <ContextMenuTrigger
+        contextOnly
+        enabled={hasMenu}
+        enabledOnMobile={false}
+        style={styles.hoverTarget}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+      >
+        <Tooltip delayDuration={300} enabledOnDesktop={!open} enabledOnMobile={false} interactive>
+          <TooltipTrigger asChild>{children}</TooltipTrigger>
+          <TooltipContent
+            side="right"
+            align="start"
+            offset={8}
+            maxWidth={360}
+            style={styles.tooltipCard}
+          >
+            {/* The icon sits inline in the title so a wrapping name continues under it. */}
+            <Text style={styles.tooltipTitle}>
+              <View style={styles.tooltipIconSlot}>
+                <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
+              </View>
+              {presentation.label}
+            </Text>
+            {row.target.kind === "agent" ? (
+              <>
+                <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
+                <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+              </>
+            ) : null}
+          </TooltipContent>
+        </Tooltip>
+      </ContextMenuTrigger>
+    </DropdownMenu>
   );
 }
 
@@ -390,19 +404,17 @@ function WorkspaceSessionKebab({
   tabId,
   label,
   open,
-  onOpenChange,
 }: {
   layoutKey: string;
   tabId: string;
   label: string;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
 }) {
   const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
   // Built on open so the entries reflect the pane's tabs at that moment.
   const entries = useMemo(() => (open ? (builder?.(tabId) ?? []) : []), [builder, open, tabId]);
   return (
-    <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
+    <>
       <DropdownMenuTrigger
         hitSlop={8}
         style={sidebarKebabTriggerStyle}
@@ -412,7 +424,12 @@ function WorkspaceSessionKebab({
       >
         {renderSidebarKebabTriggerIcon}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" width={260} sheetTitle={label}>
+      <DropdownMenuContent
+        align="end"
+        width={260}
+        sheetTitle={label}
+        testID={`sidebar-workspace-session-menu-${tabId}`}
+      >
         {entries.map((entry) =>
           entry.kind === "separator" ? (
             <DropdownMenuSeparator key={entry.key} />
@@ -421,7 +438,7 @@ function WorkspaceSessionKebab({
           ),
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+    </>
   );
 }
 
