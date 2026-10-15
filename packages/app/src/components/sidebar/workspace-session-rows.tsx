@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ContextMenuTrigger } from "@/components/ui/context-menu";
+import { ContextMenuTrigger, useContextMenu } from "@/components/ui/context-menu";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
@@ -273,14 +273,13 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   );
   const kebab = useOpenKebabMenuVisibility(hasMenu && (isHovered || isNative || isCompact));
 
-  return (
+  const content = (
     <WorkspaceTabPresentationResolver tab={tab} serverId={serverId} workspaceId={workspaceId}>
       {(presentation) => (
         <SessionRowHoverTarget
           row={row}
           serverId={serverId}
           presentation={presentation}
-          {...kebab.menuProps}
           hasMenu={hasMenu}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
@@ -313,7 +312,6 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                   </Text>
                   {kebab.showKebab && row.tabId ? (
                     <WorkspaceSessionKebab
-                      open={kebab.menuProps.open}
                       layoutKey={layoutKey}
                       tabId={row.tabId}
                       label={presentation.label}
@@ -333,6 +331,11 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
       )}
     </WorkspaceTabPresentationResolver>
   );
+  return (
+    <DropdownMenu compactMode="sheet" {...kebab.menuProps}>
+      {content}
+    </DropdownMenu>
+  );
 });
 
 /**
@@ -344,8 +347,6 @@ function SessionRowHoverTarget({
   serverId,
   presentation,
   hasMenu,
-  open,
-  onOpenChange,
   onPointerEnter,
   onPointerLeave,
   children,
@@ -354,48 +355,45 @@ function SessionRowHoverTarget({
   serverId: string;
   presentation: WorkspaceTabPresentation;
   hasMenu: boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   children: ReactElement;
 }) {
+  const { open } = useContextMenu();
   return (
-    <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
-      <ContextMenuTrigger
-        contextOnly
-        enabled={hasMenu}
-        enabledOnMobile={false}
-        style={styles.hoverTarget}
-        onPointerEnter={onPointerEnter}
-        onPointerLeave={onPointerLeave}
-      >
-        <Tooltip delayDuration={300} enabledOnDesktop={!open} enabledOnMobile={false} interactive>
-          <TooltipTrigger asChild>{children}</TooltipTrigger>
-          <TooltipContent
-            side="right"
-            align="start"
-            offset={8}
-            maxWidth={360}
-            style={styles.tooltipCard}
-          >
-            {/* The icon sits inline in the title so a wrapping name continues under it. */}
-            <Text style={styles.tooltipTitle}>
-              <View style={styles.tooltipIconSlot}>
-                <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
-              </View>
-              {presentation.label}
-            </Text>
-            {row.target.kind === "agent" ? (
-              <>
-                <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
-                <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
-              </>
-            ) : null}
-          </TooltipContent>
-        </Tooltip>
-      </ContextMenuTrigger>
-    </DropdownMenu>
+    <ContextMenuTrigger
+      contextOnly
+      enabled={hasMenu}
+      enabledOnMobile={false}
+      style={styles.hoverTarget}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <Tooltip delayDuration={300} enabledOnDesktop={!open} enabledOnMobile={false} interactive>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent
+          side="right"
+          align="start"
+          offset={8}
+          maxWidth={360}
+          style={styles.tooltipCard}
+        >
+          {/* The icon sits inline in the title so a wrapping name continues under it. */}
+          <Text style={styles.tooltipTitle}>
+            <View style={styles.tooltipIconSlot}>
+              <WorkspaceTabIcon presentation={presentation} active backdrop="surface1" />
+            </View>
+            {presentation.label}
+          </Text>
+          {row.target.kind === "agent" ? (
+            <>
+              <AgentTooltipMeta serverId={serverId} agentId={row.target.agentId} />
+              <AgentPreview serverId={serverId} agentId={row.target.agentId} full />
+            </>
+          ) : null}
+        </TooltipContent>
+      </Tooltip>
+    </ContextMenuTrigger>
   );
 }
 
@@ -403,13 +401,12 @@ function WorkspaceSessionKebab({
   layoutKey,
   tabId,
   label,
-  open,
 }: {
   layoutKey: string;
   tabId: string;
   label: string;
-  open: boolean;
 }) {
+  const { open } = useContextMenu();
   const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
   // Built on open so the entries reflect the pane's tabs at that moment.
   const entries = useMemo(() => (open ? (builder?.(tabId) ?? []) : []), [builder, open, tabId]);
