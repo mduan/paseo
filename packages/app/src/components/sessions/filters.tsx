@@ -357,6 +357,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.border,
   },
   trigger: {
+    minHeight: buttonControlHeight.sm,
     maxWidth: 260,
   },
   triggerText: {
