@@ -121,7 +121,7 @@ function toLegacyGithubSearchItems(items: ForgeSearchResultItem[]): LegacyGithub
  */
 export interface CheckoutDiffSubscriber {
   read(
-    params: Omit<CheckoutDiffSubscriptionRequest, "signal">,
+    params: Omit<CheckoutDiffSubscriptionRequest, "signal"> & { deepenHistory?: boolean },
   ): Promise<CheckoutDiffSnapshotPayload>;
   subscribe(
     params: CheckoutDiffSubscriptionRequest,
@@ -448,6 +448,7 @@ export class CheckoutSession {
     const snapshot = await this.checkoutDiffManager.read({
       cwd: expandTilde(msg.cwd),
       compare: msg.compare,
+      deepenHistory: msg.deepenHistory,
     });
     this.host.emit({
       type: "checkout.diff.get.response",

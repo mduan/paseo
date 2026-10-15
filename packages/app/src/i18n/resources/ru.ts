@@ -1048,6 +1048,8 @@ export const ru: TranslationResources = {
         failedRefresh: "Не удалось обновить состояние Git.",
         seeUncommittedChanges: "Показать незафиксированные изменения",
         seeCommittedChanges: "Показать зафиксированные изменения",
+        fetchingHistory: "Загрузка истории…",
+        fetchMoreHistory: "Загрузить больше истории и повторить",
         checkingRepository: "Проверяем репозиторий...",
         notRepository: "Это не репозиторий Git",
         diffMode: "Режим диффа",

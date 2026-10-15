@@ -1064,6 +1064,8 @@ export const es: TranslationResources = {
         failedRefresh: "No se pudo actualizar el estado de git.",
         seeUncommittedChanges: "Ver cambios no confirmados",
         seeCommittedChanges: "Ver cambios confirmados",
+        fetchingHistory: "Obteniendo historial…",
+        fetchMoreHistory: "Obtener más historial y reintentar",
         checkingRepository: "Comprobando repositorio...",
         notRepository: "No es un repositorio de git",
         diffMode: "modo diferencial",

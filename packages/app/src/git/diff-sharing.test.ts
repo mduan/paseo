@@ -1,3 +1,4 @@
+import { CheckoutDiffHistoryStatus } from "@getpaseo/protocol/messages";
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import { describe, expect, it } from "vitest";
 import { retainDiffFiles, shareCheckoutDiff, shareCommitFileDiff } from "./diff-sharing";
@@ -144,6 +145,19 @@ describe("diff sharing", () => {
       diffTooLarge: true,
     };
     expect(shareCheckoutDiff(next, rejected)).toEqual(rejected);
+  });
+  it("publishes history progress changes even when files and errors are unchanged", () => {
+    const previous = {
+      cwd: "/repo",
+      files: [],
+      error: null,
+      requestId: "a",
+      historyStatus: CheckoutDiffHistoryStatus.Fetching,
+    };
+    const incoming = { ...previous, historyStatus: CheckoutDiffHistoryStatus.NeedsMoreHistory };
+    const next = shareCheckoutDiff(previous, incoming);
+    expect(next.historyStatus).toBe(CheckoutDiffHistoryStatus.NeedsMoreHistory);
+    expect(next.files).toBe(previous.files);
   });
   it("preserves cached commit bodies and publishes null transitions", () => {
     const previous = { file };

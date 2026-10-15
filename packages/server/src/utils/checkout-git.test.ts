@@ -12,6 +12,14 @@ import {
 } from "fs";
 import { join } from "path";
 import { win32 } from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  CheckoutHistoryRecovery,
+  resolveCheckoutMergeBase,
+  ShallowHistoryError,
+} from "./checkout-history.js";
+import { runGitCommand } from "./run-git-command.js";
+import { createShallowGitClone } from "../test-utils/shallow-git-repo.js";
 import { tmpdir } from "os";
 import pino from "pino";
 import { base64EncryptedWireByteLength } from "@getpaseo/relay";
@@ -1580,6 +1588,99 @@ const x = 1;
       ).rejects.toThrow(/merge-base/);
     },
   );
+
+  function createShallowComparison(commits: number): string {
+    const clone = join(tempDir, "shallow");
+    createShallowGitClone({ sourcePath: repoDir, clonePath: clone, baseCommits: commits });
+    return clone;
+  }
+
+  async function shallowHistoryError(cwd: string): Promise<ShallowHistoryError> {
+    try {
+      await resolveCheckoutMergeBase({ cwd, baseRef: "origin/main" });
+    } catch (error) {
+      if (error instanceof ShallowHistoryError) return error;
+      throw error;
+    }
+    throw new Error("Expected missing shallow history");
+  }
+
+  it("recovers a shallow comparison with one bounded fetch shared across worktrees", async () => {
+    const clone = createShallowComparison(10);
+    execFileSync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/feature"],
+      { cwd: clone },
+    );
+    const worktree = join(tempDir, "second-viewer");
+    execFileSync("git", ["worktree", "add", "--detach", worktree, "HEAD"], { cwd: clone });
+    const firstError = await shallowHistoryError(clone);
+    const secondError = await shallowHistoryError(worktree);
+    let releaseFetch!: () => void;
+    const gate = new Promise<void>((resolveGate) => {
+      releaseFetch = resolveGate;
+    });
+    let fetches = 0;
+    const recovery = new CheckoutHistoryRecovery(async (args, options) => {
+      if (args[0] === "fetch") {
+        fetches += 1;
+        await gate;
+      }
+      return runGitCommand(args, options);
+    });
+    const first = recovery.recover({ history: secondError });
+    const second = recovery.recover({ history: firstError });
+    expect(first?.started).toBe(true);
+    expect(second?.started).toBe(false);
+    expect(first?.promise).toBe(second?.promise);
+    releaseFetch();
+    await first?.promise;
+    expect(fetches).toBe(1);
+    const diff = await getCheckoutDiff(clone, {
+      mode: "base",
+      baseRef: "main",
+      includeStructured: true,
+    });
+    expect(diff.structured?.map((file) => file.path)).toEqual(["feature.txt"]);
+  });
+
+  it("waits for an explicit retry when 500 more commits are insufficient", async () => {
+    const clone = createShallowComparison(600);
+    const recovery = new CheckoutHistoryRecovery();
+    await recovery.recover({ history: await shallowHistoryError(clone) })?.promise;
+    const stillShallow = await shallowHistoryError(clone);
+    expect(recovery.recover({ history: stillShallow })).toBeUndefined();
+    await recovery.recover({ history: stillShallow, retry: true })?.promise;
+    const diff = await getCheckoutDiff(clone, {
+      mode: "base",
+      baseRef: "main",
+      includeStructured: true,
+    });
+    expect(diff.structured?.map((file) => file.path)).toEqual(["feature.txt"]);
+  });
+
+  it("retains fetch failures and allows an explicit retry", async () => {
+    const clone = createShallowComparison(10);
+    const error = await shallowHistoryError(clone);
+    const recovery = new CheckoutHistoryRecovery();
+    execFileSync("git", ["remote", "set-url", "origin", join(tempDir, "missing-remote")], {
+      cwd: clone,
+    });
+    await recovery.recover({ history: error })?.promise;
+    expect(recovery.failure(error)).toBeInstanceOf(Error);
+    expect(recovery.recover({ history: error })).toBeUndefined();
+    execFileSync("git", ["remote", "set-url", "origin", pathToFileURL(repoDir).href], {
+      cwd: clone,
+    });
+    await recovery.recover({ history: error, retry: true })?.promise;
+    expect(recovery.failure(error)).toBeUndefined();
+    const diff = await getCheckoutDiff(clone, {
+      mode: "base",
+      baseRef: "main",
+      includeStructured: true,
+    });
+    expect(diff.structured?.map((file) => file.path)).toEqual(["feature.txt"]);
+  });
 
   it("does not throw on large diffs (marks file as too_large)", async () => {
     const large = Array.from({ length: 200_000 }, (_, i) => `line ${i}`).join("\n") + "\n";

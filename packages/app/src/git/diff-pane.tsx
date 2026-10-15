@@ -1,3 +1,4 @@
+import { CheckoutDiffHistoryStatus } from "@getpaseo/protocol/messages";
 import { useState, useCallback, useMemo, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -1108,6 +1109,10 @@ interface DiffBodyContentProps {
   emptyMessage: string;
   emptyAction: ChangesEmptyAction | null;
   children: ReactElement;
+  historyStatus?: CheckoutDiffHistoryStatus;
+  historyLoadingLabel: string;
+  historyRetryLabel: string;
+  onRetryHistory?: () => void;
   checkingRepositoryLabel: string;
   notRepositoryLabel: string;
 }
@@ -1123,6 +1128,10 @@ function DiffBodyContent({
   emptyMessage,
   emptyAction,
   children,
+  historyStatus,
+  historyLoadingLabel,
+  historyRetryLabel,
+  onRetryHistory,
   checkingRepositoryLabel,
   notRepositoryLabel,
 }: DiffBodyContentProps) {
@@ -1150,8 +1159,11 @@ function DiffBodyContent({
   }
   if (isDiffLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.loadingContainer} testID="changes-loading">
         <ThemedLoadingSpinner size="large" uniProps={foregroundMutedIconColorMapping} />
+        {historyStatus === CheckoutDiffHistoryStatus.Fetching ? (
+          <Text style={styles.loadingText}>{historyLoadingLabel}</Text>
+        ) : null}
       </View>
     );
   }
@@ -1162,6 +1174,16 @@ function DiffBodyContent({
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{diffErrorMessage}</Text>
+        {onRetryHistory ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            testID="changes-deepen-history"
+            onPress={onRetryHistory}
+          >
+            {historyRetryLabel}
+          </Button>
+        ) : null}
       </View>
     );
   }
@@ -1357,6 +1379,8 @@ function ChangesTreeRail({
 }
 
 function ChangesBody({
+  isLoading,
+  errorMessage,
   presentation,
   children,
   desktopTreeVisible,
@@ -1369,6 +1393,8 @@ function ChangesBody({
   collapsedFolderPaths,
   onCollapsedFolderPathsChange,
 }: {
+  isLoading: boolean;
+  errorMessage: string | null;
   presentation: ChangesPresentation;
   children: ReactElement;
   desktopTreeVisible: boolean;
@@ -1381,6 +1407,7 @@ function ChangesBody({
   collapsedFolderPaths: string[];
   onCollapsedFolderPathsChange: (paths: string[]) => void;
 }) {
+  if (isLoading || errorMessage) return children;
   if (presentation === "tree") {
     if (files.length === 0) return children;
     return (
@@ -1600,6 +1627,8 @@ export function ChangesSurface({
     diffPayloadError,
     diffTooLarge,
     isDiffLoading,
+    historyStatus,
+    retryHistory,
     reviewActions,
     commentsCapabilityMissing,
     onExpandGap,
@@ -1806,6 +1835,10 @@ export function ChangesSurface({
       statusErrorMessage={statusErrorMessage}
       notGit={notGit}
       isDiffLoading={isDiffLoading}
+      historyStatus={historyStatus}
+      historyLoadingLabel={t("workspace.git.diff.fetchingHistory")}
+      historyRetryLabel={t("workspace.git.diff.fetchMoreHistory")}
+      onRetryHistory={retryHistory}
       diffErrorMessage={diffErrorMessage}
       diffTooLarge={diffTooLarge}
       hasChanges={hasChanges}
@@ -1826,6 +1859,8 @@ export function ChangesSurface({
   );
   const bodyContent = (
     <ChangesBody
+      isLoading={isDiffLoading}
+      errorMessage={diffErrorMessage}
       presentation={presentation}
       desktopTreeVisible={desktopTreeVisible}
       isMobile={isMobile}

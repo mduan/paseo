@@ -1,4 +1,6 @@
 import type pino from "pino";
+import { CheckoutDiffHistoryStatus } from "@getpaseo/protocol/messages";
+import { CheckoutHistoryRecovery, ShallowHistoryError } from "../utils/checkout-history.js";
 import type { SubscribeCheckoutDiffRequest, SessionOutboundMessage } from "./messages.js";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
 import { expandTilde } from "../utils/path.js";
@@ -64,6 +66,7 @@ export interface CheckoutDiffSubscription {
 export class CheckoutDiffManager {
   private readonly workspaceGitService: CheckoutDiffWorkspace;
   private readonly targets = new Map<string, CheckoutDiffWatchTarget>();
+  private readonly historyRecovery = new CheckoutHistoryRecovery();
 
   constructor(options: {
     logger: pino.Logger;
@@ -74,9 +77,11 @@ export class CheckoutDiffManager {
   }
 
   async read(
-    params: Omit<CheckoutDiffSubscriptionRequest, "signal">,
+    params: Omit<CheckoutDiffSubscriptionRequest, "signal"> & { deepenHistory?: boolean },
   ): Promise<CheckoutDiffSnapshotPayload> {
-    return this.computeCheckoutDiffSnapshot(params.cwd, this.normalizeCompare(params.compare));
+    return this.computeCheckoutDiffSnapshot(params.cwd, this.normalizeCompare(params.compare), {
+      deepenHistory: params.deepenHistory,
+    });
   }
 
   async subscribe(
@@ -273,7 +278,7 @@ export class CheckoutDiffManager {
   private async computeCheckoutDiffSnapshot(
     cwd: string,
     compare: CheckoutDiffCompareInput,
-    options?: { diffCwd?: string; force?: boolean; reason?: string },
+    options?: { diffCwd?: string; force?: boolean; reason?: string; deepenHistory?: boolean },
   ): Promise<CheckoutDiffSnapshotPayload> {
     const diffCwd = options?.diffCwd ?? cwd;
     try {
@@ -309,11 +314,42 @@ export class CheckoutDiffManager {
         error: null,
       };
     } catch (error) {
+      if (error instanceof ShallowHistoryError) {
+        const pending = this.historyRecovery.recover({
+          history: error,
+          retry: options?.deepenHistory,
+        });
+        if (pending) {
+          if (pending.started) {
+            void pending.promise.then(() => this.refreshHistoryTargets());
+            this.refreshHistoryTargets();
+          }
+          return {
+            cwd,
+            files: [],
+            historyStatus: CheckoutDiffHistoryStatus.Fetching,
+            error: toCheckoutError(new Error("Fetching history…")),
+          };
+        }
+        const failure = this.historyRecovery.failure(error);
+        return {
+          cwd,
+          files: [],
+          historyStatus: CheckoutDiffHistoryStatus.NeedsMoreHistory,
+          error: toCheckoutError(failure ?? error),
+        };
+      }
       return {
         cwd,
         files: [],
         error: toCheckoutError(error),
       };
+    }
+  }
+
+  private refreshHistoryTargets(): void {
+    for (const target of this.targets.values()) {
+      if (target.compare.mode === "base") this.scheduleTargetRefresh(target);
     }
   }
 

@@ -4228,6 +4228,21 @@ export class DaemonClient {
     });
   }
 
+  async deepenCheckoutHistory(input: {
+    cwd: string;
+    compare: SubscribeCheckoutDiffRequest["compare"];
+  }): Promise<CheckoutDiffPayload> {
+    return this.sendCorrelatedSessionRequest({
+      message: {
+        type: "checkout.diff.get.request",
+        cwd: input.cwd,
+        compare: this.normalizeCheckoutDiffCompare(input.compare),
+        deepenHistory: true,
+      },
+      responseType: "checkout.diff.get.response",
+    });
+  }
+
   observeCheckoutDiff(
     cwd: string,
     compare: SubscribeCheckoutDiffRequest["compare"],

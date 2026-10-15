@@ -1030,6 +1030,8 @@ export const ar: TranslationResources = {
         failedRefresh: "فشل تحديث حالة git.",
         seeUncommittedChanges: "عرض التغييرات غير الملتزم بها",
         seeCommittedChanges: "عرض التغييرات الملتزم بها",
+        fetchingHistory: "جارٍ جلب السجل…",
+        fetchMoreHistory: "جلب المزيد من السجل وإعادة المحاولة",
         checkingRepository: "فحص المستودع...",
         notRepository: "ليس مستودع جيت",
         diffMode: "وضع الفرق",

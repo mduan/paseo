@@ -1043,6 +1043,8 @@ export const ja: TranslationResources = {
         failedRefresh: "gitの状態の更新に失敗しました。",
         seeUncommittedChanges: "未コミットの変更を表示",
         seeCommittedChanges: "コミット済みの変更を表示",
+        fetchingHistory: "履歴を取得中…",
+        fetchMoreHistory: "履歴をさらに取得して再試行",
         checkingRepository: "リポジトリを確認中...",
         notRepository: "gitリポジトリではありません",
         diffMode: "差分モード",
