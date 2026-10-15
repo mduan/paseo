@@ -1304,6 +1304,48 @@ test("selects, preserves, copies, and dismisses diff text without opening a revi
   });
 });
 
+for (const layout of ["unified", "split"] as const) {
+  test(`canvas diff selects a word on double click and a line on triple click in ${layout} layout`, async ({
+    page,
+  }) => {
+    const line = `const foo_bar = otherValue; ${"longValue ".repeat(40)}tail;`;
+    await openCopyableSelectionDiff(page, `${line}\nnextLine`);
+    await setOpenChangesPresentation(page, { layout, wrapLines: true });
+    const point = await page.getByTestId("diff-file-0-body").evaluate((body, currentLayout) => {
+      const bounds = body.getBoundingClientRect();
+      const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="git-diff-canvas"]')!;
+      const style = getComputedStyle(canvas);
+      const fontSize = Number.parseFloat(style.fontSize);
+      const context = document.createElement("canvas").getContext("2d")!;
+      context.font = `${fontSize}px ${style.fontFamily}`;
+      const columnLeft = currentLayout === "split" ? bounds.width / 2 : 0;
+      const gutterWidth = 2 * Math.ceil(fontSize * 0.62) + 12;
+      return {
+        x: bounds.x + columnLeft + gutterWidth + 8 + 12.75 * context.measureText("A").width,
+        y: bounds.y + Math.round(fontSize * 1.5) * 0.5,
+      };
+    }, layout);
+
+    await page.mouse.dblclick(point.x, point.y);
+    await copyDiffSelectionWithKeyboard(page);
+    await expectClipboardText(page, "foo_bar");
+    await page.mouse.click(point.x, point.y, { clickCount: 3 });
+    await copyDiffSelectionWithKeyboard(page);
+    await expectClipboardText(page, line);
+    await expect(page.getByTestId("inline-review-editor")).toHaveCount(0);
+
+    await dragAddedTextRange(page, {
+      lines: [line, "nextLine"],
+      side: layout === "split" ? "right" : undefined,
+      wrapped: true,
+      start: { line: 0, offset: 2 },
+      end: { line: 0, offset: 5 },
+    });
+    await copyDiffSelectionWithKeyboard(page);
+    await expectClipboardText(page, "nst");
+  });
+}
+
 test("canvas diff clears a selection when collapsing an earlier file", async ({ page }) => {
   const workspace = await createWorkspaceWithTwoSelectionDiffs();
   await useUnwrappedDiffLines(page);
@@ -1997,7 +2039,7 @@ async function clickFirstChangedLine(page: Page): Promise<void> {
   ]);
   if (!bodyBounds) throw new Error("Expanded diff body has no bounds");
   const lineHeight = Math.round(fontSize * 1.5);
-  await page.mouse.click(bodyBounds.x + 120, bodyBounds.y + lineHeight * 1.5);
+  await page.mouse.click(bodyBounds.x + 120, bodyBounds.y + lineHeight * 0.5);
 }
 
 async function openCopyableSelectionDiff(page: Page, content: string): Promise<void> {
@@ -2044,7 +2086,7 @@ async function rightClickFirstChangedLine(page: Page, fileIndex = 0): Promise<vo
   ]);
   if (!bodyBounds) throw new Error("Expanded diff body has no bounds");
   const lineHeight = Math.round(fontSize * 1.5);
-  await page.mouse.click(bodyBounds.x + 120, bodyBounds.y + lineHeight * 1.5, {
+  await page.mouse.click(bodyBounds.x + 120, bodyBounds.y + lineHeight * 0.5, {
     button: "right",
   });
 }
@@ -2110,12 +2152,12 @@ async function dragExactAddedText(
   const textLeft = bodyBounds.x + gutterWidth + 8;
   await page.mouse.move(
     textLeft + offsets.startOffset * metrics.characterWidth + 1,
-    bodyBounds.y + lineHeight * 1.5,
+    bodyBounds.y + lineHeight * 0.5,
   );
   await page.mouse.down();
   await page.mouse.move(
     textLeft + offsets.endOffset * metrics.characterWidth - 1,
-    bodyBounds.y + lineHeight * 1.5,
+    bodyBounds.y + lineHeight * 0.5,
     { steps: 8 },
   );
   await page.mouse.up();
@@ -2170,7 +2212,7 @@ async function dragAddedTextRange(
         8 +
         localOffset * metrics.characterWidth -
         (input.horizontalOffset ?? 0),
-      y: bounds.y + (1 + fragmentsBefore(line) + fragment + 0.5) * lineHeight,
+      y: bounds.y + (fragmentsBefore(line) + fragment + 0.5) * lineHeight,
     };
   };
   const start = point(input.start);
