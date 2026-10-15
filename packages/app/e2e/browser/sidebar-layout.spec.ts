@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -11,6 +11,20 @@ import {
   openMobileAgentSidebar,
 } from "../support/helpers/sidebar";
 import { waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
+
+async function replayPointerOut(target: Locator): Promise<void> {
+  // Electron can emit pointerout with no related target while hovering portaled content.
+  await target.evaluate((element) => {
+    const { left, top, width, height } = element.getBoundingClientRect();
+    const clientX = left + width / 2;
+    const clientY = top + height / 2;
+    const pointerTarget = document.elementFromPoint(clientX, clientY);
+    if (!pointerTarget) throw new Error("Pointer target is missing");
+    pointerTarget.dispatchEvent(
+      new PointerEvent("pointerout", { bubbles: true, relatedTarget: null, clientX, clientY }),
+    );
+  });
+}
 
 async function dragSidebarTo(page: Page, width: number) {
   const handle = page.getByTestId("left-sidebar-resize-handle");
@@ -216,6 +230,7 @@ test("a hover-revealed sidebar stays open across its workspace hover card", asyn
     const cardBounds = await card.boundingBox();
     if (!rowBounds || !cardBounds) throw new Error("Workspace hover targets have no bounds");
     await page.mouse.move(cardBounds.x + 20, rowBounds.y + rowBounds.height / 2, { steps: 20 });
+    await replayPointerOut(card);
     await page.waitForTimeout(250);
     await expect(sidebar).toBeVisible();
     await expect(card).toBeVisible();
@@ -257,6 +272,7 @@ test("a hover-revealed sidebar stays open across its session tooltip", async ({ 
     const x = Math.max(sidebarBounds.x + sidebarBounds.width + 20, tooltipBounds.x + 20);
     expect(x).toBeLessThan(tooltipBounds.x + tooltipBounds.width);
     await page.mouse.move(x, tooltipBounds.y + 20, { steps: 20 });
+    await replayPointerOut(tooltip);
     await page.waitForTimeout(250);
     await expect(sidebar).toBeVisible();
     await expect(tooltip).toBeVisible();
@@ -307,22 +323,7 @@ test("a hover-revealed sidebar stays open after its menu closes under the pointe
             .click({ position: { x: 100, y: 100 } });
         }
         await expect(copyPath).toBeHidden();
-        // Replay Electron's pointerout with no related target when a menu closes inside the window.
-        await sidebar.evaluate((element) => {
-          const { left, top, width, height } = element.getBoundingClientRect();
-          const clientX = left + width / 2;
-          const clientY = top + height / 2;
-          const target = document.elementFromPoint(clientX, clientY);
-          if (!target) throw new Error("Sidebar pointer target is missing");
-          target.dispatchEvent(
-            new PointerEvent("pointerout", {
-              bubbles: true,
-              relatedTarget: null,
-              clientX,
-              clientY,
-            }),
-          );
-        });
+        await replayPointerOut(sidebar);
         await page.waitForTimeout(250);
         await expect(sidebar).toBeVisible();
       }

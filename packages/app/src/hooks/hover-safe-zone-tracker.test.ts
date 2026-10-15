@@ -6,7 +6,6 @@ const CONTENT: RectLike = { left: 120, right: 240, top: 20, bottom: 120 };
 
 interface TrackerHandle {
   pointerMoved(x: number, y: number): void;
-  pointerLeftWindow(): void;
   windowBlurred(): void;
   readonly enters: number;
   readonly leaves: number;
@@ -32,7 +31,6 @@ function createHandle(
   });
   return {
     pointerMoved: tracker.pointerMoved,
-    pointerLeftWindow: tracker.pointerLeftWindow,
     windowBlurred: tracker.windowBlurred,
     get enters() {
       return enters;
@@ -74,7 +72,7 @@ describe("hover safe-zone tracker", () => {
   it("treats leaving the browser window as leaving the safe zone", () => {
     const handle = createHandle();
 
-    handle.pointerLeftWindow();
+    handle.pointerMoved(-1, 40);
     expect(handle.leaves).toBe(1);
 
     // Already outside — blur does not fire a second leave.

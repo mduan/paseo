@@ -14,7 +14,6 @@ export interface HoverSafeZoneTrackerInput {
 
 export interface HoverSafeZoneTracker {
   pointerMoved(x: number, y: number): void;
-  pointerLeftWindow(): void;
   windowBlurred(): void;
 }
 
@@ -43,7 +42,6 @@ export function createHoverSafeZoneTracker(input: HoverSafeZoneTrackerInput): Ho
       }
       leave();
     },
-    pointerLeftWindow: leave,
     windowBlurred: leave,
   };
 }
