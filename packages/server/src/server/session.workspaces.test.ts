@@ -3104,6 +3104,8 @@ test("fetch_agent_history_request filters across history and paginates chronolog
         updatedAt: "2026-03-03T12:00:00.000Z",
       }),
       title: "Unbilled usage report",
+      model: "history-model",
+      archivedAt: "2026-03-04T12:00:00.000Z",
     },
     {
       ...makeAgent({
@@ -3124,6 +3126,8 @@ test("fetch_agent_history_request filters across history and paginates chronolog
         updatedAt: "2026-03-01T12:00:00.000Z",
       }),
       title: "Add Stripe billing",
+      model: "history-model",
+      archivedAt: "2026-03-04T12:00:00.000Z",
     },
   ];
 
@@ -3149,6 +3153,46 @@ test("fetch_agent_history_request filters across history and paginates chronolog
   const second = filterByType(emitted, "fetch_agent_history_response")[1];
   expect(second.payload.entries.map((entry) => entry.agent.id)).toEqual(["strong"]);
   expect(second.payload.pageInfo.hasMore).toBe(false);
+  const filter = {
+    archived: true,
+    providers: ["codex"],
+    models: [{ provider: "codex", model: "history-model" }],
+  };
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "metadata-first",
+    filter,
+    includeFilterOptions: true,
+    page: { limit: 1 },
+  });
+  const filteredFirst = filterByType(emitted, "fetch_agent_history_response")[2];
+  expect(filteredFirst.payload.entries.map((entry) => entry.agent.id)).toEqual(["weak"]);
+  expect(filteredFirst.payload.filterOptions).toEqual({
+    projects: [{ projectKey: project.projectId, projectName: "history-search" }],
+    models: [
+      { provider: "codex", model: "history-model" },
+      { provider: "codex", model: null },
+    ],
+  });
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "metadata-next",
+    filter,
+    page: { limit: 1, cursor: filteredFirst.payload.pageInfo.nextCursor! },
+  });
+  const filteredNext = filterByType(emitted, "fetch_agent_history_response")[3];
+  expect(filteredNext.payload.entries.map((entry) => entry.agent.id)).toEqual(["strong"]);
+  expect(filteredNext.payload.pageInfo.hasMore).toBe(false);
+  expect(filteredNext.payload.filterOptions).toBeUndefined();
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "metadata-active",
+    filter: { archived: false, includeArchived: false },
+    includeFilterOptions: true,
+  });
+  const active = filterByType(emitted, "fetch_agent_history_response")[4];
+  expect(active.payload.entries.map((entry) => entry.agent.id)).toEqual(["unrelated"]);
+  expect(active.payload.filterOptions).toEqual(filteredFirst.payload.filterOptions);
 });
 
 test("fetch_agent_history_request rejects a malformed search cursor", async () => {

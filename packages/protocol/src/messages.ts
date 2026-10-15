@@ -923,7 +923,17 @@ const AgentDirectoryFilterSchema = z.object({
   includeArchived: z.boolean().optional(),
   requiresAttention: z.boolean().optional(),
   thinkingOptionId: z.string().nullable().optional(),
+  archived: z.boolean().optional(),
+  providers: z.array(z.string()).optional(),
+  models: z.array(z.object({ provider: z.string(), model: z.string().nullable() })).optional(),
 });
+
+export const AgentHistoryFilterOptionsSchema = z.object({
+  projects: z.array(z.object({ projectKey: z.string(), projectName: z.string() })),
+  models: z.array(z.object({ provider: z.string(), model: z.string().nullable() })),
+});
+
+export type AgentHistoryFilterOptions = z.infer<typeof AgentHistoryFilterOptionsSchema>;
 
 export const DeleteAgentRequestMessageSchema = z.object({
   type: z.literal("delete_agent_request"),
@@ -1343,6 +1353,7 @@ export const ProjectListRequestMessageSchema = z.object({
 export const FetchAgentHistoryRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_history_request"),
   requestId: z.string(),
+  includeFilterOptions: z.boolean().optional(),
   filter: AgentDirectoryFilterSchema.optional(),
   // A free-text filter over agent title, workspace name, branch, and project name.
   // Matching rows follow the requested sort and cursor pagination.
@@ -3741,6 +3752,7 @@ export const ServerInfoStatusPayloadSchema = z
         agentTimelinePromptIndex: z.boolean().optional(),
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
+        agentHistoryFilters: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
@@ -4275,6 +4287,7 @@ export const FetchAgentHistoryResponseMessageSchema = z.object({
     pageInfo: AgentDirectoryPageInfoSchema,
     // Older daemons truncate relevance-ranked searches instead of returning a cursor.
     searchTruncated: z.boolean().optional(),
+    filterOptions: AgentHistoryFilterOptionsSchema.optional(),
   }),
 });
 

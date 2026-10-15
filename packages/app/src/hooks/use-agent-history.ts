@@ -1,9 +1,10 @@
+import type { AgentHistoryFilterOptions } from "@getpaseo/protocol/messages";
 import type {
   DaemonClient,
   FetchAgentHistoryOptions,
   FetchAgentHistoryPageInfo,
 } from "@getpaseo/client/internal/daemon-client";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
@@ -28,6 +29,8 @@ export interface AgentHistoryResult {
   isLoadingMore: boolean;
   /** False when any target host predates search; the screen hides the field. */
   isSearchSupported: boolean;
+  isFilterSupported: boolean;
+  filterOptions: AgentHistoryFilterOptions;
   /** More sessions matched than the ranked page holds. Narrow the query. */
   isSearchTruncated: boolean;
   /** Hosts that failed while others succeeded. The list still renders. */
@@ -39,6 +42,7 @@ export interface AgentHistoryResult {
 export interface AgentHistoryPage {
   agents: AggregatedAgent[];
   pageInfo: FetchAgentHistoryPageInfo;
+  filterOptions?: AgentHistoryFilterOptions;
   /** More matched this host's query than its page could hold. */
   isSearchTruncated: boolean;
 }
@@ -64,6 +68,7 @@ export interface AgentHistoryHost {
 interface AgentHistoryBatchPage {
   agents: AggregatedAgent[];
   pageInfoByServerId: Record<string, FetchAgentHistoryPageInfo>;
+  filterOptions?: AgentHistoryFilterOptions;
   hostErrors: AgentHistoryHostError[];
   /** Set only under a query: more sessions matched than this page can hold. */
   isSearchTruncated?: boolean;
@@ -76,9 +81,13 @@ export async function fetchAgentHistoryPage(input: {
   serverId: string;
   cursor: string | null;
   search?: string;
+  filter?: FetchAgentHistoryOptions["filter"];
+  includeFilterOptions?: boolean;
 }): Promise<AgentHistoryPage> {
   const payload = await input.client.fetchAgentHistory({
     ...(input.search ? { search: input.search } : {}),
+    ...(input.filter ? { filter: input.filter } : {}),
+    ...(input.includeFilterOptions ? { includeFilterOptions: true } : {}),
     sort: AGENT_HISTORY_SORT,
     page: input.cursor
       ? { limit: AGENT_HISTORY_PAGE_LIMIT, cursor: input.cursor }
@@ -89,7 +98,16 @@ export async function fetchAgentHistoryPage(input: {
     serverId: input.serverId,
     entries: payload.entries,
   });
+  const thinkingOptions = new Map(
+    payload.entries.map(({ agent }) => [
+      agent.id,
+      agent.effectiveThinkingOptionId ??
+        agent.runtimeInfo?.thinkingOptionId ??
+        agent.thinkingOptionId,
+    ]),
+  );
   return {
+    filterOptions: payload.filterOptions,
     isSearchTruncated: payload.searchTruncated === true,
     agents: Array.from(agents.values(), (agent) => ({
       id: agent.id,
@@ -102,6 +120,9 @@ export async function fetchAgentHistoryPage(input: {
       cwd: agent.cwd,
       workspaceId: agent.workspaceId,
       provider: agent.provider,
+      model: agent.runtimeInfo?.model ?? agent.model,
+      thinkingOptionId: thinkingOptions.get(agent.id),
+      lastUsage: agent.lastUsage,
       pendingPermissionCount: agent.pendingPermissions.length,
       requiresAttention: agent.requiresAttention,
       attentionReason: agent.attentionReason,
@@ -161,6 +182,8 @@ export async function fetchAgentHistoryBatch(input: {
   hosts: readonly AgentHistoryHost[];
   cursorByServerId: AgentHistoryCursorByServerId | null;
   search?: string;
+  filter?: FetchAgentHistoryOptions["filter"];
+  includeFilterOptions?: boolean;
 }): Promise<AgentHistoryBatchPage> {
   const cursorByServerId = input.cursorByServerId ?? {};
   const hasCursorFilter = Object.keys(cursorByServerId).length > 0;
@@ -174,6 +197,8 @@ export async function fetchAgentHistoryBatch(input: {
         client: host.client,
         serverId: host.serverId,
         cursor: cursorByServerId[host.serverId] ?? null,
+        filter: input.filter,
+        includeFilterOptions: input.includeFilterOptions && !input.cursorByServerId,
         ...(input.search ? { search: input.search } : {}),
       });
       return { host, page };
@@ -205,6 +230,10 @@ export async function fetchAgentHistoryBatch(input: {
     pages.map(({ host, page }) => [host.serverId, page.pageInfo]),
   );
   return {
+    filterOptions: {
+      projects: pages.flatMap(({ page }) => page.filterOptions?.projects ?? []),
+      models: pages.flatMap(({ page }) => page.filterOptions?.models ?? []),
+    },
     agents: sortByLatestActivity(agents),
     pageInfoByServerId,
     hostErrors,
@@ -215,9 +244,10 @@ export async function fetchAgentHistoryBatch(input: {
 }
 
 export function useAgentHistory(options: {
-  serverId?: string | null;
+  serverIds?: readonly string[];
   enabled?: boolean;
   search?: string;
+  filter?: FetchAgentHistoryOptions["filter"];
 }): AgentHistoryResult {
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -227,10 +257,6 @@ export function useAgentHistory(options: {
     () => runtime.getVersion(),
     () => runtime.getVersion(),
   );
-  const serverId = useMemo(() => {
-    const value = options.serverId;
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-  }, [options.serverId]);
   const enabled = options.enabled ?? true;
   // A host the user asked about splits two ways: one this fetch can reach, and
   // one whose sessions will be missing from the answer. Both come out of here,
@@ -239,7 +265,9 @@ export function useAgentHistory(options: {
   const { targetHosts, unreachableHosts } = useMemo(() => {
     void runtimeVersion;
     const serverLabelById = new Map(daemons.map((daemon) => [daemon.serverId, daemon.label]));
-    const serverIds = serverId ? [serverId] : daemons.map((daemon) => daemon.serverId);
+    const serverIds = options.serverIds?.length
+      ? options.serverIds
+      : daemons.map((daemon) => daemon.serverId);
     const hosts: AgentHistoryHost[] = [];
     const unreachable: AgentHistoryHostError[] = [];
 
@@ -255,7 +283,7 @@ export function useAgentHistory(options: {
     }
 
     return { targetHosts: hosts, unreachableHosts: unreachable };
-  }, [daemons, runtime, runtimeVersion, serverId]);
+  }, [daemons, runtime, runtimeVersion, options.serverIds]);
   const targetServerIds = useMemo(() => targetHosts.map((host) => host.serverId), [targetHosts]);
   // One gate, checked before the field is offered: a fleet where any host
   // predates search has no search, rather than a list that silently omits that
@@ -270,16 +298,32 @@ export function useAgentHistory(options: {
       [targetServerIds],
     ),
   );
+  // COMPAT(agentHistoryFilters): added in v0.11.0-fork.15, remove gate after 2027-04-14.
+  const isFilterSupported = useSessionStore(
+    useCallback(
+      (state) =>
+        targetServerIds.length > 0 &&
+        targetServerIds.every(
+          (id) => state.sessions[id]?.serverInfo?.features?.agentHistoryFilters === true,
+        ),
+      [targetServerIds],
+    ),
+  );
+  const filter = isFilterSupported ? options.filter : undefined;
   const search = useMemo(() => {
     const trimmed = options.search?.trim() ?? "";
     return isSearchSupported ? trimmed : "";
   }, [isSearchSupported, options.search]);
   const queryKey = useMemo(
     () => [
-      ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(targetServerIds)),
+      ...(targetServerIds.length === 1
+        ? agentHistoryQueryKey(targetServerIds[0])
+        : allAgentHistoryQueryKey(targetServerIds)),
       search,
+      filter,
+      isFilterSupported,
     ],
-    [search, serverId, targetServerIds],
+    [search, filter, isFilterSupported, targetServerIds],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
@@ -296,6 +340,7 @@ export function useAgentHistory(options: {
     queryKey,
     enabled: Boolean(enabled && targetHosts.length > 0),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
     initialPageParam: null,
     getNextPageParam: getNextAgentHistoryPageParam,
     queryFn: async ({ pageParam }) => {
@@ -305,6 +350,8 @@ export function useAgentHistory(options: {
       return fetchAgentHistoryBatch({
         hosts: targetHosts,
         cursorByServerId: pageParam,
+        filter,
+        includeFilterOptions: isFilterSupported,
         ...(search ? { search } : {}),
       });
     },
@@ -317,6 +364,7 @@ export function useAgentHistory(options: {
     isFetching,
     isFetchingNextPage,
     isLoading,
+    isPlaceholderData,
     refetch,
   } = historyQuery;
 
@@ -344,7 +392,14 @@ export function useAgentHistory(options: {
     );
     return sortByLatestActivity(labelledAgents);
   }, [data?.pages, serverLabelById]);
-  const isInitialLoad = isLoading && agents.length === 0;
+  const filterOptions = useMemo<AgentHistoryFilterOptions>(
+    () => ({
+      projects: data?.pages.flatMap((page) => page.filterOptions?.projects ?? []) ?? [],
+      models: data?.pages.flatMap((page) => page.filterOptions?.models ?? []) ?? [],
+    }),
+    [data?.pages],
+  );
+  const isInitialLoad = isPlaceholderData || (isLoading && agents.length === 0);
   const isRevalidating = isFetching && !isFetchingNextPage && agents.length > 0;
   const isSearchTruncated = Boolean(search && data?.pages.some((page) => page.isSearchTruncated));
   const hostErrors = useMemo(
@@ -361,6 +416,8 @@ export function useAgentHistory(options: {
     hasMore: hasNextPage,
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
+    isFilterSupported,
+    filterOptions,
     isSearchTruncated,
     hostErrors,
     refreshAll,

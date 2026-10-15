@@ -20,4 +20,7 @@ export type AgentDirectoryEntry = Pick<
   | "projectPlacement"
 > & {
   pendingPermissionCount?: number;
+  model?: Agent["model"];
+  thinkingOptionId?: Agent["thinkingOptionId"];
+  lastUsage?: Agent["lastUsage"];
 };

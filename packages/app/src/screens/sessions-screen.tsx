@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect, type ReactElement } from "re
 import { View, Text } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ChevronLeft, Import } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -11,8 +11,15 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
 import { SearchField } from "@/components/ui/search-field";
-import { HostFilter } from "@/components/hosts/host-filter";
-import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker";
+import {
+  HistoryFilterBar,
+  HistoryStatus,
+  hasHistoryFilters,
+  EMPTY_HISTORY_FILTERS,
+  type HistoryFilters,
+} from "@/components/sessions/filters";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import type { Theme } from "@/styles/theme";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -22,7 +29,8 @@ import { buildOpenProjectRoute } from "@/utils/host-routes";
 /** Long enough that a typed word is one request, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 200;
 
-const sessionsHostOptionTestID = (serverId: string) => `sessions-host-filter-item-${serverId}`;
+const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
+const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 /**
  * A host that failed while others answered. Without this the list silently
@@ -49,17 +57,6 @@ function SessionHostErrorsBanner({
   );
 }
 
-/** An empty list means something different once a query is narrowing it. */
-function resolveEmptyText(input: {
-  t: TFunction;
-  isSearching: boolean;
-  isAllHosts: boolean;
-}): string {
-  if (input.isSearching) return input.t("sessions.noMatches");
-  if (input.isAllHosts) return input.t("sessions.empty");
-  return "No sessions for this host";
-}
-
 export function SessionsScreen() {
   const isFocused = useIsFocused();
 
@@ -71,14 +68,25 @@ export function SessionsScreen() {
 }
 
 function SessionsScreenContent() {
-  const { theme } = useUnistyles();
   const { t } = useTranslation();
   const importSession = useImportSession();
   const hosts = useHosts();
-  const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
+  const [filters, setFilters] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const compact = useIsCompactFormFactor();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
-  const historyServerId = selectedHost === ALL_HOSTS_OPTION_ID ? null : selectedHost;
+  const filter = useMemo(
+    () => ({
+      projectKeys: filters.projects,
+      providers: filters.providers,
+      models: filters.models,
+      includeArchived: filters.status !== HistoryStatus.Active,
+      ...(filters.status === HistoryStatus.All
+        ? {}
+        : { archived: filters.status === HistoryStatus.Archived }),
+    }),
+    [filters.projects, filters.providers, filters.models, filters.status],
+  );
   const {
     agents,
     hasMore,
@@ -86,24 +94,27 @@ function SessionsScreenContent() {
     isLoadingMore,
     isError,
     isSearchSupported,
+    isFilterSupported,
+    filterOptions,
     isSearchTruncated,
     hostErrors,
     loadMore,
     refreshAll,
   } = useAgentHistory({
-    serverId: historyServerId,
+    serverIds: filters.hosts,
+    filter,
     search,
   });
   const isSearching = isSearchSupported && search.length > 0;
 
   useEffect(() => {
-    if (
-      selectedHost !== ALL_HOSTS_OPTION_ID &&
-      !hosts.some((host) => host.serverId === selectedHost)
-    ) {
-      setSelectedHost(ALL_HOSTS_OPTION_ID);
+    const hostsStillPresent = filters.hosts.filter((id) =>
+      hosts.some((host) => host.serverId === id),
+    );
+    if (hostsStillPresent.length !== filters.hosts.length) {
+      setFilters((current) => ({ ...current, hosts: hostsStillPresent }));
     }
-  }, [hosts, selectedHost]);
+  }, [hosts, filters.hosts]);
 
   const [isManualRefresh, setIsManualRefresh] = useState(false);
 
@@ -112,21 +123,19 @@ function SessionsScreenContent() {
     void refreshAll().finally(() => setIsManualRefresh(false));
   }, [refreshAll]);
 
-  // Searching filters the chronological history without changing its date buckets.
-  const emptyText = resolveEmptyText({
-    t,
-    isSearching,
-    isAllHosts: selectedHost === ALL_HOSTS_OPTION_ID,
-  });
-  const showHostFilter = hosts.length > 1;
-  const showFilterRow = showHostFilter || isSearchSupported;
+  const isFiltering = isFilterSupported ? hasHistoryFilters(filters) : filters.hosts.length > 0;
+  const emptyText = isSearching || isFiltering ? t("sessions.noMatches") : t("sessions.empty");
   const showLoadError = isError && agents.length === 0;
+  const showResults = !isInitialLoad && !showLoadError;
 
   const handleBack = useCallback(() => {
     router.navigate(buildOpenProjectRoute());
   }, []);
 
-  const handleClearSearch = useCallback(() => setSearchInput(""), []);
+  const handleClearFilters = useCallback(() => {
+    setSearchInput("");
+    setFilters(EMPTY_HISTORY_FILTERS);
+  }, []);
 
   const listFooterComponent = useMemo(() => {
     // COMPAT(historyPagination): old daemons return a truncated relevance page.
@@ -153,36 +162,45 @@ function SessionsScreenContent() {
   return (
     <View style={styles.container}>
       <MenuHeader title={t("sessions.title")} />
-      {showFilterRow ? (
-        <View style={styles.filterContainer}>
+      <View style={styles.filterContainer}>
+        <View style={styles.searchRow}>
           {isSearchSupported ? (
-            <SearchField
-              value={searchInput}
-              onChangeText={setSearchInput}
-              placeholder={t("sessions.searchPlaceholder")}
-              clearAccessibilityLabel={t("sessions.actions.clearSearch")}
-              testID="sessions-search-input"
-              clearTestID="sessions-search-clear"
-            />
+            <View style={styles.searchField}>
+              <SearchField
+                value={searchInput}
+                onChangeText={setSearchInput}
+                placeholder={t("sessions.searchPlaceholder")}
+                clearAccessibilityLabel={t("sessions.actions.clearSearch")}
+                testID="sessions-search-input"
+                clearTestID="sessions-search-clear"
+              />
+            </View>
           ) : null}
-          {showHostFilter ? (
-            <HostFilter
-              hosts={hosts}
-              selectedHost={selectedHost}
-              onSelectHost={setSelectedHost}
-              triggerTestID="sessions-host-filter-trigger"
-              hostOptionTestID={sessionsHostOptionTestID}
+          {compact ? (
+            <HistoryFilterBar
+              filters={filters}
+              options={filterOptions}
+              supported={isFilterSupported}
+              onChange={setFilters}
             />
           ) : null}
         </View>
-      ) : null}
+        {!compact ? (
+          <HistoryFilterBar
+            filters={filters}
+            options={filterOptions}
+            supported={isFilterSupported}
+            onChange={setFilters}
+          />
+        ) : null}
+      </View>
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}
       {isInitialLoad ? (
         <View style={styles.loadingContainer}>
-          <LoadingSpinner size="large" color={theme.colors.foregroundMuted} />
+          <ThemedLoadingSpinner size="large" uniProps={mutedColorMapping} />
         </View>
       ) : null}
-      {!isInitialLoad && showLoadError ? (
+      {showLoadError ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Unable to load sessions</Text>
           <Button variant="ghost" onPress={handleRefresh}>
@@ -190,12 +208,12 @@ function SessionsScreenContent() {
           </Button>
         </View>
       ) : null}
-      {!isInitialLoad && !showLoadError && agents.length === 0 ? (
+      {showResults && agents.length === 0 ? (
         <View style={styles.emptyContainer} testID="sessions-empty">
           <Text style={styles.emptyText}>{emptyText}</Text>
-          {isSearching ? (
-            <Button variant="ghost" onPress={handleClearSearch}>
-              {t("sessions.actions.clearSearch")}
+          {isSearching || isFiltering ? (
+            <Button variant="ghost" onPress={handleClearFilters}>
+              {t("sessions.filters.clear")}
             </Button>
           ) : (
             <Button variant="ghost" leftIcon={ChevronLeft} onPress={handleBack}>
@@ -207,7 +225,7 @@ function SessionsScreenContent() {
           </Button>
         </View>
       ) : null}
-      {!isInitialLoad && !showLoadError && agents.length > 0 ? (
+      {showResults && agents.length > 0 ? (
         <AgentList
           agents={agents}
           showCheckoutInfo={false}
@@ -230,15 +248,15 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface0,
   },
   filterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
+    gap: theme.spacing[3],
     paddingHorizontal: {
       xs: theme.spacing[3],
       md: theme.spacing[6],
     },
     paddingTop: theme.spacing[4],
   },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  searchField: { flex: 1 },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
