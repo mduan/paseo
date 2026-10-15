@@ -218,6 +218,23 @@ test.describe("History search across hosts", () => {
         .and(page.getByTestId(/^agent-row-/))
         .filter({ hasText: activeTitle });
       await expect(activeRow).toContainText("0 turns");
+      const archivedHeight = await archivedRow.evaluate(
+        (element) => element.getBoundingClientRect().height,
+      );
+      const activeTop = await activeRow.evaluate((element) => element.getBoundingClientRect().y);
+      await page.getByTestId("sessions-display-trigger").click();
+      for (const enabled of [false, true]) {
+        await page.getByTestId("sessions-display-status").click();
+        await expect(page.getByTestId("sessions-display-status")).toHaveAttribute(
+          "aria-checked",
+          String(enabled),
+        );
+        await expect
+          .poll(async () => (await archivedRow.boundingBox())?.height)
+          .toBe(archivedHeight);
+        await expect.poll(async () => (await activeRow.boundingBox())?.y).toBe(activeTop);
+      }
+      await page.keyboard.press("Escape");
       await expect(
         page
           .getByRole("button")

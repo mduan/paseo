@@ -238,6 +238,7 @@ function SessionRow({
                 label={t("agentList.badges.archived")}
                 leading={archivedIcon}
                 size="xs"
+                style={styles.archivedBadge}
               />
             ) : null}
           </View>
@@ -688,7 +689,6 @@ const styles = StyleSheet.create((theme) => ({
   rowContent: {
     flex: 1,
     minWidth: 0,
-    overflow: "hidden",
   },
   rowTitleRow: {
     flexDirection: "row",
@@ -703,6 +703,10 @@ const styles = StyleSheet.create((theme) => ({
     columnGap: theme.spacing[3],
     rowGap: theme.spacing[1],
     marginTop: theme.spacing[1.5],
+  },
+  archivedBadge: {
+    // Keep the pill's padding and border outside the metadata line's height.
+    marginVertical: -theme.spacing[0.5],
   },
   rowSelected: {
     backgroundColor: theme.colors.surface2,
