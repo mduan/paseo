@@ -7,6 +7,7 @@ import {
   normalizeAttachmentMetadata,
   normalizeComposerAttachment,
   UserComposerAttachmentSchema,
+  NewWorkspaceDraftProjectSchema,
   type CanonicalDraftInput,
   type DraftLifecycleState,
   type DraftRecord,
@@ -101,6 +102,7 @@ const PersistedDraftRecordSchema = z.union([NestedDraftRecordSchema, FlatDraftRe
 export const PersistedDraftStoreSchema = z.strictObject({
   drafts: z.record(z.string(), PersistedDraftRecordSchema).optional(),
   createModalDraft: PersistedDraftRecordSchema.nullable().optional(),
+  newWorkspaceProject: NewWorkspaceDraftProjectSchema.optional(),
 });
 type PersistedDraftRecord = z.infer<typeof PersistedDraftRecordSchema>;
 
@@ -252,5 +254,6 @@ export async function migratePersistedState(
     // COMPAT(newWorkspaceDraftSingleton): migrated in v0.1.108; remove after 2027-01-13.
     drafts: migrateNewWorkspaceDraftKeys(nextDrafts),
     createModalDraft,
+    ...(input.newWorkspaceProject ? { newWorkspaceProject: input.newWorkspaceProject } : {}),
   };
 }

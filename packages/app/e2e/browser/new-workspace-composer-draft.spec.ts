@@ -14,6 +14,7 @@ import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-cli
 import { getServerId } from "../support/helpers/server-id";
 import { seedSavedSettingsHosts } from "../support/helpers/settings";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { attachImageFromMenu, removeAttachmentPill } from "../support/helpers/composer";
 
 const DRAFT = `Please investigate the workspace startup failure.
 
@@ -22,7 +23,9 @@ Trace the request from the app through the daemon, preserve the existing behavio
 test.describe("New workspace composer draft", () => {
   test.describe.configure({ timeout: 240_000 });
 
-  test("keeps the draft when the project changes", async ({ page }) => {
+  test("keeps the draft and its sidebar indicator when the project changes", async ({
+    page,
+  }, testInfo) => {
     const firstProject: SeededWorkspace = await seedWorkspace({
       repoPrefix: "new-workspace-draft-project-a-",
     });
@@ -40,6 +43,12 @@ test.describe("New workspace composer draft", () => {
       await expectNewWorkspaceProjectSelected(page, firstProject.projectDisplayName);
 
       await fillNewWorkspaceDraft(page, DRAFT);
+      const firstAction = page
+        .getByTestId(`sidebar-project-new-worktree-${firstProject.projectKey}`)
+        .first();
+      await expect(firstAction).toHaveAttribute("aria-label", "Resume workspace draft");
+      await page.getByRole("textbox", { name: "Message agent..." }).hover();
+      await expect(firstAction).toHaveCSS("opacity", "1");
 
       await selectNewWorkspaceProject(page, {
         projectKey: secondProject.projectKey,
@@ -47,6 +56,37 @@ test.describe("New workspace composer draft", () => {
       });
 
       await expectNewWorkspaceDraft(page, DRAFT);
+      const secondAction = page
+        .getByTestId(`sidebar-project-new-worktree-${secondProject.projectKey}`)
+        .first();
+      await expect(secondAction).toHaveAttribute("aria-label", "Resume workspace draft");
+      await expect(firstAction).not.toHaveAttribute("aria-label", "Resume workspace draft");
+      await secondAction.hover();
+      await expect(page.getByText("Resume workspace draft", { exact: true })).toBeVisible();
+      await expect(
+        page.getByTestId(`sidebar-project-kebab-${secondProject.projectKey}`).first(),
+      ).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath("workspace-draft-pencil-hover.png") });
+
+      await page.getByTestId("sidebar-settings").click();
+      await expect(page).toHaveURL(/\/settings(?:\/.*)?(?:\?.*)?$/);
+      await secondAction.click();
+      await expectNewWorkspaceProjectSelected(page, secondProject.projectDisplayName);
+      await expectNewWorkspaceDraft(page, DRAFT);
+
+      await fillNewWorkspaceDraft(page, "");
+      await expect(secondAction).not.toHaveAttribute("aria-label", "Resume workspace draft");
+      await attachImageFromMenu(page, {
+        name: "draft.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          "base64",
+        ),
+      });
+      await expect(secondAction).toHaveAttribute("aria-label", "Resume workspace draft");
+      await removeAttachmentPill(page, "composer-image-attachment-pill", "Remove image attachment");
+      await expect(secondAction).not.toHaveAttribute("aria-label", "Resume workspace draft");
     } finally {
       await secondProject.cleanup();
       await firstProject.cleanup();

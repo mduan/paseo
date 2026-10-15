@@ -1323,6 +1323,7 @@ export const en = {
         newWorkspace: "New workspace",
         showMore: "Show more",
         showLess: "Show less",
+        resumeWorkspaceDraft: "Resume workspace draft",
         createWorkspaceFor: "Create a new workspace for {{projectName}}",
         copyPath: "Copy path",
         copyBranchName: "Copy branch name",

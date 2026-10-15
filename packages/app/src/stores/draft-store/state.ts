@@ -5,6 +5,8 @@ import {
 } from "@/attachments/types";
 import { PluginResourceComposerAttachmentSchema } from "@/plugins/attachments";
 import { z } from "zod";
+import { NEW_WORKSPACE_DRAFT_KEY } from "@/stores/draft-keys";
+import { hasDraftContent } from "@/composer/draft/input-draft-core";
 
 export const DRAFT_STORE_VERSION = 5;
 export const FINALIZED_DRAFT_TTL_MS = 5 * 60 * 1000;
@@ -50,6 +52,24 @@ export function editDraftRecordText(
 export interface DraftStoreState {
   drafts: Record<string, DraftRecord>;
   createModalDraft: DraftRecord | null;
+  newWorkspaceProject?: NewWorkspaceDraftProject;
+}
+
+export const NewWorkspaceDraftProjectSchema = z.strictObject({
+  viewKey: z.string(),
+  serverId: z.string(),
+  projectId: z.string(),
+  sourceDirectory: z.string(),
+  displayName: z.string(),
+});
+export type NewWorkspaceDraftProject = z.infer<typeof NewWorkspaceDraftProjectSchema>;
+
+export function selectNewWorkspaceDraftProject(
+  state: DraftStoreState,
+): NewWorkspaceDraftProject | undefined {
+  const draft = state.drafts[NEW_WORKSPACE_DRAFT_KEY];
+  if (draft?.lifecycle !== "active" || !hasDraftContent(draft.input)) return undefined;
+  return state.newWorkspaceProject;
 }
 
 export const AttachmentMetadataSchema = z.strictObject({
@@ -134,6 +154,7 @@ const DraftRecordSchema: z.ZodType<DraftRecord> = z.strictObject({
 export const DraftStoreStateSchema: z.ZodType<DraftStoreState> = z.strictObject({
   drafts: z.record(z.string(), DraftRecordSchema),
   createModalDraft: DraftRecordSchema.nullable(),
+  newWorkspaceProject: NewWorkspaceDraftProjectSchema.optional(),
 });
 
 export function isAttachmentMetadata(value: unknown): value is AttachmentMetadata {

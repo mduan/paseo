@@ -1315,6 +1315,7 @@ export const ar: TranslationResources = {
         newWorkspace: "مساحة عمل جديدة",
         showMore: "عرض المزيد",
         showLess: "عرض أقل",
+        resumeWorkspaceDraft: "استئناف مسودة مساحة العمل",
         createWorkspaceFor: "قم بإنشاء مساحة عمل جديدة لـ{{projectName}}",
         copyPath: "نسخ المسار",
         copyBranchName: "انسخ اسم الفرع",

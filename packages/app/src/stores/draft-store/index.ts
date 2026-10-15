@@ -27,6 +27,7 @@ import {
   type DraftLifecycleState,
   type DraftRecord,
   type DraftStoreState,
+  type NewWorkspaceDraftProject,
 } from "./state";
 import {
   migrateDraftInput,
@@ -40,6 +41,7 @@ import { createValidatedPersistStorage } from "@/storage/validated-persist-stora
 export type { DraftInput, DraftLifecycleState } from "./state";
 
 interface DraftStoreActions {
+  setNewWorkspaceProject: (project: NewWorkspaceDraftProject) => void;
   getDraftInput: (draftKey: string) => DraftInput | undefined;
   hydrateDraftInput: (input: { draftKey: string }) => Promise<DraftInput | undefined>;
   saveDraftInput: (input: { draftKey: string; draft: DraftInput }) => void;
@@ -257,6 +259,19 @@ export const useDraftStore = create<DraftStore>()(
       createModalDraft: null,
       attachmentFocusRequestByDraftKey: {},
 
+      setNewWorkspaceProject: (project) => {
+        const current = get().newWorkspaceProject;
+        if (
+          current?.viewKey === project.viewKey &&
+          current.serverId === project.serverId &&
+          current.projectId === project.projectId &&
+          current.sourceDirectory === project.sourceDirectory &&
+          current.displayName === project.displayName
+        )
+          return;
+        set({ newWorkspaceProject: project });
+      },
+
       getDraftInput: (draftKey) => {
         const record = get().drafts[draftKey];
         return toDraftInputIfReady(record);
@@ -429,7 +444,11 @@ export const useDraftStore = create<DraftStore>()(
       name: "paseo-drafts",
       version: DRAFT_STORE_VERSION,
       storage: draftPersistStorage,
-      partialize: ({ drafts, createModalDraft }) => ({ drafts, createModalDraft }),
+      partialize: ({ drafts, createModalDraft, newWorkspaceProject }) => ({
+        drafts,
+        createModalDraft,
+        newWorkspaceProject,
+      }),
       migrate: (state) =>
         migratePersistedState(state, {
           migrateLegacyImages,

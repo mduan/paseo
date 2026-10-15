@@ -4,10 +4,43 @@ import {
   pruneFinalizedDraftRecords,
   toDraftInputIfReady,
   editDraftRecordText,
+  selectNewWorkspaceDraftProject,
+  type DraftStoreState,
   type DraftRecord,
 } from "./state";
 
 describe("draft-store lifecycle", () => {
+  it("tracks the selected project only while the New workspace prompt has unsent content", () => {
+    const project = {
+      viewKey: "project-a",
+      serverId: "host-a",
+      projectId: "project-a",
+      sourceDirectory: "/project-a",
+      displayName: "Project A",
+    };
+    const state: DraftStoreState = {
+      drafts: {},
+      createModalDraft: null,
+      newWorkspaceProject: project,
+    };
+    expect(selectNewWorkspaceDraftProject(state)).toBeUndefined();
+    state.drafts["new-workspace"] = editDraftRecordText(undefined, "Draft prompt", 1);
+    expect(selectNewWorkspaceDraftProject(state)).toBe(project);
+    const secondProject = { ...project, viewKey: "project-b", projectId: "project-b" };
+    state.newWorkspaceProject = secondProject;
+    expect(selectNewWorkspaceDraftProject(state)).toBe(secondProject);
+    state.drafts["new-workspace"].input = {
+      text: "",
+      attachments: [
+        { kind: "workspace_file", path: "README.md", selection: { kind: "whole_file" } },
+      ],
+    };
+    expect(selectNewWorkspaceDraftProject(state)).toBe(secondProject);
+    state.drafts["new-workspace"].lifecycle = "sent";
+    expect(selectNewWorkspaceDraftProject(state)).toBeUndefined();
+    state.drafts["new-workspace"] = editDraftRecordText(undefined, "", 2);
+    expect(selectNewWorkspaceDraftProject(state)).toBeUndefined();
+  });
   it("edits text without invalidating attachment subscribers", () => {
     const draft: DraftRecord = {
       input: {
