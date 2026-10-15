@@ -203,6 +203,10 @@ test.describe("History search across hosts", () => {
       const toolbarHeight = await toolbar.evaluate(
         (element) => element.getBoundingClientRect().height,
       );
+      const hostFilterLabel = page
+        .getByTestId("sessions-hosts-filter-trigger")
+        .getByText("All hosts", { exact: true });
+      const filterLabelTop = (await hostFilterLabel.boundingBox())?.y;
       for (const group of ["hosts", "projects", "providers", "models"]) {
         await page.getByTestId(`sessions-${group}-filter-trigger`).click();
         await page.getByTestId(`sessions-${group}-filter-all`).click();
@@ -256,12 +260,14 @@ test.describe("History search across hosts", () => {
       await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
       await expectChronologicalTitles(page, [archivedTitle]);
       await expect(toolbar).toHaveCSS("height", `${toolbarHeight}px`);
+      await expect.poll(async () => (await hostFilterLabel.boundingBox())?.y).toBe(filterLabelTop);
       const filteredListTop = await archivedRow.evaluate(
         (element) => element.getBoundingClientRect().y,
       );
       await page.getByRole("button", { name: "Clear filters", exact: true }).click();
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
       await expect(toolbar).toHaveCSS("height", `${toolbarHeight}px`);
+      await expect.poll(async () => (await hostFilterLabel.boundingBox())?.y).toBe(filterLabelTop);
       await expect.poll(async () => (await archivedRow.boundingBox())?.y).toBe(filteredListTop);
       await page.getByTestId("sessions-status-filter-trigger").click();
       await page.getByTestId("sessions-status-filter-all").click();
