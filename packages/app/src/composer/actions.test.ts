@@ -1283,6 +1283,7 @@ describe("question attachment answers", () => {
     expect(answer).toContain("Issue body");
     expect(answer).toContain("Plugin issue snapshot");
     expect(context.text).toBe("See this example");
+    expect(context.imageInputs).toEqual([{ data: "AQID", mimeType: "image/png" }]);
     expect(context.images).toEqual([
       {
         type: "uploaded_file",

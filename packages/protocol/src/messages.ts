@@ -1236,7 +1236,7 @@ export const ChangeRequestCheckoutSourceSchema = z.object({
   projectPath: z.string().optional(),
 });
 
-const ImageAttachmentSchema = z.object({
+export const ImageAttachmentSchema = z.object({
   data: z.string(), // base64 encoded image
   mimeType: z.string(), // e.g., "image/jpeg", "image/png"
 });

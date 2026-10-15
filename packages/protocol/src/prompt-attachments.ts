@@ -1,11 +1,16 @@
 import { getForgeDefinitionOrNeutral } from "./forge-manifest.js";
 import type { AgentAttachment } from "./messages.js";
-import { AgentAttachmentSchema, UploadedFileAttachmentSchema } from "./messages.js";
+import {
+  AgentAttachmentSchema,
+  ImageAttachmentSchema,
+  UploadedFileAttachmentSchema,
+} from "./messages.js";
 import { z } from "zod";
 
 export const QuestionAnswerContextSchema = z.object({
   text: z.string(),
   images: z.array(UploadedFileAttachmentSchema),
+  imageInputs: z.array(ImageAttachmentSchema).optional(),
   attachments: z.array(AgentAttachmentSchema),
 });
 export type QuestionAnswerContext = z.infer<typeof QuestionAnswerContextSchema>;

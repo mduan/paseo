@@ -1,4 +1,5 @@
 import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { expect, test } from "vitest";
 import { CodexAppServerAgentSession } from "./codex-app-server-agent.js";
 import {
@@ -48,7 +49,7 @@ test("keeps QA attachment presentation on the answer message, including after re
     type: "user_message" as const,
     messageId: "native-answer",
     clientMessageId: prepared.clientMessageId,
-    text: prepared.prompt!,
+    text: "Provider answer with attachment paths",
   };
   expect(prepared.clientMessageId).toEqual(expect.any(String));
   const expected = {
@@ -166,6 +167,7 @@ test.each([false, true])(
                   path: "/uploads/image.png",
                 },
               ],
+              imageInputs: [{ data: "AQID", mimeType: "image/png" }],
               attachments: [attachment],
             },
           },
@@ -182,7 +184,13 @@ test.each([false, true])(
       const request = appServer
         .requests()
         .findLast((candidate) => candidate.method === (finished ? "turn/start" : "turn/steer"))!;
-      const params = request.params as { clientUserMessageId?: string };
+      const params = request.params as {
+        clientUserMessageId?: string;
+        input: Array<{ type: string; path?: string }>;
+      };
+      const images = params.input.filter((item) => item.type === "localImage");
+      expect(images).toHaveLength(1);
+      expect(await readFile(images[0].path!)).toEqual(Buffer.from("AQID", "base64"));
       const clientMessageId = finished
         ? manager.getTimeline(agent.id).find((item) => item.type === "user_message")
             ?.clientMessageId

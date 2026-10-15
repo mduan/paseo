@@ -2,12 +2,14 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { AgentAttachmentSchema } from "@getpaseo/protocol/messages";
 import { QuestionAnswerContextSchema } from "@getpaseo/protocol/prompt-attachments";
+import { buildAgentPrompt } from "../../prompt-attachments.js";
 import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
   ToolCallTimelineItem,
   AgentTimelineItem,
   AgentRunOptions,
+  AgentPromptInput,
 } from "../../agent-sdk-types.js";
 
 const QuestionSchema = z.object({
@@ -120,7 +122,7 @@ export class CodexAsyncQuestions {
     id: string,
     response: AgentPermissionResponse,
   ): {
-    prompt?: string;
+    prompt?: AgentPromptInput;
     clientMessageId?: string;
     presentation?: AgentRunOptions["promptPresentation"];
     complete: () => ToolCallTimelineItem;
@@ -129,7 +131,7 @@ export class CodexAsyncQuestions {
     if (!record || record.resolution !== undefined)
       throw new Error("Question is no longer pending");
     let resolution: QuestionRecord["resolution"] = "dismissed";
-    let prompt: string | undefined;
+    let prompt: AgentPromptInput | undefined;
     let clientMessageId: string | undefined;
     if (response.behavior === "allow") {
       const answers = z.record(z.string(), z.string()).parse(response.updatedInput?.answers);
@@ -153,6 +155,10 @@ export class CodexAsyncQuestions {
           const context = contexts[`Question ${index + 1}`];
           return context ? [context] : [];
         });
+        prompt = buildAgentPrompt(
+          prompt,
+          attached.flatMap((context) => context.imageInputs ?? []),
+        );
         clientMessageId = randomUUID();
         record.answerMessage = {
           clientMessageId,
