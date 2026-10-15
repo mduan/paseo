@@ -919,8 +919,8 @@ function appendUserMessage({
   turnId?: string;
 }): StreamItem[] {
   const { text, messageId, clientMessageId, imageSources, attachments } = item;
-  const { chunk, hasContent } = normalizeChunk(text);
-  if (!hasContent && !imageSources?.length && !attachments?.length) {
+  const { chunk } = normalizeChunk(text);
+  if (!hasUserMessageContent(item)) {
     return state;
   }
 
@@ -937,6 +937,12 @@ function appendUserMessage({
     attachments,
   });
   return upsertUserMessage(state, nextItem);
+}
+
+function hasUserMessageContent(
+  item: Pick<UserMessageItem, "text" | "imageSources" | "attachments">,
+): boolean {
+  return Boolean(item.text.trim() || item.imageSources?.length || item.attachments?.length);
 }
 
 function appendAssistantMessage(
@@ -1904,6 +1910,7 @@ function applyCanonicalUserMessageEvent(params: {
   const { tail, head, event, timestamp, timelineCursor, unmatchedInsert = "tail" } = params;
   if (event.type !== "timeline" || event.item.type !== "user_message") return null;
   const normalized = normalizeChunk(event.item.text);
+  const hasContent = hasUserMessageContent(event.item);
 
   const flushedTail = head.length > 0 ? flushHeadToTail(tail, head) : tail;
   const flushedHead = head.length > 0 ? [] : head;
@@ -1913,6 +1920,8 @@ function applyCanonicalUserMessageEvent(params: {
       createUniqueTimelineId([...tail, ...head], "user", normalized.chunk.trim(), timestamp),
     messageId: event.item.messageId,
     clientMessageId: event.item.clientMessageId,
+    imageSources: event.item.imageSources,
+    attachments: event.item.attachments,
     turnId: event.turnId,
     timelineCursor,
     text: normalized.chunk,
@@ -1923,7 +1932,7 @@ function applyCanonicalUserMessageEvent(params: {
       tail,
       head,
       message: canonical,
-      insert: normalized.hasContent ? "head" : "none",
+      insert: hasContent ? "head" : "none",
       presentation: "existing",
     });
     const reconciledTail = canonical.clientMessageId
@@ -1951,7 +1960,7 @@ function applyCanonicalUserMessageEvent(params: {
           : [],
     };
   }
-  const reconciled = placeCanonicalUserMessageAtTail(flushedTail, canonical, normalized.hasContent);
+  const reconciled = placeCanonicalUserMessageAtTail(flushedTail, canonical, hasContent);
   const reconciledTail = canonical.clientMessageId
     ? reconcileCanonicalUserTurnMembership(
         reconciled.items,

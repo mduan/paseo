@@ -171,9 +171,10 @@ describe("user message identity", () => {
           path: "/uploads/notes.pdf",
         },
       ];
-      const result = reduceStreamUpdate(
-        [],
-        {
+      const result = applyStreamEvent({
+        tail: [],
+        head: [],
+        event: {
           type: "timeline",
           provider: "codex",
           item: {
@@ -184,9 +185,9 @@ describe("user message identity", () => {
             attachments,
           },
         },
-        new Date(1),
-      );
-      expect(result).toMatchObject([
+        timestamp: new Date(1),
+      });
+      expect(result.tail).toMatchObject([
         {
           kind: "user_message",
           text,
