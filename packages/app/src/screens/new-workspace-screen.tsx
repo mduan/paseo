@@ -76,6 +76,8 @@ import { useWorkspace } from "@/stores/session-store-hooks";
 import { buildNewWorkspaceDraftKey, generateDraftId } from "@/stores/draft-keys";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { isActiveCreateFlowForDraft, useCreateFlowStore } from "@/stores/create-flow-store";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
   useWorkspaceDraftSubmissionStore,
   type PendingWorkspaceDraftSetup,
@@ -957,7 +959,7 @@ interface CreateChatAgentInput {
   serverId: string;
   draftKey: string;
   clearDraft: (lifecycle: "sent" | "abandoned") => void;
-  draftId?: string;
+  draftId: string;
   draftContextScopeKey: string | null;
   supportsForgeSearch: boolean;
   resolveClient: () => DaemonClient;
@@ -1181,7 +1183,27 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
         attachments: request.attachments,
       }),
   };
-  await agentCreation.result;
+  const agent = await agentCreation.result;
+  const submissions = useWorkspaceDraftSubmissionStore.getState();
+  const pending = submissions.pendingByDraftId[input.draftId];
+  // An evicted workspace never mounts its draft to consume the completed creation.
+  if (pending?.serverId === serverId) {
+    submissions.consumePending(pending);
+    const workspaceKey = buildWorkspaceTabPersistenceKey(pending);
+    const layout = useWorkspaceLayoutStore.getState();
+    if (workspaceKey) {
+      const draftTab = layout
+        .getWorkspaceTabs(workspaceKey)
+        .find((tab) => tab.target.kind === "draft" && tab.target.draftId === input.draftId);
+      if (draftTab) {
+        layout.replaceTab(workspaceKey, draftTab.tabId, { kind: "agent", agentId: agent.id });
+      }
+    }
+    const createFlow = useCreateFlowStore.getState();
+    createFlow.updateAgentId({ draftId: input.draftId, agentId: agent.id });
+    createFlow.markLifecycle({ draftId: input.draftId, lifecycle: "sent" });
+    submissions.clearDraftSetup({ draftId: input.draftId });
+  }
   if (outcome === "background") releaseDraft();
   return outcome;
 }

@@ -525,10 +525,8 @@ test.describe("New workspace flow", () => {
         subtitle: openedProject.projectDisplayName,
       });
 
-      await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
-        projectDisplayName: openedProject.projectDisplayName,
-      });
+      await openGlobalNewWorkspaceComposer(page);
+      await expectNewWorkspaceProjectSelected(page, openedProject.projectDisplayName);
 
       const composer = page.getByRole("textbox", { name: "Message agent..." });
       await expect(composer).toBeVisible({ timeout: 30_000 });
@@ -575,6 +573,7 @@ test.describe("New workspace flow", () => {
       await expect(
         activeWorkspaceDeckEntry.locator('[data-testid^="workspace-tab-agent_"]'),
       ).toHaveCount(1, { timeout: 30_000 });
+      await expect(draftTabs).toHaveCount(0);
     } finally {
       agentCreatedDelay.release();
       await tempRepo.cleanup();
