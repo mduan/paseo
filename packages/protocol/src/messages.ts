@@ -674,6 +674,7 @@ export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknow
     type: z.literal("user_message"),
     text: z.string(),
     imageSources: z.array(z.string()).optional(),
+    attachments: z.array(z.lazy(() => AgentAttachmentSchema)).optional(),
     messageId: z.string().optional(),
     clientMessageId: z.string().optional(),
   }),
@@ -1235,7 +1236,7 @@ export const ChangeRequestCheckoutSourceSchema = z.object({
   projectPath: z.string().optional(),
 });
 
-const ImageAttachmentSchema = z.object({
+export const ImageAttachmentSchema = z.object({
   data: z.string(), // base64 encoded image
   mimeType: z.string(), // e.g., "image/jpeg", "image/png"
 });

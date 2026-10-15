@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AgentRuntimeInfoSchema,
+  AgentAttachmentSchema,
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
   AgentUsageSchema,
@@ -119,6 +120,7 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
     ...TimelineItemBaseShape,
     kind: z.literal("user_message"),
     imageSources: z.array(z.string()).optional(),
+    attachments: z.array(AgentAttachmentSchema).optional(),
     clientMessageId: z.string().optional(),
     messageId: z.string().optional(),
     text: z.string(),
@@ -454,6 +456,7 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         ...base,
         kind: item.kind,
         ...(item.imageSources?.length ? { imageSources: item.imageSources } : {}),
+        ...(item.attachments?.length ? { attachments: item.attachments } : {}),
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,
@@ -552,6 +555,7 @@ function deserializeBuiltinTimelineItem(
         ...base,
         kind: item.kind,
         ...(item.imageSources?.length ? { imageSources: item.imageSources } : {}),
+        attachments: item.attachments,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,
@@ -774,7 +778,7 @@ function serializeProject(project: ProjectDescriptor): StoredProject {
 function isTimelineItemStoredLosslessly(item: StreamItem): boolean {
   switch (item.kind) {
     case "user_message":
-      return (item.images?.length ?? 0) === 0 && (item.attachments?.length ?? 0) === 0;
+      return (item.images?.length ?? 0) === 0;
     case "tool_call":
       return item.payload.source === "agent";
     default:

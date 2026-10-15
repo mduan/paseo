@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { validateWSOutboundMessage } from "./validation/ws-outbound.js";
 
 import {
   AgentForkContextRequestMessageSchema,
@@ -7,9 +8,42 @@ import {
   CreateAgentRequestMessageSchema,
   CreatePaseoWorktreeRequestSchema,
   SendAgentMessageRequestSchema,
+  AgentTimelineItemPayloadSchema,
 } from "./messages.js";
 
 describe("shared messages attachments", () => {
+  it("preserves attachment cards in canonical user messages and accepts messages without them", () => {
+    const base = {
+      type: "user_message",
+      text: "See attached",
+      imageSources: ["/uploads/image.png"],
+    };
+    const item = {
+      ...base,
+      attachments: [
+        {
+          type: "uploaded_file",
+          id: "notes",
+          fileName: "notes.pdf",
+          mimeType: "application/pdf",
+          size: 12,
+          path: "/uploads/notes.pdf",
+        },
+      ],
+    };
+    expect(AgentTimelineItemPayloadSchema.parse(item)).toEqual(item);
+    expect(AgentTimelineItemPayloadSchema.parse(base)).toEqual(base);
+    const message = {
+      type: "agent_stream",
+      payload: {
+        agentId: "agent-1",
+        timestamp: "2026-10-15T00:00:00.000Z",
+        event: { type: "timeline", provider: "codex", item },
+      },
+    };
+    const envelope = { type: "session", message };
+    expect(validateWSOutboundMessage(envelope)).toEqual({ success: true, data: envelope });
+  });
   it("preserves turn snapshot references in diff responses and review messages", () => {
     const snapshot = { cwd: "/tmp/repo", fromTree: "before", toTree: "after" };
     const payload = {

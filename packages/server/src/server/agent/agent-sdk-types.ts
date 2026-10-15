@@ -202,6 +202,10 @@ export interface AgentRunOptions {
   resumeFrom?: AgentPersistenceHandle;
   maxThinkingTokens?: number;
   clientMessageId?: string;
+  promptPresentation?: Pick<
+    Extract<AgentTimelineItem, { type: "user_message" }>,
+    "text" | "imageSources" | "attachments"
+  >;
 }
 
 export interface AgentSteerOptions extends AgentRunOptions {
@@ -418,6 +422,7 @@ export type AgentTimelineItem =
       messageId?: string;
       clientMessageId?: string;
       imageSources?: string[];
+      attachments?: AgentAttachment[];
     }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
@@ -683,6 +688,7 @@ export interface AgentResumeSessionOptions {
  */
 export interface AgentPermissionResult {
   followUpPrompt?: AgentPromptInput;
+  followUpOptions?: AgentRunOptions;
 }
 
 export interface AgentSession {

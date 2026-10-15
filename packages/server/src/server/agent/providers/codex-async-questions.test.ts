@@ -1,4 +1,5 @@
 import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { expect, test } from "vitest";
 import { CodexAppServerAgentSession } from "./codex-app-server-agent.js";
 import {
@@ -9,6 +10,65 @@ import {
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import type { AgentStreamEvent } from "../agent-sdk-types.js";
 import { AgentManager } from "../agent-manager.js";
+import { CodexAsyncQuestions } from "./codex/async-questions.js";
+import { respondToAgentPermission } from "../permission-response.js";
+
+test("keeps QA attachment presentation on the answer message, including after resume", () => {
+  const questions = new CodexAsyncQuestions(undefined);
+  questions.receive(questionItem);
+  const file = {
+    type: "uploaded_file" as const,
+    id: "notes",
+    fileName: "notes.pdf",
+    mimeType: "application/pdf",
+    size: 12,
+    path: "/uploads/notes.pdf",
+  };
+  const prepared = questions.prepareResponse("permission-async-question-1", {
+    behavior: "allow",
+    updatedInput: {
+      answers: { "Question 1": "Green\n\nUploaded file: screenshot.png" },
+      answerContexts: {
+        "Question 1": {
+          text: "Green",
+          images: [
+            {
+              ...file,
+              id: "image",
+              fileName: "screenshot.png",
+              mimeType: "image/png",
+              path: "/uploads/screenshot.png",
+            },
+          ],
+          attachments: [file],
+        },
+      },
+    },
+  });
+  const native = {
+    type: "user_message" as const,
+    messageId: "native-answer",
+    clientMessageId: prepared.clientMessageId,
+    text: "Provider answer with attachment paths",
+  };
+  expect(prepared.clientMessageId).toEqual(expect.any(String));
+  const expected = {
+    ...native,
+    text: "Answers to your questions:\n\nWhich color?\nGreen",
+    imageSources: ["/uploads/screenshot.png"],
+    attachments: [file],
+  };
+  // The provider can publish the user message before acknowledging the steer.
+  expect(questions.decorateUserMessage(native)).toEqual(expected);
+  prepared.complete();
+  const resumed = new CodexAsyncQuestions(questions.serialize());
+  expect(resumed.decorateUserMessage({ ...native, clientMessageId: undefined })).toEqual({
+    ...expected,
+    clientMessageId: undefined,
+  });
+  const unrelated = { ...native, clientMessageId: "other", messageId: "other" };
+  expect(resumed.decorateUserMessage(unrelated)).toEqual(unrelated);
+});
 
 const questionItem = {
   type: "agentMessage",
@@ -74,6 +134,136 @@ async function setup(metadata?: Record<string, unknown>, rejectSteer = false) {
 }
 
 const answer = { behavior: "allow" as const, updatedInput: { answers: { "Question 1": "Green" } } };
+
+test.each([false, true])(
+  "publishes attachment cards for QA answers after turn completion: %s",
+  async (finished) => {
+    const { session, appServer, events, ask, finish } = await setup();
+    const { manager, agent } = await manage(session);
+    try {
+      await ask();
+      if (finished) await finish();
+      const attachment = {
+        type: "uploaded_file" as const,
+        id: "file",
+        fileName: "notes.pdf",
+        mimeType: "application/pdf",
+        size: 3,
+        path: "/uploads/notes.pdf",
+      };
+      const response = {
+        behavior: "allow",
+        updatedInput: {
+          answers: { "Question 1": "Green\n\nUploaded file: notes.pdf" },
+          answerContexts: {
+            "Question 1": {
+              text: "Green",
+              images: [
+                {
+                  ...attachment,
+                  id: "image",
+                  fileName: "image.png",
+                  mimeType: "image/png",
+                  path: "/uploads/image.png",
+                },
+              ],
+              imageInputs: [{ data: "AQID", mimeType: "image/png" }],
+              attachments: [attachment],
+            },
+          },
+        },
+      } as const;
+      await respondToAgentPermission({
+        agentManager: manager,
+        agentId: agent.id,
+        requestId: "permission-async-question-1",
+        response,
+        logger: createTestLogger(),
+      });
+      if (finished) await manager.waitForAgentRunStart(agent.id);
+      const request = appServer
+        .requests()
+        .findLast((candidate) => candidate.method === (finished ? "turn/start" : "turn/steer"))!;
+      const params = request.params as {
+        clientUserMessageId?: string;
+        input: Array<{ type: string; path?: string }>;
+      };
+      const images = params.input.filter((item) => item.type === "localImage");
+      expect(images).toHaveLength(1);
+      expect(await readFile(images[0].path!)).toEqual(Buffer.from("AQID", "base64"));
+      const clientMessageId = finished
+        ? manager.getTimeline(agent.id).find((item) => item.type === "user_message")
+            ?.clientMessageId
+        : params.clientUserMessageId;
+      expect(clientMessageId).toEqual(expect.any(String));
+      const shown = waitForNextEvent(
+        session,
+        "timeline",
+        (event) => event.item.type === "user_message" && event.item.messageId === "qa-answer",
+      );
+      appServer.child.stdout.write(
+        JSON.stringify({
+          method: "item/started",
+          params: {
+            threadId: "thread-1",
+            turnId: "native-turn",
+            item: {
+              type: "userMessage",
+              id: "qa-answer",
+              clientUserMessageId: params.clientUserMessageId,
+              content: [
+                {
+                  type: "text",
+                  text: "Answers to your questions:\n\nWhich color?\nGreen\n\nUploaded file: notes.pdf",
+                },
+              ],
+            },
+          },
+        }) + "\n",
+      );
+      await shown;
+      expect(
+        events.filter((event) => event.type === "timeline" && event.item.type === "user_message"),
+      ).toContainEqual(
+        expect.objectContaining({
+          item: expect.objectContaining({
+            text: "Answers to your questions:\n\nWhich color?\nGreen",
+            imageSources: ["/uploads/image.png"],
+            attachments: [attachment],
+          }),
+        }),
+      );
+      await expect
+        .poll(() => manager.getTimeline(agent.id).filter((item) => item.type === "user_message"))
+        .toEqual([
+          expect.objectContaining({
+            text: "Answers to your questions:\n\nWhich color?\nGreen",
+            imageSources: ["/uploads/image.png"],
+            attachments: [attachment],
+          }),
+        ]);
+    } finally {
+      await manager.closeAgent(agent.id);
+    }
+  },
+);
+
+test("rejects invalid QA attachment context without resolving the question", () => {
+  const questions = new CodexAsyncQuestions(undefined);
+  questions.receive(questionItem);
+  expect(() =>
+    questions.prepareResponse("permission-async-question-1", {
+      behavior: "allow",
+      updatedInput: {
+        answers: { "Question 1": "Green" },
+        answerContexts: {
+          "Question 1": { text: "Green", images: [], attachments: [{ type: "invalid" }] },
+        },
+      },
+    }),
+  ).toThrow();
+  expect(questions.pending()).toHaveLength(1);
+});
 
 async function setupRewind(fail = false) {
   const records = [

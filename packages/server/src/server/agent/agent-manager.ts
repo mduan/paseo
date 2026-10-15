@@ -2819,6 +2819,7 @@ export class AgentManager {
       if (options?.clientMessageId) {
         this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, {
           messageId: options.clientMessageId,
+          presentation: options.promptPresentation,
           turnId,
           providerMessageId:
             stagedSubmittedPromptEcho?.item.type === "user_message"
@@ -5045,7 +5046,12 @@ export class AgentManager {
     agent: ActiveManagedAgent,
     prompt: AgentPromptInput,
     clientMessageId: string,
-    options?: { messageId?: string; providerMessageId?: string; turnId?: string },
+    options?: {
+      messageId?: string;
+      providerMessageId?: string;
+      turnId?: string;
+      presentation?: AgentRunOptions["promptPresentation"];
+    },
   ): void {
     if (this.timelineStore.getSubmittedUserMessage(agent.id, clientMessageId)) {
       return;
@@ -5054,7 +5060,13 @@ export class AgentManager {
     agent.lastUserMessageAt = new Date();
     const item: AgentTimelineItem = {
       type: "user_message",
-      text: submittedPromptText(prompt),
+      text: options?.presentation?.text ?? submittedPromptText(prompt),
+      ...(options?.presentation?.imageSources?.length
+        ? { imageSources: options.presentation.imageSources }
+        : {}),
+      ...(options?.presentation?.attachments?.length
+        ? { attachments: options.presentation.attachments }
+        : {}),
       clientMessageId,
       ...(options?.messageId ? { messageId: options.messageId } : {}),
     };
@@ -5072,6 +5084,7 @@ export class AgentManager {
     if (!existing) {
       this.recordSubmittedPrompt(agent, item.text, clientMessageId, {
         messageId: clientMessageId,
+        presentation: item,
         ...(messageId ? { providerMessageId: messageId } : {}),
         ...(turnId ? { turnId } : {}),
       });

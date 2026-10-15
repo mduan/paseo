@@ -158,29 +158,45 @@ describe("plugin timeline rows", () => {
 });
 
 describe("user message identity", () => {
-  it.each(["Is this a bug?", ""])("hydrates prompt images with text %j", (text) => {
-    const result = reduceStreamUpdate(
-      [],
-      {
-        type: "timeline",
-        provider: "codex",
-        item: {
-          type: "user_message",
-          messageId: "first-prompt",
+  it.each(["Is this a bug?", ""])(
+    "hydrates prompt images and attachment cards with text %j",
+    (text) => {
+      const attachments = [
+        {
+          type: "uploaded_file" as const,
+          id: "notes",
+          fileName: "notes.pdf",
+          mimeType: "application/pdf",
+          size: 12,
+          path: "/uploads/notes.pdf",
+        },
+      ];
+      const result = applyStreamEvent({
+        tail: [],
+        head: [],
+        event: {
+          type: "timeline",
+          provider: "codex",
+          item: {
+            type: "user_message",
+            messageId: "first-prompt",
+            text,
+            imageSources: ["/tmp/first prompt.png"],
+            attachments,
+          },
+        },
+        timestamp: new Date(1),
+      });
+      expect(result.tail).toMatchObject([
+        {
+          kind: "user_message",
           text,
           imageSources: ["/tmp/first prompt.png"],
+          attachments,
         },
-      },
-      new Date(1),
-    );
-    expect(result).toMatchObject([
-      {
-        kind: "user_message",
-        text,
-        imageSources: ["/tmp/first prompt.png"],
-      },
-    ]);
-  });
+      ]);
+    },
+  );
 
   it("replaces provisional optimistic turn membership with canonical membership", () => {
     const optimistic = createUserMessage({

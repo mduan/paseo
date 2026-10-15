@@ -393,6 +393,7 @@ export type AgentTimelineItem =
       messageId?: string;
       clientMessageId?: string;
       imageSources?: string[];
+      attachments?: AgentAttachment[];
     }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
