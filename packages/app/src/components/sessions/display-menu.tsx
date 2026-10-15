@@ -4,14 +4,8 @@ import { Text } from "react-native";
 import { Settings2 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import {
-  MenuItem,
-  MenuRoot,
-  MenuSeparator,
-  MenuSurface,
-  MenuTrigger,
-  type MenuTriggerState,
-} from "@/components/ui/menu";
+import { toolbarLabelTriggerStyle } from "@/components/ui/toolbar-label-trigger";
+import { MenuItem, MenuRoot, MenuSeparator, MenuSurface, MenuTrigger } from "@/components/ui/menu";
 import type { Theme } from "@/styles/theme";
 import { HistoryField, type HistoryFields } from "./preferences";
 
@@ -62,7 +56,7 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
         accessibilityRole="button"
         accessibilityLabel={t("sessions.display.title")}
         testID="sessions-display-trigger"
-        style={triggerStyle}
+        style={toolbarLabelTriggerStyle}
       >
         <ThemedSettings size={14} uniProps={mutedIconMapping} />
         <Text style={styles.triggerText}>{t("sessions.display.title")}</Text>
@@ -91,19 +85,6 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
   );
 }
 
-function triggerStyle({ hovered, pressed, open }: MenuTriggerState) {
-  return [styles.trigger, (hovered || pressed || open) && styles.triggerActive];
-}
-
 const styles = StyleSheet.create((theme) => ({
-  trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1.5],
-    paddingVertical: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.borderRadius.md,
-  },
-  triggerActive: { backgroundColor: theme.colors.interactionHighlight },
   triggerText: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
 }));

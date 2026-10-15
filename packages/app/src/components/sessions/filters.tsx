@@ -21,7 +21,9 @@ import {
   MenuItem,
   MenuLabel,
   MenuSeparator,
+  type MenuTriggerState,
 } from "@/components/ui/menu";
+import { toolbarLabelTriggerStyle } from "@/components/ui/toolbar-label-trigger";
 import { Button } from "@/components/ui/button";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { ProviderIcon } from "@/components/provider-icons";
@@ -267,7 +269,7 @@ export function HistoryFilterBar({
       <MenuRoot compactMode="sheet">
         <MenuTrigger
           accessibilityRole="button"
-          style={styles.trigger}
+          style={filterTriggerStyle}
           accessibilityLabel={t("sessions.filters.title")}
           testID="sessions-filters-trigger"
         >
@@ -311,7 +313,7 @@ export function HistoryFilterBar({
         <MenuRoot key={group.id}>
           <MenuTrigger
             accessibilityRole="button"
-            style={styles.trigger}
+            style={filterTriggerStyle}
             testID={`sessions-${group.id}-filter-trigger`}
             accessibilityLabel={`${group.title}: ${filterLabel(group)}`}
           >
@@ -340,21 +342,16 @@ export function HistoryFilterBar({
   );
 }
 
+function filterTriggerStyle(state: MenuTriggerState) {
+  return [toolbarLabelTriggerStyle(state), styles.trigger];
+}
+
 const styles = StyleSheet.create((theme) => ({
   bar: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: theme.spacing[2] },
   trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1.5],
-    paddingVertical: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface1,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     maxWidth: 260,
   },
-  triggerText: { fontSize: theme.fontSize.sm, color: theme.colors.foreground, flexShrink: 1 },
+  triggerText: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted, flexShrink: 1 },
   hint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,

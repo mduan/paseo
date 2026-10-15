@@ -21,7 +21,6 @@ import {
   type HistoryFilters,
   type HistoryPreferences,
 } from "@/components/sessions/preferences";
-import { useIsCompactFormFactor } from "@/constants/layout";
 import type { Theme } from "@/styles/theme";
 import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-history";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -114,7 +113,6 @@ function SessionsScreenContent() {
   );
   // Settings already update optimistically; retry must not replay a toggle.
   const retrySave = useCallback(() => saveHistory((current) => current), [saveHistory]);
-  const compact = useIsCompactFormFactor();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
   const filter = useMemo(
@@ -220,6 +218,7 @@ function SessionsScreenContent() {
           {isSearchSupported ? (
             <View style={styles.searchField}>
               <SearchField
+                fullWidth
                 value={searchInput}
                 onChangeText={setSearchInput}
                 placeholder={t("sessions.searchPlaceholder")}
@@ -229,19 +228,11 @@ function SessionsScreenContent() {
               />
             </View>
           ) : null}
-          {compact ? (
-            <>
-              {filterBar}
-              {displayMenu}
-            </>
-          ) : null}
         </View>
-        {!compact ? (
-          <View style={styles.searchRow}>
-            <View style={styles.searchField}>{filterBar}</View>
-            {displayMenu}
-          </View>
-        ) : null}
+        <View style={styles.searchRow}>
+          <View style={styles.searchField}>{filterBar}</View>
+          {displayMenu}
+        </View>
       </View>
       <HistoryPreferencesError visible={savePreferences.isError} onRetry={retrySave} />
       {hostErrors.length > 0 ? <SessionHostErrorsBanner errors={hostErrors} t={t} /> : null}

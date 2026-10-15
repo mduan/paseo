@@ -54,6 +54,47 @@ async function expectArchivedMetadata(row: Locator): Promise<void> {
   await expect(label).toHaveCSS("font-size", fontSize);
 }
 
+async function expectHistoryToolbar({
+  page,
+  compact = false,
+}: {
+  page: Page;
+  compact?: boolean;
+}): Promise<void> {
+  await expect
+    .poll(async () => {
+      const searchBounds = await page.getByTestId("sessions-search-input").evaluate((element) => {
+        let frame = element.parentElement;
+        while (frame && !Number.parseFloat(getComputedStyle(frame).borderTopWidth))
+          frame = frame.parentElement;
+        if (!frame) throw new Error("Search field frame not found");
+        const bounds = frame.getBoundingClientRect();
+        return { x: bounds.x, width: bounds.width };
+      });
+      const railBounds = await page
+        .getByTestId("sessions-display-trigger")
+        .locator("..")
+        .evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          return { x: bounds.x, width: bounds.width };
+        });
+      return {
+        leftAligned: Math.abs(searchBounds.x - railBounds.x) < 1,
+        fullWidth: Math.abs(searchBounds.width - railBounds.width) < 1,
+      };
+    })
+    .toEqual({ leftAligned: true, fullWidth: true });
+  const triggers = compact
+    ? ["sessions-filters-trigger"]
+    : ["hosts", "projects", "providers", "models", "status"].map(
+        (group) => `sessions-${group}-filter-trigger`,
+      );
+  for (const trigger of [...triggers, "sessions-display-trigger"]) {
+    await expect(page.getByTestId(trigger)).toHaveCSS("border-top-width", "0px");
+    await expect(page.getByTestId(trigger)).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  }
+}
+
 // Searching across hosts merges each host's chronological matching sessions.
 test.describe("History search across hosts", () => {
   test.describe.configure({ timeout: 420_000 });
@@ -156,6 +197,7 @@ test.describe("History search across hosts", () => {
       await openSessions(page);
       await search(page, NONCE);
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
+      await expectHistoryToolbar({ page });
       const archivedRow = page
         .getByRole("button")
         .and(page.getByTestId(/^agent-row-/))
@@ -250,6 +292,7 @@ test.describe("History search across hosts", () => {
       await page.keyboard.press("Escape");
       await page.screenshot({ path: testInfo.outputPath("history-desktop.png") });
       await page.setViewportSize({ width: 390, height: 844 });
+      await expectHistoryToolbar({ page, compact: true });
       await expect(page.getByTestId("sessions-filters-trigger")).toHaveAttribute("role", "button");
       await page.getByTestId("sessions-filters-trigger").click();
       await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
