@@ -266,8 +266,6 @@ const ThemedChevronDown = withUnistyles(ChevronDown);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
-const GATED_WORKSPACE_HEADER_LEFT = <SidebarMenuToggle />;
-
 interface WorkspaceScreenProps {
   serverId: string;
   workspaceId: string;
@@ -1077,27 +1075,27 @@ function WorkspaceHeaderTitleBar({
   onViewScriptTerminal,
   onOpenUrlInBrowserTab,
 }: WorkspaceHeaderTitleBarProps) {
+  const { t } = useTranslation();
   const aiRenamePending = useAiRenamePending({
     serverId: normalizedServerId,
     target: ConversationTitleTarget.Workspace,
     id: normalizedWorkspaceId,
   });
+  let displayedTitle = title;
+  if (isLoading) displayedTitle = t("common.states.loading");
+  if (aiRenamePending) displayedTitle = t("common.states.renaming");
   return (
     <View style={styles.headerTitleContainer}>
-      {isLoading || aiRenamePending ? (
-        <View style={styles.headerTitleTextGroup}>
-          <View style={styles.headerTitleSkeleton} />
-        </View>
-      ) : (
-        <View style={styles.headerTitleTextGroup}>
-          <ScreenTitle testID="workspace-header-title">{title}</ScreenTitle>
+      <View style={styles.headerTitleTextGroup}>
+        <ScreenTitle testID="workspace-header-title">{displayedTitle}</ScreenTitle>
+        {!isLoading && !aiRenamePending ? (
           <WorkspaceHeaderProjectRow
             subtitle={subtitle}
             isSubtitleDistinct={isSubtitleDistinct}
             serverId={normalizedServerId}
           />
-        </View>
-      )}
+        ) : null}
+      </View>
       <View style={styles.compactHeaderMenuCluster}>
         {isMobile ? (
           <WorkspaceHeaderMenuMobile
@@ -1372,10 +1370,28 @@ function shouldInspectWorkspaceRecovery(
   return recoveryRequested && hasHydratedWorkspaces && workspace === null;
 }
 
-function WorkspaceScreenGateFrame({ children }: { children: ReactNode }) {
+function WorkspaceScreenGateFrame({
+  children,
+  isLoading,
+}: {
+  children: ReactNode;
+  isLoading: boolean;
+}) {
+  const { t } = useTranslation();
   return (
     <>
-      <ScreenHeader left={GATED_WORKSPACE_HEADER_LEFT} />
+      <ScreenHeader
+        left={
+          <>
+            <SidebarMenuToggle />
+            {isLoading ? (
+              <ScreenTitle testID="workspace-header-title">
+                {t("common.states.loading")}
+              </ScreenTitle>
+            ) : null}
+          </>
+        }
+      />
       <View style={styles.centerContent}>{children}</View>
     </>
   );
@@ -1412,6 +1428,7 @@ function WorkspacePanelContent({
 function renderWorkspaceScreenGateShell(input: {
   gate: ReactNode;
   workspaceKey: string | null;
+  isLoading: boolean;
 }): ReactElement | null {
   if (!input.gate) {
     return null;
@@ -1422,7 +1439,9 @@ function renderWorkspaceScreenGateShell(input: {
       <View style={styles.container}>
         <View style={styles.threePaneRow}>
           <View style={styles.centerColumn}>
-            <WorkspaceScreenGateFrame>{input.gate}</WorkspaceScreenGateFrame>
+            <WorkspaceScreenGateFrame isLoading={input.isLoading}>
+              {input.gate}
+            </WorkspaceScreenGateFrame>
           </View>
         </View>
       </View>
@@ -3902,6 +3921,7 @@ function WorkspaceScreenContent({
   const gatedWorkspaceScreen = renderWorkspaceScreenGateShell({
     gate: workspaceScreenGate,
     workspaceKey: persistenceKey,
+    isLoading: workspaceRouteState.kind === "loading",
   });
 
   const headerRight = useMemo(
@@ -4371,14 +4391,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
     flexShrink: 0,
-  },
-  headerTitleSkeleton: {
-    width: 220,
-    maxWidth: "100%",
-    height: 22,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface3,
-    opacity: 0.25,
   },
   headerRight: {
     flexDirection: "row",

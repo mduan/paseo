@@ -19,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TitleSkeleton } from "@/components/ui/title-skeleton";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
@@ -234,6 +233,7 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   workspaceId: string;
   selected: boolean;
 }) {
+  const { t } = useTranslation();
   const tab = useMemo(
     () => ({
       key: row.key,
@@ -303,18 +303,11 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
                       })}
                     />
                   </View>
-                  {presentation.titleState === "loading" ? (
-                    <View style={styles.labelPlaceholder}>
-                      <TitleSkeleton
-                        width="100%"
-                        testID={`sidebar-workspace-session-title-loading-${row.key}`}
-                      />
-                    </View>
-                  ) : (
-                    <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
-                      {presentation.label}
-                    </Text>
-                  )}
+                  <Text style={selected ? styles.labelSelected : styles.label} numberOfLines={1}>
+                    {presentation.titleState === "loading"
+                      ? t("workspace.tabs.loading")
+                      : presentation.label}
+                  </Text>
                   {kebab.showKebab && row.tabId ? (
                     <WorkspaceSessionKebab
                       {...kebab.menuProps}
@@ -609,12 +602,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
-  },
-  labelPlaceholder: {
-    flex: 1,
-    minWidth: 0,
-    height: 18,
-    justifyContent: "center",
   },
   age: {
     flexShrink: 0,

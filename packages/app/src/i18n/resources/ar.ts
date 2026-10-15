@@ -50,6 +50,7 @@ export const ar: TranslationResources = {
       noOptionsMatchSearch: "لا توجد خيارات تطابق بحثك.",
     },
     states: {
+      renaming: "جارٍ تغيير الاسم...",
       loading: "تحميل...",
       starting: "جارٍ البدء...",
       copied: "منقول",

@@ -51,6 +51,7 @@ export const fr: TranslationResources = {
       noOptionsMatchSearch: "Aucune option ne correspond à votre recherche.",
     },
     states: {
+      renaming: "Renommage...",
       loading: "Chargement...",
       starting: "Départ...",
       copied: "Copié",

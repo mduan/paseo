@@ -1,4 +1,3 @@
-import { TitleSkeleton } from "@/components/ui/title-skeleton";
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -623,10 +622,9 @@ function TabHandleContent({
       <View style={styles.tabIcon}>
         <WorkspaceTabIcon presentation={presentation} active={isHighlighted} backdrop={backdrop} />
       </View>
-      {showLabel && presentation.titleState === "loading" ? <TitleSkeleton /> : null}
-      {showLabel && presentation.titleState !== "loading" ? (
+      {showLabel ? (
         <Text style={tabLabelStyle} selectable={false} numberOfLines={1} ellipsizeMode="tail">
-          {presentation.label}
+          {presentation.titleState === "loading" ? t("workspace.tabs.loading") : presentation.label}
         </Text>
       ) : null}
       {/* The dot is a laid-out sibling of the label, not an overlay, so a truncated label ends
