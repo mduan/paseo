@@ -15,6 +15,7 @@ import { getServerId } from "../support/helpers/server-id";
 import { seedSavedSettingsHosts } from "../support/helpers/settings";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 import { attachImageFromMenu, removeAttachmentPill } from "../support/helpers/composer";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 
 const DRAFT = `Please investigate the workspace startup failure.
 
@@ -32,19 +33,22 @@ test.describe("New workspace composer draft", () => {
     const secondProject: SeededWorkspace = await seedWorkspace({
       repoPrefix: "new-workspace-draft-project-b-",
     });
+    const firstProjectViewKey = projectPlacementViewKey(getServerId(), firstProject.projectId);
+    const secondProjectViewKey = projectPlacementViewKey(getServerId(), secondProject.projectId);
 
     try {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
         projectKey: firstProject.projectKey,
+        projectViewKey: firstProjectViewKey,
         projectDisplayName: firstProject.projectDisplayName,
       });
       await expectNewWorkspaceProjectSelected(page, firstProject.projectDisplayName);
 
       await fillNewWorkspaceDraft(page, DRAFT);
       const firstAction = page
-        .getByTestId(`sidebar-project-new-worktree-${firstProject.projectKey}`)
+        .getByTestId(`sidebar-project-new-worktree-${firstProjectViewKey}`)
         .first();
       await expect(firstAction).toHaveAttribute("aria-label", "Resume workspace draft");
       await page.getByRole("textbox", { name: "Message agent..." }).hover();
@@ -52,24 +56,25 @@ test.describe("New workspace composer draft", () => {
 
       await selectNewWorkspaceProject(page, {
         projectKey: secondProject.projectKey,
+        projectViewKey: secondProjectViewKey,
         projectDisplayName: secondProject.projectDisplayName,
       });
 
       await expectNewWorkspaceDraft(page, DRAFT);
       const secondAction = page
-        .getByTestId(`sidebar-project-new-worktree-${secondProject.projectKey}`)
+        .getByTestId(`sidebar-project-new-worktree-${secondProjectViewKey}`)
         .first();
       await expect(secondAction).toHaveAttribute("aria-label", "Resume workspace draft");
       await expect(firstAction).not.toHaveAttribute("aria-label", "Resume workspace draft");
       await secondAction.hover();
       await expect(page.getByText("Resume workspace draft", { exact: true })).toBeVisible();
       await expect(
-        page.getByTestId(`sidebar-project-kebab-${secondProject.projectKey}`).first(),
+        page.getByTestId(`sidebar-project-kebab-${secondProjectViewKey}`).first(),
       ).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath("workspace-draft-pencil-hover.png") });
 
-      await page.getByTestId("sidebar-settings").click();
-      await expect(page).toHaveURL(/\/settings(?:\/.*)?(?:\?.*)?$/);
+      await page.getByTestId("sidebar-sessions").filter({ visible: true }).first().click();
+      await expect(page).toHaveURL(/\/sessions(?:\?.*)?$/);
       await secondAction.click();
       await expectNewWorkspaceProjectSelected(page, secondProject.projectDisplayName);
       await expectNewWorkspaceDraft(page, DRAFT);
@@ -134,6 +139,7 @@ test.describe("New workspace composer draft", () => {
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
         projectKey: project.projectKey,
+        projectViewKey: projectPlacementViewKey(getServerId(), project.projectId),
         projectDisplayName: project.projectDisplayName,
       });
 
