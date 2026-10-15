@@ -310,7 +310,7 @@ describe("ReplicaCache", () => {
     expect(storage.rows.size).toBe(0);
   });
 
-  it("round-trips image references in canonical user messages", async () => {
+  it("round-trips image references and attachment cards in canonical user messages", async () => {
     const storage = new MemoryStorage();
     const writer = createCache(storage);
     const original = {
@@ -321,6 +321,16 @@ describe("ReplicaCache", () => {
           kind: "user_message",
           text: "Is this a bug?",
           imageSources: ["/tmp/first prompt.png"],
+          attachments: [
+            {
+              type: "uploaded_file",
+              id: "notes",
+              fileName: "notes.pdf",
+              mimeType: "application/pdf",
+              size: 12,
+              path: "/uploads/notes.pdf",
+            },
+          ],
         } satisfies StreamItem,
       ],
     };

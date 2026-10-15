@@ -9,6 +9,7 @@ import type { PendingPermission } from "@/types/shared";
 import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { UserComposerAttachment } from "@/attachments/types";
+import type { QuestionAnswerContext } from "@getpaseo/protocol/prompt-attachments";
 import { getAttachmentStore } from "@/attachments/store";
 import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
 import { buildQuestionAttachmentAnswer } from "@/composer/question-answer";
@@ -396,20 +397,27 @@ export function QuestionFormCard({
     setError(undefined);
     try {
       const answers = buildQuestionFormAnswers(questions, selections, otherTexts);
+      const answerContexts: Record<string, QuestionAnswerContext> = {};
       for (const [index, question] of questions.entries()) {
         const items = attachments[index];
         if (!items?.length) continue;
         if (!client) throw new Error(t("common.errors.daemonClientUnavailable"));
-        answers[question.header] = await buildQuestionAttachmentAnswer({
+        const built = await buildQuestionAttachmentAnswer({
           text: answers[question.header] ?? "",
           attachments: items,
           client,
           store: await getAttachmentStore(),
         });
+        answers[question.header] = built.answer;
+        answerContexts[question.header] = built.context;
       }
       await onRespond({
         behavior: "allow",
-        updatedInput: { ...permission.request.input, answers },
+        updatedInput: {
+          ...permission.request.input,
+          answers,
+          ...(permission.request.name === "request_user_input_async" ? { answerContexts } : {}),
+        },
       });
     } catch (error) {
       if (!showTextInput) setError(error instanceof Error ? error.message : String(error));
@@ -429,6 +437,7 @@ export function QuestionFormCard({
     t,
     onRespond,
     permission.request.input,
+    permission.request.name,
     showTextInput,
   ]);
 

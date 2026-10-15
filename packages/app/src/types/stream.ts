@@ -918,9 +918,9 @@ function appendUserMessage({
   timelineCursor?: TimelinePosition;
   turnId?: string;
 }): StreamItem[] {
-  const { text, messageId, clientMessageId, imageSources } = item;
+  const { text, messageId, clientMessageId, imageSources, attachments } = item;
   const { chunk, hasContent } = normalizeChunk(text);
-  if (!hasContent && !imageSources?.length) {
+  if (!hasContent && !imageSources?.length && !attachments?.length) {
     return state;
   }
 
@@ -934,6 +934,7 @@ function appendUserMessage({
     text: chunk,
     timestamp,
     imageSources,
+    attachments,
   });
   return upsertUserMessage(state, nextItem);
 }

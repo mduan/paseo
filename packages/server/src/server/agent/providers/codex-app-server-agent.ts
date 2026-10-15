@@ -4097,6 +4097,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         entry.item = this.asyncQuestions.timeline(entry.item.callId) ?? entry.item;
       }
       if (entry.item.type === "user_message") {
+        entry.item = this.asyncQuestions.decorateUserMessage(entry.item);
         this.rememberCodexUserMessageTurn(entry.item.messageId, entry.providerTurnId);
       }
     }
@@ -4874,7 +4875,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (prepared.prompt && expectedTurnId) {
       const result = await this.steerActiveTurn(prepared.prompt, {
         expectedTurnId,
-        clientMessageId: randomUUID(),
+        clientMessageId: prepared.clientMessageId ?? randomUUID(),
       });
       if (result.status !== "accepted") {
         throw new Error("The active Codex turn changed. Retry sending your answer.");
@@ -4888,7 +4889,19 @@ export class CodexAppServerAgentSession implements AgentSession {
       requestId,
       resolution: response,
     });
-    return followUpPrompt ? { followUpPrompt } : undefined;
+    return followUpPrompt
+      ? {
+          followUpPrompt,
+          ...(prepared.clientMessageId
+            ? {
+                followUpOptions: {
+                  clientMessageId: prepared.clientMessageId,
+                  promptPresentation: prepared.presentation,
+                },
+              }
+            : {}),
+        }
+      : undefined;
   }
 
   private handlePlanPermissionResponse(params: {
@@ -7086,7 +7099,9 @@ export class CodexAppServerAgentSession implements AgentSession {
       return;
     }
     const clientMessageId = timelineItem.clientMessageId ?? this.activeClientMessageId;
-    const item = clientMessageId ? { ...timelineItem, clientMessageId } : timelineItem;
+    const item = this.asyncQuestions.decorateUserMessage(
+      clientMessageId ? { ...timelineItem, clientMessageId } : timelineItem,
+    );
     this.activeClientMessageId = null;
     this.emitEvent({ type: "timeline", provider: CODEX_PROVIDER, item });
   }

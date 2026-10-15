@@ -1,8 +1,13 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { AgentAttachmentSchema } from "@getpaseo/protocol/messages";
+import { QuestionAnswerContextSchema } from "@getpaseo/protocol/prompt-attachments";
 import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
   ToolCallTimelineItem,
+  AgentTimelineItem,
+  AgentRunOptions,
 } from "../../agent-sdk-types.js";
 
 const QuestionSchema = z.object({
@@ -18,6 +23,15 @@ const ItemSchema = z.object({
 const RecordSchema = z.object({
   item: ItemSchema,
   resolution: z.union([z.literal("dismissed"), z.array(z.string())]).optional(),
+  answerMessage: z
+    .object({
+      clientMessageId: z.string(),
+      messageId: z.string().optional(),
+      text: z.string(),
+      imageSources: z.array(z.string()),
+      attachments: z.array(AgentAttachmentSchema),
+    })
+    .optional(),
 });
 type QuestionRecord = z.infer<typeof RecordSchema>;
 
@@ -105,12 +119,18 @@ export class CodexAsyncQuestions {
   prepareResponse(
     id: string,
     response: AgentPermissionResponse,
-  ): { prompt?: string; complete: () => ToolCallTimelineItem } {
+  ): {
+    prompt?: string;
+    clientMessageId?: string;
+    presentation?: AgentRunOptions["promptPresentation"];
+    complete: () => ToolCallTimelineItem;
+  } {
     const record = this.records.get(id);
     if (!record || record.resolution !== undefined)
       throw new Error("Question is no longer pending");
     let resolution: QuestionRecord["resolution"] = "dismissed";
     let prompt: string | undefined;
+    let clientMessageId: string | undefined;
     if (response.behavior === "allow") {
       const answers = z.record(z.string(), z.string()).parse(response.updatedInput?.answers);
       resolution = record.item.questions.map((_, index) => {
@@ -124,14 +144,63 @@ export class CodexAsyncQuestions {
         record.item.questions
           .map((question, index) => `${question.title}\n${values[index]}`)
           .join("\n\n");
+      const contexts = z
+        .record(z.string(), QuestionAnswerContextSchema)
+        .optional()
+        .parse(response.updatedInput?.answerContexts);
+      if (contexts && Object.keys(contexts).length) {
+        const attached = record.item.questions.flatMap((_, index) => {
+          const context = contexts[`Question ${index + 1}`];
+          return context ? [context] : [];
+        });
+        clientMessageId = randomUUID();
+        record.answerMessage = {
+          clientMessageId,
+          text:
+            "Answers to your questions:\n\n" +
+            record.item.questions
+              .map(
+                (question, index) =>
+                  `${question.title}\n${contexts[`Question ${index + 1}`]?.text ?? values[index]}`,
+              )
+              .join("\n\n"),
+          imageSources: attached.flatMap((context) => context.images.map((image) => image.path)),
+          attachments: attached.flatMap((context) => context.attachments),
+        };
+      }
     }
     return {
       prompt,
+      ...(clientMessageId ? { clientMessageId, presentation: record.answerMessage } : {}),
       complete: () => {
         record.resolution = resolution;
         return toTimeline(record);
       },
     };
+  }
+
+  decorateUserMessage(
+    item: Extract<AgentTimelineItem, { type: "user_message" }>,
+  ): Extract<AgentTimelineItem, { type: "user_message" }> {
+    for (const record of this.records.values()) {
+      const message = record.answerMessage;
+      if (
+        !message ||
+        !(
+          (item.clientMessageId && item.clientMessageId === message.clientMessageId) ||
+          (item.messageId && item.messageId === message.messageId)
+        )
+      )
+        continue;
+      if (item.messageId) message.messageId = item.messageId;
+      return {
+        ...item,
+        text: message.text,
+        imageSources: message.imageSources,
+        attachments: message.attachments,
+      };
+    }
+    return item;
   }
 
   timeline(itemId: string): ToolCallTimelineItem | null {

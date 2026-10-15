@@ -1,5 +1,8 @@
 import { Buffer } from "buffer";
-import { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
+import {
+  renderPromptAttachmentAsText,
+  type QuestionAnswerContext,
+} from "@getpaseo/protocol/prompt-attachments";
 import type { AttachmentStore, ComposerAttachment } from "@/attachments/types";
 import { uploadFileAttachments, type ComposerSendClient } from "./actions";
 import { splitComposerAttachmentsForSubmit } from "./attachments/submit";
@@ -15,7 +18,7 @@ export async function buildQuestionAttachmentAnswer({
   attachments: ComposerAttachment[];
   client: Pick<ComposerSendClient, "uploadFile">;
   store: Pick<AttachmentStore, "encodeBase64">;
-}): Promise<string> {
+}): Promise<{ answer: string; context: QuestionAnswerContext }> {
   const split = splitComposerAttachmentsForSubmit(attachments);
   const uploadedImages = await uploadFileAttachments({
     client,
@@ -28,5 +31,12 @@ export async function buildQuestionAttachmentAnswer({
   const context = [...uploadedImages.map((image) => image.attachment), ...split.attachments].map(
     renderPromptAttachmentAsText,
   );
-  return [text.trim(), ...context].filter(Boolean).join("\n\n");
+  return {
+    answer: [text.trim(), ...context].filter(Boolean).join("\n\n"),
+    context: {
+      text: text.trim(),
+      images: uploadedImages.map((image) => image.attachment),
+      attachments: split.attachments,
+    },
+  };
 }

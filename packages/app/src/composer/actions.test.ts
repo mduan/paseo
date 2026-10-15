@@ -1211,7 +1211,7 @@ describe("file upload preparation", () => {
 describe("question attachment answers", () => {
   it("uploads image bytes and includes files, workspace excerpts, issues and plugin snapshots", async () => {
     const uploaded: string[] = [];
-    const answer = await buildQuestionAttachmentAnswer({
+    const { answer, context } = await buildQuestionAttachmentAnswer({
       text: " See this example ",
       attachments: [
         { kind: "image", metadata: imageMetadata },
@@ -1282,6 +1282,23 @@ describe("question attachment answers", () => {
     expect(answer).toContain(issueItem.url);
     expect(answer).toContain("Issue body");
     expect(answer).toContain("Plugin issue snapshot");
+    expect(context.text).toBe("See this example");
+    expect(context.images).toEqual([
+      {
+        type: "uploaded_file",
+        id: "image-1",
+        fileName: "img-1.png",
+        mimeType: "image/png",
+        size: 3,
+        path: "/uploads/image.png",
+      },
+    ]);
+    expect(context.attachments.map((attachment) => attachment.type)).toEqual([
+      "uploaded_file",
+      "text",
+      "forge_issue",
+      "text",
+    ]);
   });
 
   it.each(["encode", "upload"])(

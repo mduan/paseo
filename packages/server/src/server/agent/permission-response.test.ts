@@ -70,7 +70,10 @@ describe("respondToAgentPermission", () => {
 
   test("starts a follow-up run returned by the provider permission response", async () => {
     const agentManager = new FakePermissionAgentManager();
-    agentManager.permissionResult = { followUpPrompt: "implement the approved plan" };
+    agentManager.permissionResult = {
+      followUpPrompt: "implement the approved plan",
+      followUpOptions: { clientMessageId: "qa-answer" },
+    };
 
     await respondToAgentPermission({
       agentManager,
@@ -91,6 +94,7 @@ describe("respondToAgentPermission", () => {
       {
         agentId: "agent-1",
         prompt: "implement the approved plan",
+        options: { clientMessageId: "qa-answer" },
       },
     ]);
     expect(agentManager.replacementRuns).toEqual([]);
