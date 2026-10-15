@@ -18,7 +18,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
-import { Archive, ChevronRight, Folder, GitBranch, Network, Server } from "lucide-react-native";
+import { Archive, Folder, GitBranch, Network, Server } from "lucide-react-native";
 import { useProviderIcon } from "@/components/provider-icons";
 import { WorkspaceTabIcon } from "@/screens/workspace/workspace-tab-presentation";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -48,7 +48,6 @@ const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedBranch = withUnistyles(GitBranch);
 const ThemedServer = withUnistyles(Server);
-const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedRefreshControl = withUnistyles(RefreshControl);
 
 interface AgentListProps {
@@ -309,7 +308,6 @@ function SessionRowContext({
   const showProject = fields.project && Boolean(projectName);
   const showWorkspace = fields.workspace && Boolean(folderName);
   const showBranch = fields.branch && Boolean(branch);
-  const showPlacement = showProject || showWorkspace;
   const ranges = useMemo(
     () => ({
       workspace: findHighlightRanges(search ?? "", folderName),
@@ -320,44 +318,38 @@ function SessionRowContext({
   );
   return (
     <>
-      {showPlacement ? (
+      {showProject ? (
         <View style={styles.metaItem}>
-          {showProject ? (
-            <View style={styles.metaItem}>
-              <ProjectIconView
-                iconDataUri={null}
-                initial={projectName.charAt(0).toUpperCase()}
-                projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
-                size={14}
-                textStyle={styles.projectIconText}
-              />
-              <HighlightedText
-                text={projectName}
-                ranges={ranges.project}
-                style={styles.sessionMetaText}
-                numberOfLines={1}
-                testID={`agent-row-project-${agent.serverId}-${agent.id}`}
-              />
-            </View>
-          ) : null}
-          {showWorkspace ? (
-            <View style={styles.metaItem}>
-              {showProject ? <ThemedChevronRight size={12} uniProps={mutedIconMapping} /> : null}
-              <ThemedFolder size={14} uniProps={mutedIconMapping} />
-              <HighlightedText
-                text={folderName}
-                ranges={ranges.workspace}
-                style={styles.sessionMetaText}
-                numberOfLines={1}
-                testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
-              />
-            </View>
-          ) : null}
+          <ProjectIconView
+            iconDataUri={null}
+            initial={projectName.charAt(0).toUpperCase()}
+            projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
+            size={14}
+            textStyle={styles.projectIconText}
+          />
+          <HighlightedText
+            text={projectName}
+            ranges={ranges.project}
+            style={styles.sessionMetaText}
+            numberOfLines={1}
+            testID={`agent-row-project-${agent.serverId}-${agent.id}`}
+          />
+        </View>
+      ) : null}
+      {showWorkspace ? (
+        <View style={styles.metaItem}>
+          <ThemedFolder size={14} uniProps={mutedIconMapping} />
+          <HighlightedText
+            text={folderName}
+            ranges={ranges.workspace}
+            style={styles.sessionMetaText}
+            numberOfLines={1}
+            testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
+          />
         </View>
       ) : null}
       {showBranch ? (
         <View style={styles.metaItem}>
-          {showPlacement ? <Text style={styles.sessionMetaSeparator}>·</Text> : null}
           <ThemedBranch size={14} uniProps={mutedIconMapping} />
           <HighlightedText
             text={branch}
@@ -732,11 +724,6 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: "100%",
     fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
-  },
-  sessionMetaSeparator: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foregroundMuted,
-    opacity: 0.7,
   },
   metaItem: {
     flexDirection: "row",
