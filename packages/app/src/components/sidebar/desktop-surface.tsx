@@ -4,6 +4,7 @@ export function DesktopSidebarSurface({
   children,
 }: {
   overlay: boolean;
+  active: boolean;
   onDismiss: () => void;
   children: ReactNode;
 }) {

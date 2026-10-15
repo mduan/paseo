@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type { PointerEvent as RNPointerEvent } from "react-native";
 import { isWeb } from "@/constants/platform";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
-import { hasActiveWebOverlay } from "@/lib/overlay-root";
 import { MIN_SIDEBAR_WIDTH } from "@/stores/panel-store";
 
 export const SIDEBAR_EDGE_WIDTH = MIN_SIDEBAR_WIDTH / 4;
@@ -14,10 +13,6 @@ export function useSidebarEdgeHover({ enabled }: { enabled: boolean }) {
   const revealOnPointerMove = useCallback((event: RNPointerEvent) => {
     if (event.nativeEvent.pointerType === "mouse" && !event.nativeEvent.buttons) setRevealed(true);
   }, []);
-  const dismissOnMouseLeave = useCallback(() => {
-    if (isWeb && hasActiveWebOverlay()) return;
-    dismiss();
-  }, [dismiss]);
   const canReveal = enabled && finePointer;
 
   useEffect(() => {
@@ -41,6 +36,5 @@ export function useSidebarEdgeHover({ enabled }: { enabled: boolean }) {
     canReveal,
     revealOnPointerMove,
     dismiss,
-    dismissOnMouseLeave,
   };
 }

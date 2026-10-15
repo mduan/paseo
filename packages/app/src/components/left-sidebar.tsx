@@ -52,7 +52,7 @@ import { useHosts } from "@/runtime/host-runtime";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { builtinSidebarNavLabelKey } from "@/sidebar-nav/model";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
-import { MIN_SIDEBAR_WIDTH, usePanelStore } from "@/stores/panel-store";
+import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
@@ -118,16 +118,11 @@ interface DesktopSidebarProps extends SidebarSharedProps {
   insetsTop: number;
   active: boolean;
   overlay: boolean;
-  onCollapse: () => void;
 }
 
-type LeftSidebarProps = Pick<DesktopSidebarProps, "active" | "overlay" | "onCollapse">;
+type LeftSidebarProps = Pick<DesktopSidebarProps, "active" | "overlay">;
 
-export const LeftSidebar = memo(function LeftSidebar({
-  active,
-  overlay,
-  onCollapse,
-}: LeftSidebarProps) {
+export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSidebarProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -274,7 +269,6 @@ export const LeftSidebar = memo(function LeftSidebar({
           insetsTop={insets.top}
           active={active}
           overlay={overlay}
-          onCollapse={onCollapse}
           handleOpenProject={handleOpenProjectDesktop}
           handleImportSession={openImportSession}
           handleSettings={handleSettingsDesktop}
@@ -657,7 +651,6 @@ function DesktopSidebar({
   insetsTop,
   active,
   overlay,
-  onCollapse,
 }: DesktopSidebarProps) {
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
@@ -671,7 +664,6 @@ function DesktopSidebar({
 
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
-  const resizeCollapsed = useSharedValue(false);
   const revealProgress = useSharedValue(0);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
@@ -700,24 +692,15 @@ function DesktopSidebar({
         .onStart((event) => {
           startWidthRef.current = visibleSidebarWidth - event.absoluteX;
           resizeWidth.value = visibleSidebarWidth;
-          resizeCollapsed.value = false;
         })
         .onUpdate((event) => {
-          if (resizeCollapsed.value) return;
           const newWidth = startWidthRef.current + event.absoluteX;
-          if (newWidth < MIN_SIDEBAR_WIDTH / 2) {
-            resizeCollapsed.value = true;
-            resizeWidth.value = visibleSidebarWidth;
-            runOnJS(onCollapse)();
-            return;
-          }
           resizeWidth.value = resolveDesktopSidebarWidth({
             requestedWidth: newWidth,
             viewportWidth,
           });
         })
         .onEnd((event) => {
-          if (resizeCollapsed.value) return;
           const requestedWidth = startWidthRef.current + event.absoluteX;
           runOnJS(setSidebarWidth)(resolveDesktopSidebarWidth({ requestedWidth, viewportWidth }));
         })
@@ -726,8 +709,6 @@ function DesktopSidebar({
         }),
     [
       hideResizeGrip,
-      onCollapse,
-      resizeCollapsed,
       resizeWidth,
       setSidebarWidth,
       showResizeGrip,

@@ -654,20 +654,14 @@ function SidebarChrome({
 }) {
   const isCompactLayout = useIsCompactFormFactor();
   const isMobileActive = useIsMobilePanelActive("agent-list");
-  const closeDesktopAgentList = usePanelStore((state) => state.closeDesktopAgentList);
-  const { revealed, canReveal, revealOnPointerMove, dismiss, dismissOnMouseLeave } =
-    useSidebarEdgeHover({ enabled: overlay });
-  const collapseSidebar = useCallback(() => {
-    dismiss();
-    closeDesktopAgentList();
-  }, [closeDesktopAgentList, dismiss]);
+  const { revealed, canReveal, revealOnPointerMove, dismiss } = useSidebarEdgeHover({
+    enabled: overlay,
+  });
   const desktopActive = visible || revealed;
   const active = isCompactLayout ? visible && isMobileActive : desktopActive;
-  const sidebar = mounted ? (
-    <LeftSidebar active={active} overlay={overlay} onCollapse={collapseSidebar} />
-  ) : null;
+  const sidebar = mounted ? <LeftSidebar active={active} overlay={overlay} /> : null;
   const desktopSidebar = (
-    <DesktopSidebarSurface overlay={overlay} onDismiss={dismissOnMouseLeave}>
+    <DesktopSidebarSurface overlay={overlay} active={active} onDismiss={dismiss}>
       {canReveal ? (
         <View
           testID="sidebar-edge-trigger"
@@ -1039,7 +1033,7 @@ export default function RootLayout() {
 const layoutStyles = StyleSheet.create((theme) => ({
   sidebarEdgeTrigger: {
     position: "absolute",
-    top: HEADER_INNER_HEIGHT,
+    top: 0,
     bottom: 0,
     left: 0,
     width: SIDEBAR_EDGE_WIDTH,

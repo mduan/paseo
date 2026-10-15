@@ -25,7 +25,6 @@ async function dragSidebarTo(page: Page, width: number) {
   await page.evaluate(() => new Promise(requestAnimationFrame));
   const x = startX + width - sidebarBounds.width - 20;
   await page.mouse.move(x, y, { steps: 15 });
-  return { x, y };
 }
 
 test("a collapsed sidebar slides over content and dismisses when the mouse leaves", async ({
@@ -36,6 +35,9 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
     await gotoWorkspace(page, workspace.workspaceId);
     await waitForWorkspaceTabsVisible(page);
     const sidebar = page.getByTestId("left-sidebar");
+    await dragSidebarTo(page, 420);
+    await page.mouse.up();
+    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(420);
     const retainedSidebar = await sidebar.elementHandle();
     await page.getByTestId("menu-button").filter({ visible: true }).first().click();
     await page.mouse.move(600, 300);
@@ -45,6 +47,18 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
 
     await page.mouse.move(51, 300);
     await expect(sidebar).toBeHidden();
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error("App viewport is not available");
+    for (const y of [2, viewport.height / 2, viewport.height - 10]) {
+      await page.mouse.move(49, y);
+      await page.mouse.move(400, y);
+      await expect(sidebar).toBeVisible();
+      await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+      await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(420);
+      await expect.poll(async () => (await sidebar.boundingBox())?.height).toBe(viewport.height);
+      await page.mouse.move(600, y);
+      await expect(sidebar).toBeHidden();
+    }
     await page.mouse.move(49, 300);
     await expect(sidebar).toBeVisible();
     await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
@@ -122,60 +136,6 @@ test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
     await expectMobileAgentSidebarVisible(page);
     await closeMobileAgentSidebar(page);
     await expectMobileAgentSidebarHidden(page);
-  } finally {
-    await workspace.cleanup();
-  }
-});
-
-test("dragging below half the minimum collapses immediately and preserves the saved width", async ({
-  page,
-}) => {
-  const workspace = await seedWorkspace({ repoPrefix: "sidebar-collapse-" });
-  try {
-    await gotoWorkspace(page, workspace.workspaceId);
-    await waitForWorkspaceTabsVisible(page);
-    const sidebar = page.getByTestId("left-sidebar");
-
-    await dragSidebarTo(page, 240);
-    await page.mouse.up();
-    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
-    await dragSidebarTo(page, 190);
-    await expect(sidebar).toBeVisible();
-    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(200);
-    await page.mouse.up();
-    await expect(sidebar).toBeVisible();
-
-    await dragSidebarTo(page, 240);
-    await page.mouse.up();
-    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
-    const boundary = await dragSidebarTo(page, 100);
-    await expect(sidebar).toBeVisible();
-    await page.mouse.move(boundary.x - 1, boundary.y);
-    await expect(sidebar).toBeHidden();
-    await page.mouse.move(400, boundary.y);
-    await page.mouse.up();
-    await expect(sidebar).toBeHidden();
-    await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("panel-state")))
-      .toContain('"sidebarWidth":240');
-
-    await page.mouse.move(2, 300);
-    await expect(sidebar).toBeVisible();
-    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
-    expect((await sidebar.boundingBox())?.width).toBe(240);
-    await dragSidebarTo(page, 90);
-    await expect(sidebar).toBeHidden();
-    await page.mouse.up();
-    await expect(sidebar).toBeHidden();
-
-    await page.mouse.move(600, 300);
-    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
-    await expect(sidebar).toBeVisible();
-    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(240);
-    await dragSidebarTo(page, 200);
-    await page.mouse.up();
-    await expect(sidebar).toBeVisible();
-    await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(200);
   } finally {
     await workspace.cleanup();
   }
