@@ -56,7 +56,7 @@ export type HistoryFields = z.infer<typeof HistoryFieldsSchema>;
 export type HistoryFilters = z.infer<typeof HistoryFiltersSchema>;
 export const EMPTY_HISTORY_FILTERS = HistoryFiltersSchema.parse({});
 export const DEFAULT_HISTORY_FIELDS = HistoryFieldsSchema.parse({});
-const RECENT_SEARCH_LIMIT = 20;
+const RECENT_SEARCH_LIMIT = 100;
 
 export const HistoryPreferencesSchema = z.object({
   fields: HistoryFieldsSchema.catch(DEFAULT_HISTORY_FIELDS),

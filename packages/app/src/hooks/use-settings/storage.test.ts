@@ -826,12 +826,12 @@ describe("saveAppSettings", () => {
     },
   );
 
-  it("persists the 20 most recent unique History searches without changing filters", async () => {
+  it("persists the 100 most recent unique History searches without changing filters", async () => {
     const deps = makeDeps();
     const queryClient = new QueryClient();
-    const searches = Array.from({ length: 20 }, (_, index) => `query ${index}`);
+    const searches = Array.from({ length: 100 }, (_, index) => `query ${index}`);
     const recentSearches = addRecentHistorySearch({ searches, query: "  older search  " });
-    expect(recentSearches).toEqual(["older search", ...searches.slice(0, 19)]);
+    expect(recentSearches).toEqual(["older search", ...searches.slice(0, 99)]);
     const reordered = addRecentHistorySearch({ searches: recentSearches, query: "query 3" });
     expect(reordered).toEqual([
       "query 3",
@@ -839,7 +839,7 @@ describe("saveAppSettings", () => {
       "query 0",
       "query 1",
       "query 2",
-      ...searches.slice(4, 19),
+      ...searches.slice(4, 99),
     ]);
     expect(addRecentHistorySearch({ searches: reordered, query: "  " })).toBe(reordered);
     expect(addRecentHistorySearch({ searches: reordered, query: " query 3 " })).toBe(reordered);
