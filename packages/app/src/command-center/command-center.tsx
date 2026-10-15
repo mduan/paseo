@@ -1,6 +1,5 @@
 import {
   FlatList,
-  Modal,
   Pressable,
   Text,
   View,
@@ -15,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Check, ChevronRight, Folder, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { BottomSheetFlatList, type BottomSheetFlatListMethods } from "@gorhom/bottom-sheet";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { AgentStatusDot } from "@/components/agent-status-dot";
 import { MaterialFileIcon } from "@/components/material-file-icon";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -768,10 +768,25 @@ export function CommandCenter() {
   if (!state.open) return null;
   return (
     <OverlayLayerProvider layer={isWeb ? modalLayer : 0}>
-      <Modal visible transparent animationType="fade" onRequestClose={state.close}>
+      <ModalPortal
+        layer={modalLayer}
+        visible
+        transparent
+        animationType="fade"
+        onRequestClose={state.close}
+      >
         <View style={styles.overlay}>
-          <Pressable style={styles.backdrop} onPress={state.close} />
-          <View ref={setWebOverlayScope} testID="command-center-panel" style={styles.panel}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={state.close}
+            testID="command-center-backdrop"
+          />
+          <View
+            ref={setWebOverlayScope}
+            tabIndex={isWeb ? -1 : undefined}
+            testID="command-center-panel"
+            style={styles.panel}
+          >
             <View style={[styles.header, styles.searchRow]} testID="command-center-header">
               {state.scope === "files" ? (
                 <ScopeChip label={t("shell.commandCenter.files")} onRemove={state.clearScope} />
@@ -800,7 +815,7 @@ export function CommandCenter() {
             <FlatList ref={listRef} {...commonListProps} />
           </View>
         </View>
-      </Modal>
+      </ModalPortal>
     </OverlayLayerProvider>
   );
 }

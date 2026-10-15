@@ -21,14 +21,7 @@ import {
   useState,
   type ComponentType,
 } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type PressableStateCallbackType,
-} from "react-native";
+import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -70,6 +63,7 @@ import {
   buildProjectPickerOptions,
   type ProjectPickerOption,
 } from "@/components/project-picker-options";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
 import { getIsElectronRuntime } from "@/constants/layout";
@@ -847,11 +841,18 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       : null;
 
   const modal = (
-    <Modal visible transparent animationType="fade" onRequestClose={isWeb ? undefined : handleBack}>
+    <ModalPortal
+      layer={modalLayer}
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={isWeb ? undefined : handleBack}
+    >
       <View style={styles.overlay} testID="add-project-flow">
         <Pressable style={styles.backdrop} onPress={onClose} testID="add-project-flow-backdrop" />
         <View
           ref={setWebOverlayScope}
+          tabIndex={isWeb ? -1 : undefined}
           style={styles.panel}
           testID={`add-project-flow-page-${page.kind}`}
           accessibilityLabel={`Add project: ${page.kind}`}
@@ -960,7 +961,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
           </View>
         </View>
       </View>
-    </Modal>
+    </ModalPortal>
   );
 
   return createElement(OverlayLayerProvider, { layer: isWeb ? modalLayer : 0 }, modal);

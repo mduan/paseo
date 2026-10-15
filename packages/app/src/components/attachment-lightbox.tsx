@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,10 +10,10 @@ import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-ur
 import { isNative, isWeb } from "@/constants/platform";
 import { SPACING } from "@/styles/theme";
 import { WindowChromeRootRegion } from "@/utils/desktop-window";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
 import type { ViewportSize } from "@/components/zoomable-viewport/geometry";
 import {
-  getOverlayRoot,
   OverlayLayerProvider,
   useGlobalWebOverlayLayer,
   useWebOverlayRegistration,
@@ -96,21 +95,9 @@ export function AttachmentLightbox({ source, onClose }: AttachmentLightboxProps)
 
   const content = (
     <OverlayLayerProvider layer={modalLayer}>
-      <ModalRoot
-        style={[
-          styles.root,
-          isWeb ? styles.webOverlay : null,
-          isWeb ? { zIndex: modalLayer } : null,
-        ]}
-      >
+      <ModalRoot style={styles.root}>
         <WindowChromeRootRegion corners="both">
-          <View
-            ref={setWebOverlayScope}
-            style={styles.root}
-            role={isWeb ? "dialog" : undefined}
-            aria-modal={isWeb ? true : undefined}
-            tabIndex={isWeb ? -1 : undefined}
-          >
+          <View ref={setWebOverlayScope} style={styles.root} tabIndex={isWeb ? -1 : undefined}>
             <Pressable
               testID="attachment-lightbox-backdrop"
               accessibilityRole="button"
@@ -143,12 +130,17 @@ export function AttachmentLightbox({ source, onClose }: AttachmentLightboxProps)
     </OverlayLayerProvider>
   );
 
-  if (isWeb) return createPortal(content, getOverlayRoot());
-
   return (
-    <Modal transparent animationType="fade" statusBarTranslucent visible onRequestClose={onClose}>
+    <ModalPortal
+      layer={modalLayer}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      visible
+      onRequestClose={onClose}
+    >
       {content}
-    </Modal>
+    </ModalPortal>
   );
 }
 
@@ -157,11 +149,6 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minHeight: 0,
     minWidth: 0,
-  },
-  webOverlay: {
-    position: "absolute",
-    inset: 0,
-    pointerEvents: "auto",
   },
   backdrop: {
     position: "absolute",

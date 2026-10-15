@@ -1,12 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type PressableStateCallbackType,
-} from "react-native";
+import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -15,6 +8,7 @@ import { router } from "expo-router";
 import { Server } from "lucide-react-native";
 import { create } from "zustand";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { ModalPortal } from "@/components/ui/modal-portal";
 import { HostStatusDotSlot } from "@/components/hosts/host-picker";
 import { isWeb } from "@/constants/platform";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
@@ -242,10 +236,17 @@ export function HostChooserModal() {
   if (!request) return null;
 
   const modal = (
-    <Modal visible transparent animationType="fade" onRequestClose={close} testID="host-chooser">
+    <ModalPortal
+      layer={modalLayer}
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={close}
+      testID="host-chooser"
+    >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={close} />
-        <View ref={setWebOverlayScope} style={styles.panel}>
+        <Pressable style={styles.backdrop} onPress={close} testID="host-chooser-backdrop" />
+        <View ref={setWebOverlayScope} tabIndex={isWeb ? -1 : undefined} style={styles.panel}>
           <View style={styles.header}>
             <Text style={styles.title}>{request.title}</Text>
             <TextInput
@@ -278,7 +279,7 @@ export function HostChooserModal() {
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </ModalPortal>
   );
 
   return createElement(OverlayLayerProvider, { layer: isWeb ? modalLayer : 0 }, modal);
