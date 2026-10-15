@@ -1844,6 +1844,15 @@ function mapCodexThreadUserMessageItem(
     return null;
   }
   const text = extractUserText(normalizedItem.content) ?? "";
+  const imageSources: string[] = [];
+  for (const block of Array.isArray(normalizedItem.content) ? normalizedItem.content : []) {
+    const record = toObjectRecord(block);
+    if (!record) continue;
+    let source: unknown;
+    if (record.type === "localImage") source = record.path;
+    if (record.type === "image") source = record.url;
+    if (typeof source === "string" && source.trim()) imageSources.push(source);
+  }
   const messageId = nonEmptyString(normalizedItem.id);
   const clientMessageId = nonEmptyString(
     normalizedItem.clientId ?? normalizedItem.client_id ?? normalizedItem.clientUserMessageId,
@@ -1851,6 +1860,7 @@ function mapCodexThreadUserMessageItem(
   return {
     type: "user_message",
     text,
+    ...(imageSources.length ? { imageSources } : {}),
     ...(messageId ? { messageId } : {}),
     ...(clientMessageId ? { clientMessageId } : {}),
   };

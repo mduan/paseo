@@ -4634,6 +4634,57 @@ describe("Codex app-server provider", () => {
     });
   });
 
+  test.each([
+    { type: "localImage", path: "/tmp/first prompt.png" },
+    { type: "image", url: `data:image/png;base64,${ONE_BY_ONE_PNG_BASE64}` },
+  ])("restores first-prompt images from Codex history ($type)", async (image) => {
+    const source = "path" in image ? image.path : image.url;
+    const appServer = createFakeCodexAppServer({
+      "thread/read": () => ({
+        thread: {
+          turns: [
+            {
+              items: [
+                {
+                  type: "userMessage",
+                  id: "first-prompt",
+                  content: [
+                    { type: "text", text: "Is this a bug?" },
+                    image,
+                    null,
+                    { type: "localImage", path: 42 },
+                    { type: "image", url: "" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    });
+    const provider = createProviderWithFakeAppServer(appServer);
+    const session = await provider.resumeSession(archivedThreadHandle(), undefined, undefined, {
+      purpose: "history",
+    });
+    try {
+      const history: AgentStreamEvent[] = [];
+      for await (const event of session.streamHistory()) history.push(event);
+      expect(history).toContainEqual(
+        expect.objectContaining({
+          type: "timeline",
+          item: expect.objectContaining({
+            type: "user_message",
+            text: "Is this a bug?",
+            imageSources: [source],
+          }),
+        }),
+      );
+    } finally {
+      await session.close();
+      appServer.assertNoErrors();
+    }
+  });
+
   test("loads Codex persisted history from the app-server thread", async () => {
     const session = createSession();
     const requests: Array<{ method: string; params: unknown }> = [];

@@ -310,6 +310,26 @@ describe("ReplicaCache", () => {
     expect(storage.rows.size).toBe(0);
   });
 
+  it("round-trips image references in canonical user messages", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const original = {
+      ...timeline(),
+      items: [
+        {
+          ...timelineItem(),
+          kind: "user_message",
+          text: "Is this a bug?",
+          imageSources: ["/tmp/first prompt.png"],
+        } satisfies StreamItem,
+      ],
+    };
+    writer.commitTimeline(SERVER_ID, "agent-1", original);
+    await writer.flush();
+    const reader = createCache(storage);
+    expect(await reader.readTimeline(SERVER_ID, "agent-1")).toEqual(original);
+  });
+
   it("round-trips explicit directory and timeline commits", async () => {
     const storage = new MemoryStorage();
     const writer = createCache(storage);

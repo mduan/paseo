@@ -118,6 +118,7 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...TimelineItemBaseShape,
     kind: z.literal("user_message"),
+    imageSources: z.array(z.string()).optional(),
     clientMessageId: z.string().optional(),
     messageId: z.string().optional(),
     text: z.string(),
@@ -452,6 +453,7 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
       return {
         ...base,
         kind: item.kind,
+        ...(item.imageSources?.length ? { imageSources: item.imageSources } : {}),
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,
@@ -549,6 +551,7 @@ function deserializeBuiltinTimelineItem(
       return {
         ...base,
         kind: item.kind,
+        ...(item.imageSources?.length ? { imageSources: item.imageSources } : {}),
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
         text: item.text,

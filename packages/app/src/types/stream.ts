@@ -101,6 +101,7 @@ export interface UserMessageItem {
   text: string;
   timestamp: Date;
   images?: UserMessageImageAttachment[];
+  imageSources?: string[];
   attachments?: AgentAttachment[];
 }
 
@@ -113,6 +114,7 @@ export interface UserMessageInput {
   text: string;
   timestamp: Date;
   images?: UserMessageImageAttachment[];
+  imageSources?: string[];
   attachments?: AgentAttachment[];
 }
 
@@ -128,6 +130,7 @@ export function createUserMessage(input: UserMessageInput): UserMessageItem {
     ...(input.messageId ? { messageId: input.messageId } : {}),
     ...(input.turnId ? { turnId: input.turnId } : {}),
     ...(input.timelineCursor ? { timelineCursor: input.timelineCursor } : {}),
+    ...(input.imageSources?.length ? { imageSources: input.imageSources } : {}),
     text: input.text,
     timestamp: input.timestamp,
     ...(input.images && input.images.length > 0 ? { images: input.images } : {}),
@@ -223,6 +226,21 @@ export function upsertUserMessage(
 
 type UserMessagePresentationPolicy = "existing" | "incoming";
 
+function userMessagesEqual(existing: UserMessageItem, merged: UserMessageItem): boolean {
+  return (
+    existing.id === merged.id &&
+    existing.turnId === merged.turnId &&
+    existing.clientMessageId === merged.clientMessageId &&
+    existing.messageId === merged.messageId &&
+    existing.timelineCursor === merged.timelineCursor &&
+    existing.text === merged.text &&
+    existing.timestamp === merged.timestamp &&
+    existing.images === merged.images &&
+    existing.imageSources === merged.imageSources &&
+    existing.attachments === merged.attachments
+  );
+}
+
 interface UserMessageProductionResult {
   items: StreamItem[];
   index: number;
@@ -266,17 +284,7 @@ function produceUserMessage(
     // that row's turn so the live turn is not folded as finished.
     turnId: existing.turnId ?? incoming.turnId,
   });
-  if (
-    existing.id === merged.id &&
-    existing.turnId === merged.turnId &&
-    existing.clientMessageId === merged.clientMessageId &&
-    existing.messageId === merged.messageId &&
-    existing.timelineCursor === merged.timelineCursor &&
-    existing.text === merged.text &&
-    existing.timestamp === merged.timestamp &&
-    existing.images === merged.images &&
-    existing.attachments === merged.attachments
-  ) {
+  if (userMessagesEqual(existing, merged)) {
     return { items, index, message: existing, matched: true };
   }
   const next = [...items];
@@ -897,18 +905,22 @@ export function handoffCreatedAgentUserMessageToStream(params: {
   });
 }
 
-function appendUserMessage(
-  state: StreamItem[],
-  text: string,
-  timestamp: Date,
-  _source: StreamUpdateSource,
-  messageId?: string,
-  clientMessageId?: string,
-  timelineCursor?: TimelinePosition,
-  turnId?: string,
-): StreamItem[] {
+function appendUserMessage({
+  state,
+  item,
+  timestamp,
+  timelineCursor,
+  turnId,
+}: {
+  state: StreamItem[];
+  item: Extract<AgentTimelineItem, { type: "user_message" }>;
+  timestamp: Date;
+  timelineCursor?: TimelinePosition;
+  turnId?: string;
+}): StreamItem[] {
+  const { text, messageId, clientMessageId, imageSources } = item;
   const { chunk, hasContent } = normalizeChunk(text);
-  if (!hasContent) {
+  if (!hasContent && !imageSources?.length) {
     return state;
   }
 
@@ -921,6 +933,7 @@ function appendUserMessage(
     turnId,
     text: chunk,
     timestamp,
+    imageSources,
   });
   return upsertUserMessage(state, nextItem);
 }
@@ -1519,16 +1532,7 @@ function reduceTimelineEvent(
   switch (item.type) {
     case "user_message":
       return finalizeActiveThoughts(
-        appendUserMessage(
-          state,
-          item.text,
-          timestamp,
-          source,
-          item.messageId,
-          item.clientMessageId,
-          timelineCursor,
-          event.turnId,
-        ),
+        appendUserMessage({ state, item, timestamp, timelineCursor, turnId: event.turnId }),
       );
     case "assistant_message":
       return finalizeActiveThoughts(

@@ -67,6 +67,20 @@ const LegacyAgentSnapshotPayloadSchema = AgentSnapshotPayloadSchema.extend({
 });
 
 describe("wire schema compatibility", () => {
+  test("user image references preserve compatibility in both directions", () => {
+    const legacy = { type: "user_message", text: "Is this a bug?", messageId: "prompt-1" };
+    const withImage = { ...legacy, imageSources: ["/tmp/first prompt.png"] };
+    const legacySchema = z.object({
+      type: z.literal("user_message"),
+      text: z.string(),
+      messageId: z.string().optional(),
+      clientMessageId: z.string().optional(),
+    });
+    expect(AgentTimelineItemPayloadSchema.parse(legacy)).toEqual(legacy);
+    expect(AgentTimelineItemPayloadSchema.parse(withImage)).toEqual(withImage);
+    expect(legacySchema.parse(withImage)).toEqual(legacy);
+  });
+
   test("hello parses with and without the project update capability", () => {
     const legacy = WSHelloMessageSchema.parse({
       type: "hello",

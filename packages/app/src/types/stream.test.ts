@@ -158,6 +158,30 @@ describe("plugin timeline rows", () => {
 });
 
 describe("user message identity", () => {
+  it.each(["Is this a bug?", ""])("hydrates prompt images with text %j", (text) => {
+    const result = reduceStreamUpdate(
+      [],
+      {
+        type: "timeline",
+        provider: "codex",
+        item: {
+          type: "user_message",
+          messageId: "first-prompt",
+          text,
+          imageSources: ["/tmp/first prompt.png"],
+        },
+      },
+      new Date(1),
+    );
+    expect(result).toMatchObject([
+      {
+        kind: "user_message",
+        text,
+        imageSources: ["/tmp/first prompt.png"],
+      },
+    ]);
+  });
+
   it("replaces provisional optimistic turn membership with canonical membership", () => {
     const optimistic = createUserMessage({
       clientMessageId: "hello-client",

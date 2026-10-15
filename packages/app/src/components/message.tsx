@@ -99,6 +99,7 @@ import {
 import { getCompactionMarkerLabel } from "./message-compaction-label";
 import { useAssistantImage } from "@/assistant-image/use-assistant-image";
 import {
+  ATTACHMENT_CONTENT_HEIGHT,
   AttachmentFrame,
   AttachmentLabel,
   AttachmentThumbnail,
@@ -126,6 +127,7 @@ interface UserMessageProps {
   messageId?: string;
   message: string;
   images?: UserMessageImageAttachment[];
+  imageSources?: string[];
   attachments?: AgentAttachment[];
   timestamp: number;
   capabilities?: AgentCapabilityFlags;
@@ -433,6 +435,7 @@ export const UserMessage = memo(function UserMessage({
   messageId,
   message,
   images = [],
+  imageSources = [],
   attachments: allAttachments = [],
   timestamp,
   capabilities,
@@ -462,6 +465,7 @@ export const UserMessage = memo(function UserMessage({
   const hasText = message.trim().length > 0;
   const textParts = useMemo(() => splitPlainTextLinks(message), [message]);
   const hasImages = images.length > 0;
+  const hasImageSources = !hasImages && imageSources.length > 0;
   const hasAttachments = attachments.length > 0;
   const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
   const formattedTimestamp = useMemo(
@@ -514,7 +518,8 @@ export const UserMessage = memo(function UserMessage({
     [showTrailingRow],
   );
 
-  if (!hasText && !hasImages && !hasAttachments) {
+  const hasContent = [hasText, hasImages, hasImageSources, hasAttachments].some(Boolean);
+  if (!hasContent) {
     return null;
   }
 
@@ -526,6 +531,22 @@ export const UserMessage = memo(function UserMessage({
         onPointerLeave={handlePointerLeave}
       >
         <View style={userMessageStylesheet.bubble}>
+          {hasImageSources ? (
+            <View style={imagePreviewContainerStyle}>
+              {[...new Set(imageSources)].map((source) => (
+                <AttachmentFrame key={source}>
+                  <AssistantMarkdownImage
+                    source={source}
+                    size={ATTACHMENT_CONTENT_HEIGHT}
+                    occurrenceKey={`${agentId}:${messageId}:${source}`}
+                    hasLeadingContent={false}
+                    client={client}
+                    serverId={serverId}
+                  />
+                </AttachmentFrame>
+              ))}
+            </View>
+          ) : null}
           {hasImages ? (
             <View style={imagePreviewContainerStyle}>
               {images.map((image) => (
@@ -815,6 +836,7 @@ function AssistantMarkdownImage({
   occurrenceKey,
   alt,
   hasLeadingContent,
+  size,
   client,
   workspaceRoot,
   serverId,
@@ -823,6 +845,7 @@ function AssistantMarkdownImage({
   occurrenceKey: string;
   alt?: string;
   hasLeadingContent: boolean;
+  size?: number;
   client?: DaemonClient | null;
   workspaceRoot?: string;
   serverId?: string;
@@ -835,8 +858,9 @@ function AssistantMarkdownImage({
     () => ({
       marginTop: hasLeadingContent ? 16 : 0,
       marginBottom: 0,
+      ...(size ? { width: size, marginHorizontal: 0 } : {}),
     }),
-    [hasLeadingContent],
+    [hasLeadingContent, size],
   );
   const image = useAssistantImage({
     source,
@@ -854,6 +878,7 @@ function AssistantMarkdownImage({
     [containerStyle],
   );
   const imageSizeStyle = useMemo<ViewStyle>(() => {
+    if (size) return { width: size, height: size };
     if (aspectRatio) {
       // Never scale up past the image's own pixel size.
       const naturalWidth =
@@ -864,7 +889,7 @@ function AssistantMarkdownImage({
       };
     }
     return { height: ASSISTANT_IMAGE_MIN_HEIGHT };
-  }, [aspectRatio, serverId, source, workspaceRoot]);
+  }, [aspectRatio, serverId, source, workspaceRoot, size]);
   const surfaceStyle = useMemo<StyleProp<ViewStyle>>(
     () => [assistantMessageStylesheet.imageSurface, imageSizeStyle],
     [imageSizeStyle],
@@ -882,10 +907,10 @@ function AssistantMarkdownImage({
     () => [
       assistantMessageStylesheet.imageFrame,
       containerStyle,
-      { height: ASSISTANT_IMAGE_MIN_HEIGHT },
+      { height: size ?? ASSISTANT_IMAGE_MIN_HEIGHT },
       assistantMessageStylesheet.imageState,
     ],
-    [containerStyle],
+    [containerStyle, size],
   );
 
   if (image.status === "failed") {
