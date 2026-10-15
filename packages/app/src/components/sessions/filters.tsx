@@ -213,18 +213,6 @@ export function HistoryFilterBar({
         })),
       },
       {
-        id: "status",
-        title: t("sessions.filters.status"),
-        all: t("sessions.filters.allSessions"),
-        selected: filters.status === HistoryStatus.All ? [] : [filters.status],
-        icon: <ThemedArchive size={14} uniProps={mutedIconMapping} />,
-        disabled: !supported,
-        options: [
-          { id: HistoryStatus.Active, label: t("sessions.filters.active") },
-          { id: HistoryStatus.Archived, label: t("agentList.badges.archived") },
-        ],
-      },
-      {
         id: "projects",
         title: t("sessions.filters.projects"),
         all: t("sidebar.display.projectFilter.all"),
@@ -276,6 +264,18 @@ export function HistoryFilterBar({
               <ProviderIcon provider={model.provider} size={14} uniProps={mutedIconMapping} />
             ),
           })),
+      },
+      {
+        id: "status",
+        title: t("sessions.filters.status"),
+        all: t("sessions.filters.allSessions"),
+        selected: filters.status === HistoryStatus.All ? [] : [filters.status],
+        icon: <ThemedArchive size={14} uniProps={mutedIconMapping} />,
+        disabled: !supported,
+        options: [
+          { id: HistoryStatus.Active, label: t("sessions.filters.active") },
+          { id: HistoryStatus.Archived, label: t("agentList.badges.archived") },
+        ],
       },
     ];
   }, [filters, hosts, options, supported, t]);

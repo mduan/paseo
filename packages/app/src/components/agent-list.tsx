@@ -235,38 +235,40 @@ function SessionRow({
             <AgentActivityTime date={agent.lastActivityAt} />
           </View>
         </View>
-        <View style={[styles.rowMetaRow, styles.contextRow]}>
-          {projectName ? (
-            <View style={styles.metaItem}>
-              <ProjectIconView
-                iconDataUri={null}
-                initial={projectName.charAt(0).toUpperCase()}
-                projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
-                size={14}
-                textStyle={styles.projectIconText}
-              />
-              <HighlightedText
-                text={projectName}
-                ranges={ranges.project}
-                style={styles.sessionMetaText}
-                numberOfLines={1}
-                testID={`agent-row-project-${agent.serverId}-${agent.id}`}
-              />
-            </View>
-          ) : null}
-          {workspaceName ? (
-            <View style={styles.metaItem}>
-              <ThemedChevronRight size={12} uniProps={mutedIconMapping} />
-              <ThemedFolder size={14} uniProps={mutedIconMapping} />
-              <HighlightedText
-                text={workspaceName}
-                ranges={ranges.workspace}
-                style={styles.sessionMetaText}
-                numberOfLines={1}
-                testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
-              />
-            </View>
-          ) : null}
+        <View style={styles.rowMetaRow}>
+          <View style={styles.metaItem}>
+            {projectName ? (
+              <View style={styles.metaItem}>
+                <ProjectIconView
+                  iconDataUri={null}
+                  initial={projectName.charAt(0).toUpperCase()}
+                  projectViewKey={agent.projectPlacement?.projectKey ?? agent.cwd}
+                  size={14}
+                  textStyle={styles.projectIconText}
+                />
+                <HighlightedText
+                  text={projectName}
+                  ranges={ranges.project}
+                  style={styles.sessionMetaText}
+                  numberOfLines={1}
+                  testID={`agent-row-project-${agent.serverId}-${agent.id}`}
+                />
+              </View>
+            ) : null}
+            {workspaceName ? (
+              <View style={styles.metaItem}>
+                <ThemedChevronRight size={12} uniProps={mutedIconMapping} />
+                <ThemedFolder size={14} uniProps={mutedIconMapping} />
+                <HighlightedText
+                  text={workspaceName}
+                  ranges={ranges.workspace}
+                  style={styles.sessionMetaText}
+                  numberOfLines={1}
+                  testID={`agent-row-workspace-${agent.serverId}-${agent.id}`}
+                />
+              </View>
+            ) : null}
+          </View>
           {branch ? (
             <View style={styles.metaItem}>
               <Text style={styles.sessionMetaSeparator}>·</Text>
@@ -288,8 +290,8 @@ function SessionRow({
               </Text>
             </View>
           ) : null}
+          <SessionRowModel agent={agent} />
         </View>
-        <SessionRowModel agent={agent} />
       </View>
     </Pressable>
   );
@@ -312,7 +314,7 @@ function SessionRowModel({ agent }: { agent: AggregatedAgent }) {
   const estimated = usage?.totalCostEstimated || usage?.paseoSubagentCostEstimated;
 
   return (
-    <View style={styles.rowMetaRow}>
+    <View style={styles.metaItem}>
       <View style={styles.metaItem}>
         <ProviderIcon
           provider={agent.provider}
@@ -619,11 +621,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: theme.spacing[1],
-    marginTop: theme.spacing[1.5],
-  },
-  contextRow: {
     columnGap: theme.spacing[3],
+    rowGap: theme.spacing[1],
+    marginTop: theme.spacing[1.5],
   },
   rowSelected: {
     backgroundColor: theme.colors.surface2,
