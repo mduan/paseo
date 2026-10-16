@@ -368,6 +368,7 @@ describe("shared messages attachments", () => {
           contextKind: "chat_history",
           title: "Chat history",
           text: "Earlier context",
+          sourceAgentId: "source-agent",
         },
         {
           type: "text",
@@ -386,6 +387,7 @@ describe("shared messages attachments", () => {
         contextKind: "chat_history",
         title: "Chat history",
         text: "Earlier context",
+        sourceAgentId: "source-agent",
       },
       {
         type: "text",

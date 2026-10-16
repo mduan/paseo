@@ -1135,21 +1135,16 @@ export const ExternalResourceAttachmentMetadataSchema = z.object({
   url: z.string(),
 });
 
-export const TextAttachmentSchema = z
-  .object({
-    type: z.literal("text"),
-    mimeType: z.literal("text/plain"),
-    contextKind: z.string().optional(),
-    title: z.string().nullable().optional(),
-    text: z.string(),
-    // Set on chat_history attachments: the agent the summary fork came from.
-    sourceAgentId: z.string().optional(),
-    externalResource: ExternalResourceAttachmentMetadataSchema.optional(),
-  })
-  .transform(({ contextKind, ...attachment }) => ({
-    ...attachment,
-    ...(contextKind === "chat_history" ? { contextKind } : {}),
-  }));
+export const TextAttachmentSchema = z.object({
+  type: z.literal("text"),
+  mimeType: z.literal("text/plain"),
+  contextKind: z.string().optional(),
+  title: z.string().nullable().optional(),
+  text: z.string(),
+  // Set on chat_history attachments: the agent the summary fork came from.
+  sourceAgentId: z.string().optional(),
+  externalResource: ExternalResourceAttachmentMetadataSchema.optional(),
+});
 
 export const ReviewAttachmentContextLineSchema = z.object({
   oldLineNumber: z.number().int().positive().nullable(),
@@ -1221,7 +1216,11 @@ function normalizeAgentAttachments(input: unknown): AgentAttachment[] {
   for (const item of input) {
     const parsed = AgentAttachmentSchema.safeParse(item);
     if (parsed.success) {
-      normalized.push(parsed.data);
+      const attachment = parsed.data;
+      if (attachment.type === "text" && attachment.contextKind !== "chat_history") {
+        delete attachment.contextKind;
+      }
+      normalized.push(attachment);
     }
   }
   return normalized;
