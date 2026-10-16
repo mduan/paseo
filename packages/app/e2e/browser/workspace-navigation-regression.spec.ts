@@ -133,6 +133,45 @@ test.describe("Workspace navigation regression", () => {
     await expect(page.getByText("Add a project", { exact: true })).toHaveCount(0);
   });
 
+  test("terminal notifications reuse the mounted workspace when returning from Settings", async ({
+    page,
+  }) => {
+    const serverId = getServerId();
+    const session = await seedWorkspace({ repoPrefix: "terminal-notification-navigation-" });
+    try {
+      const result = await session.client.createTerminal(
+        session.repoPath,
+        "Notification terminal",
+        undefined,
+        { workspaceId: session.workspaceId },
+      );
+      if (!result.terminal) throw new Error(result.error ?? "Terminal was not created");
+      await page.goto(buildHostWorkspaceRoute(serverId, session.workspaceId));
+      const workspace = page.getByTestId(`workspace-deck-entry-${serverId}:${session.workspaceId}`);
+      await expect(workspace).toBeVisible();
+      const originalElement = await workspace.elementHandle();
+      await openSettings(page);
+      await page.evaluate(
+        (data) => {
+          globalThis.dispatchEvent(
+            new CustomEvent("paseo:web-notification-click", {
+              detail: { data },
+              cancelable: true,
+            }),
+          );
+        },
+        { serverId, workspaceId: session.workspaceId, terminalId: result.terminal.id },
+      );
+      await expect(
+        page.getByTestId(`workspace-tab-terminal_${result.terminal.id}`).filter({ visible: true }),
+      ).toHaveAttribute("aria-selected", "true");
+      await expect(workspace).toHaveCount(1);
+      expect(await originalElement?.evaluate((element) => element.isConnected)).toBe(true);
+    } finally {
+      await session.cleanup();
+    }
+  });
+
   test("shows the New launcher after returning from settings and closing the last agent draft tab", async ({
     page,
     withWorkspace,

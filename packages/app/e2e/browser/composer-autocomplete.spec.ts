@@ -419,6 +419,12 @@ test.describe("Composer autocomplete", () => {
       await openAgentRoute(page, first);
       await expectComposerVisible(page, { timeout: 30_000 });
 
+      const firstWorkspace = page.getByTestId(
+        `workspace-deck-entry-${serverId}:${first.workspaceId}`,
+      );
+      const firstWorkspaceElement = await firstWorkspace.elementHandle();
+      await composerLocator(page).fill("Preserve this draft while switching workspaces");
+
       await openAppWideNewWorkspace(page);
       await switchWorkspaceViaSidebar({ page, serverId, workspaceId: second.workspaceId });
       await expectComposerVisible(page, { timeout: 30_000 });
@@ -454,6 +460,10 @@ test.describe("Composer autocomplete", () => {
         workspaceId: first.workspaceId,
       });
 
+      expect(await firstWorkspaceElement?.evaluate((element) => element.isConnected)).toBe(true);
+      await expect(composerLocator(page)).toHaveValue(
+        "Preserve this draft while switching workspaces",
+      );
       await composerLocator(page).fill("/");
       const popover = page
         .getByTestId("composer-autocomplete-popover")

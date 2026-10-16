@@ -4,7 +4,6 @@ import {
   type ReactNode,
   useContext,
   useEffect,
-  useId,
   useRef,
 } from "react";
 import { StyleSheet, View } from "react-native";
@@ -37,13 +36,16 @@ export function measureFloatingPanelPortalHost(name: string): Promise<Rect | nul
   return measureElement(element);
 }
 
-export function FloatingPanelPortal({ children }: { children: ReactNode }): ReactElement {
-  // Retained routes can mount the same workspace more than once.
-  const hostName = useId();
+export function FloatingPanelPortalHostNameProvider({
+  hostName,
+  children,
+}: {
+  hostName: string;
+  children: ReactNode;
+}): ReactElement {
   return (
     <FloatingPanelPortalHostNameContext.Provider value={hostName}>
       {children}
-      <FloatingPanelPortalHost name={hostName} />
     </FloatingPanelPortalHostNameContext.Provider>
   );
 }

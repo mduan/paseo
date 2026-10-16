@@ -56,11 +56,16 @@ catching a render error there unmounts the navigator, so the recovery button
 cannot reliably dispatch a navigation reset. Starting recovery at `/` would
 restore the same workspace and could repeat the crash.
 
-## App-Wide Route Hops
+## Workspace Navigation
 
-When app-wide routes such as `/new`, `/settings`, or `/sessions` navigate back
-into a host workspace, use `navigateToWorkspace()`. Do not make the caller
-branch on its current route.
+Open workspaces with `navigateToWorkspace()`, including returns from `/new`,
+`/settings`, or `/sessions`. Open agent tabs with `navigateToAgent()`.
+Do not make callers branch on their current route.
+
+Never pass workspace URLs directly to `router.push()` or `router.navigate()`.
+Each workspace route owns a retained deck. A second route duplicates the deck,
+including its hidden workspaces and their effects. Full-history forks and terminal
+notification clicks must use the same navigation helpers as sidebar selection.
 
 Pass only `serverId` and `workspaceId` for normal attention-aware navigation.
 When the action names a specific tab, pass it as `target`; that explicit choice

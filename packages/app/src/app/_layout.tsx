@@ -74,7 +74,10 @@ import {
   type StartupBlocker,
 } from "@/navigation/host-runtime-bootstrap";
 import { registerWorkspaceRouteNavigationRef } from "@/navigation/workspace-route-navigation";
-import { useTrackForegroundWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
+import {
+  navigateToWorkspace,
+  useTrackForegroundWorkspaceSelection,
+} from "@/stores/navigation-active-workspace-store";
 import { ThemedStack } from "@/navigation/themed-stack";
 import { shouldUseDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
 import { AgentNavigationListener } from "@/desktop/agent-navigation";
@@ -171,6 +174,14 @@ function PushNotificationRouter() {
     const agentId = target.agentId;
     if (serverId && workspaceId && agentId) {
       navigateToAgent({ serverId, workspaceId, agentId, pin: true });
+      return;
+    }
+    if (serverId && workspaceId && target.terminalId) {
+      navigateToWorkspace({
+        serverId,
+        workspaceId,
+        target: { kind: "terminal", terminalId: target.terminalId },
+      });
       return;
     }
 

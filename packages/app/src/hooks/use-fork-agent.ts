@@ -21,7 +21,7 @@ import {
 } from "@/attachments/workspace-attachments-store";
 import { useWorkspaceDraftSubmissionStore } from "@/stores/workspace-draft-submission-store";
 import { toErrorMessage } from "@/utils/error-messages";
-import { buildHostAgentDetailRoute, buildNewWorkspaceRoute } from "@/utils/host-routes";
+import { buildNewWorkspaceRoute } from "@/utils/host-routes";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 /**
@@ -139,8 +139,12 @@ async function runFullHistoryFork(input: {
       throw new Error(t("message.actions.forkMissingWorkspace"));
     }
     const fork = await client.forkAgent(agentId, { ...boundary, cwd: agent.cwd, workspaceId });
-    // The open-intent route waits for the new agent to reach the session store before focusing it.
-    input.navigate(buildHostAgentDetailRoute(serverId, fork.id, workspaceId));
+    navigateToWorkspace({
+      serverId,
+      workspaceId,
+      target: { kind: "agent", agentId: fork.id },
+      pin: true,
+    });
     return;
   }
   const draftId = generateDraftId();
