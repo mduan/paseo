@@ -107,8 +107,8 @@ const TAB_ICON_WIDTH = 14;
 const TAB_CONTENT_GAP = 4;
 const TAB_DROP_INDICATOR_WIDTH = 4;
 const TAB_MODIFIED_DOT_SIZE = 8;
-const TAB_MIN_WIDTH = 96;
-const TAB_MAX_WIDTH = 160;
+const TAB_MIN_WIDTH = 160;
+const TAB_MAX_WIDTH = 960;
 const TAB_CLOSE_BUTTON_RESERVED_WIDTH = 0;
 const TAB_LABEL_LAYOUT_ALLOWANCE = 4;
 const AGENT_TOOLTIP_TITLE_MAX_LENGTH = 80;
@@ -1018,7 +1018,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           (showPaneSplitActions ? PANE_SPLIT_ACTIONS_RESERVED_WIDTH : 0) +
           (showPaneMaximizeAction ? PANE_MAXIMIZE_ACTION_RESERVED_WIDTH : 0),
       ),
-      rowPaddingHorizontal: TAB_ROW_PADDING_HORIZONTAL,
+      rowPaddingHorizontal: TAB_ROW_PADDING_HORIZONTAL + TAB_CHIP_GAP / 2,
       tabGap: TAB_CHIP_GAP,
       minTabWidth: TAB_MIN_WIDTH,
       maxTabWidth: TAB_MAX_WIDTH,
@@ -1211,7 +1211,7 @@ function ResolvedWorkspaceDesktopTabsRow({
     }: DraggableRenderItemInfo<ResolvedWorkspaceDesktopTabRowItem>) => {
       const shouldShowCloseButton = layout.closeButtonPolicy === "all";
       const layoutItem = layout.items[index] ?? null;
-      const resolvedTabWidth = layoutItem?.width ?? 150;
+      const resolvedTabWidth = layoutItem?.width ?? TAB_MIN_WIDTH;
       const showLabel = layoutItem?.showLabel ?? true;
       const showDropIndicatorBefore = activeDragTabId !== null && tabDropPreviewIndex === index;
       const showDropIndicatorAfter =

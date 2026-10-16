@@ -304,6 +304,72 @@ test.describe("Tab creation", () => {
   });
 });
 
+test("long chat tabs grow to fit and shrink to 160px before scrolling", async ({
+  page,
+}, testInfo) => {
+  const seeded = await seedWorkspace({ repoPrefix: "long-chat-tabs-" });
+  const title =
+    "Investigate workspace tab sizing and preserve readable chat titles while opening agents and resizing split workspace panes";
+  try {
+    await page.setViewportSize({ width: 1800, height: 900 });
+    const first = await seeded.client.createAgent({
+      provider: "mock",
+      model: "e2e-fast-stream",
+      cwd: seeded.repoPath,
+      workspaceId: seeded.workspaceId,
+      title,
+    });
+    await gotoWorkspace(page, seeded.workspaceId);
+    const firstTab = page.getByTestId(`workspace-tab-agent_${first.id}`).filter({ visible: true });
+    await expectTabTitleFits(page, title, { min: 600, max: 960 });
+    const expandedWidth = await firstTab.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    await page.screenshot({ path: testInfo.outputPath("long-chat-tab.png") });
+
+    const second = await seeded.client.createAgent({
+      provider: "mock",
+      model: "e2e-fast-stream",
+      cwd: seeded.repoPath,
+      workspaceId: seeded.workspaceId,
+      title: `${title} 2`,
+    });
+    await page.getByTestId(`sidebar-workspace-session-agent:${second.id}`).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect
+      .poll(() => firstTab.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeLessThan(expandedWidth);
+    expect(
+      await firstTab.evaluate((element) => element.getBoundingClientRect().width),
+    ).toBeGreaterThan(160);
+    const scroll = page.getByTestId("workspace-tabs-scroll").filter({ visible: true });
+    expect(await scroll.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+      false,
+    );
+    await page.screenshot({ path: testInfo.outputPath("chat-tabs-shrunk.png") });
+
+    for (let index = 3; index <= 8; index++) {
+      const agent = await seeded.client.createAgent({
+        provider: "mock",
+        model: "e2e-fast-stream",
+        cwd: seeded.repoPath,
+        workspaceId: seeded.workspaceId,
+        title: `${title} ${index}`,
+      });
+      await page.getByTestId(`sidebar-workspace-session-agent:${agent.id}`).click();
+    }
+    await expect
+      .poll(() => firstTab.evaluate((element) => element.getBoundingClientRect().width))
+      .toBe(160);
+    await expect
+      .poll(() => scroll.evaluate((element) => element.scrollWidth > element.clientWidth))
+      .toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("chat-tabs-overflow.png") });
+  } finally {
+    await seeded.cleanup();
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // No-Flash Transition Tests
 // ═══════════════════════════════════════════════════════════════════════════
@@ -337,7 +403,7 @@ test.describe("Tab transitions (no flash)", () => {
 
     expect(counts.every((count) => count === initialCount)).toBe(true);
     expect(new Set(snapshots.map(tabIdentityKey)).size).toBeLessThanOrEqual(2);
-    await expectTabTitleFits(page, "New Agent", { min: 96, max: 160 });
+    await expectTabTitleFits(page, "New Agent", { min: 160, max: 160 });
   });
 
   test("Terminal transition completes within visual budget", async ({ page }) => {
