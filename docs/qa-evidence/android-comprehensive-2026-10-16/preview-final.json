@@ -1,0 +1,582 @@
+{
+  "caseExecutionStatus": "passed_after_fix",
+  "workerReport": {
+    "caseId": "link-review-queued-previews",
+    "status": "passed_retained_preview_stage_assertions",
+    "updatedAt": "2026-10-16T20:34:08.296365+00:00",
+    "source": {
+      "appCutoff": "f55ca00df9efef507aa25cd2be022bd0f8010fb5",
+      "checkoutHEAD": "fe0a4cef01d977c61f0fa659f41d308c0841999f",
+      "checkoutChangeSinceAppCutoff": "documentation only",
+      "apk": "candidate7-release.apk",
+      "sha256": "58988eed357c4feb9e230525a4a83c1b134187e051804c4ca270ea3f333a8483",
+      "installedIdentity": "No reinstall; same package path as prior installed-hash verification",
+      "identityEvidence": [
+        "attempt1-readiness.json",
+        "../previews-layout/api35-5582/52-installed-hash.json"
+      ]
+    },
+    "device": {
+      "serial": "emulator-5582",
+      "avd": "paseo-preview-final-api35",
+      "api": 35,
+      "coldBootAttemptsUsed": 1,
+      "maxAuthorized": 3
+    },
+    "urls": [
+      {
+        "stage": "draft",
+        "kind": "issue",
+        "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "status": "passed_composed_with_prior_native_evidence",
+        "fullSheet": ["../previews-layout/10-draft-issue.json"],
+        "oneOverlayBack": [
+          "../previews-layout/27-draft-back.json",
+          "../previews-layout/28-draft-back.json"
+        ],
+        "exactAndroidVIEW": ["../previews-layout/14-intents.txt"]
+      },
+      {
+        "stage": "draft",
+        "kind": "change",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "status": "passed_composed_with_prior_native_evidence",
+        "fullSheet": ["attempt1-38-draft-change-sheet.xml", "attempt1-38-draft-change-sheet.png"],
+        "oneOverlayBack": [
+          "../previews-layout/31-pr-back.json",
+          "../previews-layout/32-review-draft.json"
+        ],
+        "exactAndroidVIEW": ["attempt1-39-draft-change-intent.txt"]
+      },
+      {
+        "stage": "draft",
+        "kind": "generic",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "status": "passed",
+        "fullSheet": [
+          "attempt1-41b-draft-generic-sheet.xml",
+          "attempt1-41b-draft-generic-sheet.png"
+        ],
+        "oneOverlayBack": [
+          "attempt1-42-draft-generic-back.xml",
+          "attempt1-42-draft-generic-back.png"
+        ],
+        "exactAndroidVIEW": ["attempt1-44-draft-generic-intent.txt"]
+      },
+      {
+        "stage": "queued",
+        "kind": "issue",
+        "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-15-queued-issue-sheet.xml", "attempt1-15-queued-issue-sheet.png"],
+        "oneOverlayBack": ["attempt1-16-issue-back-queue.xml", "attempt1-16-issue-back-queue.png"],
+        "exactAndroidVIEW": ["attempt1-18-issue-external-intent.txt"]
+      },
+      {
+        "stage": "queued",
+        "kind": "change",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-24-change-sheet.xml", "attempt1-24-change-sheet.png"],
+        "oneOverlayBack": ["attempt1-25-change-back.xml", "attempt1-25-change-back.png"],
+        "exactAndroidVIEW": ["attempt1-31-queued-change-intent.txt"]
+      },
+      {
+        "stage": "queued",
+        "kind": "generic",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-24-generic-sheet.xml", "attempt1-24-generic-sheet.png"],
+        "oneOverlayBack": ["attempt1-25-generic-back.xml", "attempt1-25-generic-back.png"],
+        "exactAndroidVIEW": ["attempt1-35-queued-generic-intent.txt"]
+      },
+      {
+        "stage": "sent_canonical",
+        "kind": "issue",
+        "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-54-sent-issue-sheet.xml", "attempt1-54-sent-issue-sheet.png"],
+        "oneOverlayBack": ["attempt1-55-sent-issue-back.xml", "attempt1-55-sent-issue-back.png"],
+        "exactAndroidVIEW": ["attempt1-57-sent-issue-intent.txt"]
+      },
+      {
+        "stage": "sent_canonical",
+        "kind": "change",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-54-sent-change-sheet.xml", "attempt1-54-sent-change-sheet.png"],
+        "oneOverlayBack": ["attempt1-55-sent-change-back.xml", "attempt1-55-sent-change-back.png"],
+        "exactAndroidVIEW": ["attempt1-61-sent-change-intent.txt"]
+      },
+      {
+        "stage": "sent_canonical",
+        "kind": "generic",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "status": "passed",
+        "fullSheet": ["attempt1-54-sent-generic-sheet.xml", "attempt1-54-sent-generic-sheet.png"],
+        "oneOverlayBack": [
+          "attempt1-55-sent-generic-back.xml",
+          "attempt1-55-sent-generic-back.png"
+        ],
+        "exactAndroidVIEW": ["attempt1-65-sent-generic-intent.txt"]
+      }
+    ],
+    "queuedReview": {
+      "status": "passed",
+      "exactBody": "QUEUED_REVIEW_EXACT\nUnicode café 漢字 🚀\nRange FOUR through SEVEN",
+      "filePath": "preview-source.ts",
+      "lineStart": 4,
+      "lineEnd": 7,
+      "bodyEvidence": ["attempt1-26-queued-review.xml", "attempt1-26-queued-review.png"],
+      "sourceEvidence": [
+        "attempt1-27-queued-review-source.xml",
+        "attempt1-27-queued-review-source.png",
+        "attempt1-27-source-storage.db"
+      ],
+      "nativeTabChooser": [
+        "attempt1-28-native-tab-chooser.xml",
+        "attempt1-28-native-tab-chooser.png"
+      ],
+      "sameQueueReturn": [
+        "attempt1-29-review-return-unchanged.xml",
+        "attempt1-29-review-return-unchanged.png",
+        "attempt1-29-review-return-assertions.json"
+      ],
+      "unchangedMembership": "one each issue, change, generic, review; text FINAL_QUEUE_PRESERVE_77; reorder/edit/send-now controls; preview closed",
+      "beforeReturnBaseline": "attempt1-23-late-settle.xml"
+    },
+    "canonical": {
+      "exactlyOneCanonicalMessage": true,
+      "messageId": "msg_1792182413507_7epea2nw9",
+      "seq": 21,
+      "turnId": "fake-turn-1792181412231",
+      "attachments": 4,
+      "types": ["forge_issue", "forge_change_request", "text", "review"],
+      "urls": [
+        "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact"
+      ],
+      "review": {
+        "filePath": "preview-source.ts",
+        "side": "new",
+        "lineNumber": 7,
+        "startSide": "new",
+        "startLineNumber": 4,
+        "body": "QUEUED_REVIEW_EXACT\nUnicode café 漢字 🚀\nRange FOUR through SEVEN",
+        "source": "file",
+        "context": {
+          "hunkHeader": "Owned lines",
+          "targetLine": {
+            "oldLineNumber": 7,
+            "newLineNumber": 7,
+            "type": "context",
+            "content": "export const row7 = 'SOURCE_7';"
+          },
+          "lines": []
+        }
+      },
+      "status": "idle",
+      "activeTurn": null,
+      "held": [],
+      "nativeQueueEmpty": true,
+      "nativeOverlayClosed": true,
+      "draftEmpty": true,
+      "composition": "Queued preview/unchanged return validated before intentional edit; final canonical sent fixture uses same restored payload through one native idle/error-recovery send, a new accepted identity. It was not automatic queue-release delivery."
+    },
+    "canonicalEvidence": [
+      "attempt1-49-four-draft-settled.xml",
+      "attempt1-49-four-draft-settled.png",
+      "attempt1-50-canonical-before.json",
+      "attempt1-51-canonical-after.json",
+      "attempt1-52-empty-draft.json",
+      "attempt1-67-final-native-message.xml",
+      "attempt1-67-final-native-message.png",
+      "attempt1-68-final-canonical-assertions.json",
+      "attempt1-68-final-canonical-timeline.json",
+      "send-attempts-summary.json"
+    ],
+    "composition": [
+      "Actual queued row created natively while unique controlled SDK turn held: screenshot11; canonical matching message count zero.",
+      "Queued URL/review return assertions completed on retained four-attachment queue before intentional edit.",
+      "Queue edit intentionally removed review per the pre-existing tested userAttachmentsOnly contract. Current task storage backed up; only owned review-draft-store entry restored from86 with all other keys byte-identical.",
+      "Old held gate released once; held[] and no active turn. Error status persisted until the valid new native send.",
+      "Final sent-stage evidence uses the same restored text/URLs/review payload through one native Send with a new accepted identity. Exactly one canonical four-attachment message; eight overall send requests: seven rejected, one accepted.",
+      "This retry does not prove automatic queue-release delivery or one overall dispatch."
+    ],
+    "reusedNativeSubsets": [
+      {
+        "report": "../chat-races/report.json",
+        "assertion": "queued image open/close preserves queue"
+      },
+      {
+        "report": "../review-remaining/report.json",
+        "assertion": "draft and canonical-sent review exact long Unicode text/path/range/source/return/cross-chat cleanup"
+      },
+      {
+        "evidence": [
+          "../previews-layout/fresh5586/21-issue-select-all.png",
+          "../previews-layout/fresh5586/24-issue-native-pasted.json",
+          "../previews-layout/fresh5586/33-user-native-paste.json"
+        ],
+        "assertion": "shared LinkText native selection and exact copy; unchanged in C7. No every-stage/every-variant copy claim."
+      }
+    ],
+    "excludedAndLimited": [
+      {
+        "kind": "native cancellation and rejected retries",
+        "detail": "Wire cancel_agent_request20:13:02 preceded first rejected send20:13:08; seven send responses rejected A foreground turn is already active while private SDK gate remained held. Queue retained. No spontaneous completion or app regression inferred.",
+        "evidence": [
+          "native-send-cancel-wire.json",
+          "send-attempts-summary.json",
+          "attempt1-13-current-held.json",
+          "attempt1-13-current-timeline.json"
+        ]
+      },
+      {
+        "kind": "initial optimistic76 from earlier run",
+        "detail": "Still excluded; prior canonical timeline had zero attachment messages. This retry uses new accepted identity only."
+      },
+      {
+        "kind": "native capture instability",
+        "detail": "Several12s AX timeouts; early screenshot12 tap missed due changed layout; first generic draft tap41 consumed by close animation and assertion failed. Neither counted as pass. Subsequent fresh XML/native captures established each retained assertion."
+      },
+      {
+        "kind": "external browser",
+        "detail": "Owned emulator Chrome first run ANRed20; Chrome only closed/stopped. Assertions use exact Android VIEW receipts. No remote page-load or signed-in Chrome claim.",
+        "evidence": ["attempt1-20-foreground-queue.png", "external-intent-receipts.json"]
+      },
+      {
+        "kind": "queue edit review removal",
+        "detail": "Existing base behavior, separately observed37; root verified base d831c7bf3 already filters review. No source fix or regression claim.",
+        "evidence": [
+          "attempt1-37-intentional-edit-draft.xml",
+          "attempt1-37-intentional-edit-storage.json",
+          "attempt1-47-restore-assertions.json"
+        ]
+      },
+      {
+        "kind": "runtime scope",
+        "detail": "No physical phone, SamsungOneUI, OS/renderer comparison, broad instability diagnosis, production6767, source edit, shared Codex, full test suite, push or release."
+      }
+    ],
+    "freshExternalReceipt": "external-intent-receipts.json",
+    "cleanup": {
+      "appForceStopped": true,
+      "sdkGateFree": true,
+      "noActiveTurn": true,
+      "rawAdbOnly": true,
+      "noHelperSession": true,
+      "pendingNativeCLI": false,
+      "records": 21,
+      "sha256": "15626b0660f5caf4e4ac5f665362664970e8d524b24e04d2f85684e9ed4d8227",
+      "db": "attempt1-69-final-task-storage.db",
+      "device": "emulator-5582",
+      "avd": "paseo-preview-final-api35",
+      "coldBootAttemptsUsed": 1,
+      "rootOwnsRemainingEmulatorShutdown": true
+    },
+    "rootCleanup": "final-cleanup.json",
+    "validation": "No product changes or test reruns in this retry; reuse prior required source checks. Native/API/SQLite assertions are the new validation.",
+    "selectedSafeScreenshots": [
+      "attempt1-11-after-submit.png",
+      "attempt1-15-queued-issue-sheet.png",
+      "attempt1-24-change-sheet.png",
+      "attempt1-24-generic-sheet.png",
+      "attempt1-26-queued-review.png",
+      "attempt1-27-queued-review-source.png",
+      "attempt1-28-native-tab-chooser.png",
+      "attempt1-29-review-return-unchanged.png",
+      "attempt1-41b-draft-generic-sheet.png",
+      "attempt1-49-four-draft-settled.png",
+      "attempt1-53-sent-attachment-bounds.png",
+      "attempt1-54-sent-generic-sheet.png",
+      "attempt1-67-final-native-message.png"
+    ]
+  },
+  "queueReturnAssertions": {
+    "actualNativeTabChooser": true,
+    "sameQueueText": "FINAL_QUEUE_PRESERVE_77",
+    "membership": [
+      "Owned issue link",
+      "Owned change link",
+      "Generic URL resource",
+      "Open review attachment",
+      "Edit queued message",
+      "Send queued message now",
+      "Reorder queued message"
+    ],
+    "unchanged": true,
+    "reviewBody": "QUEUED_REVIEW_EXACT\nUnicode café 漢字 🚀\nRange FOUR through SEVEN",
+    "range": [4, 7],
+    "sourcePath": "preview-source.ts"
+  },
+  "freshAndroidVIEWReceipts": {
+    "receipts": [
+      {
+        "file": "attempt1-18-issue-external-intent.txt",
+        "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "androidRecord": "2fd6f11 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t35 f}}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{2fd6f11 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t35 f}}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=1 lastLaunchTime=-1s328ms"
+        ],
+        "tapAtUTC": "2026-10-16T20:15:10.133864+00:00",
+        "dumpAtUTC": "2026-10-16T20:15:11.409607+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 696],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-31-queued-change-intent.txt",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "androidRecord": "2a19676 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t37}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{2a19676 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t37}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/pull/42?diff=split&line=7#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=1 lastLaunchTime=-59ms"
+        ],
+        "tapAtUTC": "2026-10-16T20:20:35.800414+00:00",
+        "dumpAtUTC": "2026-10-16T20:20:36.822745+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-35-queued-generic-intent.txt",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "androidRecord": "48adcfd u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t38}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{48adcfd u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t38}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=0 lastLaunchTime=0"
+        ],
+        "tapAtUTC": "2026-10-16T20:21:37.730602+00:00",
+        "dumpAtUTC": "2026-10-16T20:21:38.706042+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-39-draft-change-intent.txt",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "androidRecord": "6404427 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t39}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{6404427 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t39}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/pull/42?diff=split&line=7#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=1 lastLaunchTime=-140ms"
+        ],
+        "tapAtUTC": "2026-10-16T20:23:09.575864+00:00",
+        "dumpAtUTC": "2026-10-16T20:23:10.535745+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-44-draft-generic-intent.txt",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "androidRecord": "d019a02 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t40}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{d019a02 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t40}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=0 lastLaunchTime=0"
+        ],
+        "tapAtUTC": "2026-10-16T20:24:22.875638+00:00",
+        "dumpAtUTC": "2026-10-16T20:24:23.868012+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-57-sent-issue-intent.txt",
+        "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+        "androidRecord": "52653c u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t42}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{52653c u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t42}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=0 lastLaunchTime=0"
+        ],
+        "tapAtUTC": "2026-10-16T20:28:59.393148+00:00",
+        "dumpAtUTC": "2026-10-16T20:29:00.375117+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-61-sent-change-intent.txt",
+        "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+        "androidRecord": "3dc27f9 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t43}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{3dc27f9 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t43}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/pull/42?diff=split&line=7#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=1 lastLaunchTime=-307ms"
+        ],
+        "tapAtUTC": "2026-10-16T20:29:39.057249+00:00",
+        "dumpAtUTC": "2026-10-16T20:29:40.040133+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      },
+      {
+        "file": "attempt1-65-sent-generic-intent.txt",
+        "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+        "androidRecord": "ebf9170 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t44 f}}",
+        "receipt": [
+          "* Hist  #0: ActivityRecord{ebf9170 u0 com.android.chrome/com.google.android.apps.chrome.IntentDispatcher t44 f}}",
+          "launchedFromUid=10207 launchedFromPackage=sh.paseo launchedFromFeature=null userId=0",
+          "Intent { act=android.intent.action.VIEW dat=https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact flg=0x10800000 cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher }",
+          "launchFailed=false launchCount=1 lastLaunchTime=-886ms"
+        ],
+        "tapAtUTC": "2026-10-16T20:30:15.294059+00:00",
+        "dumpAtUTC": "2026-10-16T20:30:16.241009+00:00",
+        "tapArgs": ["shell", "input", "tap", 110, 693],
+        "dumpsysExit": 0
+      }
+    ],
+    "freshSentGenericProof": {
+      "previousDraftGenericTask": 40,
+      "newSentGenericTask": 44,
+      "newActivityRecord": "ebf9170",
+      "newLaunchAge": "886ms",
+      "launchedFromPackage": "sh.paseo",
+      "noLogcatClearUsed": true,
+      "method": "Fresh Android activity records plus timestamped native tap/dumpsys, with owned Chrome stopped between targets. No stale logcat URL matching."
+    }
+  },
+  "sendAttempts": [
+    {
+      "at": "2026-10-16T20:13:08.512000+00:00",
+      "messageId": "msg_1792181585918_s3mqwuiii",
+      "requestId": "7159662d-62b7-42b8-8ff2-c8b86df2c190",
+      "responses": [
+        {
+          "requestId": "7159662d-62b7-42b8-8ff2-c8b86df2c190",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:16:23.665000+00:00",
+      "messageId": "msg_1792181779585_23j6n7b7u",
+      "requestId": "ff4e965d-1f7d-4c39-95f0-981c8a8d090f",
+      "responses": [
+        {
+          "requestId": "ff4e965d-1f7d-4c39-95f0-981c8a8d090f",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:17:55.076000+00:00",
+      "messageId": "msg_1792181871954_jgpkfa3x8",
+      "requestId": "a9443ec5-1d88-4ba4-bd08-3dc1f196ec35",
+      "responses": [
+        {
+          "requestId": "a9443ec5-1d88-4ba4-bd08-3dc1f196ec35",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:20:42.856000+00:00",
+      "messageId": "msg_1792182040312_drblaaufl",
+      "requestId": "9d520f17-1eb5-4e94-a1ac-d014b0fe476e",
+      "responses": [
+        {
+          "requestId": "9d520f17-1eb5-4e94-a1ac-d014b0fe476e",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:20:57.275000+00:00",
+      "messageId": "msg_1792182053315_sae5mqp7u",
+      "requestId": "f7c11208-34a0-4914-b676-aa8b5f6b58df",
+      "responses": [
+        {
+          "requestId": "f7c11208-34a0-4914-b676-aa8b5f6b58df",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:21:42.280000+00:00",
+      "messageId": "msg_1792182100457_5102b6lri",
+      "requestId": "e29f0912-f32f-4d5d-b2cd-c4f30c35df0b",
+      "responses": [
+        {
+          "requestId": "e29f0912-f32f-4d5d-b2cd-c4f30c35df0b",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:21:56.248000+00:00",
+      "messageId": "msg_1792182112165_46qujggjj",
+      "requestId": "85709183-f7a9-4fbf-a932-eb1e64fb28be",
+      "responses": [
+        {
+          "requestId": "85709183-f7a9-4fbf-a932-eb1e64fb28be",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": false,
+          "error": "A foreground turn is already active"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T20:26:54.075000+00:00",
+      "messageId": "msg_1792182413507_7epea2nw9",
+      "requestId": "96283b2f-b3ba-4fd1-a024-51f1a65cfa8d",
+      "responses": [
+        {
+          "requestId": "96283b2f-b3ba-4fd1-a024-51f1a65cfa8d",
+          "agentId": "d750630e-3236-43f7-bcc9-387aeca8c25d",
+          "accepted": true,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "reviewOnlyRestore": {
+    "changedKeys": ["@paseo:review-draft-store"],
+    "ownEntry": "review:server=srv_tLoJQ5Dyn05g:workspace=wks_139025a53ebc47d4",
+    "records": 21,
+    "preservedOtherKeys": true,
+    "sha256": "09c1916cc378b245143da05683465b4e89a71ccd87e043c44a0cd5878109ebf7"
+  },
+  "verifiedRootShutdown": {
+    "at": "2026-10-16T20:31:58.277632+00:00",
+    "ownedHostPID": 84468,
+    "serverId": "srv_tLoJQ5Dyn05g",
+    "portsStopped": [52689, 52756, 53285, 5582, 5583],
+    "remainingListeners": [],
+    "held": [],
+    "agentsQuiescent": true,
+    "emulatorAVD": "paseo-preview-final-api35",
+    "emulatorSerial": "emulator-5582",
+    "coldBootsUsed": 1,
+    "userdataAndHomesPreserved": true,
+    "productionTouched": false,
+    "phoneTouched": false
+  },
+  "rootValidation": {
+    "all9StageVariantRowsHaveEvidence": true,
+    "URLReferencesChecked": 44,
+    "distinctFreshAndroidRecords": 8,
+    "currentPackageSourceMatchesF55": true
+  },
+  "localReferenceNote": "Raw .dev evidence paths are checkout-local traceability; this JSON embeds the final assertions and receipt excerpts independently."
+}
