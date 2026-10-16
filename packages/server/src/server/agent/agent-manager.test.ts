@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -10704,6 +10704,170 @@ test("provider user_message is recorded from the live stream", async () => {
   expect(userMessages).toHaveLength(1);
   expect(userMessages[0].text).toBe("continuation prompt");
 });
+
+enum SubmittedMediaDelivery {
+  StagedEcho = "staged echo",
+  LateEcho = "late echo",
+  Steer = "steer",
+  ReplaceSteer = "replace steer",
+  OutOfBand = "out of band",
+}
+
+test.each(Object.values(SubmittedMediaDelivery))(
+  "canonical submitted prompts preserve media at acceptance (%s)",
+  async (delivery) => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-submitted-media-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const durableTimelineStore = new RecordingTimelineStore();
+    const imageData =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl4Kj8AAAAASUVORK5CYII=";
+    const attachments: NonNullable<AgentRunOptions["promptPresentation"]>["attachments"] = [
+      {
+        type: "uploaded_file",
+        id: "submitted-file",
+        fileName: "diagram.txt",
+        mimeType: "text/plain",
+        size: 7,
+        path: join(workdir, "diagram.txt"),
+      },
+    ];
+    const text = delivery === SubmittedMediaDelivery.LateEcho ? "describe diagram" : "";
+    const prompt: AgentPromptInput = [
+      ...(text ? [{ type: "text" as const, text }] : []),
+      { type: "image", data: imageData, mimeType: "image/png" },
+      ...attachments,
+    ];
+    const explicitPresentation =
+      delivery === SubmittedMediaDelivery.ReplaceSteer ||
+      delivery === SubmittedMediaDelivery.OutOfBand
+        ? { text: "visible answer", imageSources: ["/presentation/image.png"], attachments }
+        : undefined;
+    const options: AgentRunOptions = {
+      clientMessageId: "submitted-media-client",
+      ...(explicitPresentation ? { promptPresentation: explicitPresentation } : {}),
+    };
+    class SubmittedMediaSession extends TestAgentSession {
+      echo() {
+        this.pushEvent({
+          type: "timeline",
+          provider: this.provider,
+          turnId: "submitted-media-turn",
+          item: {
+            type: "user_message",
+            text: "provider-rendered prompt",
+            messageId: "provider-media",
+            clientMessageId: options.clientMessageId,
+            imageSources: ["/provider/image.png"],
+          },
+        });
+      }
+
+      override async startTurn(): Promise<{ turnId: string }> {
+        if (delivery === SubmittedMediaDelivery.StagedEcho) this.echo();
+        return { turnId: "submitted-media-turn" };
+      }
+
+      async steerActiveTurn() {
+        return { status: "accepted" as const };
+      }
+
+      tryHandleOutOfBand() {
+        return { run: async () => {} };
+      }
+    }
+    const session = new SubmittedMediaSession({ provider: "codex", cwd: workdir });
+    const client = new TestAgentClient();
+    vi.spyOn(client, "createSession").mockResolvedValue(session);
+    const manager = new AgentManager({
+      clients: { codex: client },
+      registry: storage,
+      durableTimelineStore,
+      logger,
+    });
+    const liveItems: AgentTimelineItem[] = [];
+    manager.subscribe(
+      (event) => {
+        if (
+          event.type === "agent_stream" &&
+          event.event.type === "timeline" &&
+          event.event.item.type === "user_message"
+        ) {
+          liveItems.push(event.event.item);
+        }
+      },
+      { replayState: false },
+    );
+    let agentId: string | undefined;
+    try {
+      const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+        workspaceId: undefined,
+      });
+      agentId = agent.id;
+      if (delivery === SubmittedMediaDelivery.OutOfBand) {
+        expect(manager.tryRunOutOfBand(agent.id, prompt, options)).toBe(true);
+      } else {
+        const steering =
+          delivery === SubmittedMediaDelivery.Steer ||
+          delivery === SubmittedMediaDelivery.ReplaceSteer;
+        const run = manager.runAgent(
+          agent.id,
+          steering ? "holding turn" : prompt,
+          steering ? undefined : options,
+        );
+        await manager.waitForAgentRunStart(agent.id);
+        if (delivery === SubmittedMediaDelivery.LateEcho) session.echo();
+        if (delivery === SubmittedMediaDelivery.Steer) {
+          expect(await manager.steerAgentRun(agent.id, prompt, options)).toEqual({
+            status: "accepted",
+          });
+        }
+        if (delivery === SubmittedMediaDelivery.ReplaceSteer) {
+          expect(await manager.steerOrReplaceActiveTurn(agent.id, prompt, options)).toEqual({
+            status: "steered",
+          });
+        }
+        session.pushEvent({
+          type: "turn_completed",
+          provider: "codex",
+          turnId: "submitted-media-turn",
+        });
+        await run;
+      }
+      await manager.flush();
+      const rows = manager.fetchTimeline(agent.id, { direction: "tail", limit: 20 }).rows;
+      const userRows = rows.filter((row) => row.item.type === "user_message");
+      expect(userRows).toHaveLength(1);
+      expect(liveItems).toHaveLength(1);
+      const item = userRows[0].item;
+      expect(item).toMatchObject({
+        type: "user_message",
+        text: explicitPresentation?.text ?? text,
+        ...(delivery !== SubmittedMediaDelivery.OutOfBand
+          ? { messageId: options.clientMessageId }
+          : {}),
+        clientMessageId: options.clientMessageId,
+        attachments,
+      });
+      if (item.type !== "user_message") throw new Error("Expected submitted user message");
+      expect(item.imageSources).toHaveLength(1);
+      if (explicitPresentation) {
+        expect(item.imageSources).toEqual(explicitPresentation.imageSources);
+      } else {
+        expect(readFileSync(item.imageSources![0])).toEqual(Buffer.from(imageData, "base64"));
+      }
+      expect(liveItems[0]).toEqual(item);
+      const durableRows = await durableTimelineStore.getCommittedRows(agent.id);
+      expect(durableRows.filter((row) => row.item.type === "user_message")).toMatchObject([
+        { item },
+      ]);
+    } finally {
+      if (agentId) await manager.closeAgent(agentId);
+      await manager.flush();
+      await storage.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  },
+);
 
 test("canonical submitted prompt keeps wire identity while rewind resolves provider identity", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-submitted-prompt-"));
