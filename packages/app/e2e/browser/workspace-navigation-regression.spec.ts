@@ -133,6 +133,37 @@ test.describe("Workspace navigation regression", () => {
     await expect(page.getByText("Add a project", { exact: true })).toHaveCount(0);
   });
 
+  test("does not consume another route's agent intent in a retained workspace", async ({
+    page,
+  }) => {
+    const workspace = await seedWorkspace({ repoPrefix: "retained-agent-intent-" });
+    try {
+      const agent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Existing agent",
+      });
+      await workspace.client.archiveAgent(agent.id);
+      await page.goto(
+        buildHostWorkspaceOpenRoute(getServerId(), workspace.workspaceId, `agent:${agent.id}`),
+      );
+      await expectWorkspaceTabVisible(page, agent.id);
+      // Push through the live router so the workspace stays mounted beneath the unrelated URL.
+      await page.evaluate(`(() => {
+        const modules = [...globalThis.__r.getModules().values()];
+        const router = modules.map(module => module.publicModule.exports?.router)
+          .find(router => typeof router?.push === "function");
+        if (!router) throw new Error("Expo router is unavailable");
+        router.push("/settings/general?open=agent%3Amissing-agent");
+      })()`);
+      await clickSettingsBackToWorkspace(page);
+      await expectWorkspaceTabVisible(page, agent.id);
+      await expectOnlyWorkspaceAgentTabsVisible(page, [agent.id]);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   test("terminal notifications reuse the mounted workspace when returning from Settings", async ({
     page,
   }) => {
