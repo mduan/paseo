@@ -143,7 +143,10 @@ export function useWorkspaceSessionRows(workspace: SidebarWorkspaceEntry): Works
           ? (session.agents.get(agent.parentAgentId) ??
             session.agentDetails?.get(agent.parentAgentId))
           : undefined;
-        return isWorkspaceRootAgent(agent, parent);
+        const hasOpenTab = tabs.some(
+          (tab) => tab.target.kind === "agent" && tab.target.agentId === agent.id,
+        );
+        return isWorkspaceRootAgent(agent, parent) || hasOpenTab;
       });
       agents.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       return agents.map((agent) => agent.id);
