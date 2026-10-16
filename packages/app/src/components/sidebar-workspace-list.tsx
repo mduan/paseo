@@ -456,8 +456,9 @@ function ProjectRowTrailingActions({
   const {
     settings: { sidebarShowWorkspaceCount },
   } = useAppSettings();
+  const actionsAlwaysVisible = platformIsNative || isMobileBreakpoint;
   const { showKebab: actionsVisible, menuProps } = useOpenKebabMenuVisibility(
-    isHovered || platformIsNative || isMobileBreakpoint,
+    isHovered || actionsAlwaysVisible,
   );
   const handleMenuOpenChange = useCallback(
     (open: boolean) => {
@@ -470,10 +471,14 @@ function ProjectRowTrailingActions({
     <View style={styles.projectTrailingActions}>
       {sidebarShowWorkspaceCount ? (
         <View
-          style={[
-            styles.projectWorkspaceCountOverlay,
-            actionsVisible && styles.projectKebabButtonHidden,
-          ]}
+          style={
+            actionsAlwaysVisible
+              ? undefined
+              : [
+                  styles.projectWorkspaceCountOverlay,
+                  actionsVisible && styles.projectKebabButtonHidden,
+                ]
+          }
           pointerEvents="none"
           testID={`sidebar-project-workspace-count-${projectViewKey}`}
         >
