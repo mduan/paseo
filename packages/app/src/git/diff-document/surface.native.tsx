@@ -90,10 +90,6 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const consumedFocusRef = useRef<string | null>(null);
   const scrollTop = useSharedValue(0);
   const { shift: keyboardShift } = useKeyboardShift();
-  const keyboardSpacerStyle = useAnimatedStyle(
-    () => ({ height: keyboardShift.value }),
-    [keyboardShift],
-  );
   const horizontalOffsets = useSharedValue<DiffHorizontalOffsets>({});
   const family = props.displayPreferences.monoFontFamily.trim() || SYSTEM_MONO;
   const typography = useMemo<DiffTypography>(
@@ -263,19 +259,17 @@ export function DiffSurface(props: DiffSurfaceProps) {
     }
   }, [collapsedFilePaths, mode, model.files, onToggleFile, scrollTop]);
   const contentInsetBottom = props.contentInsetBottom ?? 0;
-  const contentStyle = useMemo(
-    () => ({
-      minHeight: Math.max(model.height, viewport.height) + contentInsetBottom,
-      backgroundColor: "transparent",
-    }),
-    [contentInsetBottom, model.height, viewport.height],
+  const contentHeight = Math.max(model.height, viewport.height) + contentInsetBottom;
+  const keyboardSpacerStyle = useAnimatedStyle(
+    () => ({ height: contentHeight + keyboardShift.value }),
+    [contentHeight, keyboardShift],
   );
   return (
     <View style={[styles.root, { backgroundColor: props.palette.surface }]} onLayout={layout}>
       <AnimatedScrollView
         ref={scrollRef}
         style={[StyleSheet.absoluteFill, styles.scroll]}
-        contentContainerStyle={contentStyle}
+        keyboardShouldPersistTaps="handled"
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator
