@@ -270,19 +270,20 @@ function PaseoSubagentTitle({
 }
 
 /**
- * The title followed directly by its metadata. A long title takes all of the shrinking until it
+ * Wide panels follow the title directly with metadata. A long title takes all of the shrinking until it
  * reaches its floor, and only then does the metadata truncate: its shrink weight is so large that
  * the metadata's share rounds to zero while both can shrink. A short title never shrinks.
  */
 function RowTitle({ label, meta }: { label: string; meta?: string }): ReactElement {
+  const isCompact = useIsCompactFormFactor();
   const longTitle = label.length > TITLE_FLOOR_CHARS;
   return (
-    <View style={styles.rowTitle}>
+    <View style={isCompact ? styles.rowTitleCompact : styles.rowTitle}>
       <Text style={longTitle ? styles.rowLabelLong : styles.rowLabelShort} numberOfLines={1}>
         {label}
       </Text>
       {meta ? (
-        <Text style={styles.rowTrailing} numberOfLines={1}>
+        <Text style={styles.rowTrailing} numberOfLines={isCompact ? undefined : 1}>
           {meta}
         </Text>
       ) : null}
@@ -394,6 +395,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     flexShrink: 1,
     minWidth: 0,
+  },
+  rowTitleCompact: {
+    flex: 1,
+    minWidth: 0,
+    gap: theme.spacing[1],
   },
   rowLabelShort: {
     flexShrink: 0,
