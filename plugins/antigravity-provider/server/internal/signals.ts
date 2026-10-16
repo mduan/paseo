@@ -26,7 +26,15 @@ export function signalProcess(options: SignalOptions): void | Promise<void> {
   try {
     process.kill(plan.pid, plan.signal);
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") return;
+    if (!(error instanceof Error && "code" in error && error.code === "EPERM")) throw error;
+    // macOS can reject a group signal while its exited leader awaits reaping.
+    try {
+      process.kill(options.pid, options.signal);
+    } catch (directError) {
+      if (!(directError instanceof Error && "code" in directError && directError.code === "ESRCH"))
+        throw directError;
+    }
   }
 }
 

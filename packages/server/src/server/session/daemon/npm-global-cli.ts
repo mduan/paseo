@@ -114,7 +114,12 @@ function parseNpmGlobalPaseoInstall(stdout: string): NpmGlobalPaseoInstall | nul
 }
 
 export class DefaultNpmGlobalPaseoCli implements NpmGlobalPaseoCli {
-  constructor(private readonly runCommand: CommandRunner = runExternalCommand) {}
+  // The terminal worker imports this class through Node's strip-only loader.
+  private readonly runCommand: CommandRunner;
+
+  constructor(runCommand: CommandRunner = runExternalCommand) {
+    this.runCommand = runCommand;
+  }
 
   async inspect(): Promise<NpmGlobalPaseoInstall> {
     const result = await this.runCommand(
