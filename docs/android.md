@@ -8,10 +8,18 @@ Controlled by `APP_VARIANT` in `packages/app/app.config.js` (vanilla Expo, no cu
 | ------------- | ----------- | ---------------- |
 | `production`  | Paseo       | `sh.paseo`       |
 | `development` | Paseo Debug | `sh.paseo.debug` |
+| `fork`        | Paseo Fork  | `sh.paseo.fork`  |
 
 EAS profiles: `development`, `production`, and `production-apk` in `packages/app/eas.json`.
 
 `development` uses Android `debug`.
+
+Use `fork` for a separate installation alongside Paseo. It has its own settings and host pairing.
+It has no Firebase configuration, so push notifications are unavailable.
+
+Sign local fork APKs with `~/.paseo/android-fork-signing/fork.jks` (alias `paseo-fork`).
+The adjacent `password` file contains the keystore password. Preserve both files for future updates.
+Expo's generated release build uses a bundled debug key; replace that signature with `apksigner` before distribution.
 
 ## Version codes
 
