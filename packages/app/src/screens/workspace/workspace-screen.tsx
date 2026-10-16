@@ -35,10 +35,7 @@ import { HostBadge } from "@/hosts/host-badge";
 import { useHostBadges } from "@/hosts/use-host-badges";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { ShortcutKey } from "@/utils/format-shortcut";
-import {
-  FloatingPanelPortalHost,
-  FloatingPanelPortalHostNameProvider,
-} from "@/components/ui/floating-panel-portal";
+import { FloatingPanelPortal } from "@/components/ui/floating-panel-portal";
 import { SplitContainer } from "@/components/split-container";
 import { RetainedPanel } from "@/components/retained-panel";
 import { WorkspaceActions } from "@/git/workspace-actions";
@@ -224,7 +221,6 @@ import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-ch
 import { usePublishReviewAttachment } from "@/git/use-working-diff";
 import { useHasPullRequest, usePullRequestAutoAdd } from "@/panels/pull-request";
 
-const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
 const EMPTY_UI_TABS: WorkspaceTab[] = [];
 const EMPTY_WORKSPACE_SCRIPTS: WorkspaceDescriptor["scripts"] = [];
 const EMPTY_PINNED_AGENT_IDS = new Set<string>();
@@ -4042,11 +4038,6 @@ function WorkspaceScreenContent({
     () => isFocusModeEnabled && !isMobile,
     [isFocusModeEnabled, isMobile],
   );
-  const workspaceFloatingPanelPortalHostName = useMemo(
-    () =>
-      `${WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX}:${normalizedServerId}:${normalizedWorkspaceId}`,
-    [normalizedServerId, normalizedWorkspaceId],
-  );
   const renderWorkspaceScreenHeader = useCallback(
     () =>
       showScreenHeader ? (
@@ -4282,10 +4273,7 @@ function WorkspaceScreenContent({
           cwd={workspaceDirectory}
         />
         <View style={styles.threePaneRow}>
-          <FloatingPanelPortalHostNameProvider hostName={workspaceFloatingPanelPortalHostName}>
-            {workspaceCenterColumn}
-          </FloatingPanelPortalHostNameProvider>
-          <FloatingPanelPortalHost name={workspaceFloatingPanelPortalHostName} />
+          <FloatingPanelPortal>{workspaceCenterColumn}</FloatingPanelPortal>
         </View>
         <ImportSessionSheet
           visible={isRouteFocused && isImportSheetVisible}
