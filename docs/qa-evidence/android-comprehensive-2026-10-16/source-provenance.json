@@ -1,0 +1,12 @@
+{
+  "head": "2ab5f737b4c9910ab6a9bb2a6d5cfd73f0a5ab8c",
+  "buildBase": "b6da9b1e9",
+  "command": "git diff --src-prefix=c/ --dst-prefix=w/ b6da9b1e9 HEAD --binary",
+  "diffSHA256": "bdc77433630fb295557ea2b828db8d61cb58926998a721e094a03855e0ef70d6",
+  "frozenBuildPatchSHA256": "bdc77433630fb295557ea2b828db8d61cb58926998a721e094a03855e0ef70d6",
+  "exactPatchMatch": true,
+  "APK": "apks/candidate6-release.apk",
+  "apkSHA256": "7a2d90affc5055635d11b56da3d976b4fad0d12c56774783e3b992b8533256f9",
+  "sourceTreeClean": true,
+  "note": "Explicit prefixes reproduce Git mnemonic worktree prefixes from the prebuild capture; commit comparisons default to a/b."
+}

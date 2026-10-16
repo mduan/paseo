@@ -1,0 +1,54 @@
+{
+  "text": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+  "record": {
+    "input": {
+      "text": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+      "attachments": [
+        {
+          "kind": "forge_issue",
+          "item": {
+            "kind": "issue",
+            "forge": "github",
+            "number": 41,
+            "title": "Owned issue link",
+            "url": "https://example.invalid/owned/issues/41?label=caf%C3%A9&view=full#exact",
+            "state": "open",
+            "body": "Owned test fixture",
+            "labels": []
+          }
+        },
+        {
+          "kind": "forge_change_request",
+          "item": {
+            "kind": "change_request",
+            "forge": "github",
+            "number": 42,
+            "title": "Owned change link",
+            "url": "https://example.invalid/owned/pull/42?diff=split&line=7#exact",
+            "state": "open",
+            "body": "Owned test fixture",
+            "labels": []
+          }
+        },
+        {
+          "kind": "plugin_resource",
+          "pluginId": "owned-qa-resource",
+          "sourceId": "owned-links",
+          "sourceTitle": "Owned link",
+          "sourceIcon": "CircleDot",
+          "item": {
+            "id": "owned-resource-43",
+            "identifier": "LINK-43",
+            "title": "Generic URL resource",
+            "url": "https://example.invalid/owned/resource/43?label=caf%C3%A9&view=full#exact",
+            "text": "Owned generic URL resource body",
+            "resourceType": "document"
+          }
+        }
+      ]
+    },
+    "lifecycle": "active",
+    "updatedAt": 1792171548746,
+    "version": 2
+  }
+}

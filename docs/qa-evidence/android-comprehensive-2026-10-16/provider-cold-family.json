@@ -1,0 +1,204 @@
+{
+  "apiPassed": true,
+  "sameHomePortServerId": "Root35912,61576,K8cJJ3,srv_R-n96RY3FAXm,HEAD2ab5f737b",
+  "checks": [
+    {
+      "kind": "parent",
+      "fields": [
+        "id",
+        "model",
+        "thinkingOptionId",
+        "effectiveThinkingOptionId",
+        "turnCount",
+        "lastUsage",
+        "archivedAt"
+      ],
+      "exactlyPreserved": true
+    },
+    {
+      "kind": "managed",
+      "fields": [
+        "id",
+        "model",
+        "thinkingOptionId",
+        "effectiveThinkingOptionId",
+        "turnCount",
+        "lastUsage",
+        "archivedAt"
+      ],
+      "exactlyPreserved": true
+    }
+  ],
+  "nativeDescriptorIdentityStatusModelEffortCostPreserved": true,
+  "nativeDescriptorObservationTimestampRebuilt": {
+    "createdAt": {
+      "before": "2026-10-16T11:42:22.985Z",
+      "after": "2026-10-16T19:07:26.207Z"
+    },
+    "updatedAt": {
+      "before": "2026-10-16T11:42:22.985Z",
+      "after": "2026-10-16T19:07:26.207Z"
+    }
+  },
+  "nativeTimelineItemsExactlyPreserved": true,
+  "nativeRecordedHighPreserved": true,
+  "archivedManagedCostIncludedExactlyOnce": true,
+  "total": 0.1965568,
+  "before": "family-after-native-archive.json",
+  "after": "family-after-final-cold.json",
+  "nativeColdAssertion": "passed: actual parent model/high/6turns/cost0.09own0.20total; only provider-native child row returns with High/~0.07; managed remains globallyarchived",
+  "nativeColdCostPassed": true,
+  "nativeColdCostEvidence": [
+    "api35/102-cold-current-native.json",
+    "api35/104-cold-real-meter.json",
+    "api35/104-cold-real-meter.png"
+  ],
+  "nativeColdProviderRowAssertion": "passed",
+  "passed": true,
+  "nativeColdProviderRowEvidence": [
+    "api35/109-cold-provider-only-sheet.json",
+    "api35/109-cold-provider-only-sheet.png"
+  ],
+  "nativeReconnectWireEvidence": [
+    {
+      "at": "2026-10-16T19:07:41.451Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "in",
+      "rpcType": "hello"
+    },
+    {
+      "at": "2026-10-16T19:07:42.248Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "agent.timeline.set_subscription.response",
+      "requestId": "5f541724-fe4b-4c49-80ad-c1f54ec9c1b4",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:48.516Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "c79dd7aa-9745-4538-a143-b7f3108e79e5",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:48.553Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "9442fca3-cf20-4d8f-92d6-7f4c6bedef33",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:48.581Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "c9ff21ad-e0b0-4101-b22f-845e85af38f9",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:48.599Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "3028cb20-7293-4185-821c-17c097bab292",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:49.635Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "e39c8943-1115-4e49-bb8a-f93f302f596c",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:49.644Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "66bfc3d8-c1c2-484a-a010-4f5e7cc1a593",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:49.982Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "172d0d7e-83d3-464e-a09a-1800d659aef0",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:49.984Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "5fcf1808-7d89-4529-bd19-5a09feb906e1",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:51.600Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "fetch_agent_timeline_response",
+      "requestId": "31fb4976-a030-413a-aab3-25a319882c23",
+      "agentId": "1e047d7d-1fbf-4417-8784-24d33da28ca3",
+      "costs": [],
+      "labels": []
+    },
+    {
+      "at": "2026-10-16T19:07:55.260Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "c2bde094-6720-4292-bdab-01cc26069471",
+      "costs": [],
+      "labels": [
+        {
+          "modelId": "litellm/claude-sonnet-5-5",
+          "before": "claude-sonnet-5-5",
+          "after": "claude-sonnet-5-5"
+        }
+      ]
+    },
+    {
+      "at": "2026-10-16T19:07:55.470Z",
+      "event": "qa-wire",
+      "connectionId": 10,
+      "direction": "out",
+      "rpcType": "get_providers_snapshot_response",
+      "requestId": "4aa4e7c6-1e37-47b7-a5ce-cdbdbb0b03ad",
+      "costs": [],
+      "labels": [
+        {
+          "modelId": "litellm/claude-sonnet-5-5",
+          "before": "claude-sonnet-5-5",
+          "after": "claude-sonnet-5-5"
+        }
+      ]
+    }
+  ]
+}

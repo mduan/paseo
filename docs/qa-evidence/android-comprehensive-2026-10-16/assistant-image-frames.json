@@ -1,0 +1,43 @@
+{
+  "sourceArtifact": "previews-layout/api35-5582/image-checkpoint.json",
+  "sourceCommit": "f55ca00df9efef507aa25cd2be022bd0f8010fb5",
+  "status": "passed_candidate7_native_frame_bitmap_lightbox_anchor",
+  "candidate6": {
+    "status": "failed_candidate6_superseded_by_candidate7",
+    "small": "40-image-metrics.json:125x77color pixels inside nominal128x80bitmap =>64x40dp natural cap passed; surrounding frame oversized",
+    "wideControl": "43-wide-metrics.json:636x84color pixels inside nominal640x85.33bitmap =>320x42.67dp width cap passed",
+    "tall": "37-assistant-tall-inline.png blank viewing region beforeAFTER; expected source aspect0.2 with96dp width cap but Yoga derives1600dp height before maxWidth; native frame height concern"
+  },
+  "candidate7": {
+    "apkSHA256": "58988eed357c4feb9e230525a4a83c1b134187e051804c4ca270ea3f333a8483",
+    "installedHashEvidence": "52-installed-hash.json",
+    "small": {
+      "evidence": ["56-C7-small-head.png", "58-C7-small-close-anchor.png"],
+      "bitmapNominalPhysical": [128, 80],
+      "bitmapLogical": [64, 40],
+      "frame": "No excess height:BEFORE590,image646\u2013726,AFTER778; priorC6 frame400physical tall"
+    },
+    "wide": {
+      "evidence": ["55-C7-small-settled.png", "55-C7-wide-control-metrics.json"],
+      "note": "Existing wide response rendered by installedC7; no need duplicate fixture",
+      "bitmapLogical": [320, 42.6666666667]
+    },
+    "tall": {
+      "evidence": ["60-C7-tall-current.png", "62-tall-native-ui.xml", "65-C7-tall-before-edge.png"],
+      "bitmapNominalPhysicalWidth": 192,
+      "bitmapLogicalWidth": 96,
+      "sourcePixels": [320, 1600],
+      "heightLogicalFromAspect": 480,
+      "frameEdges": "Top meets visible bitmap immediately below BEFORE65; bottom meets visible bitmap immediately above AFTER60; native Open image node62 bounds coincide with visible image. No extra letterbox extent.",
+      "measurementLimit": "Full960physical height exceeds viewport; height inferred from measured96dp width and known undistorted1:5source aspect, with separate actual native top/bottom edge captures. No single complete-frame screenshot claimed."
+    },
+    "lightbox": {
+      "before": "56-small-metrics.json",
+      "open": "57-lightbox-metrics.json",
+      "closed": "58-anchor-metrics.json",
+      "inlineColorPixels": [125, 77],
+      "lightboxColorPixels": [641, 395],
+      "anchor": "exact same x35/y647/125x77 bitmap and BEFORE/AFTER markers after native Close"
+    }
+  }
+}

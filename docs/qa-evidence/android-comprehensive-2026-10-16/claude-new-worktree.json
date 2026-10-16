@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "forkAgentId": "ccd97bb7-ee3e-4708-a106-8cdb99dc9a2b",
+  "workspaceId": "wks_9b74bb9d9ef73cd8",
+  "cwd": "<QA_HOME>/worktrees/1r66kngl/fabulous-scorpion",
+  "sourceUnchanged": true,
+  "firstUserRowsOnly": 1,
+  "laterMarkerExcluded": true,
+  "initialBashPwdRetained": true,
+  "imageSHA256": "293acc7fa5530b6f48c94a2e16904269152352b5fe74031266579d0b6b2a6869",
+  "model": "claude-sonnet-5-5",
+  "thinking": "high",
+  "mode": "bypassPermissions",
+  "nativeImageAssertion": "passed:36 retained native thumbnail and43 full native image preview",
+  "nativeEvidence": [
+    "api35/32-worktree-form.json",
+    "api35/34-postfix-worktree-native.json",
+    "api35/36-worktree-image-native.json",
+    "api35/36-worktree-image-native.png",
+    "api35/41-image-preview-open.json",
+    "api35/43-current-image-preview.png"
+  ],
+  "redaction": "Only the temporary QA home prefix in cwd is redacted; assertion values are unchanged."
+}

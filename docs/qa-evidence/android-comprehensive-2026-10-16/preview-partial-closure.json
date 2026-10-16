@@ -1,0 +1,81 @@
+{
+  "status": "partial_native_environment_limited",
+  "codeCutoff": "f55ca00df9efef507aa25cd2be022bd0f8010fb5",
+  "apkSHA256": "58988eed357c4feb9e230525a4a83c1b134187e051804c4ca270ea3f333a8483",
+  "acceptedSubsets": {
+    "scenario": "link-review-queued-previews",
+    "status": "accepted_subsets_only",
+    "detail": [
+      "Draft forge/generic full URL sheets and draft AndroidBack/external target controls.",
+      "Shared LinkText native full selection/exactCopy and normaltap accepted onC6, unchangedC7; not claiming everystage/variant separatelycopied.",
+      "Actual queued review19/20 exactUnicode body/path/R4–R7 and native source21+persisted lineStart4/lineEnd7.",
+      "Previously completed native queued image queue-preservation subset reused.",
+      "Previously completed draft AND canonical-sent review exact body/path/range/source/return/cross-chat-cleanup subset reused; canonical-sent review is tested."
+    ],
+    "evidence": [
+      "10-draft-issue.json",
+      "30-draft-pr.json",
+      "api35-5582/12-draft-generic-sheet.png",
+      "api35-5582/13-draft-generic-selected.png",
+      "api35-5582/70-draft-generic-url.xml",
+      "fresh5586/21-issue-select-all.png",
+      "fresh5586/24-issue-native-pasted.json",
+      "api35-5582/19-native-queued.png",
+      "api35-5582/20-queued-review-sheet.png",
+      "api35-5582/21-queued-review-source.png",
+      "api35-5582/queued-review-checkpoint.json",
+      "../chat-races/report.json",
+      "../review-remaining/report.json"
+    ]
+  },
+  "unverifiedFinalAssertions": [
+    "Queued forge_issue,forge_change_request,genericLINK full URL sheets, one-overlayAndroidBack and intendedexternalURLs.",
+    "Queued review source→NATIVEtabchooser→samecomposer with unchangedqueue.",
+    "Exactlyone canonical dispatch after genuine nativequeue release; finalfourattachmentfixture canonicalacceptance.",
+    "Sent forge/link stage matrix from that canonicalfourattachmentfixture; prior canonical-sent REVIEW subset remains accepted."
+  ],
+  "optimistic76": {
+    "status": "not_canonical_not_queue_pass",
+    "detail": "76blueuserbubble wasoptimistic/pending.85finalcanonicaltimeline containsZERO usermessageswithattachments; noqueued/sentstage pass inferred.",
+    "evidence": [
+      "api35-5582/76-native-queued-C7.png",
+      "api35-5582/77-sent-baseline.json",
+      "api35-5582/85-final-canonical-summary.json"
+    ]
+  },
+  "environmentLimit": {
+    "lastRecovery": "SameAVD/userdata/configscopedrestarts only; no cause diagnosis retained.",
+    "lastOutcome": "83bootcompleted+pm pathconfirmedC7; accessibilitydump12stimeout;84directshellscreencap12stimeout. Rootdirectedstoprecoveryloops.",
+    "evidence": ["api35-5582/81-recovery-stop.json", "api35-5582/83-package-readiness.txt"],
+    "discardedInference": "Missingwireagent.turn wasnotablocker; existingnormalizer derivesitfromactiveTurn/status. No host/proxy/productchange madeforthisinference."
+  },
+  "finalCleanup": {
+    "at": "2026-10-16T19:44:08.269552+00:00",
+    "held": [],
+    "agentsIdle": true,
+    "verifiedOwnedProcesses": [
+      {
+        "pid": 99020,
+        "script": ".dev/android-comprehensive-qa/previews-layout/host.mts",
+        "ports": [52689, 52756]
+      },
+      {
+        "pid": 20279,
+        "script": ".dev/android-comprehensive-qa/previews-layout/sidecar.mts",
+        "ports": [53285]
+      }
+    ],
+    "device": {
+      "serial": "emulator-5582",
+      "avd": "paseo-preview-final-api35",
+      "pid": 20578,
+      "session": 69060,
+      "stopExit": 0,
+      "userdataPreserved": true
+    },
+    "remainingListeners": [],
+    "homesAndFixturesPreserved": true,
+    "productionTouched": false
+  },
+  "note": "Original .dev evidence references provide local traceability; the adjacent ledger and selected queued-review screenshot preserve the result independently."
+}
