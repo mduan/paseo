@@ -1,5 +1,4 @@
 import { createConversationTitleGenerator } from "./agent/conversation-title.js";
-import { generateBranchNameFromFirstAgentContext } from "./worktree-branch-name-generator.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { BrowserAutomationHostCapabilitySchema } from "@getpaseo/protocol/browser-automation/capabilities";
@@ -4352,35 +4351,13 @@ export class Session {
       );
       createdAgentId = snapshot.id;
       await this.agentUpdates.forwardLiveAgent(snapshot);
-      if (!provisionalTitle && images?.length) {
-        void generateBranchNameFromFirstAgentContext({
-          agentManager: this.agentManager,
+      if (!config.title?.trim() && !snapshot.internal) {
+        this.scheduleAgentName({
+          agentId: snapshot.id,
           cwd: resolvedCwd,
-          workspaceGitService: this.workspaceGitService,
-          providerSnapshotManager: this.providerSnapshotManager,
-          daemonConfig: this.readStructuredGenerationDaemonConfig(),
-          currentSelection: {
-            provider: config.provider,
-            model: config.model,
-            thinkingOptionId: config.thinkingOptionId,
-          },
           firstAgentContext,
-          logger: this.sessionLogger,
-        })
-          .then(async (generated) => {
-            if (!generated?.title) return undefined;
-            const stored = await this.agentStorage.get(snapshot.id);
-            if (stored && !stored.title && this.agentManager.getAgent(snapshot.id)) {
-              return this.agentManager.setTitle(snapshot.id, generated.title);
-            }
-            return undefined;
-          })
-          .catch((error) => {
-            this.sessionLogger.warn(
-              { err: error, agentId: snapshot.id },
-              "Failed to name image-only chat",
-            );
-          });
+          provisionalTitle,
+        });
       }
       if (resolvedIntent.createdDirectoryWorkspace && buildAgentBranchNameSeed(firstAgentContext)) {
         this.workspaceAutoName.scheduleForDirectory(
@@ -8329,16 +8306,50 @@ export class Session {
     }
   }
 
-  private async prepareAgentMessage(agentId: string, text: string): Promise<void> {
-    await ensureAgentLoaded(agentId, {
+  private scheduleAgentName(input: {
+    agentId: string;
+    cwd: string;
+    firstAgentContext: FirstAgentContext;
+    provisionalTitle: string | null;
+  }): void {
+    if (!buildAgentBranchNameSeed(input.firstAgentContext)) return;
+    void this.generateConversationTitle({
+      cwd: input.cwd,
+      firstAgentContext: input.firstAgentContext,
+      currentSelection: this.agentManager.getAgent(input.agentId)?.config,
+    })
+      .then(async (title) => {
+        const stored = await this.agentStorage.get(input.agentId);
+        if (
+          stored &&
+          (stored.title ?? null) === input.provisionalTitle &&
+          this.agentManager.getAgent(input.agentId)
+        ) {
+          return this.agentManager.setTitle(input.agentId, title);
+        }
+        return undefined;
+      })
+      .catch((error) => {
+        this.sessionLogger.warn({ err: error, agentId: input.agentId }, "Failed to auto-name chat");
+      });
+  }
+
+  private async prepareAgentMessage(
+    agentId: string,
+    firstAgentContext: FirstAgentContext,
+  ): Promise<void> {
+    const agent = await ensureAgentLoaded(agentId, {
       agentManager: this.agentManager,
       agentStorage: this.agentStorage,
       logger: this.sessionLogger,
     });
     const stored = await this.agentStorage.get(agentId);
-    if (stored && !stored.title && !stored.lastUserMessageAt) {
-      const { provisionalTitle } = resolveCreateAgentTitles({ initialPrompt: text });
+    if (stored && !stored.title && !stored.lastUserMessageAt && !agent.internal) {
+      const { provisionalTitle } = resolveCreateAgentTitles({
+        initialPrompt: firstAgentContext.prompt,
+      });
       if (provisionalTitle) await this.agentManager.setTitle(agentId, provisionalTitle);
+      this.scheduleAgentName({ agentId, cwd: agent.cwd, firstAgentContext, provisionalTitle });
     }
   }
 
@@ -8397,11 +8408,20 @@ export class Session {
           messageId: msg.messageId,
           request: { prompt, activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt" },
           prepare: async () => {
-            await this.prepareAgentMessage(agentId, msg.text);
+            await this.prepareAgentMessage(agentId, {
+              prompt: msg.text,
+              images: msg.images,
+              attachments: msg.attachments,
+            });
           },
           send,
         });
       } else {
+        await this.prepareAgentMessage(agentId, {
+          prompt: msg.text,
+          images: msg.images,
+          attachments: msg.attachments,
+        });
         await send();
       }
 

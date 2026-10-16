@@ -1,7 +1,4 @@
-import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@getpaseo/protocol/agent-title-limits";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
-
-const MAX_INITIAL_AGENT_TITLE_CHARS = Math.min(60, MAX_EXPLICIT_AGENT_TITLE_CHARS);
 
 function deriveInitialAgentTitle(prompt: string): string | null {
   const firstContentLine = prompt
@@ -15,8 +12,7 @@ function deriveInitialAgentTitle(prompt: string): string | null {
   if (!normalized) {
     return null;
   }
-  const clamped = normalized.slice(0, MAX_INITIAL_AGENT_TITLE_CHARS).trim();
-  return clamped.length > 0 ? clamped : null;
+  return normalized;
 }
 
 export function resolveCreateAgentTitles(options: {

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { z } from "zod";
 
 import type { AgentManager } from "./agent/agent-manager.js";
 import type { StructuredAgentGenerationWithFallbackOptions } from "./agent/agent-response-loop.js";
@@ -24,10 +25,7 @@ The branch must be a valid git ref: lowercase letters, numbers, hyphens, and sla
 The branch is generated directly from the prompt — it is NEVER derived from or slugified from the title.
 
 Title style:
-An actionable task label: requested operation + concrete target + strongest distinguishing anchor (sentence case, max 80 characters).
-Preserve explicit identifiers such as PR or issue numbers, file paths, packages, components, commands, and quoted names when they distinguish the task.
-Aim for about 4 words, but never drop a part needed to understand or distinguish the task.
-Example: "Refactor PR #2638 Playwright specs".
+Use a concise, specific name in sentence case. Preserve the task, its target, and distinguishing identifiers. Prefer clarity over brevity.
 
 Branch style:
 A short task-shaped slug preserving the operation, target, and explicit identifier when present.
@@ -66,6 +64,22 @@ function createStructuredGenerator(result: { title: string; branch: string }) {
 }
 
 describe("generateBranchNameFromFirstAgentContext", () => {
+  test("accepts workspace titles longer than 80 characters", async () => {
+    const title =
+      "Check Android analytics project grouping and preserve workspace identifiers during chat creation";
+    const structured = createStructuredGenerator({ title, branch: "check-android-analytics" });
+    const result = await generateBranchNameFromFirstAgentContext({
+      agentManager: {} as AgentManager,
+      cwd: "/tmp/repo",
+      firstAgentContext: { prompt: "Check Android analytics project grouping" },
+      logger: createLogger(),
+      deps: { generateStructuredAgentResponseWithFallback: structured.generateStructured },
+    });
+    expect(result).toEqual({ title, branch: "check-android-analytics" });
+    const schema = structured.calls[0].schema;
+    if (!(schema instanceof z.ZodType)) throw new Error("Expected a Zod schema");
+    expect(schema.parse({ title, branch: "check-android-analytics" })).toEqual(result);
+  });
   test("passes image-only context to the naming model", async () => {
     const structured = createStructuredGenerator({
       title: "Fix checkout error",
@@ -283,7 +297,7 @@ describe("generateBranchNameFromFirstAgentContext", () => {
     });
 
     expect(prompt).toContain("Title style:\nTitle in Spanish.");
-    expect(prompt).not.toContain("Aim for about 4 words");
+    expect(prompt).not.toContain("Use a concise, specific name in sentence case.");
     // Contract and branch style are not part of the title override.
     expect(prompt).toContain("Generate a title and a git branch name");
     expect(prompt).toContain("Branch style:\nA short task-shaped slug");
@@ -297,7 +311,7 @@ describe("generateBranchNameFromFirstAgentContext", () => {
 
     expect(prompt).toContain("Branch style:\nUse the prefix mb/.");
     expect(prompt).not.toContain("A short task-shaped slug");
-    expect(prompt).toContain("Aim for about 4 words");
+    expect(prompt).toContain("Use a concise, specific name in sentence case.");
   });
 
   test("the contract is never overridable by user instructions", async () => {

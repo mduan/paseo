@@ -14,6 +14,10 @@ import { buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import { buildMetadataPrompt } from "../utils/build-metadata-prompt.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import type { ProviderSnapshotManager } from "./agent/provider-snapshot-manager.js";
+import {
+  CONVERSATION_TITLE_SCHEMA,
+  DEFAULT_CONVERSATION_TITLE_STYLE,
+} from "./agent/conversation-title.js";
 
 interface BranchNameGeneratorLogger {
   info: (obj: object, msg?: string) => void;
@@ -40,7 +44,7 @@ export interface GenerateBranchNameFromFirstAgentContextOptions {
 }
 
 const BranchNameSchema = z.object({
-  title: z.string().min(1).max(80),
+  title: CONVERSATION_TITLE_SCHEMA,
   branch: z.string().min(1).max(100),
 });
 
@@ -65,12 +69,7 @@ async function buildPrompt(
       {
         configKey: "title",
         label: "Title style",
-        default: [
-          "An actionable task label: requested operation + concrete target + strongest distinguishing anchor (sentence case, max 80 characters).",
-          "Preserve explicit identifiers such as PR or issue numbers, file paths, packages, components, commands, and quoted names when they distinguish the task.",
-          "Aim for about 4 words, but never drop a part needed to understand or distinguish the task.",
-          'Example: "Refactor PR #2638 Playwright specs".',
-        ].join("\n"),
+        default: DEFAULT_CONVERSATION_TITLE_STYLE,
       },
       {
         configKey: "branchName",

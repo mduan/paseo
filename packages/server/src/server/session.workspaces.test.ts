@@ -51,6 +51,7 @@ import {
 import type { WorkspaceGitRuntimeSnapshot } from "./workspace-git-service.js";
 import type { generateBranchNameFromFirstAgentContext } from "./worktree-branch-name-generator.js";
 import { WorkspaceAutoName } from "./workspace-auto-name.js";
+import { MessageReceipts } from "./message-receipts/index.js";
 import type { ForgeService } from "../services/forge-service.js";
 import { createNoopWorkspaceGitService } from "./test-utils/workspace-git-service-stub.js";
 import { deriveProjectKey } from "./project-key.js";
@@ -572,6 +573,7 @@ function createSessionForWorkspaceTests(
       newName: string,
     ) => Promise<{ previousBranch: string | null; currentBranch: string | null }>;
     generateWorkspaceName?: typeof generateBranchNameFromFirstAgentContext;
+    messageReceipts?: SessionOptions["messageReceipts"];
   } = {},
 ): TestSession {
   const logger = {
@@ -646,7 +648,7 @@ function createSessionForWorkspaceTests(
 
   const session = asTestSession(
     new Session({
-      messageReceipts: createMessageReceiptsStub(),
+      messageReceipts: options.messageReceipts ?? createMessageReceiptsStub(),
       creationService: createTestCreationService(),
       clientId: "test-client",
       permissions: OWNER_PERMISSIONS,
@@ -752,10 +754,23 @@ function createSessionForWorkspaceTests(
   return session;
 }
 
-test.each([false, true])(
-  "image-only workspace creation names the workspace and preserves a concurrent manual chat name (%s)",
-  async (manuallyRenamed) => {
-    const images = [{ data: "c2NyZWVuc2hvdA==", mimeType: "image/png" }];
+test.each([
+  { prompt: undefined, manuallyRenamed: false },
+  { prompt: undefined, manuallyRenamed: true },
+  {
+    prompt:
+      "For the Android Paseo app, I am still running the build before checking the analytics project grouping fix",
+    manuallyRenamed: false,
+  },
+  {
+    prompt:
+      "For the Android Paseo app, I am still running the build before checking the analytics project grouping fix",
+    manuallyRenamed: true,
+  },
+])(
+  "workspace creation names the chat from its initial context and preserves manual names ($prompt, $manuallyRenamed)",
+  async ({ prompt, manuallyRenamed }) => {
+    const images = prompt ? undefined : [{ data: "c2NyZWVuc2hvdA==", mimeType: "image/png" }];
     const workspaces = new Map<string, PersistedWorkspaceRecord>();
     let created = false;
     let chat = makeManagedAgent({
@@ -793,12 +808,12 @@ test.each([false, true])(
         createAgent: async (
           config: AgentSessionConfig,
           _id: string,
-          options: { workspaceId?: string },
+          options: { workspaceId?: string; initialTitle?: string },
         ) => {
           if (config.internal) return { id: "naming-agent" };
           created = true;
           chat = { ...chat, workspaceId: options.workspaceId };
-          stored = { ...stored, workspaceId: options.workspaceId };
+          stored = { ...stored, workspaceId: options.workspaceId, title: options.initialTitle };
           return chat;
         },
         getAgent: () => (created ? chat : null),
@@ -806,8 +821,8 @@ test.each([false, true])(
         streamAgent: async function* () {},
         waitForAgentRunStart: async () => {},
         getProviderAvailability: async () => ({ available: true }),
-        runAgent: async (_id: string, prompt: AgentPromptInput) => {
-          namingPrompts.push(prompt);
+        runAgent: async (_id: string, namingPrompt: AgentPromptInput) => {
+          namingPrompts.push(namingPrompt);
           if (manuallyRenamed) stored = { ...stored, title: "My name" };
           return {
             finalText: '{"title":"Fix checkout error","branch":"fix-checkout-error"}',
@@ -830,7 +845,12 @@ test.each([false, true])(
       type: "workspace.create.request",
       requestId: "image-only-workspace",
       source: { kind: "directory", path: REPO_CWD },
-      agent: { agentId: chat.id, config: { provider: "codex", cwd: REPO_CWD }, images },
+      agent: {
+        agentId: chat.id,
+        config: { provider: "codex", cwd: REPO_CWD },
+        initialPrompt: prompt,
+        images,
+      },
     });
     expect(findByType(emitted, "workspace.create.response")?.payload.error).toBeNull();
     await vi.waitFor(() => {
@@ -839,13 +859,99 @@ test.each([false, true])(
         expect.objectContaining({ title: "Fix checkout error" }),
       ]);
     });
-    expect(workspaceContexts).toEqual([{ images, prompt: undefined, attachments: undefined }]);
+    expect(workspaceContexts).toEqual([{ images, prompt, attachments: undefined }]);
+    const namingText = prompt ?? "Use the attached images";
     expect(namingPrompts).toEqual([
-      [
-        { type: "text", text: expect.stringContaining("Use the attached images") },
-        { type: "image", ...images[0] },
-      ],
+      images
+        ? [
+            { type: "text", text: expect.stringContaining(namingText) },
+            { type: "image", ...images[0] },
+          ]
+        : expect.stringContaining(prompt),
     ]);
+  },
+);
+
+test.each([
+  { messageId: undefined, fail: false, explicitTitle: undefined },
+  { messageId: "first-message", fail: false, explicitTitle: undefined },
+  { messageId: "first-message", fail: true, explicitTitle: undefined },
+  { messageId: "first-message", fail: false, explicitTitle: "My custom name" },
+])(
+  "names an empty chat on its first prompt ($messageId, $fail, $explicitTitle)",
+  async ({ messageId, fail, explicitTitle }) => {
+    const directory = mkdtempSync(path.join(tmpdir(), "paseo-first-prompt-name-"));
+    const chat = makeManagedAgent({
+      id: "new-chat",
+      cwd: REPO_CWD,
+      lifecycle: "idle",
+      updatedAt: "2026-10-15T00:00:00Z",
+    });
+    let stored = {
+      ...makeStoredAgent({ id: chat.id, cwd: chat.cwd, updatedAt: "2026-10-15T00:00:00Z" }),
+      title: explicitTitle,
+    };
+    const emitted: SessionOutboundMessage[] = [];
+    const namingPrompts: AgentPromptInput[] = [];
+    const sentPrompts: AgentPromptInput[] = [];
+    let namingFinished = 0;
+    const prompt =
+      "For the Android Paseo app, I am still running the build before checking the analytics project grouping fix";
+    const generatedTitle = "Check Android analytics project grouping";
+    const expectedTitle = explicitTitle ?? (fail ? prompt : generatedTitle);
+    const expectedNamingRuns = explicitTitle ? 0 : 1;
+    const session = createSessionForWorkspaceTests({
+      messageReceipts: new MessageReceipts(directory),
+      onMessage: (message) => emitted.push(message),
+      agentStorage: { get: async () => stored },
+      agentManager: {
+        getAgent: () => chat,
+        listAgents: () => [chat],
+        waitForAgentClose: async () => {},
+        tryRunOutOfBand: () => false,
+        hasInFlightRun: () => false,
+        streamAgent: async function* (_id: string, input: AgentPromptInput) {
+          sentPrompts.push(input);
+          yield* [];
+        },
+        waitForAgentRunStart: async () => {},
+        getProviderAvailability: async () => ({ available: true }),
+        createAgent: async () => ({ id: "naming-agent" }),
+        runAgent: async (_id: string, input: AgentPromptInput) => {
+          namingPrompts.push(input);
+          if (fail) throw new Error("Model unavailable");
+          return { finalText: JSON.stringify({ title: generatedTitle }), timeline: [] };
+        },
+        closeAgent: async () => {
+          namingFinished++;
+        },
+        deleteAgentState: async () => {},
+        setTitle: async (_id: string, title: string) => {
+          stored = { ...stored, title };
+        },
+      },
+    });
+    try {
+      await session.handleMessage({
+        type: "send_agent_message_request",
+        requestId: "send-first",
+        agentId: chat.id,
+        text: prompt,
+        messageId,
+      });
+      expect(findByType(emitted, "send_agent_message_response")?.payload).toMatchObject({
+        accepted: true,
+        error: null,
+      });
+      await vi.waitFor(() => {
+        expect(namingFinished).toBe(expectedNamingRuns);
+        expect(stored.title).toBe(expectedTitle);
+      });
+      expect(sentPrompts).toEqual([prompt]);
+      expect(namingPrompts).toEqual(explicitTitle ? [] : [expect.stringContaining(prompt)]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   },
 );
 

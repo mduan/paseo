@@ -12,6 +12,7 @@ import {
   type StructuredGenerationDaemonConfig,
 } from "../../agent/structured-generation-providers.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
+import type { FirstAgentContext } from "@getpaseo/protocol/messages";
 import {
   buildMetadataPrompt,
   type MetadataConfigKey,
@@ -46,6 +47,8 @@ export interface StructuredTextGeneration {
 export interface StructuredTextGenerationRequest<T> {
   cwd: string;
   prompt: string;
+  images?: FirstAgentContext["images"];
+  currentSelection?: ResolveStructuredGenerationProvidersOptions["currentSelection"];
   schema: z.ZodType<T>;
   schemaName: string;
   agentTitle: string;
@@ -182,17 +185,18 @@ export function createAgentStructuredTextGeneration(deps: {
   ) => ResolveStructuredGenerationProvidersOptions["currentSelection"];
 }): StructuredTextGeneration {
   return {
-    async generate({ cwd, prompt, schema, schemaName, agentTitle }) {
+    async generate({ cwd, prompt, images, currentSelection, schema, schemaName, agentTitle }) {
       const providers = await resolveStructuredGenerationProviders({
         cwd,
         providerSnapshotManager: deps.providerSnapshotManager,
         daemonConfig: deps.readDaemonConfig(),
-        currentSelection: deps.getFocusedSelection(cwd),
+        currentSelection: currentSelection ?? deps.getFocusedSelection(cwd),
       });
       return generateStructuredAgentResponseWithFallback({
         manager: deps.agentManager,
         cwd,
         prompt,
+        images,
         schema,
         schemaName,
         maxRetries: 2,
