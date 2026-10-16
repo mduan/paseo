@@ -27,21 +27,6 @@ const { mockTheme } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("lucide-react-native", () => {
-  const StubIcon = () => null;
-  return {
-    ArrowLeftToLine: StubIcon,
-    ArrowRightToLine: StubIcon,
-    Copy: StubIcon,
-    CopyX: StubIcon,
-    Ellipsis: StubIcon,
-    FolderSearch: StubIcon,
-    Pencil: StubIcon,
-    RotateCw: StubIcon,
-    X: StubIcon,
-  };
-});
-
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: {
     create: (factory: unknown) =>

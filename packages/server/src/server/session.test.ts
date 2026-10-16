@@ -293,7 +293,10 @@ interface SessionForTestOptions {
   agentManager?: { [K in keyof SessionOptions["agentManager"]]?: unknown };
   agentStorage?: { [K in keyof SessionOptions["agentStorage"]]?: unknown };
   github?: Partial<ForgeService & GitHubService>;
-  checkoutDiffManager?: { scheduleRefreshForCwd: ReturnType<typeof vi.fn> };
+  checkoutDiffManager?: {
+    scheduleRefreshForCwd: ReturnType<typeof vi.fn>;
+    refreshForCwdNow?: ReturnType<typeof vi.fn>;
+  };
   workspaceGitService?: {
     getCheckout?: ReturnType<typeof vi.fn>;
     getCheckoutDiff?: ReturnType<typeof vi.fn>;
@@ -342,8 +345,10 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     createPullRequest: vi.fn(),
     mergePullRequest: vi.fn(),
   };
-  const checkoutDiffManager = options.checkoutDiffManager ?? {
+  const checkoutDiffManager = {
     scheduleRefreshForCwd: vi.fn(),
+    refreshForCwdNow: vi.fn().mockResolvedValue(undefined),
+    ...options.checkoutDiffManager,
   };
   const workspaceGitService = {
     getCheckout: vi.fn(),
@@ -2084,6 +2089,9 @@ function createWorkspaceGitSnapshot(
       isPaseoOwnedWorktree: false,
       isDirty: true,
       baseRef: "main",
+      baseRefLabel: "main",
+      upstreamRef: null,
+      headSha: null,
       aheadBehind: { ahead: 2, behind: 1 },
       aheadOfOrigin: 2,
       behindOfOrigin: 1,
@@ -3919,6 +3927,8 @@ describe("session checkout status handling", () => {
         currentBranch: "feature/service",
         isDirty: true,
         baseRef: "main",
+        baseRefLabel: "main",
+        headSha: null,
         aheadBehind: { ahead: 2, behind: 1 },
         aheadOfOrigin: 2,
         behindOfOrigin: 1,

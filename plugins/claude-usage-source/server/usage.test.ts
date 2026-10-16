@@ -728,7 +728,7 @@ it("discovery uses the credential token profile instead of stale Claude config",
             organization: { uuid: "token-org" },
           }),
         Date.now,
-        { home: directory, claudeHome: directory },
+        { home: directory, claudeHome: directory, readKeychainCredentials: async () => null },
       ),
     ).toEqual({
       key: "token-account.token-org",
@@ -793,7 +793,7 @@ it("identifies the same credential route that fetch uses when oauthAccount is ab
         });
       },
       Date.now,
-      { claudeHome: directory, home: directory },
+      { claudeHome: directory, home: directory, readKeychainCredentials: async () => null },
     );
     expect(profileRequested).toBe(true);
     expect(account).toEqual({ key: "account-uuid.org-uuid", label: "owner@example.test" });
@@ -860,7 +860,11 @@ it("discovery and fetch share the explicit Claude credential route", async () =>
   const directory = mkdtempSync(join(tmpdir(), "claude-home-identity-"));
   try {
     writeClaudeCredentials(directory, "home-fixture-token");
-    const lookup = { claudeHome: directory, home: directory };
+    const lookup = {
+      claudeHome: directory,
+      home: directory,
+      readKeychainCredentials: async () => null,
+    };
     let usageRequested = false;
     await fetchUsage(
       credentialInput(directory),
@@ -917,7 +921,7 @@ function tokenLookup(accessToken: string) {
   const directory = mkdtempSync(join(tmpdir(), "claude-profile-token-"));
   tokenDirectories.push(directory);
   writeClaudeCredentials(directory, accessToken);
-  return { claudeHome: directory, home: directory };
+  return { claudeHome: directory, home: directory, readKeychainCredentials: async () => null };
 }
 
 it("discovers a Pi OAuth login independently of the CLI login", async () => {

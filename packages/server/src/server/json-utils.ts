@@ -8,9 +8,8 @@ export type JsonValue =
 
 /**
  * Coerce arbitrary values into JSON-safe structures.
- * Unlike the previous implementation, this never throws on undefined—
- * it replaces unsupported values (undefined, functions, symbols) with null
- * so responses always make it back to the client.
+ * Omit undefined object properties, as JSON.stringify does, so optional fields
+ * do not become schema-invalid nulls. Unsupported array values become null.
  */
 export function ensureValidJson<T>(value: T): T {
   const seen = new WeakSet<object>();
@@ -47,6 +46,7 @@ export function ensureValidJson<T>(value: T): T {
       seen.add(current);
       const obj: Record<string, JsonValue> = {};
       for (const [key, val] of Object.entries(current as Record<string, unknown>)) {
+        if (val === undefined) continue;
         obj[key] = sanitize(val);
       }
       seen.delete(current);

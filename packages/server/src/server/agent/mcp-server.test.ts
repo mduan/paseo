@@ -5846,6 +5846,26 @@ describe("agent snapshot MCP serialization", () => {
     expect(snapshot.pendingPermissions).toEqual([]);
   });
 
+  it.each([0, 2])("preserves turnCount %i in get_agent_status", async (turnCount) => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue(
+      createManagedAgent({ id: "counted-agent", turnCount }),
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      logger,
+    });
+    const response = await registeredTool(server, "get_agent_status").handler({
+      agentId: "counted-agent",
+    });
+    expect(response.structuredContent).toMatchObject({ snapshot: { turnCount } });
+    expect(AgentSnapshotPayloadSchema.safeParse(response.structuredContent.snapshot).success).toBe(
+      true,
+    );
+  });
+
   it("does not expose internal stored agents from get_agent_status", async () => {
     const { agentManager, agentStorage, spies } = createTestDeps();
     spies.agentManager.getAgent.mockReturnValue(null);

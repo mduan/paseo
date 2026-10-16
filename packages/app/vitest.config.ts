@@ -1,5 +1,6 @@
 import { defineConfig, configDefaults } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import { transformWithEsbuild } from "vite";
 import path from "path";
 import fs from "fs";
 
@@ -13,6 +14,17 @@ const resolvePackageEntry = (packageName: string) => {
 };
 
 export default defineConfig({
+  plugins: [
+    {
+      name: "expo-clipboard-jsx",
+      transform(code, id) {
+        // Expo publishes JSX in this .js file, which Metro handles but Vite skips.
+        if (id.replace(/\?.*$/, "").endsWith("/expo-clipboard/build/ClipboardPasteButton.js")) {
+          return transformWithEsbuild(code, id, { loader: "jsx" });
+        }
+      },
+    },
+  ],
   test: {
     environment: "node",
     exclude: [...configDefaults.exclude, "e2e/**"],
@@ -79,6 +91,7 @@ export default defineConfig({
     ],
     exclude: [
       "expo-clipboard",
+      "expo-modules-core",
       "react-native-reanimated",
       "react-native-gesture-handler",
       "react-native-keyboard-controller",
