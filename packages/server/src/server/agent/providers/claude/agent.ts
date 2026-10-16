@@ -700,6 +700,33 @@ function toBase64ImageOutput(block: unknown): ProviderImageOutput | null {
   };
 }
 
+function claudeUserMessageWithImages({
+  text,
+  content,
+}: {
+  text: string | null;
+  content: unknown;
+}): Extract<AgentTimelineItem, { type: "user_message" }> | undefined {
+  const sources: string[] = [];
+  for (const block of normalizeHistoryBlocks(content) ?? []) {
+    const image = toBase64ImageOutput(block);
+    if (!image?.data) continue;
+    try {
+      sources.push(
+        materializeProviderImage({ data: image.data, mimeType: image.mimeType ?? null }).path,
+      );
+    } catch {
+      continue;
+    }
+  }
+  if (!text && !sources.length) return;
+  return {
+    type: "user_message",
+    text: text ?? "",
+    ...(sources.length ? { imageSources: sources } : {}),
+  };
+}
+
 // Claude returns images inside tool_result content as base64 Anthropic blocks. Left in place they
 // reach coerceToolResultContentToString, which JSON.stringifies the whole array — dumping base64
 // into the tool output. We pull those blocks out to render them as image markdown and leave a
@@ -5333,11 +5360,9 @@ class ClaudeAgentSession implements AgentSession {
       });
     }
 
-    if (textMessageType === "user_message" && userTextParts.length > 0) {
-      items.unshift({
-        type: "user_message",
-        text: userTextParts.join("\n\n"),
-      });
+    if (textMessageType === "user_message") {
+      const message = claudeUserMessageWithImages({ text: userTextParts.join("\n\n"), content });
+      if (message) items.unshift(message);
     }
 
     return items;
@@ -6278,13 +6303,9 @@ export function convertClaudeHistoryEntry(
   const timeline: AgentTimelineItem[] = [];
 
   if (entry.type === "user") {
-    const text = extractUserMessageText(content);
-    if (text) {
-      timeline.push({
-        type: "user_message",
-        text,
-        ...(userMessageId ? { messageId: userMessageId } : {}),
-      });
+    const message = claudeUserMessageWithImages({ text: extractUserMessageText(content), content });
+    if (message) {
+      timeline.push({ ...message, ...(userMessageId ? { messageId: userMessageId } : {}) });
     }
   }
 

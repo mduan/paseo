@@ -15,6 +15,7 @@ import {
   resolveClaudeCodeVersion,
   toClaudeSdkMcpConfig,
 } from "./agent.js";
+import * as providerImageOutput from "../provider-image-output.js";
 import { claudeProjectDirSync } from "./project-dir.js";
 import { streamSession } from "../test-utils/session-stream-adapter.js";
 import type {
@@ -48,6 +49,63 @@ afterEach(() => {
 });
 
 describe("convertClaudeHistoryEntry", () => {
+  test.each([false, true])("restores user images with image-only=%s", async (imageOnly) => {
+    const bytes = Buffer.from("Claude user image fixture");
+    const image = {
+      type: "image",
+      source: { type: "base64", media_type: "image/png", data: bytes.toString("base64") },
+    };
+    const result = convertClaudeHistoryEntry(
+      {
+        type: "user",
+        uuid: "user-image-1",
+        message: {
+          content: imageOnly ? [image] : [{ type: "text", text: "Original image" }, image],
+        },
+      },
+      () => [],
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "user_message",
+      messageId: "user-image-1",
+      text: imageOnly ? "" : "Original image",
+      imageSources: [expect.any(String)],
+    });
+    const item = result[0];
+    if (item.type !== "user_message") throw new Error("Expected user message");
+    expect(await fs.readFile(item.imageSources![0])).toEqual(bytes);
+  });
+
+  test("keeps user text and remaining images when an image cannot be materialized", () => {
+    vi.spyOn(providerImageOutput, "materializeProviderImage")
+      .mockImplementationOnce(() => {
+        throw new Error("Attachment storage unavailable");
+      })
+      .mockReturnValueOnce({ path: "/owned-qa/second-image.png" });
+    const image = {
+      type: "image",
+      source: { type: "base64", media_type: "image/png", data: "aGk=" },
+    };
+
+    expect(
+      convertClaudeHistoryEntry(
+        {
+          type: "user",
+          message: { content: [{ type: "text", text: "Original image" }, image, image] },
+        },
+        () => [],
+      ),
+    ).toEqual([
+      {
+        type: "user_message",
+        text: "Original image",
+        imageSources: ["/owned-qa/second-image.png"],
+      },
+    ]);
+  });
+
   test("maps user tool results to timeline items", () => {
     const toolUseId = "toolu_test";
     const entry = {
@@ -1924,6 +1982,27 @@ describe("ClaudeAgentSession context window usage", () => {
       model: options?.model,
     });
   }
+
+  test("renders inline images in SDK user messages", async () => {
+    const session = await createSessionForTest();
+    try {
+      const events = session.translateMessageToEvents({
+        type: "user",
+        message: {
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "aGk=" } },
+          ],
+        },
+      } as unknown as SDKMessage);
+      expect(events).toContainEqual({
+        type: "timeline",
+        provider: "claude",
+        item: { type: "user_message", text: "", imageSources: [expect.any(String)] },
+      });
+    } finally {
+      await session.close();
+    }
+  });
 
   test("emits canonical task snapshots from Claude TaskCreate results", async () => {
     const session = await createSessionForTest();
