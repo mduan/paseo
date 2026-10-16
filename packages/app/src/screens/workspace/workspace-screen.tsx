@@ -3098,13 +3098,16 @@ function WorkspaceScreenContent({
         onCloseTabsToLeft: (id) => handleCloseTabsToLeftInPane(id, paneTabs),
         onCloseTabsToRight: (id) => handleCloseTabsToRightInPane(id, paneTabs),
         onCloseOtherTabs: (id) => handleCloseOtherTabsInPane(id, paneTabs),
-        paneMoves: {
-          root,
-          explorerSidebarPaneId,
-          workspaceKey: persistenceKey,
-          moveTabToPane: moveWorkspaceTabToPane,
-          splitPane: splitWorkspacePane,
-        },
+        paneMoves:
+          !isMobile && supportsDesktopPaneSplits()
+            ? {
+                root,
+                explorerSidebarPaneId,
+                workspaceKey: persistenceKey,
+                moveTabToPane: moveWorkspaceTabToPane,
+                splitPane: splitWorkspacePane,
+              }
+            : undefined,
       }).menuEntries;
     });
   }, [
@@ -3130,6 +3133,7 @@ function WorkspaceScreenContent({
     explorerSidebarPaneId,
     moveWorkspaceTabToPane,
     splitWorkspacePane,
+    isMobile,
   ]);
 
   const handleClosePane = useCallback(
