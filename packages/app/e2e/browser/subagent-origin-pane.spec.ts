@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
+import { closeWorkspaceAgentTab } from "../support/helpers/archive-tab";
 import { runWorkspaceActionFromCommandCenter } from "../support/helpers/command-center-workspace-actions";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -37,6 +38,39 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
   });
+});
+
+test("an opened subagent appears in the sidebar until its tab closes", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "subagent-sidebar-" });
+  try {
+    const pair = await seedParentWithSubagent(workspace, {
+      parentTitle: "Sidebar parent",
+      childTitle: "Sidebar child",
+    });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await openAgentRoute(page, { workspaceId: pair.workspaceId, agentId: pair.parent.id });
+    const parentRow = page.getByTestId(`sidebar-workspace-session-agent:${pair.parent.id}`);
+    const childRow = page.getByTestId(`sidebar-workspace-session-agent:${pair.child.id}`);
+    await expect(parentRow).toBeVisible();
+    await expect(childRow).toHaveCount(0);
+    await openSubagentsTrack(page);
+    await page.getByTestId(`subagents-track-row-${pair.child.id}`).click();
+    await expect(page.getByTestId(`workspace-tab-agent_${pair.child.id}`)).toBeVisible();
+    await expect(childRow).toBeVisible();
+
+    await parentRow.click();
+    await expect(childRow).toBeVisible();
+    await page.reload();
+    await expect(childRow).toBeVisible();
+    await childRow.click();
+    await page.getByTestId(`workspace-tab-agent_${pair.child.id}`).hover();
+    await closeWorkspaceAgentTab(page, pair.child.id);
+    await expect(childRow).toHaveCount(0);
+    await openSubagentsTrack(page);
+    await expect(page.getByTestId(`subagents-track-row-${pair.child.id}`)).toBeVisible();
+  } finally {
+    await workspace.cleanup();
+  }
 });
 
 test("a subagent opened from a right-pane parent stays with its parent when left has focus", async ({
