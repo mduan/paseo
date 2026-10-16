@@ -430,6 +430,7 @@ export function FileExplorerPane({
 }: FileExplorerPaneProps) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const normalizedWorkspaceRoot = useMemo(() => workspaceRoot.trim(), [workspaceRoot]);
   const workspaceStateKey = useMemo(
@@ -983,6 +984,7 @@ export function FileExplorerPane({
       return;
     }
     useExplorerRevealStore.setState({ request: undefined });
+    setSearchQuery("");
     const ancestors = explorerAncestorPaths(revealRequest.path);
     pendingScrollPathRef.current = revealRequest.path;
     selectExplorerEntry(revealRequest.path);
@@ -1006,7 +1008,7 @@ export function FileExplorerPane({
   // Scrolls once the revealed row exists, which can take several listings after the request.
   useEffect(() => {
     const path = pendingScrollPathRef.current;
-    if (!path || !treeListRef.current) {
+    if (!path || searchQuery.trim() || !treeListRef.current) {
       return;
     }
     const index = listRows.findIndex((row) => row.type === "entry" && row.row.entry.path === path);
@@ -1017,7 +1019,7 @@ export function FileExplorerPane({
     if (!viewablePathsRef.current.has(path)) {
       treeListRef.current.scrollToIndex({ index, viewPosition: 0.5, animated: true });
     }
-  }, [listRows]);
+  }, [listRows, searchQuery]);
 
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken<ExplorerListRow>[] }) => {
@@ -1167,6 +1169,8 @@ export function FileExplorerPane({
       <FileExplorerPaneContent
         serverId={serverId}
         workspaceId={workspaceId ?? null}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
         onOpenFile={onOpenFile}
         error={error}
         isCompact={isCompact}
@@ -1246,6 +1250,8 @@ function RootCreationContextTarget({
 interface FileExplorerPaneContentProps {
   serverId: string;
   workspaceId: string | null;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
   onOpenFile?: (filePath: string) => void;
   error: string | null;
   isCompact: boolean;
@@ -1274,6 +1280,8 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
   const {
     serverId,
     workspaceId,
+    searchQuery,
+    onSearchQueryChange,
     onOpenFile,
     error,
     isCompact,
@@ -1297,7 +1305,6 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
   } = props;
 
   const showHiddenFiles = usePanelStore((state) => state.explorerShowHiddenFiles);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const handleNewFileAtRoot = useCallback(() => {
     onNewEntryAtRoot?.(".", "file");
@@ -1439,7 +1446,7 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
       <View style={styles.searchRow}>
         <SearchField
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={onSearchQueryChange}
           placeholder={t("workspace.fileExplorer.search.placeholder")}
           clearAccessibilityLabel={t("workspace.fileExplorer.search.clear")}
           testID="files-search-input"
