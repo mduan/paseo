@@ -102,6 +102,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     contentMeasuredForKey: null as string | null,
   });
   const scrollOffsetYRef = useRef(0);
+  const scrollAnchorGenerationRef = useRef(0);
   const isUserScrollActiveRef = useRef(false);
   const scrollKeyboardDismiss = useScrollKeyboardDismiss();
   const streamKeyboardInset = useKeyboardStreamInset();
@@ -234,6 +235,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
 
   const scrollToBottom = useCallback(
     (animated: boolean) => {
+      scrollAnchorGenerationRef.current += 1;
       programmaticScrollEventBudgetRef.current = 3;
       flatListRef.current?.scrollToOffset({
         offset: 0,
@@ -306,6 +308,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
       contentMeasuredForKey: null,
     };
     scrollOffsetYRef.current = 0;
+    scrollAnchorGenerationRef.current += 1;
     isUserScrollActiveRef.current = false;
     clearPendingUserScrollEnd();
     clearNativeViewportSettling();
@@ -326,11 +329,40 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
     };
   }, [agentId, clearNativeViewportSettling, clearPendingUserScrollEnd, evaluateHistoryStart]);
 
-  useEffect(() => () => clearNativeViewportSettling(), [clearNativeViewportSettling]);
+  useEffect(
+    () => () => {
+      scrollAnchorGenerationRef.current += 1;
+      clearNativeViewportSettling();
+    },
+    [clearNativeViewportSettling],
+  );
 
   useEffect(() => {
     bottomAnchorController.prepareForStickyContentChange();
   }, [bottomAnchorController, historyRows, segments.liveHead]);
+
+  const captureScrollAnchor = useStableEvent(() => {
+    const metrics = streamViewportMetricsRef.current;
+    const hasMeasuredViewport =
+      metrics.viewportMeasuredForKey === metrics.containerKey &&
+      metrics.contentMeasuredForKey === metrics.containerKey;
+    if (
+      !hasMeasuredViewport ||
+      metrics.contentHeight <= 0 ||
+      metrics.viewportHeight <= 0 ||
+      metrics.viewportWidth <= 0
+    )
+      return;
+    const generation = ++scrollAnchorGenerationRef.current;
+    return (delta: number) => {
+      if (scrollAnchorGenerationRef.current !== generation) return;
+      scrollAnchorGenerationRef.current += 1;
+      const offset = Math.max(0, scrollOffsetYRef.current + delta);
+      flatListRef.current?.scrollToOffset({ offset, animated: false });
+      scrollOffsetYRef.current = offset;
+      streamViewportMetricsRef.current = { ...streamViewportMetricsRef.current, offsetY: offset };
+    };
+  });
 
   useEffect(() => {
     const handle: StreamViewportHandle = {
@@ -345,6 +377,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         markNativeViewportSettling();
       },
       detachFromBottom: () => bottomAnchorController.detachByUser(),
+      captureScrollAnchor,
     };
     viewportRef.current = handle;
     return () => {
@@ -352,7 +385,13 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         viewportRef.current = null;
       }
     };
-  }, [agentId, bottomAnchorController, markNativeViewportSettling, viewportRef]);
+  }, [
+    agentId,
+    bottomAnchorController,
+    captureScrollAnchor,
+    markNativeViewportSettling,
+    viewportRef,
+  ]);
 
   const isScrollEventNearBottom = useStableEvent(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -404,6 +443,7 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
   });
 
   const handleScrollBeginDrag = useStableEvent((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollAnchorGenerationRef.current += 1;
     clearPendingUserScrollEnd();
     isUserScrollActiveRef.current = true;
     scrollKeyboardDismiss.onScrollBeginDrag(event);

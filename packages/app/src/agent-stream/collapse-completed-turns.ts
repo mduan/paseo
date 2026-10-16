@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useReducer } from "react";
+import { createContext, useCallback, useContext, useMemo, useReducer, useRef } from "react";
 import type { StreamItem } from "@/types/stream";
 import { getStreamItemMessageId } from "./presentation";
 import { continuesTurn, startsNewTurn } from "./turn-membership";
@@ -122,6 +122,9 @@ function useExpandedTurnKeys(chatKey: string) {
   return [expandedTurnKeysByChat.get(chatKey) ?? EMPTY_TURN_KEYS, toggle] as const;
 }
 
+type WorkToggleTarget = Pick<WorkToggle, "turnKey"> & { top?: number };
+type PendingWorkToggleAnchor = Required<WorkToggleTarget> & { restore: (delta: number) => void };
+
 /** Folds `tail`, with in-memory expanded turns per chat. */
 export function useFoldedTail(input: {
   chatKey: string;
@@ -129,26 +132,39 @@ export function useFoldedTail(input: {
   head: StreamItem[];
   isTurnActive: boolean;
   activeTurnId: string | null;
-  onBeforeToggle: () => void;
+  onBeforeToggle: () => ((delta: number) => void) | undefined;
 }): { tail: StreamItem[]; workToggles: WorkToggleContextValue } {
   const { chatKey, tail, head, isTurnActive, activeTurnId, onBeforeToggle } = input;
   const [expandedTurnKeys, toggleTurnKey] = useExpandedTurnKeys(chatKey);
+  const pendingAnchorRef = useRef<PendingWorkToggleAnchor | undefined>(undefined);
   const onToggle = useCallback(
-    (turnKey: string) => {
-      onBeforeToggle();
+    ({ turnKey, top }: WorkToggleTarget) => {
+      const restore = onBeforeToggle();
+      pendingAnchorRef.current =
+        top !== undefined && restore ? { turnKey, top, restore } : undefined;
       toggleTurnKey(turnKey);
     },
     [onBeforeToggle, toggleTurnKey],
   );
+  const onToggleLayout = useCallback(({ turnKey, top }: Required<WorkToggleTarget>) => {
+    const anchor = pendingAnchorRef.current;
+    if (!anchor || anchor.turnKey !== turnKey) return;
+    pendingAnchorRef.current = undefined;
+    anchor.restore(anchor.top - top);
+  }, []);
   return useMemo(() => {
     const folded = foldCompletedTurns({ tail, head, isTurnActive, activeTurnId, expandedTurnKeys });
-    return { tail: folded.items, workToggles: { toggles: folded.toggles, onToggle } };
-  }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle]);
+    return {
+      tail: folded.items,
+      workToggles: { toggles: folded.toggles, onToggle, onToggleLayout },
+    };
+  }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle, onToggleLayout]);
 }
 
 export interface WorkToggleContextValue {
   toggles: ReadonlyMap<string, WorkToggle>;
-  onToggle: (turnKey: string) => void;
+  onToggle: (target: WorkToggleTarget) => void;
+  onToggleLayout: (target: Required<WorkToggleTarget>) => void;
 }
 
 /** Rows read their toggle from context, so memoized history rows update when it changes. */
@@ -157,5 +173,7 @@ export const WorkToggleContext = createContext<WorkToggleContextValue | undefine
 export function useWorkToggle(itemId: string | undefined) {
   const value = useContext(WorkToggleContext);
   const toggle = itemId ? value?.toggles.get(itemId) : undefined;
-  return toggle && value ? { ...toggle, onToggle: value.onToggle } : undefined;
+  return toggle && value
+    ? { ...toggle, onToggle: value.onToggle, onToggleLayout: value.onToggleLayout }
+    : undefined;
 }
