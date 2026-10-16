@@ -8,6 +8,29 @@ import {
 import { CodexAppServerClient } from "./app-server-transport.js";
 
 describe("Codex app-server transport", () => {
+  test.each(["\u2028", "\u2029"])(
+    "completes fork responses containing Unicode separator %j",
+    async (separator) => {
+      const child = createCodexAppServerChildProcess();
+      const client = new CodexAppServerClient(child, createTestLogger());
+      const result = {
+        thread: { id: "forked-thread", turns: [{ output: `textbox: ${separator}\nnext` }] },
+      };
+      const response = Buffer.from(`${JSON.stringify({ id: 1, result })}\n`);
+      const split = response.indexOf(Buffer.from(separator)) + 1;
+
+      try {
+        const request = client.request("thread/fork", { threadId: "source-thread" }, 1000);
+        child.stdout.write(response.subarray(0, split));
+        child.stdout.write(response.subarray(split));
+
+        await expect(request).resolves.toEqual(result);
+      } finally {
+        await client.dispose();
+      }
+    },
+  );
+
   test("ignores non-JSON stdout lines without dropping pending requests", async () => {
     const child = createCodexAppServerChildProcess();
     const client = new CodexAppServerClient(child, createTestLogger());

@@ -1,9 +1,9 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import readline from "node:readline";
 import type { Logger } from "pino";
 import { z } from "zod";
 
 import { terminateWithTreeKill } from "../../../../utils/tree-kill.js";
+import { JsonlFrameDecoder } from "../jsonl-frame-decoder.js";
 
 const DEFAULT_TIMEOUT_MS = 14 * 24 * 60 * 60 * 1000;
 const APP_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 2_000;
@@ -168,7 +168,7 @@ function readProviderTurnId(params: unknown): string | undefined {
 }
 
 export class CodexAppServerClient {
-  private readonly rl: readline.Interface;
+  private readonly handleStdoutChunk: (chunk: string) => void;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly requestHandlers = new Map<string, RequestHandler>();
   private notificationHandler: NotificationHandler | null = null;
@@ -182,12 +182,19 @@ export class CodexAppServerClient {
     private readonly logger: Logger,
     private readonly getTraceContext: () => CodexAppServerTraceContext = () => ({}),
   ) {
-    this.rl = readline.createInterface({ input: child.stdout });
-    this.rl.on("line", (line) => {
-      void this.handleLine(line).catch((error) => {
-        this.logger.warn({ error, line }, "Failed to handle Codex app-server stdout line");
-      });
+    // Node readline also splits on U+2028/U+2029, which are valid inside JSON strings.
+    const frameDecoder = new JsonlFrameDecoder({
+      frame: (frame) => {
+        void this.handleMessage(frame).catch((error) => {
+          this.logger.warn({ error, frame }, "Failed to handle Codex app-server stdout frame");
+        });
+      },
+      problem: (problem, detail) => {
+        this.logger.warn({ problem, detail }, "Ignoring invalid Codex app-server stdout frame");
+      },
     });
+    this.handleStdoutChunk = (chunk) => frameDecoder.write(chunk);
+    child.stdout.setEncoding("utf8").on("data", this.handleStdoutChunk);
 
     child.stderr.on("data", (chunk) => {
       this.stderrBuffer += chunk.toString();
@@ -259,7 +266,7 @@ export class CodexAppServerClient {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.unexpectedTerminationHandler = null;
-    this.rl.close();
+    this.child.stdout.off("data", this.handleStdoutChunk);
     this.rejectPending(new Error("Codex app-server client is closed"));
     try {
       this.child.stdin.end();
@@ -286,7 +293,7 @@ export class CodexAppServerClient {
       return;
     }
     this.disposed = true;
-    this.rl.close();
+    this.child.stdout.off("data", this.handleStdoutChunk);
     this.rejectPending(error);
     const handler = this.unexpectedTerminationHandler;
     this.unexpectedTerminationHandler = null;
@@ -319,21 +326,7 @@ export class CodexAppServerClient {
     }
   }
 
-  private async handleLine(line: string): Promise<void> {
-    if (!line.trim()) return;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(line);
-    } catch (error) {
-      this.logger.warn({ error, line }, "Ignoring non-JSON Codex app-server stdout line");
-      return;
-    }
-
-    if (!isRecord(raw)) {
-      this.logger.warn({ line }, "Parsed JSON is not an object");
-      return;
-    }
-
+  private async handleMessage(raw: Record<string, unknown>): Promise<void> {
     if (isJsonRpcResponse(raw)) {
       const id = raw.id;
       if (raw.result !== undefined || raw.error) {
