@@ -5,7 +5,12 @@ import {
   normalizeWorkspaceDescriptor,
   type Agent,
 } from "@/stores/session-store";
-import type { StreamItem } from "@/types/stream";
+import {
+  applyStreamEvent,
+  createUserMessage,
+  handoffCreatedAgentUserMessageToStream,
+  type StreamItem,
+} from "@/types/stream";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { ReplicaCache } from ".";
 import type { DirectoryCheckpoint } from "@/runtime/replica-cache";
@@ -339,6 +344,82 @@ describe("ReplicaCache", () => {
     const reader = createCache(storage);
     expect(await reader.readTimeline(SERVER_ID, "agent-1")).toEqual(original);
   });
+
+  it.each([false, true])(
+    "retains submitted image references across cold restore (canonical first: %s)",
+    async (canonicalFirst) => {
+      const submitted = createUserMessage({
+        clientMessageId: "image-only-prompt",
+        text: "",
+        timestamp: new Date(1000),
+        images: [
+          {
+            id: "picked-image",
+            mimeType: "image/png",
+            storageType: "native-file",
+            storageKey: "file:///picked-image.png",
+            createdAt: 1000,
+          },
+        ],
+      });
+      const canonical = {
+        type: "timeline" as const,
+        provider: "codex" as const,
+        item: {
+          type: "user_message" as const,
+          messageId: "image-only-prompt",
+          clientMessageId: "image-only-prompt",
+          text: "",
+          imageSources: ["/uploads/picked-image.png"],
+          attachments: [
+            { type: "text" as const, mimeType: "text/plain" as const, text: "image context" },
+          ],
+        },
+      };
+      const applyCanonical = (tail: StreamItem[]) =>
+        applyStreamEvent({
+          tail,
+          head: [],
+          event: canonical,
+          timestamp: new Date(2000),
+          timelineCursor: { epoch: "image-epoch", seq: 1 },
+        });
+      const merged = canonicalFirst
+        ? handoffCreatedAgentUserMessageToStream({
+            ...applyCanonical([]),
+            message: submitted,
+          })
+        : applyCanonical([submitted]);
+      expect(merged.tail).toHaveLength(1);
+      expect(merged.tail[0]).toMatchObject({
+        ...submitted,
+        messageId: canonical.item.messageId,
+        imageSources: canonical.item.imageSources,
+        attachments: canonical.item.attachments,
+      });
+
+      const storage = new MemoryStorage();
+      const writer = createCache(storage);
+      writer.commitTimeline(SERVER_ID, "agent-1", {
+        agentId: "agent-1",
+        items: merged.tail,
+        range: { epoch: "image-epoch", startSeq: 1, endSeq: 1 },
+        hasOlder: false,
+      });
+      await writer.flush();
+      const restored = await createCache(storage).readTimeline(SERVER_ID, "agent-1");
+      expect(restored?.items).toHaveLength(1);
+      expect(restored?.items[0]).toMatchObject({
+        text: "",
+        imageSources: canonical.item.imageSources,
+        attachments: canonical.item.attachments,
+      });
+      expect(applyCanonical(restored!.items).tail[0]).toMatchObject({
+        imageSources: canonical.item.imageSources,
+        attachments: canonical.item.attachments,
+      });
+    },
+  );
 
   it("round-trips explicit directory and timeline commits", async () => {
     const storage = new MemoryStorage();

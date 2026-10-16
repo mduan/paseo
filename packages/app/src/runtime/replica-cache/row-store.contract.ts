@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ReplicaRow, ReplicaRowStore } from "./row-store";
+import { REPLICA_ROW_STORE_SCHEMA_VERSION } from "./row-store-schema";
 
 export interface ReplicaRowStoreHarness {
   store: ReplicaRowStore;
@@ -182,12 +183,17 @@ export function runReplicaRowStoreContract(
     });
 
     it("wipes cached rows when the schema version changes on open", async () => {
-      await store.apply({
-        upserts: [row("server-a", "agent", "agent-1", "stale")],
+      const oldStore = await harness.openWithSchemaVersion(REPLICA_ROW_STORE_SCHEMA_VERSION - 1);
+      await oldStore.apply({
+        upserts: [
+          row("server-a", "agent", "agent-1", "stale"),
+          row("server-a", "timeline", "agent-1", "missing canonical media"),
+          row("server-a", "checkpoint", "singleton", '{"cursor":6}'),
+        ],
         deletes: [],
       });
 
-      const upgradedStore = await harness.openWithSchemaVersion(2);
+      const upgradedStore = await harness.openWithSchemaVersion(REPLICA_ROW_STORE_SCHEMA_VERSION);
 
       expect(await upgradedStore.readAll()).toEqual([]);
     });
