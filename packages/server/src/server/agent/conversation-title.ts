@@ -56,7 +56,7 @@ export function createConversationTitleGenerator(deps: ConversationTitleDependen
         {
           configKey: "title",
           default:
-            "Use a concise, specific name in sentence case, max 80 characters. Preserve the task, its target, and distinguishing identifiers. Prefer clarity over brevity.",
+            "Use a concise, specific name in sentence case, max 120 characters. Preserve the task, its target, and distinguishing identifiers. Prefer clarity over brevity.",
         },
       ],
       after: "Return JSON only with a single field 'title'.",
