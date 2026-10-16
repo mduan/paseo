@@ -1,0 +1,6 @@
+{
+  "expected": "https://example.invalid/owned/punctuation?alpha=1&beta=two#anchor",
+  "targets": ["https://example.invalid/owned/punctuation?alpha=1&beta=two#anchor"],
+  "passed": true,
+  "punctuationExcluded": true
+}

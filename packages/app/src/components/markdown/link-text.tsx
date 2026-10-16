@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Text, type GestureResponderEvent, type StyleProp, type TextStyle } from "react-native";
-import { isWeb } from "@/constants/platform";
+import { isNative, isWeb } from "@/constants/platform";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { markdownLinkTextStyle } from "./link-children";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -13,6 +13,9 @@ type MarkdownLinkTextProps = {
   onBlur?(): void;
   children?: ReactNode;
 } & ({ href: string; onPress?: never } | { href?: never; onPress(): void });
+
+// Native Pressability otherwise activates the link when text selection releases a long press.
+function handleNativeLongPress() {}
 
 export function MarkdownLinkText({
   style,
@@ -55,6 +58,7 @@ export function MarkdownLinkText({
       dataSet={dataSet}
       style={textStyle}
       onPress={handlePress}
+      onLongPress={isNative ? handleNativeLongPress : undefined}
       {...(isWeb
         ? {
             href,

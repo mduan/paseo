@@ -138,6 +138,76 @@ const SourceSchema = z.object({
     );
   });
 
+  it("preserves summary attachments in fetched and streamed user messages", () => {
+    const item = {
+      type: "user_message",
+      text: "Continue",
+      attachments: [
+        {
+          type: "text",
+          mimeType: "text/plain",
+          contextKind: "chat_history",
+          title: "Chat history",
+          text: "Earlier context",
+          sourceAgentId: "source-agent",
+        },
+      ],
+    };
+    const timestamp = "2026-10-16T00:00:00.000Z";
+    const messages = [
+      {
+        type: "fetch_agent_timeline_response",
+        payload: {
+          requestId: "summary-timeline",
+          agentId: "summary-agent",
+          agent: null,
+          direction: "tail",
+          projection: "projected",
+          epoch: "epoch",
+          reset: false,
+          staleCursor: false,
+          gap: false,
+          window: { minSeq: 1, maxSeq: 1, nextSeq: 2 },
+          startCursor: null,
+          endCursor: null,
+          hasOlder: false,
+          hasNewer: false,
+          entries: [
+            {
+              provider: "claude",
+              item,
+              timestamp,
+              seqStart: 1,
+              seqEnd: 1,
+              sourceSeqRanges: [{ startSeq: 1, endSeq: 1 }],
+              collapsed: [],
+            },
+          ],
+          error: null,
+        },
+      },
+      {
+        type: "agent_stream",
+        payload: {
+          agentId: "summary-agent",
+          timestamp,
+          event: { type: "timeline", provider: "claude", item },
+        },
+      },
+    ];
+
+    for (const message of messages) {
+      const envelope = { type: "session", message };
+      expect(GeneratedWSOutboundMessageSchema.safeParse(envelope)).toEqual({
+        success: true,
+        data: envelope,
+      });
+      item.attachments[0].mimeType = "application/invalid";
+      expect(GeneratedWSOutboundMessageSchema.safeParse(envelope).success).toBe(false);
+      item.attachments[0].mimeType = "text/plain";
+    }
+  });
+
   it("accepts project config responses with and without setup commit status", () => {
     const payload = {
       requestId: "project-config-read",

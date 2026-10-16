@@ -1,8 +1,44 @@
 import { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
 import type { AgentAttachment, FirstAgentContext } from "@getpaseo/protocol/messages";
-import type { AgentPromptContentBlock, AgentPromptInput } from "./agent-sdk-types.js";
+import type {
+  AgentPromptContentBlock,
+  AgentPromptInput,
+  AgentRunOptions,
+} from "./agent-sdk-types.js";
+import { materializeProviderImage } from "./providers/provider-image-output.js";
 
 export { renderPromptAttachmentAsText } from "@getpaseo/protocol/prompt-attachments";
+
+function submittedPromptText(prompt: AgentPromptInput): string {
+  if (typeof prompt === "string") {
+    return prompt;
+  }
+  return prompt
+    .flatMap((block) => (block.type === "text" && !("mimeType" in block) ? [block.text] : []))
+    .join("\n")
+    .trim();
+}
+
+export function getAgentPromptPresentation(
+  prompt: AgentPromptInput,
+): NonNullable<AgentRunOptions["promptPresentation"]> {
+  const imageSources: string[] = [];
+  const attachments: AgentAttachment[] = [];
+  if (Array.isArray(prompt)) {
+    for (const block of prompt) {
+      if (block.type === "image") {
+        imageSources.push(materializeProviderImage(block).path);
+      } else if (block.type !== "text" || "mimeType" in block) {
+        attachments.push(block);
+      }
+    }
+  }
+  return {
+    text: submittedPromptText(prompt),
+    ...(imageSources.length ? { imageSources } : {}),
+    ...(attachments.length ? { attachments } : {}),
+  };
+}
 
 export function buildAgentPrompt(
   text: string,

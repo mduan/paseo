@@ -1,0 +1,13 @@
+{
+  "agentId": "82a30bc6-b087-4225-9649-9797b26fe937",
+  "workspaceId": "wks_906304cc3262d7ce",
+  "clientMessageId": "draft_msg_1792144253030_i1p8nj35i:initial-message",
+  "oneUser": true,
+  "oneImage": true,
+  "emptyText": true,
+  "oneAssistant": true,
+  "turnCount": 1,
+  "automaticTitles": "Recreate white looping logo",
+  "model": "gpt-6.1-sol",
+  "thinking": "high"
+}

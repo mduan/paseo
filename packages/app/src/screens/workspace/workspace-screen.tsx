@@ -707,6 +707,14 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
     setIsOpen(true);
   }, []);
 
+  const handleRevealFileInExplorer = useCallback(
+    (path: string) => {
+      setIsOpen(false);
+      return onRevealFileInExplorer(path);
+    },
+    [onRevealFileInExplorer],
+  );
+
   const renderTabOption = useCallback(
     ({
       option,
@@ -741,7 +749,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
           onCopyAgentId={onCopyAgentId}
           onCopyTerminalId={onCopyTerminalId}
           onCopyFilePath={onCopyFilePath}
-          onRevealFileInExplorer={onRevealFileInExplorer}
+          onRevealFileInExplorer={handleRevealFileInExplorer}
           onReloadAgent={onReloadAgent}
           onRenameTab={onRenameTab}
           onCloseTab={onCloseTab}
@@ -761,7 +769,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
       onCopyAgentId,
       onCopyTerminalId,
       onCopyFilePath,
-      onRevealFileInExplorer,
+      handleRevealFileInExplorer,
       onReloadAgent,
       onRenameTab,
       onCloseTab,
@@ -3098,13 +3106,16 @@ function WorkspaceScreenContent({
         onCloseTabsToLeft: (id) => handleCloseTabsToLeftInPane(id, paneTabs),
         onCloseTabsToRight: (id) => handleCloseTabsToRightInPane(id, paneTabs),
         onCloseOtherTabs: (id) => handleCloseOtherTabsInPane(id, paneTabs),
-        paneMoves: {
-          root,
-          explorerSidebarPaneId,
-          workspaceKey: persistenceKey,
-          moveTabToPane: moveWorkspaceTabToPane,
-          splitPane: splitWorkspacePane,
-        },
+        paneMoves:
+          !isMobile && supportsDesktopPaneSplits()
+            ? {
+                root,
+                explorerSidebarPaneId,
+                workspaceKey: persistenceKey,
+                moveTabToPane: moveWorkspaceTabToPane,
+                splitPane: splitWorkspacePane,
+              }
+            : undefined,
       }).menuEntries;
     });
   }, [
@@ -3130,6 +3141,7 @@ function WorkspaceScreenContent({
     explorerSidebarPaneId,
     moveWorkspaceTabToPane,
     splitWorkspacePane,
+    isMobile,
   ]);
 
   const handleClosePane = useCallback(

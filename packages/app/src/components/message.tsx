@@ -874,22 +874,28 @@ function AssistantMarkdownImage({
   const imageUri = binding?.uri ?? "";
   const imageSource = useMemo(() => ({ uri: imageUri }), [imageUri]);
   const frameStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [assistantMessageStylesheet.imageFrame, containerStyle],
-    [containerStyle],
+    () => [
+      assistantMessageStylesheet.imageFrame,
+      containerStyle,
+      // Constrain the parent so native aspectRatio uses the capped width.
+      !size && aspectRatio
+        ? {
+            maxWidth: Math.min(
+              ASSISTANT_IMAGE_MAX_HEIGHT * aspectRatio,
+              getAssistantImageMetadata({ source, workspaceRoot, serverId })?.width ?? Infinity,
+            ),
+          }
+        : undefined,
+    ],
+    [aspectRatio, containerStyle, serverId, size, source, workspaceRoot],
   );
   const imageSizeStyle = useMemo<ViewStyle>(() => {
     if (size) return { width: size, height: size };
     if (aspectRatio) {
-      // Never scale up past the image's own pixel size.
-      const naturalWidth =
-        getAssistantImageMetadata({ source, workspaceRoot, serverId })?.width ?? Infinity;
-      return {
-        aspectRatio,
-        maxWidth: Math.min(ASSISTANT_IMAGE_MAX_HEIGHT * aspectRatio, naturalWidth),
-      };
+      return { aspectRatio };
     }
     return { height: ASSISTANT_IMAGE_MIN_HEIGHT };
-  }, [aspectRatio, serverId, source, workspaceRoot, size]);
+  }, [aspectRatio, size]);
   const surfaceStyle = useMemo<StyleProp<ViewStyle>>(
     () => [assistantMessageStylesheet.imageSurface, imageSizeStyle],
     [imageSizeStyle],

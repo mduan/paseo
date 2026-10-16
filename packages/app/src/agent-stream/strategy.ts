@@ -55,6 +55,7 @@ export interface StreamViewportHandle {
   prepareForViewportChange: () => void;
   /** Stop following output, as if the user scrolled up. */
   detachFromBottom?: () => void;
+  captureScrollAnchor?: () => ((delta: number) => void) | undefined;
   scrollToMessage?: (messageId: string, occurrence?: ScrollToMessageOccurrence) => void;
 }
 

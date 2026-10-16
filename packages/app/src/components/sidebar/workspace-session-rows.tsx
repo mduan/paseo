@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ContextMenuTrigger, useContextMenu } from "@/components/ui/context-menu";
-import { useIsCompactFormFactor } from "@/constants/layout";
+import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import {
   renderSidebarKebabTriggerIcon,
@@ -424,6 +424,7 @@ function WorkspaceSessionKebab({
 }) {
   const { open } = useContextMenu();
   const { tabId } = tab;
+  const isCompact = useIsCompactFormFactor();
   const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
   const layout = useWorkspaceLayoutStore((state) => state.layoutByWorkspace[layoutKey]);
   const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
@@ -455,15 +456,16 @@ function WorkspaceSessionKebab({
         onCloseTabsBefore: () => select("close-before"),
         onCloseTabsAfter: () => select("close-after"),
         onCloseOtherTabs: () => select("close-others"),
-        paneMoves: layout
-          ? {
-              root: layout.root,
-              explorerSidebarPaneId: selectExplorerSidebarPaneId(layoutState, layoutKey),
-              workspaceKey: layoutKey,
-              moveTabToPane: layoutState.moveTabToPane,
-              splitPane: layoutState.splitPane,
-            }
-          : undefined,
+        paneMoves:
+          layout && !isCompact && supportsDesktopPaneSplits()
+            ? {
+                root: layout.root,
+                explorerSidebarPaneId: selectExplorerSidebarPaneId(layoutState, layoutKey),
+                workspaceKey: layoutKey,
+                moveTabToPane: layoutState.moveTabToPane,
+                splitPane: layoutState.splitPane,
+              }
+            : undefined,
       });
   }
   return (

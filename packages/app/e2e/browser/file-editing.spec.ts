@@ -100,6 +100,48 @@ async function seedAgentWithFileLink(input: LinkedFile) {
 }
 
 test.describe("CodeMirror workspace file editing", () => {
+  test("reveals a searched deep file from the compact tab menu", async ({ page }) => {
+    const session = await seedMockAgentWorkspace({
+      repoPrefix: "file-tab-reveal-",
+      title: "Deep file reveal",
+    });
+    const filePath = "src/nested/deep/target.ts";
+    try {
+      await mkdir(path.join(session.cwd, "src/nested/deep"), { recursive: true });
+      await writeFile(path.join(session.cwd, filePath), "export const target = 1;\n");
+      await Promise.all(
+        Array.from({ length: 24 }, (_, index) =>
+          mkdir(path.join(session.cwd, `folder-${String(index).padStart(2, "0")}`)),
+        ),
+      );
+      await page.setViewportSize({ width: 390, height: 844 });
+      await openAgentRoute(page, session);
+      await page.getByTestId("workspace-explorer-toggle").click();
+      await page.getByTestId("explorer-tab-files").click();
+      await page.getByTestId("file-explorer-row-root").click();
+      await page.getByTestId("files-search-input").fill("target.ts");
+      await page.getByTestId(`file-explorer-search-result-${filePath}`).click();
+      await page.getByTestId("workspace-explorer-toggle").click();
+      await expect(page.getByTestId("files-search-input")).toHaveValue("target.ts");
+      await page.getByTestId("explorer-close").click();
+      await page.getByTestId("workspace-tab-switcher-trigger").click();
+      await page.getByTestId(`workspace-tab-menu-file_${filePath}-trigger`).click();
+      await page.getByTestId(`workspace-tab-menu-file_${filePath}-reveal-in-explorer`).click();
+
+      await expect(page.getByTestId("files-search-input")).toHaveValue("");
+      await expect(page.getByText("Switch tab", { exact: true })).toBeHidden();
+      const tree = page.getByTestId("file-explorer-tree-scroll");
+      for (const name of ["src", "nested", "deep", "target.ts"]) {
+        await expect(tree.getByText(name, { exact: true })).toBeVisible();
+      }
+      const selectedRow = tree.locator('[aria-selected="true"]');
+      await expect(selectedRow).toHaveText("target.ts");
+      await expect(selectedRow).toBeInViewport({ ratio: 1 });
+    } finally {
+      await session.cleanup();
+    }
+  });
+
   for (const split of [
     { axis: "horizontal", forward: "right", backward: "left", moveKey: "ArrowRight" },
     { axis: "vertical", forward: "bottom", backward: "top", moveKey: "ArrowDown" },

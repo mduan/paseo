@@ -26,3 +26,5 @@ export function polyfillNavigator(): void {
     navigator.platform = "";
   }
 }
+
+polyfillNavigator();

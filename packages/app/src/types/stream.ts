@@ -280,6 +280,8 @@ function produceUserMessage(
     clientMessageId: incoming.clientMessageId ?? existing.clientMessageId,
     messageId: incoming.messageId ?? existing.messageId,
     timelineCursor: incoming.timelineCursor ?? existing.timelineCursor,
+    imageSources: incoming.imageSources ?? existing.imageSources,
+    attachments: presentation.attachments ?? incoming.attachments ?? existing.attachments,
     // A created agent's local prompt is handed off after the canonical row may have landed; keep
     // that row's turn so the live turn is not folded as finished.
     turnId: existing.turnId ?? incoming.turnId,

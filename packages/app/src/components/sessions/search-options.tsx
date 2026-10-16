@@ -60,7 +60,7 @@ function SearchOptionButton({
     [onChange, option, value],
   );
   return (
-    <Tooltip enabledOnMobile>
+    <Tooltip>
       <TooltipTrigger
         disabled={disabled}
         accessibilityRole="button"

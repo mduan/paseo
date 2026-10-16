@@ -1,0 +1,12 @@
+{
+  "head": "f55ca00df9efef507aa25cd2be022bd0f8010fb5",
+  "buildBase": "2ab5f737b4c9910ab6a9bb2a6d5cfd73f0a5ab8c",
+  "command": "git diff --src-prefix=c/ --dst-prefix=w/ 2ab5f737b f55ca00df9efef507aa25cd2be022bd0f8010fb5 --binary -- packages/app/src/components/message.tsx",
+  "scope": ["packages/app/src/components/message.tsx"],
+  "diffSHA256": "315218f0ceec11e6e73661f2038d39218c93f486407b74b01d47cfbdc0b9d5f7",
+  "frozenBuildPatchSHA256": "315218f0ceec11e6e73661f2038d39218c93f486407b74b01d47cfbdc0b9d5f7",
+  "exactPatchMatch": true,
+  "apk": "apks/candidate7-release.apk",
+  "apkSHA256": "58988eed357c4feb9e230525a4a83c1b134187e051804c4ca270ea3f333a8483",
+  "nativeAcceptance": "Small/wide/tall bitmap+frame geometry, actual lightbox/close anchor passed; tall fullheight inferred from sourceaspect/width and two edge captures."
+}

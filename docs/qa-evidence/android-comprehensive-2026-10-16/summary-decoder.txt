@@ -1,0 +1,1 @@
+{"source":true,"generated":true,"clientAccepted":true,"attachments":[{"itemType":"user_message","attachmentType":"text","contextKind":"chat_history","keys":["type","mimeType","title","text","sourceAgentId","contextKind"]}],"entries":3}

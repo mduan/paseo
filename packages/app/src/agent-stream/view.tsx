@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -609,7 +610,10 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         isTurnActive,
       ],
     );
-    const detachFromBottom = useCallback(() => viewportRef.current?.detachFromBottom?.(), []);
+    const prepareForWorkToggle = useCallback(() => {
+      viewportRef.current?.detachFromBottom?.();
+      return viewportRef.current?.captureScrollAnchor?.();
+    }, []);
     const turnDiffsEnabled = useTurnDiffsEnabled(resolvedServerId);
     const turnDiffs = useAgentTurnDiffs({
       serverId: resolvedServerId,
@@ -633,7 +637,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       isTurnActive,
       activeTurnId: effectiveTurnPresentation.turnId,
       // Expanding near the bottom must not follow output past the work it reveals.
-      onBeforeToggle: detachFromBottom,
+      onBeforeToggle: prepareForWorkToggle,
     });
     const {
       start: historyWindowStart,
@@ -1985,9 +1989,27 @@ function WorkToggleRow({
   hasWork,
   durationMs,
   onToggle,
-}: WorkToggle & { onToggle: (turnKey: string) => void }) {
+  onToggleLayout,
+}: WorkToggle & Pick<WorkToggleContextValue, "onToggle" | "onToggleLayout">) {
   const { t } = useTranslation();
-  const handlePress = useCallback(() => onToggle(turnKey), [onToggle, turnKey]);
+  const ref = useRef<View>(null);
+  const handlePress = useCallback(() => {
+    if (isWeb) {
+      onToggle({ turnKey });
+      return;
+    }
+    const node = ref.current;
+    node?.measureInWindow((_x, top) => {
+      if (ref.current === node) onToggle({ turnKey, top });
+    });
+  }, [onToggle, turnKey]);
+  useLayoutEffect(() => {
+    if (isWeb) return;
+    const node = ref.current;
+    node?.measureInWindow((_x, top) => {
+      if (ref.current === node) onToggleLayout({ turnKey, top });
+    });
+  }, [onToggleLayout, turnKey]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   const label =
     durationMs !== null
@@ -2005,6 +2027,7 @@ function WorkToggleRow({
   const Chevron = expanded ? ThemedChevronDown : ThemedChevronRight;
   return (
     <Pressable
+      ref={ref}
       accessibilityRole="button"
       accessibilityState={accessibilityState}
       onPress={handlePress}

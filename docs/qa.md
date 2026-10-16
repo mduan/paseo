@@ -26,6 +26,9 @@ Evidence is something someone else can look at:
 
 Redact what you need to, keep the technical details. If an agent did the work, submit its raw output. A summary drops the details someone else needs to check it.
 
+Before planning Android QA, read the [2026-10-16 Android coverage record](qa-evidence/android-comprehensive-2026-10-16.md).
+Use its per-scenario commit and scope to select the checks that later changes affect.
+
 ## Does it work well
 
 A feature that works but stutters, shifts the layout, or misaligns by two pixels is not done.
