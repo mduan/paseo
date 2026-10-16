@@ -41,7 +41,7 @@ describe("resolveCreateAgentTitles", () => {
 });
 
 describe("conversation title generation", () => {
-  function fixture({ empty = false, fail = false } = {}) {
+  function fixture({ empty = false, fail = false, title = "  Improve workspace menus  " } = {}) {
     const prompts: string[] = [];
     const getAgent = vi.fn((id: string) => ({
       id,
@@ -83,7 +83,7 @@ describe("conversation title generation", () => {
         async generate<T>(request: StructuredTextGenerationRequest<T>): Promise<T> {
           prompts.push(request.prompt);
           if (fail) throw new Error("Model unavailable");
-          return request.schema.parse({ title: "  Improve workspace menus  " });
+          return request.schema.parse({ title });
         },
       },
       logger: createTestLogger(),
@@ -111,6 +111,15 @@ describe("conversation title generation", () => {
     expect(prompts[0]).toContain("Task for second-chat");
     expect(prompts[0]).not.toContain("internal-chat");
   });
+
+  test.each([ConversationTitleTarget.Agent, ConversationTitleTarget.Workspace])(
+    "accepts generated titles longer than 80 characters for %s",
+    async (target) => {
+      const title = "Improve workspace menus ".repeat(4).trim();
+      const { generate } = fixture({ title });
+      await expect(generate({ target, id: "first-chat" })).resolves.toBe(title);
+    },
+  );
 
   test("rejects an empty history before invoking the model", async () => {
     const { generate, prompts } = fixture({ empty: true });

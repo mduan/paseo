@@ -10,7 +10,7 @@ import type { StructuredTextGeneration } from "../session/checkout/git-metadata-
 import type { WorkspaceGitService } from "../workspace-git-service.js";
 import { buildMetadataPrompt } from "../../utils/build-metadata-prompt.js";
 
-const TITLE_SCHEMA = z.object({ title: z.string().min(1).max(80).regex(/\S/) });
+const TITLE_SCHEMA = z.object({ title: z.string().min(1).regex(/\S/) });
 
 type ConversationTitleDependencies = EnsureAgentLoadedDeps & {
   agentManager: AgentManager;
