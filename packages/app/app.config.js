@@ -66,6 +66,10 @@ function resolveSecretFile(params) {
 }
 
 const variants = {
+  fork: {
+    name: "Paseo Fork",
+    packageId: "sh.paseo.fork",
+  },
   production: {
     name: "Paseo",
     packageId: "sh.paseo",
