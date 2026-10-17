@@ -3,7 +3,6 @@ import { useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { TFunction } from "i18next";
 import { SquarePen } from "lucide-react-native";
 import React, {
@@ -94,7 +93,8 @@ import type { StreamItem, TodoEntry } from "@/types/stream";
 import type { ViewedTimelineStatus, ViewedTimelineUiBridge } from "@/timeline/viewed-timeline-sync";
 import { useArchiveFinishedSubagents, useSubagentsForParent } from "@/subagents";
 import { getInitDeferred, getInitKey } from "@/utils/agent-initialization";
-import { derivePendingPermissionKey, normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { storeFetchedAgentDetail } from "@/utils/store-fetched-agent-detail";
 import { applyLegacyDaemonWorkspaceOwnership } from "@/workspace/legacy-daemon-workspaces";
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -275,53 +275,6 @@ function resolveWorkspaceAgentTabLabel(title: string | null | undefined): string
     return null;
   }
   return normalized;
-}
-
-function shouldStoreFetchedAgentInActiveDirectory(agent: Agent): boolean {
-  return !agent.archivedAt && Boolean(agent.projectPlacement);
-}
-
-type FetchAgentResult = Awaited<ReturnType<DaemonClient["fetchAgent"]>>;
-
-function storeFetchedAgentDetail(input: {
-  serverId: string;
-  result: NonNullable<FetchAgentResult>;
-}): Agent {
-  const normalized = normalizeAgentSnapshot(input.result.agent, input.serverId);
-  const hydrated: Agent = applyLegacyDaemonWorkspaceOwnership({
-    serverId: input.serverId,
-    agent: {
-      ...normalized,
-      projectPlacement: input.result.project,
-    },
-  });
-  const store = useSessionStore.getState();
-
-  if (shouldStoreFetchedAgentInActiveDirectory(hydrated)) {
-    getHostRuntimeStore().acceptAgentSnapshot(input.serverId, hydrated);
-  } else {
-    store.setAgentDetails(input.serverId, (previous) => {
-      const next = new Map(previous);
-      next.set(hydrated.id, hydrated);
-      return next;
-    });
-  }
-
-  store.setPendingPermissions(input.serverId, (previous) => {
-    const next = new Map(previous);
-    for (const [key, pending] of next.entries()) {
-      if (pending.agentId === hydrated.id) {
-        next.delete(key);
-      }
-    }
-    for (const request of hydrated.pendingPermissions) {
-      const key = derivePendingPermissionKey(hydrated.id, request);
-      next.set(key, { key, agentId: hydrated.id, request });
-    }
-    return next;
-  });
-
-  return hydrated;
 }
 
 function useAgentPanelDescriptor(

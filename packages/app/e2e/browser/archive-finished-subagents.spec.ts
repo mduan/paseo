@@ -1,4 +1,4 @@
-import { test } from "../support/fixtures";
+import { test, expect } from "../support/fixtures";
 import { openAgentRoute } from "../support/helpers/mock-agent";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import {
@@ -24,6 +24,22 @@ test.describe("Archive finished subagents", () => {
 
   test.afterAll(async () => {
     await workspace?.cleanup();
+  });
+
+  test("unarchives a managed child after its parent is archived", async ({ page }) => {
+    const agents = await seedParentWithSubagent(workspace, {
+      parentTitle: "Archived parent",
+      childTitle: "Unarchive child",
+    });
+    await workspace.client.archiveAgent(agents.parent.id);
+    await expectManagedSubagentArchived(workspace, agents.child.id);
+    await openAgentRoute(page, { workspaceId: agents.workspaceId, agentId: agents.child.id });
+    const unarchive = page.getByRole("button", { name: "Unarchive", exact: true });
+    await expect(unarchive).toBeEnabled();
+    await unarchive.click();
+    await expect(unarchive).toHaveCount(0, { timeout: 15_000 });
+    await expectManagedSubagentUnarchived(workspace, agents.child.id);
+    await expectManagedSubagentArchived(workspace, agents.parent.id);
   });
 
   test("archives a finished managed child from the track", async ({ page }) => {

@@ -8,6 +8,7 @@ import { KeyboardTranslateView } from "@/keyboard/shift";
 import { Button } from "@/components/ui/button";
 import type { Theme } from "@/styles/theme";
 import { toErrorMessage } from "@/utils/error-messages";
+import { storeFetchedAgentDetail } from "@/utils/store-fetched-agent-detail";
 
 interface ArchivedAgentCalloutProps {
   serverId: string;
@@ -19,19 +20,23 @@ export function ArchivedAgentCallout({ serverId, agentId }: ArchivedAgentCallout
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
   const [isUnarchiving, setIsUnarchiving] = useState(false);
-  const [unarchiveError, setUnarchiveError] = useState<string | null>(null);
+  const [unarchiveError, setUnarchiveError] = useState<string>();
 
   const handleUnarchive = useCallback(async () => {
     if (!client || !isConnected || isUnarchiving) return;
     setIsUnarchiving(true);
-    setUnarchiveError(null);
+    setUnarchiveError(undefined);
     try {
       await client.refreshAgent(agentId);
+      const result = await client.fetchAgent({ agentId });
+      if (!result) throw new Error(`Agent not found: ${agentId}`);
+      storeFetchedAgentDetail({ serverId, result });
     } catch (error) {
       setUnarchiveError(toErrorMessage(error));
+    } finally {
       setIsUnarchiving(false);
     }
-  }, [client, isConnected, isUnarchiving, agentId]);
+  }, [client, isConnected, isUnarchiving, agentId, serverId]);
 
   return (
     <KeyboardTranslateView style={styles.container}>
@@ -44,7 +49,8 @@ export function ArchivedAgentCallout({ serverId, agentId }: ArchivedAgentCallout
                 size="sm"
                 variant="secondary"
                 onPress={handleUnarchive}
-                disabled={!isConnected || isUnarchiving}
+                loading={isUnarchiving}
+                disabled={!client || !isConnected || isUnarchiving}
               >
                 {t("agentPanel.archived.unarchive")}
               </Button>
