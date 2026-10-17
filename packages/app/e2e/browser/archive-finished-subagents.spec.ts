@@ -36,8 +36,10 @@ test.describe("Archive finished subagents", () => {
     await openAgentRoute(page, { workspaceId: agents.workspaceId, agentId: agents.child.id });
     const unarchive = page.getByRole("button", { name: "Unarchive", exact: true });
     await expect(unarchive).toBeEnabled();
+    await expect(page.getByTestId("message-input-root")).toHaveCount(0);
     await unarchive.click();
     await expect(unarchive).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByTestId("message-input-root").getByRole("textbox")).toBeEditable();
     await expectManagedSubagentUnarchived(workspace, agents.child.id);
     await expectManagedSubagentArchived(workspace, agents.parent.id);
   });
