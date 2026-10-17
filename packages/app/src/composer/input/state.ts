@@ -50,7 +50,7 @@ interface SendActionContext {
   defaultSendBehavior: SendBehavior;
   isAgentRunning: boolean;
   onQueue: ((payload: MessagePayload) => void) | undefined;
-  handleSendMessage: () => void;
+  handleSendMessage: (activeTurnBehavior?: ActiveTurnBehavior) => void;
   handleQueueMessage: () => void;
 }
 
@@ -125,14 +125,23 @@ export function runDefaultSendAction(ctx: SendActionContext): void {
   ctx.handleSendMessage();
 }
 
-export function runAlternateSendAction(ctx: SendActionContext): void {
-  if (ctx.defaultSendBehavior === "queue") {
-    ctx.handleSendMessage();
+/** The behavior Mod+Enter runs. Queue's alternate interrupts, matching the composer's submit path. */
+export function resolveAlternateSendBehavior(defaultSendBehavior: SendBehavior): SendBehavior {
+  return defaultSendBehavior === "queue" ? "interrupt" : "queue";
+}
+
+export function runSendBehaviorAction(behavior: SendBehavior, ctx: SendActionContext): void {
+  if (behavior !== "queue") {
+    ctx.handleSendMessage(behavior);
     return;
   }
   if (ctx.isAgentRunning && ctx.onQueue) {
     ctx.handleQueueMessage();
   }
+}
+
+export function runAlternateSendAction(ctx: SendActionContext): void {
+  runSendBehaviorAction(resolveAlternateSendBehavior(ctx.defaultSendBehavior), ctx);
 }
 
 export function runMessageInputKeyboardAction(

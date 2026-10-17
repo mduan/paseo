@@ -1,9 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSection, SettingsSelect } from "@/components/settings";
-import { useAppSettings, type SendBehavior } from "@/hooks/use-settings";
-
-const SEND_BEHAVIORS: readonly SendBehavior[] = ["interrupt", "steer", "queue"];
+import { SEND_BEHAVIORS, useAppSettings, type SendBehavior } from "@/hooks/use-settings";
 
 export function SendingSection() {
   const { t } = useTranslation();

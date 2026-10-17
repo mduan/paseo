@@ -40,6 +40,7 @@ import {
   resolveContentMaxWidth,
   sanitizeFontFamily,
   saveAppSettings as saveAppSettingsPure,
+  SEND_BEHAVIORS,
   type AppSettings,
   type AppSettingsUpdate,
   type OpenInSidePanePreferences,
@@ -80,6 +81,7 @@ export {
   parseTerminalScrollbackLines,
   resolveContentMaxWidth,
   sanitizeFontFamily,
+  SEND_BEHAVIORS,
 };
 export type {
   AppSettings,

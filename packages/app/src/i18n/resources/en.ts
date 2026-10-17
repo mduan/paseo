@@ -131,6 +131,7 @@ export const en = {
       sendAndInterrupt: "Send and interrupt",
       sendAndSteer: "Send and steer",
       sendMessage: "Send message",
+      sendOptions: "Send options",
       queue: "Queue",
       send: "Send",
     },

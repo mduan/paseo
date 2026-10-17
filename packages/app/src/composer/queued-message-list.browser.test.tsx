@@ -284,6 +284,18 @@ describe("queued message reordering", () => {
     await expect.element(page.getByText(sentMessage.text)).not.toBeInTheDocument();
   });
 
+  it("sends a queued message with the behavior chosen from its menu", async () => {
+    await act(async () => {
+      await userEvent.click(page.getByRole("button", { name: "Send options" }).nth(1));
+    });
+    await expect.element(page.getByTestId("queued-message-send-queue")).not.toBeInTheDocument();
+    await act(async () => {
+      await userEvent.click(page.getByTestId("queued-message-send-interrupt"));
+    });
+
+    expect(onSendNow).toHaveBeenCalledWith("second", "interrupt");
+  });
+
   it("keeps edit and send-now separate from the drag handle", async () => {
     await act(async () => {
       await userEvent.click(page.getByRole("button", { name: "Edit queued message" }).nth(1));
@@ -291,7 +303,7 @@ describe("queued message reordering", () => {
     });
 
     expect(onEdit).toHaveBeenCalledWith("second");
-    expect(onSendNow).toHaveBeenCalledWith("second");
+    expect(onSendNow).toHaveBeenCalledWith("second", "steer");
     expect(onReorder).not.toHaveBeenCalled();
     await expect
       .element(page.getByRole("button", { name: "Move queued message to front" }))
