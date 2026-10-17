@@ -3232,6 +3232,37 @@ describe("ClaudeAgentSession context window usage", () => {
     }
   });
 
+  test("an interrupted turn's suppressed result still reports its cost", async () => {
+    const session = await createSessionForTurns([
+      [createCompactingStatus()],
+      [
+        createSuccessResult({ subtype: "error_during_execution", is_error: true, errors: [] }),
+        createSuccessResult({ total_cost_usd: 0.5 }),
+      ],
+    ]);
+
+    try {
+      const interruptedTurn: AgentStreamEvent[] = [];
+      const streaming = (async () => {
+        for await (const event of streamSession(session, "interrupted")) {
+          interruptedTurn.push(event);
+        }
+      })();
+      await vi.waitFor(() => {
+        expect(interruptedTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+      });
+      await session.interrupt();
+      await streaming;
+
+      const nextTurn = await collectStreamEvents(session, "next");
+      expect(nextTurn).toContainEqual(
+        expect.objectContaining({ type: "usage_updated", usage: { totalCostUsd: 0.25 } }),
+      );
+    } finally {
+      await session.close();
+    }
+  });
+
   test("a compaction abandoned in an autonomous turn does not suppress the next marker", async () => {
     // Trailing output after the foreground result opens an autonomous turn, which starts
     // compacting and is then ended by the next foreground turn, never reaching a boundary.

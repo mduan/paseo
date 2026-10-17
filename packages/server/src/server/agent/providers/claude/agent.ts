@@ -3993,8 +3993,21 @@ class ClaudeAgentSession implements AgentSession {
     return this.isAssistantishMessage(message);
   }
 
+  /**
+   * A suppressed result still carries the query's running cost. Claude reports cost only on results,
+   * so dropping it would hide the interrupted turn's spend until a later turn completes.
+   */
+  private emitSuppressedResultCost(message: SDKResultMessage): void {
+    if (typeof message.total_cost_usd !== "number") return;
+    this.queryCostUsd = Math.max(this.queryCostUsd, message.total_cost_usd);
+    const totalCostUsd = this.costBeforeQueryUsd + this.queryCostUsd;
+    if (totalCostUsd <= 0) return;
+    this.notifySubscribers({ type: "usage_updated", provider: "claude", usage: { totalCostUsd } });
+  }
+
   private async routeSdkMessageFromPump(message: SDKMessage): Promise<void> {
     if (this.shouldSuppressStaleResult(message)) {
+      if (message.type === "result") this.emitSuppressedResultCost(message);
       return;
     }
 
@@ -4036,6 +4049,7 @@ class ClaudeAgentSession implements AgentSession {
     ) {
       this.pendingInterruptAbort = false;
       this.logger.debug("Suppressing stale Claude interrupt terminal result");
+      this.emitSuppressedResultCost(message);
       return;
     }
     if (
