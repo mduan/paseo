@@ -21,11 +21,20 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
+import {
+  ArrowUp,
+  ChevronDown,
+  Mic,
+  MicOff,
+  CornerDownLeft,
+  Plus,
+  Square,
+} from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { DictationOverlay } from "@/components/dictation-controls";
 import { RealtimeVoiceOverlay } from "@/components/realtime-voice-overlay";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
 import { useSessionStore } from "@/stores/session-store";
 import { useVoiceOptional } from "@/contexts/voice-context";
 import { useToast } from "@/contexts/toast-context";
@@ -80,14 +89,19 @@ import {
 import {
   applyDictationTranscript,
   computeCanStartDictation,
+  resolveAlternateSendBehavior,
   resolveComposerSurfacePresentation,
   runAlternateSendAction,
   runDefaultSendAction,
   runMessageInputKeyboardAction,
+  runSendBehaviorAction,
   stopRealtimeVoice,
+  type SendBehavior,
 } from "./state";
+import { SEND_BEHAVIORS } from "@/hooks/use-settings/storage";
 
 const DEFAULT_SEND_KEYS: ShortcutKey[][] = [["Enter"]];
+const ALTERNATE_SEND_KEYS: ShortcutKey[][] = [["mod", "Enter"]];
 const COMPOSER_INPUT_DATASET = { composerInput: "" } as const;
 
 export interface AttachmentMenuItem {
@@ -794,7 +808,95 @@ function SendButtonTooltip({
   );
 }
 
-type PrimaryActionKind = "send" | "active" | "none";
+function SendBehaviorMenuItem({
+  behavior,
+  defaultSendBehavior,
+  onSelectBehavior,
+}: {
+  behavior: SendBehavior;
+  defaultSendBehavior: SendBehavior;
+  onSelectBehavior: (behavior: SendBehavior) => void;
+}) {
+  const { t } = useTranslation();
+  const handleSelect = useCallback(() => onSelectBehavior(behavior), [behavior, onSelectBehavior]);
+  let trailing: React.ReactElement | null = null;
+  if (behavior === defaultSendBehavior) {
+    trailing = <Shortcut chord={DEFAULT_SEND_KEYS} />;
+  } else if (behavior === resolveAlternateSendBehavior(defaultSendBehavior)) {
+    trailing = <Shortcut chord={ALTERNATE_SEND_KEYS} />;
+  }
+  return (
+    <DropdownMenuItem
+      testID={`message-input-send-behavior-${behavior}`}
+      trailing={trailing}
+      onSelect={handleSelect}
+    >
+      {t(`settings.general.defaultSend.options.${behavior}`)}
+    </DropdownMenuItem>
+  );
+}
+
+function SendBehaviorSplitButton({
+  defaultSendBehavior,
+  onSelectBehavior,
+  ...sendButtonProps
+}: {
+  defaultSendBehavior: SendBehavior;
+  onSelectBehavior: (behavior: SendBehavior) => void;
+} & React.ComponentProps<typeof SendButtonTooltip>) {
+  const { t } = useTranslation();
+  const caretStyle = useCallback(
+    ({ hovered, pressed, open }: { hovered: boolean; pressed: boolean; open: boolean }) => [
+      styles.sendSplitCaret,
+      (hovered || pressed || open) && styles.sendSplitSegmentActive,
+    ],
+    [],
+  );
+  const isDisabled = sendButtonProps.isSendButtonDisabled;
+  const containerStyle = useMemo(
+    () => [styles.sendSplitButton, isDisabled && styles.buttonDisabled],
+    [isDisabled],
+  );
+  return (
+    <View style={containerStyle}>
+      <SendButtonTooltip
+        {...sendButtonProps}
+        sendButtonCombinedStyle={styles.sendSplitPrimary}
+        submitLabel={t(`settings.general.defaultSend.options.${defaultSendBehavior}`)}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={isDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t("composer.input.sendOptions")}
+          testID="message-input-send-behavior-menu-trigger"
+          style={caretStyle}
+        >
+          <ThemedChevronDown size={14} uniProps={iconAccentForegroundMapping} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align="end"
+          offset={8}
+          minWidth={180}
+          testID="message-input-send-behavior-menu"
+          sheetTitle={t("composer.input.sendOptions")}
+        >
+          {SEND_BEHAVIORS.map((behavior) => (
+            <SendBehaviorMenuItem
+              key={behavior}
+              behavior={behavior}
+              defaultSendBehavior={defaultSendBehavior}
+              onSelectBehavior={onSelectBehavior}
+            />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </View>
+  );
+}
+
+type PrimaryActionKind = "send" | "split" | "active" | "none";
 
 function hasSendableComposerContent(input: {
   hasText: boolean;
@@ -809,8 +911,14 @@ function resolvePrimaryActionKind(input: {
   allowEmptySubmit: boolean;
   isAgentRunning: boolean;
   isSubmitLoading: boolean;
+  canQueue: boolean;
+  submitLabel: string | undefined;
 }): PrimaryActionKind {
-  if (input.hasSendableContent || input.allowEmptySubmit) return "send";
+  if (input.hasSendableContent || input.allowEmptySubmit) {
+    // Custom submit buttons (labels, question answers) keep their own single action.
+    const canChooseSendBehavior = input.canQueue && !input.submitLabel && !input.isSubmitLoading;
+    return input.isAgentRunning && canChooseSendBehavior ? "split" : "send";
+  }
   if (input.isAgentRunning) return "active";
   if (input.isSubmitLoading) return "send";
   return "none";
@@ -819,13 +927,26 @@ function resolvePrimaryActionKind(input: {
 function PrimaryAction({
   kind,
   activeActionContent,
+  defaultSendBehavior,
+  onSelectBehavior,
   ...sendButtonProps
 }: {
   kind: PrimaryActionKind;
   activeActionContent: React.ReactNode;
+  defaultSendBehavior: SendBehavior;
+  onSelectBehavior: (behavior: SendBehavior) => void;
 } & React.ComponentProps<typeof SendButtonTooltip>) {
   if (kind === "active") return activeActionContent;
   if (kind === "send") return <SendButtonTooltip {...sendButtonProps} />;
+  if (kind === "split") {
+    return (
+      <SendBehaviorSplitButton
+        {...sendButtonProps}
+        defaultSendBehavior={defaultSendBehavior}
+        onSelectBehavior={onSelectBehavior}
+      />
+    );
+  }
   return null;
 }
 interface ToggleRealtimeVoiceContext {
@@ -917,6 +1038,7 @@ interface SendMessageContext {
   onSubmit: (payload: MessagePayload) => void;
   onMinimizeHeight: () => void;
   preserveHeightOnSubmit: boolean;
+  activeTurnBehavior?: ActiveTurnBehavior;
 }
 
 function sendMessageImpl(ctx: SendMessageContext): void {
@@ -934,6 +1056,7 @@ function sendMessageImpl(ctx: SendMessageContext): void {
     attachments: ctx.attachments,
     cwd: ctx.cwd,
     forceSend: ctx.isAgentRunning || undefined,
+    ...(ctx.activeTurnBehavior ? { activeTurnBehavior: ctx.activeTurnBehavior } : {}),
   });
   // When the host preserves and locks the composer (e.g. new-workspace creation),
   // the text stays put — collapsing the height would clip it. Keep it grown.
@@ -1515,33 +1638,37 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       resetComposerHeight?.();
     }, [resetComposerHeight]);
 
-    const handleSendMessage = useCallback(() => {
-      const liveValue = textInputRef.current?.getText() ?? valueRef.current;
-      if (!preserveHeightOnSubmit) {
-        updateLiveTextPresence("");
-      }
-      sendMessageImpl({
-        value: liveValue,
-        attachments,
-        hasExternalContent,
+    const handleSendMessage = useCallback(
+      (activeTurnBehavior?: ActiveTurnBehavior) => {
+        const liveValue = textInputRef.current?.getText() ?? valueRef.current;
+        if (!preserveHeightOnSubmit) {
+          updateLiveTextPresence("");
+        }
+        sendMessageImpl({
+          value: liveValue,
+          attachments,
+          hasExternalContent,
+          allowEmptySubmit,
+          cwd,
+          isAgentRunning,
+          onSubmit,
+          onMinimizeHeight: minimizeInputHeight,
+          preserveHeightOnSubmit,
+          activeTurnBehavior,
+        });
+      },
+      [
         allowEmptySubmit,
+        attachments,
         cwd,
-        isAgentRunning,
         onSubmit,
-        onMinimizeHeight: minimizeInputHeight,
+        isAgentRunning,
+        hasExternalContent,
+        minimizeInputHeight,
         preserveHeightOnSubmit,
-      });
-    }, [
-      allowEmptySubmit,
-      attachments,
-      cwd,
-      onSubmit,
-      isAgentRunning,
-      hasExternalContent,
-      minimizeInputHeight,
-      preserveHeightOnSubmit,
-      updateLiveTextPresence,
-    ]);
+        updateLiveTextPresence,
+      ],
+    );
 
     const handleQueueMessage = useCallback(
       () =>
@@ -1565,6 +1692,19 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         handleQueueMessage,
       });
     }, [defaultSendBehavior, isAgentRunning, onQueue, handleQueueMessage, handleSendMessage]);
+
+    const handleSendBehaviorAction = useCallback(
+      (behavior: SendBehavior) => {
+        runSendBehaviorAction(behavior, {
+          defaultSendBehavior,
+          isAgentRunning,
+          onQueue,
+          handleSendMessage,
+          handleQueueMessage,
+        });
+      },
+      [defaultSendBehavior, isAgentRunning, onQueue, handleQueueMessage, handleSendMessage],
+    );
 
     const handleAlternateSendAction = useCallback(() => {
       runAlternateSendAction({
@@ -1638,6 +1778,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       allowEmptySubmit,
       isAgentRunning,
       isSubmitLoading,
+      canQueue: Boolean(onQueue),
+      submitLabel,
     });
     const { canPressLoadingButton, isSendButtonDisabled, defaultActionQueues } =
       computeSendButtonState({
@@ -1875,6 +2017,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               <PrimaryAction
                 kind={primaryActionKind}
                 activeActionContent={activeActionContent}
+                defaultSendBehavior={defaultSendBehavior}
+                onSelectBehavior={handleSendBehaviorAction}
                 shouldShow
                 canPressLoadingButton={canPressLoadingButton}
                 onSubmitLoadingPress={onSubmitLoadingPress}
@@ -2053,6 +2197,31 @@ const styles = StyleSheet.create((theme: Theme) => ({
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.full,
   },
+  sendSplitButton: {
+    height: 28,
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.accent,
+    marginLeft: theme.spacing[1],
+    overflow: "hidden",
+  },
+  sendSplitPrimary: {
+    justifyContent: "center",
+    paddingLeft: theme.spacing[3],
+    paddingRight: theme.spacing[2],
+  },
+  sendSplitCaret: {
+    width: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingRight: 2,
+    borderLeftWidth: theme.borderWidth[1],
+    borderLeftColor: theme.colors.accentBright,
+  },
+  sendSplitSegmentActive: {
+    backgroundColor: theme.colors.accentBright,
+  },
   sendButtonLabel: {
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.medium,
@@ -2091,6 +2260,7 @@ const ThemedPlus = withUnistyles(Plus);
 const ThemedMic = withUnistyles(Mic);
 const ThemedMicOff = withUnistyles(MicOff);
 const ThemedArrowUp = withUnistyles(ArrowUp);
+const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedCornerDownLeft = withUnistyles(CornerDownLeft);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 

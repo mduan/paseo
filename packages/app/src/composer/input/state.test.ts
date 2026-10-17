@@ -5,6 +5,7 @@ import {
   resolveActiveSendBehavior,
   resolveComposerSurfacePresentation,
   runAlternateSendAction,
+  runSendBehaviorAction,
   runDefaultSendAction,
   runMessageInputKeyboardAction,
   stopRealtimeVoice,
@@ -199,7 +200,8 @@ describe("composer send behavior", () => {
     const calls: string[] = [];
     return {
       calls,
-      handleSendMessage: () => calls.push("send"),
+      handleSendMessage: (activeTurnBehavior?: string) =>
+        calls.push(activeTurnBehavior ? `send:${activeTurnBehavior}` : "send"),
       handleQueueMessage: () => calls.push("queue"),
       onQueue: () => undefined,
     };
@@ -251,6 +253,22 @@ describe("composer send behavior", () => {
     expect(alternateAction.calls).toEqual(["queue"]);
   });
 
+  it("sends with the behavior chosen from the menu instead of the default", () => {
+    const action = actions();
+    const ctx = {
+      defaultSendBehavior: "steer" as const,
+      isAgentRunning: true,
+      onQueue: action.onQueue,
+      handleSendMessage: action.handleSendMessage,
+      handleQueueMessage: action.handleQueueMessage,
+    };
+    runSendBehaviorAction("interrupt", ctx);
+    runSendBehaviorAction("steer", ctx);
+    runSendBehaviorAction("queue", ctx);
+
+    expect(action.calls).toEqual(["send:interrupt", "send:steer", "queue"]);
+  });
+
   it("uses Enter to queue and Mod+Enter to submit when queue is selected", () => {
     const defaultAction = actions();
     runDefaultSendAction({
@@ -271,7 +289,7 @@ describe("composer send behavior", () => {
     });
 
     expect(defaultAction.calls).toEqual(["queue"]);
-    expect(alternateAction.calls).toEqual(["send"]);
+    expect(alternateAction.calls).toEqual(["send:interrupt"]);
   });
 });
 
