@@ -3,6 +3,7 @@ import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
 import {
   resolveExistingRunWorkspace,
   resolveRunCallerAgentId,
+  resolveRunModeId,
   runRunCommand,
   type AgentRunOptions,
 } from "./run";
@@ -54,6 +55,31 @@ describe("managed agent caller context", () => {
     await expect(
       resolveRunCallerAgentId(daemonWithAgents(), { PASEO_AGENT_ID: "   " }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("run mode resolution", () => {
+  const daemon = {
+    async getProvidersSnapshot() {
+      return {
+        entries: [
+          { provider: "codex", defaultModeId: "auto-review" },
+          { provider: "claude", defaultModeId: "auto" },
+        ],
+      };
+    },
+  };
+
+  it("uses the provider's advertised default when --mode is omitted", async () => {
+    await expect(resolveRunModeId(daemon, "claude", undefined)).resolves.toBe("auto");
+  });
+
+  it("keeps an explicit --mode", async () => {
+    await expect(resolveRunModeId(daemon, "claude", "plan")).resolves.toBe("plan");
+  });
+
+  it("leaves the mode to the daemon when the provider advertises none", async () => {
+    await expect(resolveRunModeId(daemon, "opencode", undefined)).resolves.toBeUndefined();
   });
 });
 

@@ -612,6 +612,7 @@ export async function runRunCommand(
     const requestEnv = Object.keys(env).length > 0 ? env : undefined;
 
     const callerAgentId = await resolveRunCallerAgentId(client);
+    const modeId = await resolveRunModeId(client, resolvedProviderModel.provider, options.mode);
     const workspace = await resolveRunWorkspace(client, options, cwd, callerAgentId);
     const workspaceId = workspace.id;
     const runCwd = workspace.cwd;
@@ -627,7 +628,7 @@ export async function runRunCommand(
             workspaceId,
             callerAgentId,
             title: resolvedTitle,
-            modeId: options.mode,
+            modeId,
             model: resolvedProviderModel.model,
             thinkingOptionId,
             initialPrompt: structuredPrompt,
@@ -698,7 +699,7 @@ export async function runRunCommand(
       workspaceId,
       callerAgentId,
       title: resolvedTitle,
-      modeId: options.mode,
+      modeId,
       model: resolvedProviderModel.model,
       thinkingOptionId,
       initialPrompt: prompt,
@@ -747,6 +748,27 @@ export async function runRunCommand(
 
 export interface RunCallerLookupClient {
   fetchAgent(options: { agentId: string }): Promise<{ agent: { id: string } } | null>;
+}
+
+export interface RunModeLookupClient {
+  getProvidersSnapshot(): Promise<{
+    entries: Array<{ provider: string; defaultModeId?: string | null }>;
+  }>;
+}
+
+// The daemon leaves an omitted mode to the provider session, which can differ from the
+// provider's advertised default (Claude falls back to Always Ask). Pick the advertised
+// default here, as the app does, so CLI-launched agents match app-launched ones.
+export async function resolveRunModeId(
+  client: RunModeLookupClient,
+  provider: string,
+  mode: string | undefined,
+): Promise<string | undefined> {
+  if (mode) {
+    return mode;
+  }
+  const snapshot = await client.getProvidersSnapshot();
+  return snapshot.entries.find((entry) => entry.provider === provider)?.defaultModeId ?? undefined;
 }
 
 // PASEO_AGENT_ID names an agent on the daemon that launched this shell. A run
