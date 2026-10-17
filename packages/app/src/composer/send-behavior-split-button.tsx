@@ -83,7 +83,7 @@ export function SendBehaviorSplitButton<TBehavior extends SendBehavior>({
           {label}
         </Pressable>
       )}
-      <DropdownMenu>
+      <DropdownMenu compactMode="sheet">
         <DropdownMenuTrigger
           disabled={disabled}
           accessibilityRole="button"
