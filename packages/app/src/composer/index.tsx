@@ -1918,15 +1918,14 @@ function ComposerContentImpl({
   );
 
   const handleSendQueuedNow = useCallback(
-    async (id: string) => {
+    async (id: string, activeTurnBehavior: ActiveTurnBehavior) => {
       if (!sendAgentMessageRef.current && !onSubmitMessageRef.current) return;
-      // Reuse the regular send path; server-side send atomically interrupts any active run.
       const result = await sendQueuedComposerMessageNow({
         agentId,
         messageId: id,
         queue: queueWriter,
         submitMessage: ({ text, attachments: queuedAttachments }) =>
-          submitMessage(text, queuedAttachments),
+          submitMessage(text, queuedAttachments, activeTurnBehavior),
         failedToSendMessage: t("composer.errors.failedToSend"),
       });
       if (result.status === "failed") {

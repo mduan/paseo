@@ -21,15 +21,7 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import {
-  ArrowUp,
-  ChevronDown,
-  Mic,
-  MicOff,
-  CornerDownLeft,
-  Plus,
-  Square,
-} from "lucide-react-native";
+import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { DictationOverlay } from "@/components/dictation-controls";
 import { RealtimeVoiceOverlay } from "@/components/realtime-voice-overlay";
@@ -99,6 +91,7 @@ import {
   type SendBehavior,
 } from "./state";
 import { SEND_BEHAVIORS } from "@/hooks/use-settings/storage";
+import { SendBehaviorSplitButton } from "@/composer/send-behavior-split-button";
 
 const DEFAULT_SEND_KEYS: ShortcutKey[][] = [["Enter"]];
 const ALTERNATE_SEND_KEYS: ShortcutKey[][] = [["mod", "Enter"]];
@@ -808,90 +801,55 @@ function SendButtonTooltip({
   );
 }
 
-function SendBehaviorMenuItem({
-  behavior,
+function ComposerSendBehaviorSplitButton({
   defaultSendBehavior,
   onSelectBehavior,
-}: {
-  behavior: SendBehavior;
-  defaultSendBehavior: SendBehavior;
-  onSelectBehavior: (behavior: SendBehavior) => void;
-}) {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => onSelectBehavior(behavior), [behavior, onSelectBehavior]);
-  let trailing: React.ReactElement | null = null;
-  if (behavior === defaultSendBehavior) {
-    trailing = <Shortcut chord={DEFAULT_SEND_KEYS} />;
-  } else if (behavior === resolveAlternateSendBehavior(defaultSendBehavior)) {
-    trailing = <Shortcut chord={ALTERNATE_SEND_KEYS} />;
-  }
-  return (
-    <DropdownMenuItem
-      testID={`message-input-send-behavior-${behavior}`}
-      trailing={trailing}
-      onSelect={handleSelect}
-    >
-      {t(`settings.general.defaultSend.options.${behavior}`)}
-    </DropdownMenuItem>
-  );
-}
-
-function SendBehaviorSplitButton({
-  defaultSendBehavior,
-  onSelectBehavior,
-  ...sendButtonProps
+  onDefaultSendAction,
+  isSendButtonDisabled,
+  submitAccessibilityLabel,
+  submitButtonTestID,
+  sendKeys,
+  sendTooltipLabel,
 }: {
   defaultSendBehavior: SendBehavior;
   onSelectBehavior: (behavior: SendBehavior) => void;
-} & React.ComponentProps<typeof SendButtonTooltip>) {
-  const { t } = useTranslation();
-  const caretStyle = useCallback(
-    ({ hovered, pressed, open }: { hovered: boolean; pressed: boolean; open: boolean }) => [
-      styles.sendSplitCaret,
-      (hovered || pressed || open) && styles.sendSplitSegmentActive,
-    ],
-    [],
+} & Pick<
+  React.ComponentProps<typeof SendButtonTooltip>,
+  | "onDefaultSendAction"
+  | "isSendButtonDisabled"
+  | "submitAccessibilityLabel"
+  | "submitButtonTestID"
+  | "sendKeys"
+  | "sendTooltipLabel"
+>) {
+  const shortcutFor = useCallback(
+    (behavior: SendBehavior) => {
+      if (behavior === defaultSendBehavior) return DEFAULT_SEND_KEYS;
+      if (behavior === resolveAlternateSendBehavior(defaultSendBehavior)) {
+        return ALTERNATE_SEND_KEYS;
+      }
+      return undefined;
+    },
+    [defaultSendBehavior],
   );
-  const isDisabled = sendButtonProps.isSendButtonDisabled;
-  const containerStyle = useMemo(
-    () => [styles.sendSplitButton, isDisabled && styles.buttonDisabled],
-    [isDisabled],
+  const tooltip = useMemo(
+    () => <SendTooltipBody label={sendTooltipLabel} sendKeys={sendKeys} />,
+    [sendKeys, sendTooltipLabel],
   );
   return (
-    <View style={containerStyle}>
-      <SendButtonTooltip
-        {...sendButtonProps}
-        sendButtonCombinedStyle={styles.sendSplitPrimary}
-        submitLabel={t(`settings.general.defaultSend.options.${defaultSendBehavior}`)}
+    <View style={styles.sendSplitSlot}>
+      <SendBehaviorSplitButton
+        primaryBehavior={defaultSendBehavior}
+        behaviors={SEND_BEHAVIORS}
+        onPrimaryPress={onDefaultSendAction}
+        onSelectBehavior={onSelectBehavior}
+        disabled={isSendButtonDisabled}
+        accessibilityLabel={submitAccessibilityLabel}
+        testID="message-input-send-behavior"
+        primaryTestID={submitButtonTestID}
+        tooltip={tooltip}
+        shortcutFor={shortcutFor}
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          disabled={isDisabled}
-          accessibilityRole="button"
-          accessibilityLabel={t("composer.input.sendOptions")}
-          testID="message-input-send-behavior-menu-trigger"
-          style={caretStyle}
-        >
-          <ThemedChevronDown size={14} uniProps={iconAccentForegroundMapping} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="end"
-          offset={8}
-          minWidth={180}
-          testID="message-input-send-behavior-menu"
-          sheetTitle={t("composer.input.sendOptions")}
-        >
-          {SEND_BEHAVIORS.map((behavior) => (
-            <SendBehaviorMenuItem
-              key={behavior}
-              behavior={behavior}
-              defaultSendBehavior={defaultSendBehavior}
-              onSelectBehavior={onSelectBehavior}
-            />
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </View>
   );
 }
@@ -940,7 +898,7 @@ function PrimaryAction({
   if (kind === "send") return <SendButtonTooltip {...sendButtonProps} />;
   if (kind === "split") {
     return (
-      <SendBehaviorSplitButton
+      <ComposerSendBehaviorSplitButton
         {...sendButtonProps}
         defaultSendBehavior={defaultSendBehavior}
         onSelectBehavior={onSelectBehavior}
@@ -2197,30 +2155,8 @@ const styles = StyleSheet.create((theme: Theme) => ({
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.full,
   },
-  sendSplitButton: {
-    height: 28,
-    flexDirection: "row",
-    alignItems: "stretch",
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accent,
+  sendSplitSlot: {
     marginLeft: theme.spacing[1],
-    overflow: "hidden",
-  },
-  sendSplitPrimary: {
-    justifyContent: "center",
-    paddingLeft: theme.spacing[3],
-    paddingRight: theme.spacing[2],
-  },
-  sendSplitCaret: {
-    width: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingRight: 2,
-    borderLeftWidth: theme.borderWidth[1],
-    borderLeftColor: theme.colors.accentBright,
-  },
-  sendSplitSegmentActive: {
-    backgroundColor: theme.colors.accentBright,
   },
   sendButtonLabel: {
     fontSize: theme.fontSize.base,
@@ -2260,7 +2196,6 @@ const ThemedPlus = withUnistyles(Plus);
 const ThemedMic = withUnistyles(Mic);
 const ThemedMicOff = withUnistyles(MicOff);
 const ThemedArrowUp = withUnistyles(ArrowUp);
-const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedCornerDownLeft = withUnistyles(CornerDownLeft);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 

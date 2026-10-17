@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
-import { ArrowUp, GripVertical, Pencil } from "lucide-react-native";
+import { GripVertical, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import type { ComposerAttachment } from "@/attachments/types";
@@ -17,13 +17,18 @@ import { getAttachmentLink } from "@/attachments/link";
 import type { DraggableRenderItemInfo } from "@/components/draggable-list.types";
 import { isNative, isWeb } from "@/constants/platform";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
+import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
 import type { QueuedComposerMessage } from "./actions";
+import { SendBehaviorSplitButton } from "./send-behavior-split-button";
+
+// Queueing an already queued message does nothing, so its menu offers only immediate sends.
+const SEND_NOW_BEHAVIORS: readonly ActiveTurnBehavior[] = ["interrupt", "steer"];
 
 type QueuedMessageListProps = Readonly<{
   queuedMessages: readonly QueuedComposerMessage[];
   onEdit: (id: string) => void;
   onReorder: (messages: QueuedComposerMessage[]) => void;
-  onSendNow: (id: string) => void;
+  onSendNow: (id: string, behavior: ActiveTurnBehavior) => void;
   onOpenAttachment: (attachment: ComposerAttachment) => void;
   editLabel: string;
   reorderLabel: string;
@@ -108,7 +113,11 @@ function QueuedMessageRow({
   sendNowLabel,
 }: QueuedMessageRowProps) {
   const handleEdit = useCallback(() => onEdit(item.id), [onEdit, item.id]);
-  const handleSendNow = useCallback(() => onSendNow(item.id), [onSendNow, item.id]);
+  const handleSteerNow = useCallback(() => onSendNow(item.id, "steer"), [onSendNow, item.id]);
+  const handleSendNowWithBehavior = useCallback(
+    (behavior: ActiveTurnBehavior) => onSendNow(item.id, behavior),
+    [onSendNow, item.id],
+  );
   const setDragHandleRef = useCallback(
     (node: unknown) => {
       dragHandleProps?.setActivatorNodeRef?.(node);
@@ -157,14 +166,14 @@ function QueuedMessageRow({
         >
           <ThemedPencil size={ICON_SIZE.sm} uniProps={iconForegroundMapping} />
         </Pressable>
-        <Pressable
-          onPress={handleSendNow}
-          style={[styles.queueActionButton, styles.queueSendButton]}
+        <SendBehaviorSplitButton
+          primaryBehavior="steer"
+          behaviors={SEND_NOW_BEHAVIORS}
+          onPrimaryPress={handleSteerNow}
+          onSelectBehavior={handleSendNowWithBehavior}
           accessibilityLabel={sendNowLabel}
-          accessibilityRole="button"
-        >
-          <ThemedArrowUp size={ICON_SIZE.sm} uniProps={iconAccentForegroundMapping} />
-        </Pressable>
+          testID="queued-message-send"
+        />
       </View>
     </View>
   );
@@ -264,14 +273,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.surface2,
   },
-  queueSendButton: {
-    backgroundColor: theme.colors.accent,
-  },
 }));
 
 const ThemedPencil = withUnistyles(Pencil);
-const ThemedArrowUp = withUnistyles(ArrowUp);
 const ThemedGripVertical = withUnistyles(GripVertical);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-const iconAccentForegroundMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
