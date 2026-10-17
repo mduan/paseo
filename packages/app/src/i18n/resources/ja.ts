@@ -2220,7 +2220,7 @@ export const ja: TranslationResources = {
           interrupt: "エージェント実行中、Enterで中断します。Command/Ctrl+Enterでキューに追加。",
           steer:
             "エージェント実行中、Enterで現在のターンに指示を送ります。Command/Ctrl+Enterでキューに追加。",
-          queue: "エージェント実行中、Enterでキューに追加します。Command/Ctrl+Enterで送信。",
+          queue: "エージェント実行中、Enterでキューに追加します。Command/Ctrl+Enterで中断。",
         },
         options: {
           interrupt: "中断",
