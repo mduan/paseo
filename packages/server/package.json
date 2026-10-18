@@ -38,6 +38,11 @@
       "source": "./src/server/config.ts",
       "default": "./dist/server/server/config.js"
     },
+    "./host-name": {
+      "types": "./dist/server/server/host-name.d.ts",
+      "source": "./src/server/host-name.ts",
+      "default": "./dist/server/server/host-name.js"
+    },
     "./process": {
       "types": "./dist/server/utils/spawn.d.ts",
       "source": "./src/utils/spawn.ts",
