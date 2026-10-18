@@ -1,9 +1,9 @@
 ---
-name: release-fork
-description: Release Paseo fork daemon changes when needed, build the Apple Silicon Mac DMG, and report a file link to the DMG. Use for "release fork" or "/release-fork".
+name: release-fork-mac
+description: Release Paseo fork daemon changes when needed, build the Apple Silicon Mac DMG, and report a file link to the DMG. Use for "release fork mac" or "/release-fork-mac".
 ---
 
-# Release fork
+# Release fork Mac
 
 Read **Fork CLI release** in `docs/release.md` and the fork scripts in `package.json`. Use this `mduan/paseo` checkout. Publish only `@mduan/paseo-cli`, without Git pushes or GitHub releases.
 

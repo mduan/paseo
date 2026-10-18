@@ -88,7 +88,11 @@ describe("useAgentCommandsQuery", () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, "now").mockReturnValue(now);
     const releaseBeta = { name: "release-beta", description: "Release beta", argumentHint: "" };
-    const releaseFork = { name: "release-fork", description: "Release fork", argumentHint: "" };
+    const releaseForkMac = {
+      name: "release-fork-mac",
+      description: "Release fork Mac",
+      argumentHint: "",
+    };
     runtime.listCommands.mockResolvedValue(commandsPayload([releaseBeta]));
 
     const { result, rerender, unmount } = renderHook(
@@ -109,11 +113,11 @@ describe("useAgentCommandsQuery", () => {
     try {
       await waitFor(() => expect(result.current.commands).toEqual([releaseBeta]));
       rerender({ enabled: false });
-      runtime.listCommands.mockResolvedValue(commandsPayload([releaseBeta, releaseFork]));
+      runtime.listCommands.mockResolvedValue(commandsPayload([releaseBeta, releaseForkMac]));
       clock.mockReturnValue(now + 60_001);
       rerender({ enabled: true });
 
-      await waitFor(() => expect(result.current.commands).toContainEqual(releaseFork));
+      await waitFor(() => expect(result.current.commands).toContainEqual(releaseForkMac));
     } finally {
       unmount();
       queryClient.clear();
