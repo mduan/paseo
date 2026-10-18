@@ -44,7 +44,7 @@ function makeSubsystem(overrides: {
   getWebSocketRuntimeMetrics?: () => DaemonWebSocketRuntimeDiagnosticSnapshot | null;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig?: () => DaemonConfigReloadResult;
-  isRelaySource?: (source: object) => boolean;
+  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
 }) {
   const emitted: SessionOutboundMessage[] = [];
   const restartIntents: Parameters<DaemonSessionHost["emitLifecycleIntent"]>[0][] = [];
@@ -74,7 +74,7 @@ function makeSubsystem(overrides: {
         overrideControlledPaths: [],
       })),
     logger: pino({ level: "silent" }),
-    isRelaySource: overrides.isRelaySource ?? (() => false),
+    getSourceTransport: overrides.getSourceTransport,
   });
   return { subsystem, emitted, paseoHome, restartIntents };
 }
@@ -84,7 +84,7 @@ describe("DaemonSession", () => {
     const relaySocket = {};
     let resets = 0;
     const { subsystem, emitted } = makeSubsystem({
-      isRelaySource: (source) => source === relaySocket,
+      getSourceTransport: (source) => (source === relaySocket ? "relay" : "direct"),
       daemonRuntimeConfig: {
         listen: null,
         getRelayConfig: () => null,
@@ -112,10 +112,32 @@ describe("DaemonSession", () => {
     ]);
   });
 
+  test("pairing offer reset is rejected when the requesting socket is unidentified", async () => {
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      getSourceTransport: () => undefined,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-3" },
+      {},
+    );
+
+    expect(resets).toBe(0);
+    expect(emitted).toMatchObject([{ type: "rpc_error", payload: { requestId: "reset-3" } }]);
+  });
+
   test("pairing offer reset rotates the keypair on a direct socket", async () => {
     let resets = 0;
     const { subsystem, emitted } = makeSubsystem({
-      isRelaySource: () => false,
+      getSourceTransport: () => "direct",
       daemonRuntimeConfig: {
         listen: null,
         getRelayConfig: () => null,

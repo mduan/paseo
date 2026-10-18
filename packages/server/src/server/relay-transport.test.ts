@@ -124,6 +124,32 @@ class FakeRelayWebSocket {
   }
 }
 
+/** Wires an E2EE client channel to a fake data socket and completes the handshake. */
+async function openClientChannel(dataSocket: FakeRelayWebSocket, daemonPublicKeyB64: string) {
+  const clientTransport: Transport = {
+    send: (data) => dataSocket.message(data, data instanceof ArrayBuffer),
+    close: () => undefined,
+    onmessage: null,
+    onclose: null,
+    onerror: null,
+  };
+  dataSocket.onSend = (data) => {
+    clientTransport.onmessage?.({
+      data: data instanceof Uint8Array ? data.slice().buffer : data,
+      isBinary: data instanceof ArrayBuffer || data instanceof Uint8Array,
+    });
+  };
+  let resolveClientOpen: (() => void) | undefined;
+  const clientOpen = new Promise<void>((resolve) => {
+    resolveClientOpen = resolve;
+  });
+  const channel = await createClientChannel(clientTransport, daemonPublicKeyB64, {
+    onopen: () => resolveClientOpen?.(),
+  });
+  await clientOpen;
+  return channel;
+}
+
 function createFakeWebSockets() {
   const sockets: FakeRelayWebSocket[] = [];
   return {
@@ -158,6 +184,7 @@ describe("relay-transport control lifecycle", () => {
       relayEndpoint: "relay.paseo.sh:443",
       relayUseTls: true,
       serverId: "srv_test",
+      daemonKeyPair: generateKeyPair(),
       createWebSocket: relay.createWebSocket,
     });
     controllers.push(controller);
@@ -182,6 +209,7 @@ describe("relay-transport control lifecycle", () => {
       relayEndpoint: "relay.paseo.sh:443",
       relayUseTls: true,
       serverId: "srv_test",
+      daemonKeyPair: generateKeyPair(),
       createWebSocket: relay.createWebSocket,
     });
     controllers.push(controller);
@@ -206,6 +234,7 @@ describe("relay-transport control lifecycle", () => {
       relayEndpoint: "relay.paseo.sh:443",
       relayUseTls: true,
       serverId: "srv_test",
+      daemonKeyPair: generateKeyPair(),
       createWebSocket: relay.createWebSocket,
     });
     controllers.push(controller);
@@ -222,6 +251,7 @@ describe("relay-transport control lifecycle", () => {
 
   test("passes stable relay external session metadata when attaching data socket", async () => {
     const logger = createMockLogger();
+    const daemonKeyPair = generateKeyPair();
     const attachedSockets: unknown[] = [];
     const attachedMetadata: unknown[] = [];
     const attachSocket = async (socket: unknown, metadata: unknown) => {
@@ -234,6 +264,7 @@ describe("relay-transport control lifecycle", () => {
       relayEndpoint: "relay.paseo.sh:443",
       relayUseTls: true,
       serverId: "srv_test",
+      daemonKeyPair,
       createWebSocket: relay.createWebSocket,
     });
     controllers.push(controller);
@@ -246,10 +277,10 @@ describe("relay-transport control lifecycle", () => {
     const dataSocket = relay.sockets[1];
     expect(dataSocket).toBeDefined();
     dataSocket.open();
+    await openClientChannel(dataSocket, exportPublicKey(daemonKeyPair.publicKey));
 
-    await Promise.resolve();
-
-    expect(attachedSockets).toEqual([dataSocket]);
+    await vi.waitFor(() => expect(attachedSockets).toHaveLength(1));
+    expect(attachedSockets[0]).not.toBe(dataSocket);
     expect(attachedMetadata).toEqual([
       {
         transport: "relay",
@@ -358,29 +389,10 @@ describe("relay-transport control lifecycle", () => {
 
     const dataSocket = relay.sockets[1];
     dataSocket.open();
-    const clientTransport: Transport = {
-      send: (data) => dataSocket.message(data, data instanceof ArrayBuffer),
-      close: () => undefined,
-      onmessage: null,
-      onclose: null,
-      onerror: null,
-    };
-    dataSocket.onSend = (data) => {
-      clientTransport.onmessage?.({
-        data: data instanceof Uint8Array ? data.slice().buffer : data,
-        isBinary: data instanceof ArrayBuffer || data instanceof Uint8Array,
-      });
-    };
-    let resolveClientOpen: (() => void) | undefined;
-    const clientOpen = new Promise<void>((resolve) => {
-      resolveClientOpen = resolve;
-    });
-    const clientChannel = await createClientChannel(
-      clientTransport,
+    const clientChannel = await openClientChannel(
+      dataSocket,
       exportPublicKey(daemonKeyPair.publicKey),
-      { onopen: () => resolveClientOpen?.() },
     );
-    await clientOpen;
     const encryptedSocket = (await attached) as {
       on: (event: "message", listener: (data: unknown) => void) => void;
     };
@@ -407,6 +419,7 @@ describe("relay-transport control lifecycle", () => {
       relayEndpoint: "[::1]:443",
       relayUseTls: true,
       serverId: "srv_test",
+      daemonKeyPair: generateKeyPair(),
       createWebSocket: relay.createWebSocket,
     });
     controllers.push(controller);

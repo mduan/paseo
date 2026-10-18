@@ -471,8 +471,8 @@ export interface SessionOptions {
   onBinaryMessage?: (frame: Uint8Array) => void;
   onBinaryMessageToSource?: (source: object, frame: Uint8Array) => Promise<void>;
   getTransportBufferedAmount?: (source?: object) => number | null;
-  /** Whether a request arrived on a relay socket. A session can span several sockets. */
-  isRelaySource?: (source: object) => boolean;
+  /** Transport of the socket a request arrived on. A session can span several sockets. */
+  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
   onLifecycleIntent?: (intent: SessionLifecycleIntent) => void;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   logger: pino.Logger;
@@ -834,7 +834,7 @@ export class Session {
       onBinaryMessage,
       onBinaryMessageToSource,
       getTransportBufferedAmount,
-      isRelaySource,
+      getSourceTransport,
       onLifecycleIntent,
       onWorkspaceRecovered,
       logger,
@@ -1073,7 +1073,7 @@ export class Session {
       serverId,
       daemonVersion,
       daemonRuntimeConfig,
-      isRelaySource,
+      getSourceTransport,
       getWebSocketRuntimeMetrics,
       getObservationMetrics: () => ({
         Registrations: this.delivery.registrationCount,

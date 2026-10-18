@@ -905,6 +905,29 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
+  test("tells sessions which transport each request socket uses for pairing code resets", async () => {
+    const server = createServer();
+    const relaySocket = new MockSocket();
+    const directSocket = new MockSocket();
+    await attachRelayAndHello({ server, socket: relaySocket, clientId: "cid-reset-relay" });
+    await attachDirectAndHello({ server, socket: directSocket, clientId: "cid-reset-direct" });
+
+    const [relaySession, directSession] = sessionMock.instances;
+    const getSourceTransport = (session: (typeof sessionMock.instances)[number]) =>
+      session.args.getSourceTransport as (source: object) => string | undefined;
+    expect(getSourceTransport(relaySession)(relaySocket)).toBe("relay");
+    expect(getSourceTransport(directSession)(directSocket)).toBe("direct");
+    expect(getSourceTransport(relaySession)(new MockSocket())).toBeUndefined();
+
+    const resetRequest = { type: "daemon.pairing_offer.reset.request", requestId: "reset-relay" };
+    relaySocket.emit("message", JSON.stringify({ type: "session", message: resetRequest }));
+    await vi.waitFor(() =>
+      expect(relaySession.handleMessage).toHaveBeenCalledWith(resetRequest, relaySocket),
+    );
+
+    await server.close();
+  });
+
   test("responds to top-level ping while provider diagnostic is still running", async () => {
     const server = createServer();
     const socket = new MockSocket();

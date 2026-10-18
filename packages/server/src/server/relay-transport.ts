@@ -17,7 +17,7 @@ export interface RelayTransportOptions {
   relayEndpoint: string; // "host:port"
   relayUseTls: boolean;
   serverId: string;
-  daemonKeyPair?: KeyPair;
+  daemonKeyPair: KeyPair;
   createWebSocket?: RelayWebSocketFactory;
 }
 
@@ -382,18 +382,14 @@ export function startRelayTransport({
         externalSessionKey: `session:${connectionId}`,
         relayConnectionId: connectionId,
       };
-      if (daemonKeyPair) {
-        void attachEncryptedSocket({
-          socket,
-          daemonKeyPair,
-          logger: relayLogger.child({ connectionId }),
-          attachSocket,
-          metadata: externalMetadata,
-          isStopped: () => stopped,
-        });
-      } else {
-        void attachSocket(socket, externalMetadata);
-      }
+      void attachEncryptedSocket({
+        socket,
+        daemonKeyPair,
+        logger: relayLogger.child({ connectionId }),
+        attachSocket,
+        metadata: externalMetadata,
+        isStopped: () => stopped,
+      });
     });
 
     socket.on("close", (code, reason) => {

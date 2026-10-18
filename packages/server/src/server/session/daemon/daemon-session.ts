@@ -55,7 +55,7 @@ export interface DaemonSessionOptions {
   logger: pino.Logger;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig: () => DaemonConfigReloadResult;
-  isRelaySource?: (source: object) => boolean;
+  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
 }
 
 /**
@@ -83,7 +83,7 @@ export class DaemonSession {
   private readonly selfUpdate: DaemonSelfUpdateSessionController;
   private readonly hubRelationships: HubRelationshipManagement | null;
   private readonly reloadConfig: () => DaemonConfigReloadResult;
-  private readonly isRelaySource: (source: object) => boolean;
+  private readonly getSourceTransport: (source: object) => "direct" | "relay" | "hub" | undefined;
 
   constructor(options: DaemonSessionOptions) {
     this.host = options.host;
@@ -101,7 +101,7 @@ export class DaemonSession {
     this.logger = options.logger;
     this.hubRelationships = options.hubRelationships ?? null;
     this.reloadConfig = options.reloadConfig;
-    this.isRelaySource = options.isRelaySource ?? (() => false);
+    this.getSourceTransport = options.getSourceTransport ?? (() => undefined);
     this.selfUpdate = new DaemonSelfUpdateSessionController({
       clientId: this.clientId,
       daemonVersion: this.daemonVersion ?? null,
@@ -237,8 +237,10 @@ export class DaemonSession {
   ): Promise<void> {
     try {
       // The reset closes every relay connection, including the requester's, before the
-      // response could reach it, which would lock a relay-only device out.
-      if (source && this.isRelaySource(source)) {
+      // response could reach it, which would lock a relay-only device out. Fail closed when
+      // the requesting socket can't be identified.
+      const transport = source ? this.getSourceTransport(source) : undefined;
+      if (!transport || transport === "relay") {
         throw new Error("Reset the pairing code from a direct or local connection to this host");
       }
       const resetDaemonKeyPair = this.daemonRuntimeConfig?.resetDaemonKeyPair;
