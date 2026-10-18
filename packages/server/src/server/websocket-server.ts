@@ -1456,6 +1456,8 @@ export class VoiceAssistantWebSocketServer {
       onBinaryMessage: options.onBinaryMessage,
       onBinaryMessageToSource: options.onBinaryMessageToSource,
       getTransportBufferedAmount: options.getTransportBufferedAmount,
+      isRelaySource: (source) =>
+        this.socketIdentities.get(source as WebSocketLike)?.transport === "relay",
       onLifecycleIntent: options.onLifecycleIntent,
       logger: options.connectionLogger.child({ module: "session" }),
       onWorkspaceRecovered: async (workspace) => {

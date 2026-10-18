@@ -1914,6 +1914,8 @@ export const ja: TranslationResources = {
         "このペアリングリンクはパスワードと同様に扱ってください。リンクを知っている人は誰でもこのデーモンにアクセスできます。",
       generatedAt: "コード生成日時: {{time}}",
       resetHint: "リセットすると、このコードでペアリングしたデバイスは切断されます。",
+      resetRelayUnavailable:
+        "コードをリセットするには、このホストに直接またはローカルで接続してください。",
       resetCode: "コードをリセット",
       resetting: "リセット中...",
       resetConfirmTitle: "ペアリングコードをリセットしますか？",

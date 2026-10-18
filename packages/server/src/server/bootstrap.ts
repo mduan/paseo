@@ -1239,7 +1239,8 @@ export async function createPaseoDaemon(
     paseoHome: config.paseoHome,
     hostname: getHostName(),
     serverId,
-    // Getter so enrollments after a pairing-code reset send the current key.
+    // New Hub relationships capture the current public key; pending enrollment retries retain
+    // their original snapshot. Active relationships authenticate with their own credential.
     get daemonPublicKey() {
       return daemonKeyPair.publicKeyB64;
     },

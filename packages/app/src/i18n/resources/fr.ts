@@ -1948,6 +1948,8 @@ export const fr: TranslationResources = {
         "Traitez ce lien d’association comme un mot de passe. Toute personne qui le possède peut accéder à ce daemon.",
       generatedAt: "Code généré {{time}}",
       resetHint: "La réinitialisation déconnecte les appareils associés avec ce code.",
+      resetRelayUnavailable:
+        "Connectez-vous directement ou localement à cet hôte pour réinitialiser le code.",
       resetCode: "Réinitialiser le code",
       resetting: "Réinitialisation...",
       resetConfirmTitle: "Réinitialiser le code d’association ?",

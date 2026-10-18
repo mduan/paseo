@@ -143,15 +143,18 @@ export function startRelayTransport({
     }
     if (controlWs) {
       try {
-        controlWs.close();
+        controlWs.terminate();
       } catch {
         // ignore
       }
       controlWs = null;
     }
+    // Terminate rather than close: a graceful close keeps the socket readable until the
+    // relay acknowledges, and the relay is untrusted. `stopped` gates any frames ws still
+    // drains from its buffer, so nothing from these channels is delivered after stop().
     for (const ws of dataSockets.values()) {
       try {
-        ws.close();
+        ws.terminate();
       } catch {
         // ignore
       }
@@ -380,13 +383,14 @@ export function startRelayTransport({
         relayConnectionId: connectionId,
       };
       if (daemonKeyPair) {
-        void attachEncryptedSocket(
+        void attachEncryptedSocket({
           socket,
           daemonKeyPair,
-          relayLogger.child({ connectionId }),
+          logger: relayLogger.child({ connectionId }),
           attachSocket,
-          externalMetadata,
-        );
+          metadata: externalMetadata,
+          isStopped: () => stopped,
+        });
       } else {
         void attachSocket(socket, externalMetadata);
       }
@@ -413,15 +417,23 @@ export function startRelayTransport({
   return { stop };
 }
 
-async function attachEncryptedSocket(
-  socket: RelayWebSocketLike,
-  daemonKeyPair: KeyPair,
-  logger: pino.Logger,
-  attachSocket: (ws: RelaySocketLike, metadata?: ExternalSocketMetadata) => Promise<void>,
-  metadata?: ExternalSocketMetadata,
-): Promise<void> {
+async function attachEncryptedSocket({
+  socket,
+  daemonKeyPair,
+  logger,
+  attachSocket,
+  metadata,
+  isStopped,
+}: {
+  socket: RelayWebSocketLike;
+  daemonKeyPair: KeyPair;
+  logger: pino.Logger;
+  attachSocket: (ws: RelaySocketLike, metadata?: ExternalSocketMetadata) => Promise<void>;
+  metadata?: ExternalSocketMetadata;
+  isStopped: () => boolean;
+}): Promise<void> {
   try {
-    const relayTransport = createRelayTransportAdapter(socket, logger);
+    const relayTransport = createRelayTransportAdapter({ socket, logger, isStopped });
     const emitter = new EventEmitter();
     const pendingMessages: Array<string | ArrayBuffer> = [];
     let attached = false;
@@ -446,7 +458,9 @@ async function attachEncryptedSocket(
       getTransportBufferedAmount: () => socket.bufferedAmount,
       terminateTransport: () => socket.terminate(),
     });
+    if (isStopped()) return;
     await attachSocket(encryptedSocket, metadata);
+    if (isStopped()) return;
     attached = true;
     for (const message of pendingMessages) {
       emitter.emit("message", message);
@@ -462,10 +476,15 @@ async function attachEncryptedSocket(
   }
 }
 
-function createRelayTransportAdapter(
-  socket: RelayWebSocketLike,
-  logger: pino.Logger,
-): RelayTransport {
+function createRelayTransportAdapter({
+  socket,
+  logger,
+  isStopped,
+}: {
+  socket: RelayWebSocketLike;
+  logger: pino.Logger;
+  isStopped: () => boolean;
+}): RelayTransport {
   const relayTransport: RelayTransport = {
     send: (data) =>
       new Promise<void>((resolve, reject) => {
@@ -491,6 +510,7 @@ function createRelayTransportAdapter(
   };
 
   socket.on("message", (data, isBinary) => {
+    if (isStopped()) return;
     const binary = isBinary === true;
     relayTransport.onmessage?.({ data: normalizeMessageData(data, binary), isBinary: binary });
   });

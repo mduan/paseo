@@ -471,6 +471,8 @@ export interface SessionOptions {
   onBinaryMessage?: (frame: Uint8Array) => void;
   onBinaryMessageToSource?: (source: object, frame: Uint8Array) => Promise<void>;
   getTransportBufferedAmount?: (source?: object) => number | null;
+  /** Whether a request arrived on a relay socket. A session can span several sockets. */
+  isRelaySource?: (source: object) => boolean;
   onLifecycleIntent?: (intent: SessionLifecycleIntent) => void;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   logger: pino.Logger;
@@ -832,6 +834,7 @@ export class Session {
       onBinaryMessage,
       onBinaryMessageToSource,
       getTransportBufferedAmount,
+      isRelaySource,
       onLifecycleIntent,
       onWorkspaceRecovered,
       logger,
@@ -1070,6 +1073,7 @@ export class Session {
       serverId,
       daemonVersion,
       daemonRuntimeConfig,
+      isRelaySource,
       getWebSocketRuntimeMetrics,
       getObservationMetrics: () => ({
         Registrations: this.delivery.registrationCount,
@@ -2323,7 +2327,7 @@ export class Session {
       this.dispatchHubExecutionMessage(msg) ??
       this.dispatchCreationMessage(msg, source) ??
       this.dispatchAgentLifecycleMessage(msg) ??
-      this.dispatchAgentConfigMessage(msg) ??
+      this.dispatchAgentConfigMessage(msg, source) ??
       this.dispatchCheckoutMessage(msg) ??
       this.dispatchWorkspaceLifecycleMessage(msg) ??
       this.dispatchWorkspaceFileMessage(msg, source) ??
@@ -2793,7 +2797,10 @@ export class Session {
     }
   }
 
-  private dispatchAgentConfigMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+  private dispatchAgentConfigMessage(
+    msg: SessionInboundMessage,
+    source: object | undefined,
+  ): Promise<void> | undefined {
     switch (msg.type) {
       case "set_agent_mode_request":
         return this.agentConfigSession.handleSetAgentModeRequest(msg);
@@ -2816,7 +2823,7 @@ export class Session {
       case "daemon.get_pairing_offer.request":
         return this.daemonSession.handleGetPairingOfferRequest(msg);
       case "daemon.pairing_offer.reset.request":
-        return this.daemonSession.handlePairingOfferResetRequest(msg);
+        return this.daemonSession.handlePairingOfferResetRequest(msg, source);
       case "daemon.config.reload.request":
         this.daemonSession.handleConfigReloadRequest(msg);
         return undefined;

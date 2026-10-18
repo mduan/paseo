@@ -1873,6 +1873,7 @@ export const zhCN: TranslationResources = {
       securityWarning: "请像保管密码一样保管此配对链接。任何获得此链接的人都可以访问此守护进程。",
       generatedAt: "代码生成于 {{time}}",
       resetHint: "重置后，使用此代码配对的设备将断开连接。",
+      resetRelayUnavailable: "请直接或在本地连接到此主机以重置代码。",
       resetCode: "重置代码",
       resetting: "正在重置...",
       resetConfirmTitle: "重置配对代码？",

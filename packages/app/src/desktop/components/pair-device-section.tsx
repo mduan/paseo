@@ -53,6 +53,8 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
   const canConfigureRelay = supportsPairingRpc && serverFeatures?.relayConfig === true;
   // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
   const canResetPairing = serverFeatures?.pairingOfferReset === true;
+  // The daemon rejects resets over the relay: the reset would drop this device's own connection.
+  const isRelayConnection = runtimeSnapshot?.activeConnection?.type === "relay";
 
   const pairingQuery = useFetchQuery({
     queryKey: daemonPairingOfferQueryKey(serverId),
@@ -81,8 +83,9 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
     mutationFn: async () => {
       if (!client) throw new Error(t("workspace.terminal.hostDisconnected"));
       await client.resetDaemonPairingOffer();
-      return pairingQuery.refetch();
     },
+    // Refetch on failure too: the keypair may have rotated even if the relay restart failed.
+    onSettled: () => pairingQuery.refetch(),
   });
 
   const qrQuery = useFetchQuery({
@@ -140,6 +143,7 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
         enablePending={enableRelay.isPending}
         enableError={enableRelay.error}
         canResetPairing={canResetPairing}
+        isRelayConnection={isRelayConnection}
         resetPending={resetPairing.isPending}
         resetError={resetPairing.error}
         onResetPairing={handleResetPairing}
@@ -170,6 +174,7 @@ interface PairDeviceBodyProps {
   enablePending: boolean;
   enableError: Error | null;
   canResetPairing: boolean;
+  isRelayConnection: boolean;
   resetPending: boolean;
   resetError: Error | null;
   onResetPairing: () => void;
@@ -314,13 +319,18 @@ function PairingOffer(props: PairDeviceBodyProps & { offer: PairingOfferData }) 
                 time: formatMessageTimestamp(new Date(props.offer.generatedAt)),
               })}
             </Text>
-            <Text style={styles.hint}>{t("pairing.device.resetHint")}</Text>
+            <Text style={styles.hint}>
+              {props.isRelayConnection
+                ? t("pairing.device.resetRelayUnavailable")
+                : t("pairing.device.resetHint")}
+            </Text>
           </View>
           <Button
             variant="outline"
             size="sm"
             leftIcon={RotateCw}
             loading={props.resetPending}
+            disabled={props.isRelayConnection}
             onPress={props.onResetPairing}
           >
             {props.resetPending ? t("pairing.device.resetting") : t("pairing.device.resetCode")}

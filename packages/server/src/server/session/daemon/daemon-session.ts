@@ -55,6 +55,7 @@ export interface DaemonSessionOptions {
   logger: pino.Logger;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig: () => DaemonConfigReloadResult;
+  isRelaySource?: (source: object) => boolean;
 }
 
 /**
@@ -82,6 +83,7 @@ export class DaemonSession {
   private readonly selfUpdate: DaemonSelfUpdateSessionController;
   private readonly hubRelationships: HubRelationshipManagement | null;
   private readonly reloadConfig: () => DaemonConfigReloadResult;
+  private readonly isRelaySource: (source: object) => boolean;
 
   constructor(options: DaemonSessionOptions) {
     this.host = options.host;
@@ -99,6 +101,7 @@ export class DaemonSession {
     this.logger = options.logger;
     this.hubRelationships = options.hubRelationships ?? null;
     this.reloadConfig = options.reloadConfig;
+    this.isRelaySource = options.isRelaySource ?? (() => false);
     this.selfUpdate = new DaemonSelfUpdateSessionController({
       clientId: this.clientId,
       daemonVersion: this.daemonVersion ?? null,
@@ -230,8 +233,14 @@ export class DaemonSession {
 
   async handlePairingOfferResetRequest(
     msg: Extract<SessionInboundMessage, { type: "daemon.pairing_offer.reset.request" }>,
+    source: object | undefined,
   ): Promise<void> {
     try {
+      // The reset closes every relay connection, including the requester's, before the
+      // response could reach it, which would lock a relay-only device out.
+      if (source && this.isRelaySource(source)) {
+        throw new Error("Reset the pairing code from a direct or local connection to this host");
+      }
       const resetDaemonKeyPair = this.daemonRuntimeConfig?.resetDaemonKeyPair;
       if (!resetDaemonKeyPair) throw new Error("This daemon cannot reset its pairing code");
       await resetDaemonKeyPair();

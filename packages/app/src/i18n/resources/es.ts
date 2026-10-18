@@ -1944,6 +1944,8 @@ export const es: TranslationResources = {
         "Trata este enlace de emparejamiento como una contraseña. Cualquiera que lo tenga puede acceder a este daemon.",
       generatedAt: "Código generado {{time}}",
       resetHint: "Al restablecerlo se desconectan los dispositivos vinculados con este código.",
+      resetRelayUnavailable:
+        "Conéctate a este host de forma directa o local para restablecer el código.",
       resetCode: "Restablecer código",
       resetting: "Restableciendo...",
       resetConfirmTitle: "¿Restablecer el código de vinculación?",

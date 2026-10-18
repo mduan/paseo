@@ -44,6 +44,7 @@ function makeSubsystem(overrides: {
   getWebSocketRuntimeMetrics?: () => DaemonWebSocketRuntimeDiagnosticSnapshot | null;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig?: () => DaemonConfigReloadResult;
+  isRelaySource?: (source: object) => boolean;
 }) {
   const emitted: SessionOutboundMessage[] = [];
   const restartIntents: Parameters<DaemonSessionHost["emitLifecycleIntent"]>[0][] = [];
@@ -73,11 +74,68 @@ function makeSubsystem(overrides: {
         overrideControlledPaths: [],
       })),
     logger: pino({ level: "silent" }),
+    isRelaySource: overrides.isRelaySource ?? (() => false),
   });
   return { subsystem, emitted, paseoHome, restartIntents };
 }
 
 describe("DaemonSession", () => {
+  test("pairing offer reset is rejected on a relay socket without rotating the keypair", async () => {
+    const relaySocket = {};
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      isRelaySource: (source) => source === relaySocket,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-1" },
+      relaySocket,
+    );
+
+    expect(resets).toBe(0);
+    expect(emitted).toEqual([
+      {
+        type: "rpc_error",
+        payload: {
+          requestId: "reset-1",
+          requestType: "daemon.pairing_offer.reset.request",
+          error: "Reset the pairing code from a direct or local connection to this host",
+        },
+      },
+    ]);
+  });
+
+  test("pairing offer reset rotates the keypair on a direct socket", async () => {
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      isRelaySource: () => false,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-2" },
+      {},
+    );
+
+    expect(resets).toBe(1);
+    expect(emitted).toMatchObject([
+      { type: "daemon.pairing_offer.reset.response", payload: { requestId: "reset-2" } },
+    ]);
+  });
+
   test("config reload returns the daemon-owned classification", () => {
     const { subsystem, emitted } = makeSubsystem({
       reloadConfig: () => ({

@@ -42,6 +42,8 @@ The daemon requires a valid cryptographic handshake before processing any comman
 
 The QR code or pairing link is the trust anchor. It contains the daemon's public key, which is required to establish the encrypted connection. Treat it like a password — don't share it publicly.
 
+If a link leaks, reset the pairing code from a direct or local connection. The daemon rejects resets over the relay, since the reset would drop the requesting device. A reset stops further relay access with the old link only. It does not affect direct, local, or Hub access, and it does not undo anything a paired device already did. After a suspected leak, also review schedules, agents, Hub relationships, and the daemon password.
+
 When a daemon password is configured, new relay clients send it in the encrypted `hello` message. This release still admits relay clients that send no credential so existing mobile builds continue to connect. A wrong password is rejected. The next release will require the password for relay connections after updated mobile builds are available.
 
 ## Local daemon trust boundary

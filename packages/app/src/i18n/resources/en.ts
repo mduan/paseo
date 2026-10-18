@@ -1920,6 +1920,7 @@ export const en = {
         "Treat this pairing link like a password. Anyone with it can access this daemon.",
       generatedAt: "Code generated {{time}}",
       resetHint: "Resetting disconnects devices paired with this code.",
+      resetRelayUnavailable: "Connect directly or locally to this host to reset the code.",
       resetCode: "Reset code",
       resetting: "Resetting...",
       resetConfirmTitle: "Reset pairing code?",
