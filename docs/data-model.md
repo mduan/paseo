@@ -49,6 +49,7 @@ $PASEO_HOME/
 ├── config.json                          # Daemon configuration
 ├── server-id                            # Stable daemon identifier (plain text, "srv_<base64url>")
 ├── daemon-keypair.json                  # E2EE keypair for relay (mode 0600)
+├── connection-history.json              # App sessions and pairing-code resets (mode 0600)
 ├── paseo.pid                            # Daemon PID lock file
 ├── local-credential                     # Per-run local client credential (mode 0600)
 ├── daemon.log                           # Default log file (path configurable)
@@ -77,6 +78,23 @@ $PASEO_HOME/
 The `agents/{sanitized-cwd}/` directory name is derived from the agent's `cwd` by stripping the filesystem root and replacing path separators with `-` (Windows drive letters become a `C-` style prefix). Persistent server stores write atomically by writing a temp file in the target directory and then renaming it into place.
 
 ---
+
+## Connection history
+
+The Pair device page retains app connection history for 30 days in `connection-history.json`.
+The daemon validates this file with Zod and writes it atomically with mode `0600`.
+CLI, MCP, plugin, and Hub connections do not enter this history.
+
+History follows logical sessions across physical sockets and the reconnect grace window.
+A socket disconnect does not end a history session until the daemon tears down the logical session.
+At startup, the daemon closes any unfinished records at the startup time.
+After a crash, this time is an upper bound because the exact disconnect time is unknown.
+Retention uses session end times, so active sessions remain visible even after 30 days.
+
+Device labels and SSH tunnel hints come from clients and do not establish identity or access rights.
+The stable app installation `clientId` groups sessions into devices.
+Pairing-code resets remain in the timeline independently of device sessions.
+Resetting a code replaces the daemon keypair but preserves this history.
 
 ## 1. Agent Record
 

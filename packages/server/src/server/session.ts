@@ -1,3 +1,4 @@
+import type { ConnectionHistoryStore } from "./connection-history/store.js";
 import { createConversationTitleGenerator } from "./agent/conversation-title.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
@@ -579,6 +580,7 @@ export interface SessionOptions {
   serverId?: string;
   daemonVersion?: string;
   daemonRuntimeConfig?: DaemonRuntimeConfig;
+  connectionHistory?: ConnectionHistoryStore;
   getWebSocketRuntimeMetrics?: () => DaemonWebSocketRuntimeDiagnosticSnapshot | null;
 }
 
@@ -1061,6 +1063,7 @@ export class Session {
       logger: this.sessionLogger,
     });
     this.daemonSession = new DaemonSession({
+      connectionHistory: options.connectionHistory,
       host: {
         emit: (msg) => this.emit(msg),
         emitLifecycleIntent: (intent) => this.emitLifecycleIntent(intent),
@@ -3104,6 +3107,9 @@ export class Session {
 
   private async dispatchMiscMessage(msg: SessionInboundMessage): Promise<void> {
     switch (msg.type) {
+      case "daemon.connection_history.get.request":
+        this.daemonSession.handleGetConnectionHistoryRequest(msg);
+        return;
       case "list_commands_request":
         await this.handleListCommandsRequest(msg);
         return;

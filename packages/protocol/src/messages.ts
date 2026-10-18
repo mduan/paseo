@@ -18,6 +18,7 @@ export {
 import { TerminalProfileSchema } from "./terminal-profile.js";
 export { TerminalProfileSchema, type TerminalProfile } from "./terminal-profile.js";
 import { z } from "zod";
+import { ConnectionHistorySchema, ConnectionTransport, DeviceKind } from "./connection-history.js";
 import { TerminalActivitySchema } from "./terminal-activity.js";
 import { CLIENT_CAPS } from "./client-capabilities.js";
 import { AGENT_LIFECYCLE_STATUSES } from "./agent-lifecycle.js";
@@ -1423,6 +1424,11 @@ export const DaemonGetStatusRequestSchema = z.object({
 
 export const DaemonGetPairingOfferRequestSchema = z.object({
   type: z.literal("daemon.get_pairing_offer.request"),
+  requestId: z.string(),
+});
+
+export const DaemonConnectionHistoryGetRequestSchema = z.object({
+  type: z.literal("daemon.connection_history.get.request"),
   requestId: z.string(),
 });
 
@@ -3334,6 +3340,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetStatusRequestSchema,
   DaemonGetPairingOfferRequestSchema,
   DaemonPairingOfferResetRequestSchema,
+  DaemonConnectionHistoryGetRequestSchema,
   DaemonConfigReloadRequestSchema,
   HubManagementDaemonConnectRequestSchema,
   HubManagementDaemonGetStatusRequestSchema,
@@ -3732,6 +3739,8 @@ export const ServerInfoStatusPayloadSchema = z
         relayConfig: z.boolean().optional(),
         // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
         pairingOfferReset: z.boolean().optional(),
+        // COMPAT(connectionHistory): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+        connectionHistory: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: z.boolean().optional(),
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
@@ -5204,6 +5213,11 @@ const DaemonPairingOfferPayloadSchema = z
 export const DaemonGetPairingOfferResponseSchema = z.object({
   type: z.literal("daemon.get_pairing_offer.response"),
   payload: DaemonPairingOfferPayloadSchema,
+});
+
+export const DaemonConnectionHistoryGetResponseSchema = z.object({
+  type: z.literal("daemon.connection_history.get.response"),
+  payload: ConnectionHistorySchema.extend({ requestId: z.string() }),
 });
 
 export const DaemonPairingOfferResetResponseSchema = z.object({
@@ -7149,6 +7163,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetStatusResponseSchema,
   DaemonGetPairingOfferResponseSchema,
   DaemonPairingOfferResetResponseSchema,
+  DaemonConnectionHistoryGetResponseSchema,
   DaemonConfigReloadResponseSchema,
   HubManagementDaemonConnectResponseSchema,
   HubManagementDaemonGetStatusResponseSchema,
@@ -7750,6 +7765,9 @@ export const WSHelloMessageSchema = z.object({
   type: z.literal("hello"),
   clientId: z.string().min(1),
   clientType: z.enum(["mobile", "browser", "cli", "mcp", "hub"]),
+  deviceLabel: z.string().max(200).optional(),
+  deviceKind: z.enum(DeviceKind).optional(),
+  connectionTransport: z.literal(ConnectionTransport.SshTunnel).optional(),
   protocolVersion: z.number().int(),
   auth: z
     .discriminatedUnion("kind", [

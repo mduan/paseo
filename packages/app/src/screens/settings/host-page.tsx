@@ -1,3 +1,4 @@
+import { ConnectionHistorySection } from "./connection-history/section";
 import {
   ArrowDown,
   ArrowUp,
@@ -281,9 +282,12 @@ export function HostPairDevicePage({ serverId }: { serverId: string }) {
   }
 
   return (
-    <SettingsSection title={t("settings.host.pairDevices.title")}>
-      <PairDeviceRow serverId={serverId} />
-    </SettingsSection>
+    <View>
+      <SettingsSection title={t("settings.host.pairDevices.title")}>
+        <PairDeviceRow serverId={serverId} />
+      </SettingsSection>
+      <ConnectionHistorySection serverId={serverId} />
+    </View>
   );
 }
 

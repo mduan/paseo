@@ -1,3 +1,4 @@
+import type { DeviceKind, ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import { legacyUsageIcon } from "./legacy-usage-icons.js";
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
 import { ProviderSnapshotUpdates } from "./provider-snapshots/index.js";
@@ -398,6 +399,9 @@ export interface DaemonClientConfig {
   clientId: string;
   clientType?: "mobile" | "browser" | "cli" | "mcp" | "hub";
   appVersion?: string;
+  deviceLabel?: string | (() => Promise<string>);
+  deviceKind?: DeviceKind;
+  connectionTransport?: ConnectionTransport.SshTunnel;
   runtimeGeneration?: number | null;
   password?: string;
   localCredential?: () => string | undefined | Promise<string | undefined>;
@@ -5320,6 +5324,12 @@ export class DaemonClient {
     });
   }
 
+  async getConnectionHistory() {
+    return this.sendNamespacedCorrelatedSessionRequest<"daemon.connection_history.get.response">({
+      message: { type: "daemon.connection_history.get.request" },
+    });
+  }
+
   async resetDaemonPairingOffer(requestId?: string): Promise<DaemonPairingOfferPayload> {
     // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
     if (this.lastServerInfoMessage?.features?.pairingOfferReset !== true) {
@@ -6331,12 +6341,19 @@ export class DaemonClient {
     }
 
     try {
+      const deviceLabel =
+        typeof this.config.deviceLabel === "function"
+          ? await this.config.deviceLabel()
+          : this.config.deviceLabel;
       if (this.transport !== transport) return;
       const auth = this.helloAuth;
       this.sendJsonMessage("hello", "hello", {
         type: "hello",
         clientId: this.config.clientId,
         clientType: this.config.clientType ?? "cli",
+        deviceLabel,
+        deviceKind: this.config.deviceKind,
+        connectionTransport: this.config.connectionTransport,
         protocolVersion: 1,
         ...(auth ? { auth } : {}),
         capabilities: {

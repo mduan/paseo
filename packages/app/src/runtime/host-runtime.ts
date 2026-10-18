@@ -1,3 +1,5 @@
+import { getAppDeviceLabel, getAppDeviceKind } from "@/utils/app-device";
+import { ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import equal from "fast-deep-equal/es6";
@@ -543,6 +545,10 @@ function createDefaultDeps(): HostRuntimeControllerDeps {
         clientId,
         clientType: "mobile",
         appVersion: resolveAppVersion() ?? undefined,
+        deviceLabel: getAppDeviceLabel,
+        deviceKind: getAppDeviceKind(),
+        connectionTransport:
+          connection.type === "remoteSsh" ? ConnectionTransport.SshTunnel : undefined,
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: nativePerformanceTrace,

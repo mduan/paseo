@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { hostname } from "node:os";
 import { app, ipcMain, powerMonitor } from "electron";
 import log from "electron-log/main";
 import {
@@ -429,6 +430,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
       }),
     desktop_app_logs: () => getDesktopAppLogs(),
     desktop_update_diagnostics: () => getDesktopUpdaterDiagnostics(),
+    desktop_get_computer_name: () => hostname(),
     desktop_get_system_idle_time: () => powerMonitor.getSystemIdleTime() * 1000,
     cli_daemon_status: () => getCliDaemonStatus(),
     write_attachment_base64: (args) => writeAttachmentBase64(args ?? {}),
