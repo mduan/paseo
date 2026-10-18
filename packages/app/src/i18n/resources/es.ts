@@ -1942,6 +1942,15 @@ export const es: TranslationResources = {
       hint: "Escanee este códigoQRconPaseoen su teléfono o copie el enlace a continuación.",
       securityWarning:
         "Trata este enlace de emparejamiento como una contraseña. Cualquiera que lo tenga puede acceder a este daemon.",
+      generatedAt: "Código generado {{time}}",
+      resetHint: "Al restablecerlo se desconectan los dispositivos vinculados con este código.",
+      resetRelayUnavailable:
+        "Conéctate a este host de forma directa o local para restablecer el código.",
+      resetCode: "Restablecer código",
+      resetting: "Restableciendo...",
+      resetConfirmTitle: "¿Restablecer el código de vinculación?",
+      resetConfirmMessage:
+        "El código QR y el enlace actuales dejarán de funcionar. Los dispositivos vinculados con ellos se desconectarán y deberán escanear el nuevo código.",
       qrUnavailable: "CódigoQRno disponible.",
       qrAccessibility: "Código QR de emparejamiento",
       retry: "Rever",

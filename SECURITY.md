@@ -19,7 +19,7 @@ The relay is designed to be untrusted. All traffic between your phone and daemon
 
 ### How it works
 
-1. The daemon generates a persistent Curve25519 keypair on first run and stores it at `$PASEO_HOME/daemon-keypair.json` with mode `0600`
+1. The daemon generates a persistent Curve25519 keypair on first run and stores it at `$PASEO_HOME/daemon-keypair.json` with mode `0600`. Resetting the pairing code in Pair device replaces the keypair, which invalidates every earlier QR code and link and disconnects relay clients paired with them
 2. The pairing URL (rendered as a QR code or opened directly) carries the daemon's public key in its URL fragment (`https://app.paseo.sh/#offer=...`). Fragments are not sent to the web server, so `app.paseo.sh` never sees the key.
 3. When the phone connects via the relay, it generates a fresh ephemeral Curve25519 keypair and sends an `e2ee_hello` message containing its public key. The daemon will not process any application messages until this handshake completes.
 4. Both sides perform a Curve25519 ECDH key exchange to derive a shared key. All subsequent messages are encrypted with XSalsa20-Poly1305 (NaCl `box`). The encrypted bundle is `[24-byte nonce][ciphertext]`. Peers optionally negotiate `binaryCiphertext` in `e2ee_hello` / `e2ee_ready`: negotiated application text is carried as a base64 WebSocket text frame, while application binary is carried as a raw WebSocket binary frame. A peer that does not negotiate the capability uses base64 text frames for both kinds.
@@ -41,6 +41,8 @@ The daemon requires a valid cryptographic handshake before processing any comman
 ### Trust model
 
 The QR code or pairing link is the trust anchor. It contains the daemon's public key, which is required to establish the encrypted connection. Treat it like a password — don't share it publicly.
+
+If a link leaks, reset the pairing code from a direct or local connection. The daemon rejects resets over the relay, since the reset would drop the requesting device. A reset stops further relay access with the old link only. It does not affect direct, local, or Hub access, and it does not undo anything a paired device already did. After a suspected leak, also review schedules, agents, Hub relationships, and the daemon password.
 
 When a daemon password is configured, new relay clients send it in the encrypted `hello` message. This release still admits relay clients that send no credential so existing mobile builds continue to connect. A wrong password is rejected. The next release will require the password for relay connections after updated mobile builds are available.
 

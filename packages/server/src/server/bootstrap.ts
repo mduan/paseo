@@ -168,7 +168,7 @@ import { wrapSessionMessage, type SessionOutboundMessage } from "./messages.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import { createConfiguredTerminalManager } from "../terminal/terminal-manager-factory.js";
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
-import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
+import { loadOrCreateDaemonKeyPair, rotateDaemonKeyPair } from "./daemon-keypair.js";
 import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
@@ -623,7 +623,7 @@ export async function createPaseoDaemon(
   });
 
   const serverId = getOrCreateServerId(config.paseoHome, { logger });
-  const daemonKeyPair = await loadOrCreateDaemonKeyPair(config.paseoHome, logger);
+  let daemonKeyPair = await loadOrCreateDaemonKeyPair(config.paseoHome, logger);
   const managedProcesses = createBootstrapManagedProcessRegistry(config, logger);
   // Reconcile the helper-process ledger in the background so it never blocks the
   // daemon from coming up; terminating a live leftover can take a few seconds.
@@ -1239,7 +1239,11 @@ export async function createPaseoDaemon(
     paseoHome: config.paseoHome,
     hostname: getHostName(),
     serverId,
-    daemonPublicKey: daemonKeyPair.publicKeyB64,
+    // New Hub relationships capture the current public key; pending enrollment retries retain
+    // their original snapshot. Active relationships authenticate with their own credential.
+    get daemonPublicKey() {
+      return daemonKeyPair.publicKeyB64;
+    },
     logger,
     remote: dependencies.hubRelationshipRemote ?? new DirectHubRelationshipRemote(),
     clock: dependencies.hubRelationshipClock,
@@ -1725,6 +1729,10 @@ export async function createPaseoDaemon(
                     useTls: relayUseTls,
                     publicUseTls: relayPublicUseTls,
                   },
+                resetDaemonKeyPair: async () => {
+                  daemonKeyPair = rotateDaemonKeyPair(config.paseoHome, logger);
+                  await relayRuntime?.setDaemonKeyPair(daemonKeyPair.keyPair);
+                },
               },
               serviceProxyPublicBaseUrl,
               browserToolsBroker,

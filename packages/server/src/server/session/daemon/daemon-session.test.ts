@@ -13,6 +13,7 @@ import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { SessionOutboundMessage } from "../../messages.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
+import { SocketTransport } from "../../socket-transport.js";
 
 const tempDirs: string[] = [];
 
@@ -44,6 +45,7 @@ function makeSubsystem(overrides: {
   getWebSocketRuntimeMetrics?: () => DaemonWebSocketRuntimeDiagnosticSnapshot | null;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig?: () => DaemonConfigReloadResult;
+  getSourceTransport?: (source: object) => SocketTransport | undefined;
 }) {
   const emitted: SessionOutboundMessage[] = [];
   const restartIntents: Parameters<DaemonSessionHost["emitLifecycleIntent"]>[0][] = [];
@@ -73,11 +75,91 @@ function makeSubsystem(overrides: {
         overrideControlledPaths: [],
       })),
     logger: pino({ level: "silent" }),
+    getSourceTransport: overrides.getSourceTransport,
   });
   return { subsystem, emitted, paseoHome, restartIntents };
 }
 
 describe("DaemonSession", () => {
+  test("pairing offer reset is rejected on a relay socket without rotating the keypair", async () => {
+    const relaySocket = {};
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      getSourceTransport: (source) =>
+        source === relaySocket ? SocketTransport.Relay : SocketTransport.Direct,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-1" },
+      relaySocket,
+    );
+
+    expect(resets).toBe(0);
+    expect(emitted).toEqual([
+      {
+        type: "rpc_error",
+        payload: {
+          requestId: "reset-1",
+          requestType: "daemon.pairing_offer.reset.request",
+          error: "Reset the pairing code from a direct or local connection to this host",
+        },
+      },
+    ]);
+  });
+
+  test("pairing offer reset is rejected when the requesting socket is unidentified", async () => {
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      getSourceTransport: () => undefined,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-3" },
+      {},
+    );
+
+    expect(resets).toBe(0);
+    expect(emitted).toMatchObject([{ type: "rpc_error", payload: { requestId: "reset-3" } }]);
+  });
+
+  test("pairing offer reset rotates the keypair on a direct socket", async () => {
+    let resets = 0;
+    const { subsystem, emitted } = makeSubsystem({
+      getSourceTransport: () => SocketTransport.Direct,
+      daemonRuntimeConfig: {
+        listen: null,
+        getRelayConfig: () => null,
+        resetDaemonKeyPair: async () => {
+          resets += 1;
+        },
+      },
+    });
+
+    await subsystem.handlePairingOfferResetRequest(
+      { type: "daemon.pairing_offer.reset.request", requestId: "reset-2" },
+      {},
+    );
+
+    expect(resets).toBe(1);
+    expect(emitted).toMatchObject([
+      { type: "daemon.pairing_offer.reset.response", payload: { requestId: "reset-2" } },
+    ]);
+  });
+
   test("config reload returns the daemon-owned classification", () => {
     const { subsystem, emitted } = makeSubsystem({
       reloadConfig: () => ({

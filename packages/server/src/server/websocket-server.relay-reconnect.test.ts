@@ -19,6 +19,7 @@ import {
 } from "@getpaseo/protocol/terminal-stream-protocol";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { APPLICATION_SOCKET_LEASE_MS } from "./websocket/physical-socket.js";
+import { SocketTransport } from "./socket-transport.js";
 
 type SocketListener = (...args: unknown[]) => void;
 
@@ -900,6 +901,29 @@ describe("relay external socket reconnect behavior", () => {
         reason: "client_shutdown_rpc",
       }),
       "ws_control_rpc_received",
+    );
+
+    await server.close();
+  });
+
+  test("tells sessions which transport each request socket uses for pairing code resets", async () => {
+    const server = createServer();
+    const relaySocket = new MockSocket();
+    const directSocket = new MockSocket();
+    await attachRelayAndHello({ server, socket: relaySocket, clientId: "cid-reset-relay" });
+    await attachDirectAndHello({ server, socket: directSocket, clientId: "cid-reset-direct" });
+
+    const [relaySession, directSession] = sessionMock.instances;
+    const getSourceTransport = (session: (typeof sessionMock.instances)[number]) =>
+      session.args.getSourceTransport as (source: object) => SocketTransport | undefined;
+    expect(getSourceTransport(relaySession)(relaySocket)).toBe(SocketTransport.Relay);
+    expect(getSourceTransport(directSession)(directSocket)).toBe(SocketTransport.Direct);
+    expect(getSourceTransport(relaySession)(new MockSocket())).toBeUndefined();
+
+    const resetRequest = { type: "daemon.pairing_offer.reset.request", requestId: "reset-relay" };
+    relaySocket.emit("message", JSON.stringify({ type: "session", message: resetRequest }));
+    await vi.waitFor(() =>
+      expect(relaySession.handleMessage).toHaveBeenCalledWith(resetRequest, relaySocket),
     );
 
     await server.close();

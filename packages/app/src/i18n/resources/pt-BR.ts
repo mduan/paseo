@@ -1927,6 +1927,15 @@ export const ptBR: TranslationResources = {
       hint: "Escaneie este QR code com o Paseo no seu celular ou copie o link abaixo.",
       securityWarning:
         "Trate este link de pareamento como uma senha. Qualquer pessoa com o link pode acessar este daemon.",
+      generatedAt: "Código gerado {{time}}",
+      resetHint: "Redefinir desconecta os dispositivos pareados com este código.",
+      resetRelayUnavailable:
+        "Conecte-se a este host de forma direta ou local para redefinir o código.",
+      resetCode: "Redefinir código",
+      resetting: "Redefinindo...",
+      resetConfirmTitle: "Redefinir código de pareamento?",
+      resetConfirmMessage:
+        "O código QR e o link atuais deixarão de funcionar. Os dispositivos pareados com eles serão desconectados e precisarão escanear o novo código.",
       qrUnavailable: "QR code indisponível.",
       qrAccessibility: "Código QR de pareamento",
       retry: "Tentar novamente",

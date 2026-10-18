@@ -1918,6 +1918,14 @@ export const en = {
       hint: "Scan this QR code with Paseo on your phone, or copy the link below.",
       securityWarning:
         "Treat this pairing link like a password. Anyone with it can access this daemon.",
+      generatedAt: "Code generated {{time}}",
+      resetHint: "Resetting disconnects devices paired with this code.",
+      resetRelayUnavailable: "Connect directly or locally to this host to reset the code.",
+      resetCode: "Reset code",
+      resetting: "Resetting...",
+      resetConfirmTitle: "Reset pairing code?",
+      resetConfirmMessage:
+        "The current QR code and link stop working. Devices paired with them disconnect and must scan the new code.",
       qrUnavailable: "QR code unavailable.",
       qrAccessibility: "Pairing QR code",
       retry: "Retry",

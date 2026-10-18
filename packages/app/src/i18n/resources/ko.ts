@@ -1903,6 +1903,14 @@ export const ko: TranslationResources = {
       hint: "휴대폰의 Paseo로 이 QR 코드를 스캔하거나 아래 링크를 복사하세요.",
       securityWarning:
         "이 페어링 링크는 비밀번호처럼 취급하세요. 링크를 가진 사람은 누구나 이 데몬에 접근할 수 있습니다.",
+      generatedAt: "코드 생성 시각: {{time}}",
+      resetHint: "재설정하면 이 코드로 페어링된 기기의 연결이 끊어집니다.",
+      resetRelayUnavailable: "코드를 재설정하려면 이 호스트에 직접 또는 로컬로 연결하세요.",
+      resetCode: "코드 재설정",
+      resetting: "재설정 중...",
+      resetConfirmTitle: "페어링 코드를 재설정할까요?",
+      resetConfirmMessage:
+        "현재 QR 코드와 링크는 더 이상 작동하지 않습니다. 이를 통해 페어링된 기기는 연결이 끊어지며 새 코드를 스캔해야 합니다.",
       qrUnavailable: "QR 코드를 사용할 수 없습니다.",
       qrAccessibility: "페어링 QR 코드",
       retry: "다시 시도",

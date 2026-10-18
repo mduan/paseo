@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import pino from "pino";
 import { generateKeyPair } from "@getpaseo/relay";
+import type { KeyPair } from "@getpaseo/relay/e2ee";
 import { createRelayRuntime } from "./relay-runtime.js";
 import { startRelayTransport, type RelayTransportController } from "./relay-transport.js";
 
@@ -38,6 +39,36 @@ describe("RelayRuntime", () => {
     runtime.setEnabled(false);
     await vi.waitFor(() => expect(stops[0]).toHaveBeenCalledOnce());
     expect(runtime.getConfig().enabled).toBe(false);
+  });
+
+  test("reconnects with the new keypair after the old transport stops", async () => {
+    const events: string[] = [];
+    const startedKeys: KeyPair[] = [];
+    const startTransport: typeof startRelayTransport = (options) => {
+      events.push("start");
+      if (options.daemonKeyPair) startedKeys.push(options.daemonKeyPair);
+      return { stop: async () => void events.push("stop") };
+    };
+    const runtime = createRelayRuntime({
+      config: {
+        enabled: true,
+        endpoint: "relay.example.test:443",
+        publicEndpoint: "relay.example.test:443",
+        useTls: true,
+        publicUseTls: true,
+      },
+      logger: pino({ level: "silent" }),
+      attachSocket: async () => undefined,
+      serverId: "relay-runtime-test",
+      daemonKeyPair: generateKeyPair(),
+      startTransport,
+    });
+    const nextKeyPair = generateKeyPair();
+
+    await runtime.setDaemonKeyPair(nextKeyPair);
+
+    expect(events).toEqual(["start", "stop", "start"]);
+    expect(startedKeys[1]).toBe(nextKeyPair);
   });
 
   test("keeps relay disabled when transport startup fails", () => {

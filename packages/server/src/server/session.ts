@@ -285,6 +285,7 @@ import {
 import { runGitCommand } from "../utils/run-git-command.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 import { resolveWorktreeSourceCwd } from "./workspace-source.js";
+import type { SocketTransport } from "./socket-transport.js";
 
 type ProviderSubagentManagerEvent = Extract<
   AgentManagerEvent,
@@ -471,6 +472,8 @@ export interface SessionOptions {
   onBinaryMessage?: (frame: Uint8Array) => void;
   onBinaryMessageToSource?: (source: object, frame: Uint8Array) => Promise<void>;
   getTransportBufferedAmount?: (source?: object) => number | null;
+  /** Transport of the socket a request arrived on. A session can span several sockets. */
+  getSourceTransport?: (source: object) => SocketTransport | undefined;
   onLifecycleIntent?: (intent: SessionLifecycleIntent) => void;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   logger: pino.Logger;
@@ -832,6 +835,7 @@ export class Session {
       onBinaryMessage,
       onBinaryMessageToSource,
       getTransportBufferedAmount,
+      getSourceTransport,
       onLifecycleIntent,
       onWorkspaceRecovered,
       logger,
@@ -1070,6 +1074,7 @@ export class Session {
       serverId,
       daemonVersion,
       daemonRuntimeConfig,
+      getSourceTransport,
       getWebSocketRuntimeMetrics,
       getObservationMetrics: () => ({
         Registrations: this.delivery.registrationCount,
@@ -2323,7 +2328,7 @@ export class Session {
       this.dispatchHubExecutionMessage(msg) ??
       this.dispatchCreationMessage(msg, source) ??
       this.dispatchAgentLifecycleMessage(msg) ??
-      this.dispatchAgentConfigMessage(msg) ??
+      this.dispatchAgentConfigMessage(msg, source) ??
       this.dispatchCheckoutMessage(msg) ??
       this.dispatchWorkspaceLifecycleMessage(msg) ??
       this.dispatchWorkspaceFileMessage(msg, source) ??
@@ -2793,7 +2798,10 @@ export class Session {
     }
   }
 
-  private dispatchAgentConfigMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+  private dispatchAgentConfigMessage(
+    msg: SessionInboundMessage,
+    source: object | undefined,
+  ): Promise<void> | undefined {
     switch (msg.type) {
       case "set_agent_mode_request":
         return this.agentConfigSession.handleSetAgentModeRequest(msg);
@@ -2815,6 +2823,8 @@ export class Session {
         return this.daemonSession.handleGetStatusRequest(msg);
       case "daemon.get_pairing_offer.request":
         return this.daemonSession.handleGetPairingOfferRequest(msg);
+      case "daemon.pairing_offer.reset.request":
+        return this.daemonSession.handlePairingOfferResetRequest(msg, source);
       case "daemon.config.reload.request":
         this.daemonSession.handleConfigReloadRequest(msg);
         return undefined;

@@ -9,6 +9,8 @@ export interface LocalPairingOffer {
   relayEnabled: boolean;
   url: string | null;
   qr: string | null;
+  /** ISO time the daemon keypair behind this offer was created. */
+  generatedAt?: string;
 }
 
 export async function generateLocalPairingOffer(args: {
@@ -50,6 +52,7 @@ export async function generateLocalPairingOffer(args: {
       relayEnabled: true,
       url,
       qr: null,
+      generatedAt: daemonKeyPair.createdAt,
     };
   }
 
@@ -64,5 +67,6 @@ export async function generateLocalPairingOffer(args: {
     relayEnabled: true,
     url,
     qr,
+    generatedAt: daemonKeyPair.createdAt,
   };
 }
