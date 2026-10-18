@@ -1734,8 +1734,12 @@ export async function createPaseoDaemon(
                   },
                 resetDaemonKeyPair: async () => {
                   daemonKeyPair = rotateDaemonKeyPair(config.paseoHome, logger);
-                  connectionHistory.recordPairingCodeReset(daemonKeyPair.createdAt);
-                  await relayRuntime?.setDaemonKeyPair(daemonKeyPair.keyPair);
+                  try {
+                    connectionHistory.recordPairingCodeReset(daemonKeyPair.createdAt);
+                  } finally {
+                    // A history write failure must not leave old relay channels active.
+                    await relayRuntime?.setDaemonKeyPair(daemonKeyPair.keyPair);
+                  }
                 },
               },
               serviceProxyPublicBaseUrl,
