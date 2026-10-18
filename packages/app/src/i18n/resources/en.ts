@@ -1790,6 +1790,7 @@ export const en = {
       disconnected: "Disconnected",
       lastSeen: "Last seen {{time}}",
       oldVersion: "Old app version",
+      connections: "{{count}} connections",
       connections_one: "{{count}} connection",
       connections_other: "{{count}} connections",
       reset: "Pairing code reset",

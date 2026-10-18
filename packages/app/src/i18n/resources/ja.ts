@@ -1782,6 +1782,7 @@ export const ja: TranslationResources = {
       disconnected: "切断済み",
       lastSeen: "最終接続 {{time}}",
       oldVersion: "古いアプリバージョン",
+      connections: "接続 {{count}} 回",
       connections_one: "接続 {{count}} 回",
       connections_other: "接続 {{count}} 回",
       reset: "ペアリングコードをリセット",

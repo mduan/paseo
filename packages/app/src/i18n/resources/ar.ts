@@ -1765,6 +1765,7 @@ export const ar: TranslationResources = {
       disconnected: "غير متصل",
       lastSeen: "آخر اتصال {{time}}",
       oldVersion: "إصدار قديم من التطبيق",
+      connections: "عدد الاتصالات: {{count}}",
       connections_one: "اتصال واحد ({{count}})",
       connections_other: "{{count}} اتصالات",
       reset: "تمت إعادة تعيين رمز الاقتران",

@@ -1816,6 +1816,7 @@ export const fr: TranslationResources = {
       disconnected: "Déconnecté",
       lastSeen: "Dernière connexion {{time}}",
       oldVersion: "Ancienne version de l’app",
+      connections: "{{count}} connexions",
       connections_one: "{{count}} connexion",
       connections_other: "{{count}} connexions",
       reset: "Code d’association réinitialisé",

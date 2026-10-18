@@ -1812,6 +1812,7 @@ export const es: TranslationResources = {
       disconnected: "Desconectado",
       lastSeen: "Última conexión {{time}}",
       oldVersion: "Versión antigua de la app",
+      connections: "{{count}} conexiones",
       connections_one: "{{count}} conexión",
       connections_other: "{{count}} conexiones",
       reset: "Código de vinculación restablecido",

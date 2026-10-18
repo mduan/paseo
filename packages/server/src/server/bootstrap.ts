@@ -625,7 +625,12 @@ export async function createPaseoDaemon(
 
   const serverId = getOrCreateServerId(config.paseoHome, { logger });
   let daemonKeyPair = await loadOrCreateDaemonKeyPair(config.paseoHome, logger);
-  const connectionHistory = new ConnectionHistoryStore({ paseoHome: config.paseoHome, logger });
+  let connectionHistory: ConnectionHistoryStore | undefined;
+  try {
+    connectionHistory = new ConnectionHistoryStore({ paseoHome: config.paseoHome, logger });
+  } catch (error) {
+    logger.error({ err: error }, "Connection history is unavailable; continuing without it");
+  }
   const managedProcesses = createBootstrapManagedProcessRegistry(config, logger);
   // Reconcile the helper-process ledger in the background so it never blocks the
   // daemon from coming up; terminating a live leftover can take a few seconds.
@@ -1735,7 +1740,7 @@ export async function createPaseoDaemon(
                 resetDaemonKeyPair: async () => {
                   daemonKeyPair = rotateDaemonKeyPair(config.paseoHome, logger);
                   try {
-                    connectionHistory.recordPairingCodeReset(daemonKeyPair.createdAt);
+                    connectionHistory?.recordPairingCodeReset(daemonKeyPair.createdAt);
                   } finally {
                     // A history write failure must not leave old relay channels active.
                     await relayRuntime?.setDaemonKeyPair(daemonKeyPair.keyPair);

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createInstance } from "i18next";
 import { ar } from "./resources/ar";
 import { en } from "./resources/en";
 import { es } from "./resources/es";
@@ -104,6 +105,26 @@ function findUntranslatedConnectionErrors(): string[] {
 }
 
 describe("translation resources", () => {
+  it.each([
+    { lng: "ru", expected: ["Подключений: 2", "Подключений: 5", "Подключений: 11"] },
+    { lng: "ar", expected: ["عدد الاتصالات: 2", "عدد الاتصالات: 5", "عدد الاتصالات: 11"] },
+  ])("keeps connection counts localized in $lng", async ({ lng, expected }) => {
+    const instance = createInstance();
+    await instance.init({
+      compatibilityJSON: "v4",
+      fallbackLng: "en",
+      lng,
+      resources: {
+        en: { translation: en },
+        ru: { translation: ru },
+        ar: { translation: ar },
+      },
+    });
+    expect([2, 5, 11].map((count) => instance.t("pairing.history.connections", { count }))).toEqual(
+      expected,
+    );
+  });
+
   it("keeps all supported language keys in sync with English", () => {
     const englishKeys = flattenKeys(en).sort();
     expect(flattenKeys(ar).sort()).toEqual(englishKeys);

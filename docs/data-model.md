@@ -83,6 +83,8 @@ The `agents/{sanitized-cwd}/` directory name is derived from the agent's `cwd` b
 
 The Pair device page retains app connection history for 30 days in `connection-history.json`.
 The daemon validates this file with Zod and writes it atomically with mode `0600`.
+If the store cannot initialize, the daemon preserves the file and starts without history for that run.
+Session record write errors do not interrupt connections or cleanup. Rename and pairing-reset operations still report write errors.
 CLI, MCP, plugin, and Hub connections do not enter this history.
 
 History follows logical sessions across physical sockets and the reconnect grace window.

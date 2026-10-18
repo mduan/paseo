@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { once } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
 import { join } from "node:path";
@@ -131,5 +132,74 @@ test("revokes old relay connections even when recording the reset fails", async 
     const relayClosed = once(relay, "close");
     relay.close();
     await relayClosed;
+  }
+}, 30_000);
+
+test.each(["{invalid", JSON.stringify({ devices: [], pairingCodeResets: "invalid" })])(
+  "starts without history and preserves unreadable history (%#)",
+  async (contents) => {
+    const root = mkdtempSync(join(tmpdir(), "paseo-unreadable-history-"));
+    const paseoHome = join(root, ".paseo");
+    mkdirSync(paseoHome);
+    const file = join(paseoHome, "connection-history.json");
+    writeFileSync(file, contents);
+    let daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>> | undefined;
+    let app: DaemonClient | undefined;
+    try {
+      daemon = await createTestPaseoDaemon({
+        paseoHomeRoot: root,
+        mcpEnabled: false,
+        cleanup: false,
+      });
+      app = new DaemonClient({
+        url: `ws://127.0.0.1:${daemon.port}/ws`,
+        clientType: "mobile",
+        clientId: "cid_unreadable_history",
+        reconnect: { enabled: false },
+      });
+      await app.connect();
+      const features = app.getLastServerInfoMessage()?.features;
+      expect(features?.connectionHistory).toBeUndefined();
+      expect(features?.connectionHistoryRename).toBeUndefined();
+      await expect(app.resetDaemonPairingOffer()).resolves.toMatchObject({
+        url: expect.any(String),
+      });
+      await daemon.daemon.stop();
+      expect(readFileSync(file, "utf8")).toBe(contents);
+    } finally {
+      await app?.close();
+      await daemon?.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test("app hello, disconnect, and shutdown survive history write failures", async () => {
+  const daemon = await createTestPaseoDaemon({ mcpEnabled: false });
+  const options = { url: `ws://127.0.0.1:${daemon.port}/ws`, reconnect: { enabled: false } };
+  const reader = new DaemonClient({ ...options, clientId: "cli-history-fault-reader" });
+  const phone = new DaemonClient({ ...options, clientId: "cid_phone_fault", clientType: "mobile" });
+  const browser = new DaemonClient({
+    ...options,
+    clientId: "cid_browser_fault",
+    clientType: "browser",
+  });
+  const file = join(daemon.paseoHome, "connection-history.json");
+  try {
+    await reader.connect();
+    mkdirSync(file);
+    await phone.connect();
+    await browser.connect();
+    expect(
+      (await reader.getConnectionHistory()).devices.map((device) => device.clientId).sort(),
+    ).toEqual(["cid_browser_fault", "cid_phone_fault"]);
+    await phone.close();
+    await daemon.daemon.stop();
+  } finally {
+    rmSync(file, { recursive: true, force: true });
+    await phone.close();
+    await browser.close();
+    await reader.close();
+    await daemon.close();
   }
 }, 30_000);

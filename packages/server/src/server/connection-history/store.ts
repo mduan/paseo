@@ -16,19 +16,15 @@ const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export class ConnectionHistoryStore {
   private readonly filePath: string;
   private readonly now: () => Date;
+  private readonly logger: pino.Logger;
   private history: ConnectionHistory = { devices: [], pairingCodeResets: [] };
 
   constructor(options: { paseoHome: string; logger: pino.Logger; now?: () => Date }) {
     this.filePath = join(options.paseoHome, "connection-history.json");
+    this.logger = options.logger;
     this.now = options.now ?? (() => new Date());
     if (!existsSync(this.filePath)) return;
-    try {
-      this.history = ConnectionHistorySchema.parse(JSON.parse(readFileSync(this.filePath, "utf8")));
-    } catch (error) {
-      options.logger.error({ err: error }, "Failed to load connection history");
-      // Preserve an unreadable history file rather than replacing it with an empty one.
-      throw error;
-    }
+    this.history = ConnectionHistorySchema.parse(JSON.parse(readFileSync(this.filePath, "utf8")));
     const restartedAt = this.now().toISOString();
     for (const device of this.history.devices) {
       for (const session of device.sessions) {
@@ -80,7 +76,7 @@ export class ConnectionHistoryStore {
         appVersion: hello.appVersion,
       });
     }
-    this.save();
+    this.saveSessionHistory();
   }
 
   renameDevice(options: { clientId: string; label: string }): ConnectionHistory {
@@ -103,7 +99,7 @@ export class ConnectionHistoryStore {
       const session = device.sessions.find((entry) => entry.id === sessionId);
       if (session && !session.disconnectedAt) {
         session.disconnectedAt = this.now().toISOString();
-        this.save();
+        this.saveSessionHistory();
         return;
       }
     }
@@ -143,6 +139,14 @@ export class ConnectionHistoryStore {
     this.history.devices = devices;
     this.history.pairingCodeResets = resets;
     return changed;
+  }
+
+  private saveSessionHistory(): void {
+    try {
+      this.save();
+    } catch (error) {
+      this.logger.error({ err: error }, "Failed to save connection session history");
+    }
   }
 
   private save(): void {

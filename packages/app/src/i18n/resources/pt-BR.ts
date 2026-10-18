@@ -1797,6 +1797,7 @@ export const ptBR: TranslationResources = {
       disconnected: "Desconectado",
       lastSeen: "Última conexão {{time}}",
       oldVersion: "Versão antiga do app",
+      connections: "{{count}} conexões",
       connections_one: "{{count}} conexão",
       connections_other: "{{count}} conexões",
       reset: "Código de pareamento redefinido",

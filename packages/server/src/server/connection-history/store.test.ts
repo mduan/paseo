@@ -185,3 +185,18 @@ test("a failed write preserves the accepted name in memory and permits retry", (
   fixture.store.renameDevice({ clientId: hello.clientId, label: "Retried phone" });
   expect(fixture.reopen().getHistory().devices[0].customLabel).toBe("Retried phone");
 });
+
+test("session history stays usable in memory when writes fail and persists after recovery", () => {
+  const fixture = historyFixture();
+  const file = join(fixture.paseoHome, "connection-history.json");
+  mkdirSync(file);
+  fixture.store.connect({ hello, sessionId: "first", transport: ConnectionTransport.Relay });
+  expect(fixture.store.getHistory().devices[0].sessions[0].disconnectedAt).toBeUndefined();
+  fixture.store.disconnect("first");
+  expect(fixture.store.getHistory().devices[0].sessions[0].disconnectedAt).toBe(
+    "2026-10-18T10:00:00.000Z",
+  );
+  rmSync(file, { recursive: true });
+  fixture.store.connect({ hello, sessionId: "second", transport: ConnectionTransport.DirectLocal });
+  expect(fixture.reopen().getHistory().devices[0].sessions).toHaveLength(2);
+});

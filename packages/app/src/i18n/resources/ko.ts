@@ -1775,6 +1775,7 @@ export const ko: TranslationResources = {
       disconnected: "연결 끊김",
       lastSeen: "마지막 연결 {{time}}",
       oldVersion: "이전 앱 버전",
+      connections: "연결 {{count}}회",
       connections_one: "연결 {{count}}회",
       connections_other: "연결 {{count}}회",
       reset: "페어링 코드 재설정",

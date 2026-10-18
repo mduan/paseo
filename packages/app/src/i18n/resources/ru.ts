@@ -1795,6 +1795,7 @@ export const ru: TranslationResources = {
       disconnected: "Отключено",
       lastSeen: "Последнее подключение {{time}}",
       oldVersion: "Старая версия приложения",
+      connections: "Подключений: {{count}}",
       connections_one: "{{count}} подключение",
       connections_other: "Подключений: {{count}}",
       reset: "Код сопряжения сброшен",

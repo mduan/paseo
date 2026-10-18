@@ -1748,6 +1748,7 @@ export const zhCN: TranslationResources = {
       disconnected: "已断开",
       lastSeen: "上次连接 {{time}}",
       oldVersion: "旧版应用",
+      connections: "{{count}} 次连接",
       connections_one: "{{count}} 次连接",
       connections_other: "{{count}} 次连接",
       reset: "配对代码已重置",
