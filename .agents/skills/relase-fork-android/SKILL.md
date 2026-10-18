@@ -31,7 +31,7 @@ Read [Android](../../../docs/android.md) for the fork variant, toolchain, and si
 ## Sign and verify
 
 1. Locate the completed release APK under `packages/app/android/app/build/outputs/apk/release/`. Use the installed SDK's `zipalign` to align a copy, then `apksigner sign --out` to replace Expo's debug signature with the existing fork key and alias from `docs/android.md`.
-2. Pass passwords through `--ks-pass file:<password-file>` and `--key-pass file:<password-file>`; keep their contents out of commands and logs. Preserve the keystore and password file.
+2. Pass the keystore password through `--ks-pass file:<password-file>`. Omit `--key-pass` when the key uses the same password. If it differs, use a separate password file: reusing one file for both flags consumes successive lines and fails on a single-line file. Keep passwords out of commands and logs; preserve the signing files.
 3. Verify with `apksigner verify --verbose --print-certs` and `zipalign -c`. Inspect APK metadata with the SDK's `aapt` or `aapt2`: package ID must be `sh.paseo.fork`, label must be `Paseo Fork`, and the version must match `packages/app/native-release-version.js` for the recorded source.
 4. Put the signed APK in a dedicated temporary download directory as `Paseo-Fork-<root-version>.apk`. Record its size, SHA-256, source commit, and signing certificate fingerprint.
 
