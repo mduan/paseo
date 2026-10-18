@@ -1871,6 +1871,13 @@ export const zhCN: TranslationResources = {
       unavailable: "配对 offer 不可用。",
       hint: "用手机上的 Paseo 扫描此二维码，或复制下方链接。",
       securityWarning: "请像保管密码一样保管此配对链接。任何获得此链接的人都可以访问此守护进程。",
+      generatedAt: "代码生成于 {{time}}",
+      resetHint: "重置后，使用此代码配对的设备将断开连接。",
+      resetCode: "重置代码",
+      resetting: "正在重置...",
+      resetConfirmTitle: "重置配对代码？",
+      resetConfirmMessage:
+        "当前的二维码和链接将失效。通过它们配对的设备将断开连接，并需要扫描新代码。",
       qrUnavailable: "二维码不可用。",
       qrAccessibility: "配对二维码",
       retry: "重试",

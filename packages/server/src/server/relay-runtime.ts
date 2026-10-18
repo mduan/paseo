@@ -27,12 +27,15 @@ interface RelayRuntimeOptions {
 export interface RelayRuntime {
   getConfig(): RelayRuntimeConfig;
   setEnabled(enabled: boolean): void;
+  /** Swaps the keypair and reconnects, dropping every relay client paired with the old key. */
+  setDaemonKeyPair(keyPair: KeyPair): Promise<void>;
   stop(): Promise<void>;
 }
 
 export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
   const startTransport = options.startTransport ?? startRelayTransport;
   let config = options.config;
+  let daemonKeyPair = options.daemonKeyPair;
   let transport: RelayTransportController | null = null;
 
   function start(): void {
@@ -43,7 +46,7 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
       relayEndpoint: config.endpoint,
       relayUseTls: config.useTls,
       serverId: options.serverId,
-      daemonKeyPair: options.daemonKeyPair,
+      daemonKeyPair,
     });
   }
 
@@ -68,11 +71,20 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
     await current?.stop();
   }
 
+  async function setDaemonKeyPair(keyPair: KeyPair): Promise<void> {
+    daemonKeyPair = keyPair;
+    if (!transport) return;
+    // Let the old control connection close before the relay sees a new one for the same serverId.
+    await stop();
+    if (config.enabled) start();
+  }
+
   if (config.enabled) start();
 
   return {
     getConfig: () => config,
     setEnabled,
+    setDaemonKeyPair,
     stop,
   };
 }

@@ -25,6 +25,8 @@ export interface DaemonRuntimeConfig {
     useTls: boolean;
     publicUseTls: boolean;
   } | null;
+  /** Replaces the daemon keypair and disconnects relay clients paired with the old one. */
+  resetDaemonKeyPair?(): Promise<void>;
 }
 
 export interface DaemonSessionHost {
@@ -59,8 +61,9 @@ export interface DaemonSessionOptions {
  * A client's read surface for the daemon process itself: its runtime status
  * (pid-lock start time, listen address, relay config, provider availability) and
  * a fresh local pairing offer for connecting a new client. Owns the `daemon.*`
- * RPCs. Reaches no state beyond the never-mutated runtime values injected at
- * construction and the outbound channel.
+ * RPCs. Reaches no state beyond the runtime values injected at construction and
+ * the outbound channel; resetting the pairing offer mutates the daemon only through
+ * the injected `resetDaemonKeyPair`.
  */
 export class DaemonSession {
   private readonly host: DaemonSessionHost;
@@ -216,38 +219,62 @@ export class DaemonSession {
     msg: Extract<SessionInboundMessage, { type: "daemon.get_pairing_offer.request" }>,
   ): Promise<void> {
     try {
-      const relay = this.daemonRuntimeConfig?.getRelayConfig();
-      const pairing = await generateLocalPairingOffer({
-        paseoHome: this.paseoHome,
-        relayEnabled: relay?.enabled ?? false,
-        relayEndpoint: relay?.endpoint,
-        relayPublicEndpoint: relay?.publicEndpoint,
-        relayUseTls: relay?.useTls,
-        relayPublicUseTls: relay?.publicUseTls,
-        appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
-        includeQr: true,
-        logger: this.logger,
-      });
       this.host.emit({
         type: "daemon.get_pairing_offer.response",
-        payload: {
-          requestId: msg.requestId,
-          url: pairing.url ?? "",
-          qr: pairing.qr ?? null,
-          relayEnabled: pairing.relayEnabled,
-        },
+        payload: { requestId: msg.requestId, ...(await this.generatePairingOffer()) },
       });
     } catch (error) {
-      this.logger.error({ err: error }, "Failed to handle daemon pairing offer request");
-      this.host.emit({
-        type: "rpc_error",
-        payload: {
-          requestId: msg.requestId,
-          requestType: "daemon.get_pairing_offer.request",
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
+      this.emitPairingOfferError(msg.requestId, msg.type, error);
     }
+  }
+
+  async handlePairingOfferResetRequest(
+    msg: Extract<SessionInboundMessage, { type: "daemon.pairing_offer.reset.request" }>,
+  ): Promise<void> {
+    try {
+      const resetDaemonKeyPair = this.daemonRuntimeConfig?.resetDaemonKeyPair;
+      if (!resetDaemonKeyPair) throw new Error("This daemon cannot reset its pairing code");
+      await resetDaemonKeyPair();
+      this.host.emit({
+        type: "daemon.pairing_offer.reset.response",
+        payload: { requestId: msg.requestId, ...(await this.generatePairingOffer()) },
+      });
+    } catch (error) {
+      this.emitPairingOfferError(msg.requestId, msg.type, error);
+    }
+  }
+
+  private async generatePairingOffer() {
+    const relay = this.daemonRuntimeConfig?.getRelayConfig();
+    const pairing = await generateLocalPairingOffer({
+      paseoHome: this.paseoHome,
+      relayEnabled: relay?.enabled ?? false,
+      relayEndpoint: relay?.endpoint,
+      relayPublicEndpoint: relay?.publicEndpoint,
+      relayUseTls: relay?.useTls,
+      relayPublicUseTls: relay?.publicUseTls,
+      appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
+      includeQr: true,
+      logger: this.logger,
+    });
+    return {
+      url: pairing.url ?? "",
+      qr: pairing.qr ?? null,
+      relayEnabled: pairing.relayEnabled,
+      generatedAt: pairing.generatedAt,
+    };
+  }
+
+  private emitPairingOfferError(requestId: string, requestType: string, error: unknown): void {
+    this.logger.error({ err: error, requestType }, "Failed to handle daemon pairing offer request");
+    this.host.emit({
+      type: "rpc_error",
+      payload: {
+        requestId,
+        requestType,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
   }
 
   handleConfigReloadRequest(

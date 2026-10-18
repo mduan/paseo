@@ -5320,6 +5320,17 @@ export class DaemonClient {
     });
   }
 
+  async resetDaemonPairingOffer(requestId?: string): Promise<DaemonPairingOfferPayload> {
+    // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+    if (this.lastServerInfoMessage?.features?.pairingOfferReset !== true) {
+      throw new Error("Update the host to reset its pairing code.");
+    }
+    return this.sendNamespacedCorrelatedSessionRequest<"daemon.pairing_offer.reset.response">({
+      requestId,
+      message: { type: "daemon.pairing_offer.reset.request" },
+    });
+  }
+
   async collectDiagnostics(requestId?: string): Promise<DiagnosticsPayload> {
     return this.sendNamespacedCorrelatedSessionRequest({
       requestId,

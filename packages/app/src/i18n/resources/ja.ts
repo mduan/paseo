@@ -1912,6 +1912,13 @@ export const ja: TranslationResources = {
       hint: "スマートフォンのPaseoでこのQRコードをスキャンするか、以下のリンクをコピーしてください。",
       securityWarning:
         "このペアリングリンクはパスワードと同様に扱ってください。リンクを知っている人は誰でもこのデーモンにアクセスできます。",
+      generatedAt: "コード生成日時: {{time}}",
+      resetHint: "リセットすると、このコードでペアリングしたデバイスは切断されます。",
+      resetCode: "コードをリセット",
+      resetting: "リセット中...",
+      resetConfirmTitle: "ペアリングコードをリセットしますか？",
+      resetConfirmMessage:
+        "現在の QR コードとリンクは使用できなくなります。これらでペアリングしたデバイスは切断され、新しいコードをスキャンする必要があります。",
       qrUnavailable: "QRコードが利用できません。",
       qrAccessibility: "ペアリング QR コード",
       retry: "再試行",

@@ -16,6 +16,8 @@ import { daemonPairingOfferQueryKey } from "@/data/daemon-pairing";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useHostRuntimeClient, useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
+import { confirmDialog } from "@/utils/confirm-dialog";
+import { formatMessageTimestamp } from "@/utils/time";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -49,6 +51,8 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
   const serverFeatures = client?.getLastServerInfoMessage()?.features;
   const supportsPairingRpc = serverFeatures?.daemonStatusRpc === true;
   const canConfigureRelay = supportsPairingRpc && serverFeatures?.relayConfig === true;
+  // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+  const canResetPairing = serverFeatures?.pairingOfferReset === true;
 
   const pairingQuery = useFetchQuery({
     queryKey: daemonPairingOfferQueryKey(serverId),
@@ -69,6 +73,14 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
       }
       const config = await patchConfig({ relay: { enabled: true } });
       if (!config) throw new Error(t("workspace.terminal.hostDisconnected"));
+      return pairingQuery.refetch();
+    },
+  });
+
+  const resetPairing = useMutation({
+    mutationFn: async () => {
+      if (!client) throw new Error(t("workspace.terminal.hostDisconnected"));
+      await client.resetDaemonPairingOffer();
       return pairingQuery.refetch();
     },
   });
@@ -102,6 +114,18 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
   const handleEnableRelay = useCallback(() => {
     enableRelay.mutate();
   }, [enableRelay]);
+  const handleResetPairing = useCallback(() => {
+    void (async () => {
+      const confirmed = await confirmDialog({
+        title: t("pairing.device.resetConfirmTitle"),
+        message: t("pairing.device.resetConfirmMessage"),
+        confirmLabel: t("pairing.device.resetCode"),
+        cancelLabel: t("common.actions.cancel"),
+        destructive: true,
+      });
+      if (confirmed) resetPairing.mutate();
+    })();
+  }, [resetPairing, t]);
 
   const qrSvg = useMemo(() => qrQuery.data ?? null, [qrQuery.data]);
 
@@ -115,6 +139,10 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
         canConfigureRelay={canConfigureRelay}
         enablePending={enableRelay.isPending}
         enableError={enableRelay.error}
+        canResetPairing={canResetPairing}
+        resetPending={resetPairing.isPending}
+        resetError={resetPairing.error}
+        onResetPairing={handleResetPairing}
         qrSvg={qrSvg}
         qrError={qrQuery.isError}
         copied={copied}
@@ -127,14 +155,24 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
   );
 }
 
+interface PairingOfferData {
+  relayEnabled: boolean;
+  url: string;
+  generatedAt?: string;
+}
+
 interface PairDeviceBodyProps {
   isPending: boolean;
   isDisconnected: boolean;
   error: Error | null;
-  offer: { relayEnabled: boolean; url: string } | undefined;
+  offer: PairingOfferData | undefined;
   canConfigureRelay: boolean;
   enablePending: boolean;
   enableError: Error | null;
+  canResetPairing: boolean;
+  resetPending: boolean;
+  resetError: Error | null;
+  onResetPairing: () => void;
   qrSvg: string | null;
   qrError: boolean;
   copied: boolean;
@@ -234,7 +272,7 @@ function RelayHeroBadge() {
   );
 }
 
-function PairingOffer(props: PairDeviceBodyProps & { offer: { url: string } }) {
+function PairingOffer(props: PairDeviceBodyProps & { offer: PairingOfferData }) {
   const { t } = useTranslation();
   const inputRef = useRef<EditingTextInputHandle>(null);
   useEffect(() => inputRef.current?.replaceText(props.offer.url), [props.offer.url]);
@@ -265,6 +303,30 @@ function PairingOffer(props: PairDeviceBodyProps & { offer: { url: string } }) {
         </Button>
       </View>
       <Alert size="sm" variant="warning" description={t("pairing.device.securityWarning")} />
+      {props.resetError ? (
+        <Alert size="sm" variant="error" description={props.resetError.message} />
+      ) : null}
+      {props.canResetPairing && props.offer.generatedAt ? (
+        <View style={styles.resetRow}>
+          <View style={styles.resetMeta}>
+            <Text style={styles.resetGeneratedAt}>
+              {t("pairing.device.generatedAt", {
+                time: formatMessageTimestamp(new Date(props.offer.generatedAt)),
+              })}
+            </Text>
+            <Text style={styles.hint}>{t("pairing.device.resetHint")}</Text>
+          </View>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={RotateCw}
+            loading={props.resetPending}
+            onPress={props.onResetPairing}
+          >
+            {props.resetPending ? t("pairing.device.resetting") : t("pairing.device.resetCode")}
+          </Button>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -393,5 +455,22 @@ const styles = StyleSheet.create((theme) => ({
   hint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+  },
+  resetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing[4],
+  },
+  resetMeta: {
+    flex: 1,
+    gap: theme.spacing[1],
+  },
+  resetGeneratedAt: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
   },
 }));
