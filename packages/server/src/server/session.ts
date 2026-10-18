@@ -285,6 +285,7 @@ import {
 import { runGitCommand } from "../utils/run-git-command.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 import { resolveWorktreeSourceCwd } from "./workspace-source.js";
+import type { SocketTransport } from "./socket-transport.js";
 
 type ProviderSubagentManagerEvent = Extract<
   AgentManagerEvent,
@@ -472,7 +473,7 @@ export interface SessionOptions {
   onBinaryMessageToSource?: (source: object, frame: Uint8Array) => Promise<void>;
   getTransportBufferedAmount?: (source?: object) => number | null;
   /** Transport of the socket a request arrived on. A session can span several sockets. */
-  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
+  getSourceTransport?: (source: object) => SocketTransport | undefined;
   onLifecycleIntent?: (intent: SessionLifecycleIntent) => void;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   logger: pino.Logger;

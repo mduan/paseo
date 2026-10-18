@@ -102,6 +102,7 @@ import type { DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
 import { DirectorySyncService } from "./directory-sync/index.js";
 import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
 import type { WorkspaceLabelService } from "./workspace-labels/index.js";
+import { SocketTransport } from "./socket-transport.js";
 import {
   APPLICATION_SOCKET_LEASE_CHECK_INTERVAL_MS,
   ApplicationSocketLease,
@@ -134,6 +135,13 @@ interface PendingConnection {
   admission: SessionAdmission | null;
   authenticating: boolean;
 }
+
+// Exhaustive, so a new identity transport fails to compile until it is mapped.
+const SOCKET_TRANSPORTS: Record<WebSocketConnectionIdentity["transport"], SocketTransport> = {
+  direct: SocketTransport.Direct,
+  relay: SocketTransport.Relay,
+  hub: SocketTransport.Hub,
+};
 
 interface WebSocketConnectionIdentity {
   connectionId: string;
@@ -1456,7 +1464,10 @@ export class VoiceAssistantWebSocketServer {
       onBinaryMessage: options.onBinaryMessage,
       onBinaryMessageToSource: options.onBinaryMessageToSource,
       getTransportBufferedAmount: options.getTransportBufferedAmount,
-      getSourceTransport: (source) => this.socketIdentities.get(source as WebSocketLike)?.transport,
+      getSourceTransport: (source) => {
+        const identity = this.socketIdentities.get(source as WebSocketLike);
+        return identity ? SOCKET_TRANSPORTS[identity.transport] : undefined;
+      },
       onLifecycleIntent: options.onLifecycleIntent,
       logger: options.connectionLogger.child({ module: "session" }),
       onWorkspaceRecovered: async (workspace) => {

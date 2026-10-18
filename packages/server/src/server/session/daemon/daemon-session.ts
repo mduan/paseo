@@ -3,6 +3,7 @@ import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import { getPidLockInfo } from "../../pid-lock.js";
 import { generateLocalPairingOffer } from "../../pairing-offer.js";
+import { SocketTransport } from "../../socket-transport.js";
 import {
   collectDaemonDiagnostics,
   type DaemonWebSocketRuntimeDiagnosticSnapshot,
@@ -55,7 +56,7 @@ export interface DaemonSessionOptions {
   logger: pino.Logger;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig: () => DaemonConfigReloadResult;
-  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
+  getSourceTransport?: (source: object) => SocketTransport | undefined;
 }
 
 /**
@@ -83,7 +84,7 @@ export class DaemonSession {
   private readonly selfUpdate: DaemonSelfUpdateSessionController;
   private readonly hubRelationships: HubRelationshipManagement | null;
   private readonly reloadConfig: () => DaemonConfigReloadResult;
-  private readonly getSourceTransport: (source: object) => "direct" | "relay" | "hub" | undefined;
+  private readonly getSourceTransport: (source: object) => SocketTransport | undefined;
 
   constructor(options: DaemonSessionOptions) {
     this.host = options.host;
@@ -240,7 +241,7 @@ export class DaemonSession {
       // response could reach it, which would lock a relay-only device out. Fail closed when
       // the requesting socket can't be identified.
       const transport = source ? this.getSourceTransport(source) : undefined;
-      if (!transport || transport === "relay") {
+      if (!transport || transport === SocketTransport.Relay) {
         throw new Error("Reset the pairing code from a direct or local connection to this host");
       }
       const resetDaemonKeyPair = this.daemonRuntimeConfig?.resetDaemonKeyPair;

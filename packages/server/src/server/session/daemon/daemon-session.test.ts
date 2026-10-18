@@ -13,6 +13,7 @@ import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { SessionOutboundMessage } from "../../messages.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
+import { SocketTransport } from "../../socket-transport.js";
 
 const tempDirs: string[] = [];
 
@@ -44,7 +45,7 @@ function makeSubsystem(overrides: {
   getWebSocketRuntimeMetrics?: () => DaemonWebSocketRuntimeDiagnosticSnapshot | null;
   hubRelationships?: HubRelationshipManagement;
   reloadConfig?: () => DaemonConfigReloadResult;
-  getSourceTransport?: (source: object) => "direct" | "relay" | "hub" | undefined;
+  getSourceTransport?: (source: object) => SocketTransport | undefined;
 }) {
   const emitted: SessionOutboundMessage[] = [];
   const restartIntents: Parameters<DaemonSessionHost["emitLifecycleIntent"]>[0][] = [];
@@ -84,7 +85,8 @@ describe("DaemonSession", () => {
     const relaySocket = {};
     let resets = 0;
     const { subsystem, emitted } = makeSubsystem({
-      getSourceTransport: (source) => (source === relaySocket ? "relay" : "direct"),
+      getSourceTransport: (source) =>
+        source === relaySocket ? SocketTransport.Relay : SocketTransport.Direct,
       daemonRuntimeConfig: {
         listen: null,
         getRelayConfig: () => null,
@@ -137,7 +139,7 @@ describe("DaemonSession", () => {
   test("pairing offer reset rotates the keypair on a direct socket", async () => {
     let resets = 0;
     const { subsystem, emitted } = makeSubsystem({
-      getSourceTransport: () => "direct",
+      getSourceTransport: () => SocketTransport.Direct,
       daemonRuntimeConfig: {
         listen: null,
         getRelayConfig: () => null,

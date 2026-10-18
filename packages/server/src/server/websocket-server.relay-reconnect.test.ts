@@ -19,6 +19,7 @@ import {
 } from "@getpaseo/protocol/terminal-stream-protocol";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { APPLICATION_SOCKET_LEASE_MS } from "./websocket/physical-socket.js";
+import { SocketTransport } from "./socket-transport.js";
 
 type SocketListener = (...args: unknown[]) => void;
 
@@ -914,9 +915,9 @@ describe("relay external socket reconnect behavior", () => {
 
     const [relaySession, directSession] = sessionMock.instances;
     const getSourceTransport = (session: (typeof sessionMock.instances)[number]) =>
-      session.args.getSourceTransport as (source: object) => string | undefined;
-    expect(getSourceTransport(relaySession)(relaySocket)).toBe("relay");
-    expect(getSourceTransport(directSession)(directSocket)).toBe("direct");
+      session.args.getSourceTransport as (source: object) => SocketTransport | undefined;
+    expect(getSourceTransport(relaySession)(relaySocket)).toBe(SocketTransport.Relay);
+    expect(getSourceTransport(directSession)(directSocket)).toBe(SocketTransport.Direct);
     expect(getSourceTransport(relaySession)(new MockSocket())).toBeUndefined();
 
     const resetRequest = { type: "daemon.pairing_offer.reset.request", requestId: "reset-relay" };
