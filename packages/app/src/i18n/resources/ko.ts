@@ -1759,6 +1759,12 @@ export const ko: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "기기 이름 변경",
+      deviceName: "기기 이름",
+      save: "저장",
+      deviceActions: "{{name}} 작업",
+      deviceConnections: "{{name}} 연결",
+
       title: "연결 기록",
       device: "기기",
       time: "시간",

@@ -1732,6 +1732,12 @@ export const zhCN: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "重命名设备",
+      deviceName: "设备名称",
+      save: "保存",
+      deviceActions: "{{name}}的操作",
+      deviceConnections: "{{name}}的连接",
+
       title: "连接历史",
       device: "设备",
       time: "时间",

@@ -222,6 +222,19 @@ export class DaemonSession {
     });
   }
 
+  handleRenameConnectionDeviceRequest(
+    msg: Extract<
+      SessionInboundMessage,
+      { type: "daemon.connection_history.rename_device.request" }
+    >,
+  ): void {
+    if (!this.connectionHistory) throw new Error("Connection history is unavailable");
+    this.host.emit({
+      type: "daemon.connection_history.rename_device.response",
+      payload: { requestId: msg.requestId, ...this.connectionHistory.renameDevice(msg) },
+    });
+  }
+
   async handleGetPairingOfferRequest(
     msg: Extract<SessionInboundMessage, { type: "daemon.get_pairing_offer.request" }>,
   ): Promise<void> {

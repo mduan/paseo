@@ -3107,6 +3107,9 @@ export class Session {
 
   private async dispatchMiscMessage(msg: SessionInboundMessage): Promise<void> {
     switch (msg.type) {
+      case "daemon.connection_history.rename_device.request":
+        this.daemonSession.handleRenameConnectionDeviceRequest(msg);
+        return;
       case "daemon.connection_history.get.request":
         this.daemonSession.handleGetConnectionHistoryRequest(msg);
         return;

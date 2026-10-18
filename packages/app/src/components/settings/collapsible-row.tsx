@@ -12,9 +12,6 @@ const hoveredIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregro
 
 interface SettingsCollapsibleRowProps {
   label: string;
-  summary?: ReactNode;
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
   defaultExpanded?: boolean;
   testID?: string;
   /** The rows revealed underneath, separated like the rows of a `SettingsCard`. */
@@ -28,19 +25,14 @@ interface SettingsCollapsibleRowProps {
  */
 export function SettingsCollapsibleRow({
   label,
-  summary,
-  expanded: controlledExpanded,
-  onExpandedChange,
   defaultExpanded = false,
   testID,
   children,
 }: SettingsCollapsibleRowProps) {
-  const [localExpanded, setExpanded] = useState(defaultExpanded);
-  const expanded = controlledExpanded ?? localExpanded;
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const toggle = useCallback(() => {
     setExpanded(!expanded);
-    onExpandedChange?.(!expanded);
-  }, [expanded, onExpandedChange]);
+  }, [expanded]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   // React Native Web does not map `accessibilityState.expanded` to `aria-expanded`.
   const webExpandedProps = useMemo(
@@ -74,7 +66,7 @@ export function SettingsCollapsibleRow({
         {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
           <>
             <View style={settingsStyles.rowContent}>
-              {summary ?? <Text style={settingsStyles.rowTitle}>{label}</Text>}
+              <Text style={settingsStyles.rowTitle}>{label}</Text>
             </View>
             <View style={chevronStyle}>
               <ThemedChevron

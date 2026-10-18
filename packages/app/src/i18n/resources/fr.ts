@@ -1800,6 +1800,12 @@ export const fr: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "Renommer l’appareil",
+      deviceName: "Nom de l’appareil",
+      save: "Enregistrer",
+      deviceActions: "Actions pour {{name}}",
+      deviceConnections: "Connexions de {{name}}",
+
       title: "Historique des connexions",
       device: "Appareil",
       time: "Heure",

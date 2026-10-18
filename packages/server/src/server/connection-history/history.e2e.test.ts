@@ -27,6 +27,7 @@ test("app history survives socket reconnects, excludes CLI clients, and closes o
   try {
     await cli.connect();
     expect(cli.getLastServerInfoMessage()?.features?.connectionHistory).toBe(true);
+    expect(cli.getLastServerInfoMessage()?.features?.connectionHistoryRename).toBe(true);
     expect((await cli.getConnectionHistory()).devices).toEqual([]);
     await app.connect();
     const initial = await cli.getConnectionHistory();
@@ -37,17 +38,36 @@ test("app history survives socket reconnects, excludes CLI clients, and closes o
       kind: DeviceKind.Desktop,
       transport: ConnectionTransport.SshTunnel,
     });
+    const renamed = await cli.renameConnectionDevice({
+      clientId: appOptions.clientId,
+      label: "  My Mac  ",
+    });
+    expect(renamed.devices[0]).toMatchObject({
+      label: appOptions.deviceLabel,
+      customLabel: "My Mac",
+    });
+    await expect(
+      cli.renameConnectionDevice({ clientId: "missing", label: "Phone" }),
+    ).rejects.toThrow("Device not found");
+    await expect(
+      cli.renameConnectionDevice({ clientId: appOptions.clientId, label: "   " }),
+    ).rejects.toThrow("Enter a device name");
+    await expect(
+      cli.renameConnectionDevice({ clientId: appOptions.clientId, label: "x".repeat(81) }),
+    ).rejects.toThrow("80 characters");
     await app.close();
     await resumed.connect();
     expect((await cli.getConnectionHistory()).devices[0].sessions).toEqual(
       initial.devices[0].sessions,
     );
+    expect((await cli.getConnectionHistory()).devices[0].customLabel).toBe("My Mac");
     await cli.resetDaemonPairingOffer();
     expect((await cli.getConnectionHistory()).pairingCodeResets).toHaveLength(1);
     await daemon.daemon.stop();
     const persisted = ConnectionHistorySchema.parse(
       JSON.parse(readFileSync(join(daemon.paseoHome, "connection-history.json"), "utf8")),
     );
+    expect(persisted.devices[0].customLabel).toBe("My Mac");
     expect(persisted.devices[0].sessions).toHaveLength(1);
     expect(persisted.devices[0].sessions[0].disconnectedAt).toEqual(expect.any(String));
   } finally {

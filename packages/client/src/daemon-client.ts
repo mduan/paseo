@@ -5330,6 +5330,14 @@ export class DaemonClient {
     });
   }
 
+  async renameConnectionDevice(options: { clientId: string; label: string }) {
+    return this.sendNamespacedCorrelatedSessionRequest<"daemon.connection_history.rename_device.response">(
+      {
+        message: { type: "daemon.connection_history.rename_device.request", ...options },
+      },
+    );
+  }
+
   async resetDaemonPairingOffer(requestId?: string): Promise<DaemonPairingOfferPayload> {
     // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
     if (this.lastServerInfoMessage?.features?.pairingOfferReset !== true) {

@@ -1766,6 +1766,12 @@ export const ja: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "デバイス名を変更",
+      deviceName: "デバイス名",
+      save: "保存",
+      deviceActions: "{{name}}の操作",
+      deviceConnections: "{{name}}の接続",
+
       title: "接続履歴",
       device: "デバイス",
       time: "時刻",

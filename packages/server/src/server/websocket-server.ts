@@ -1861,7 +1861,9 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
         pairingOfferReset: true,
         // COMPAT(connectionHistory): added in v0.11.0-fork.24, remove gate after 2027-04-18.
-        ...(this.connectionHistory ? { connectionHistory: true } : {}),
+        ...(this.connectionHistory
+          ? { connectionHistory: true, connectionHistoryRename: true }
+          : {}),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: true,
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.

@@ -1749,6 +1749,12 @@ export const ar: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "إعادة تسمية الجهاز",
+      deviceName: "اسم الجهاز",
+      save: "حفظ",
+      deviceActions: "إجراءات {{name}}",
+      deviceConnections: "اتصالات {{name}}",
+
       title: "سجل الاتصالات",
       device: "الجهاز",
       time: "الوقت",

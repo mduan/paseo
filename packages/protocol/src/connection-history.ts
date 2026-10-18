@@ -26,6 +26,7 @@ export const ConnectionSessionSchema = z.object({
 export const ConnectionDeviceSchema = z.object({
   clientId: z.string(),
   label: z.string(),
+  customLabel: z.string().optional(),
   kind: z.enum(DeviceKind),
   transport: z.enum(ConnectionTransport),
   appVersion: z.string().optional(),
@@ -45,4 +46,10 @@ export function isOlderAppVersion(options: { appVersion?: string; hostVersion?: 
   const app = options.appVersion && valid(options.appVersion);
   const host = options.hostVersion && valid(options.hostVersion);
   return Boolean(app && host && lt(app, host));
+}
+
+export const DEVICE_NAME_MAX_LENGTH = 80;
+
+export function deviceDisplayName(device: ConnectionDevice): string {
+  return device.customLabel ?? device.label;
 }

@@ -93,6 +93,9 @@ Retention uses session end times, so active sessions remain visible even after 3
 
 Device labels and SSH tunnel hints come from clients and do not establish identity or access rights.
 The stable app installation `clientId` groups sessions into devices.
+Custom names belong to that host and installation. They stay separate from the reported label,
+so a new hello cannot replace a name you saved. Renames are accepted only after the atomic write
+succeeds; reconnects, daemon restarts, and pairing-code resets preserve them.
 Pairing-code resets remain in the timeline independently of device sessions.
 Resetting a code replaces the daemon keypair but preserves this history.
 

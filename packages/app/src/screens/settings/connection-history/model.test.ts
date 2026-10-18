@@ -3,6 +3,7 @@ import {
   ConnectionTransport,
   DeviceKind,
   isOlderAppVersion,
+  deviceDisplayName,
   type ConnectionDevice,
 } from "@getpaseo/protocol/connection-history";
 import { deviceLastSeen, historyDays, sortDevices } from "./model";
@@ -75,4 +76,10 @@ test("only labels valid versions older than the host as old", () => {
   expect(isOlderAppVersion({ appVersion: "development", hostVersion: "0.11.0-fork.23" })).toBe(
     false,
   );
+});
+
+test("uses the custom device name in preference to the reported label", () => {
+  const phone = device({ id: "Android", connectedAt: "2026-10-18T01:00:00.000Z" });
+  expect(deviceDisplayName(phone)).toBe("Android");
+  expect(deviceDisplayName({ ...phone, customLabel: "Personal phone" })).toBe("Personal phone");
 });

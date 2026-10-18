@@ -1779,6 +1779,12 @@ export const ru: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "Переименовать устройство",
+      deviceName: "Имя устройства",
+      save: "Сохранить",
+      deviceActions: "Действия для {{name}}",
+      deviceConnections: "Подключения {{name}}",
+
       title: "История подключений",
       device: "Устройство",
       time: "Время",

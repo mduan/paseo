@@ -1,20 +1,36 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Theme } from "@/styles/theme";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { Text, View } from "react-native";
-import { Globe, Laptop, RotateCw, Smartphone } from "lucide-react-native";
+import {
+  ChevronRight,
+  Globe,
+  Laptop,
+  MoreVertical,
+  RotateCw,
+  Smartphone,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import {
   ConnectionTransport,
   DeviceKind,
   isOlderAppVersion,
+  deviceDisplayName,
+  DEVICE_NAME_MAX_LENGTH,
   type ConnectionDevice,
   type ConnectionSession,
 } from "@getpaseo/protocol/connection-history";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { SettingsCollapsibleRow } from "@/components/settings/collapsible-row";
+import { AdaptiveRenameModal } from "@/components/rename-modal";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Alert } from "@/components/ui/alert";
@@ -24,6 +40,7 @@ import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
+import { isWeb } from "@/constants/platform";
 import { ICON_SIZE } from "@/styles/theme";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import {
@@ -35,6 +52,8 @@ import {
   type HistoryView,
 } from "./model";
 
+const ThemedChevron = withUnistyles(ChevronRight);
+const ThemedMore = withUnistyles(MoreVertical);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedLaptop = withUnistyles(Laptop);
 const ThemedSmartphone = withUnistyles(Smartphone);
@@ -61,6 +80,30 @@ function ConnectionHistoryContent({
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const active = useRetainedPanelActive();
+  const queryClient = useQueryClient();
+  // COMPAT(connectionHistoryRename): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+  const renameSupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.connectionHistoryRename === true,
+  );
+  const [renamingDevice, setRenamingDevice] = useState<ConnectionDevice>();
+  const closeRename = useCallback(() => setRenamingDevice(undefined), []);
+  const rename = useCallback(
+    async (label: string) => {
+      if (!client || !connected) throw new Error(t("workspace.terminal.hostDisconnected"));
+      if (!renamingDevice) return;
+      try {
+        const snapshot = await client.renameConnectionDevice({
+          clientId: renamingDevice.clientId,
+          label,
+        });
+        await queryClient.cancelQueries({ queryKey: ["connection-history", serverId] });
+        queryClient.setQueryData(["connection-history", serverId], snapshot);
+      } catch (error) {
+        throw new Error(t("common.errors.unableToSave"), { cause: error });
+      }
+    },
+    [client, connected, renamingDevice, queryClient, serverId, t],
+  );
   const [view, setView] = useState<HistoryView>({ grouping: HistoryGrouping.Device });
   const history = useFetchQuery({
     queryKey: ["connection-history", serverId],
@@ -154,6 +197,7 @@ function ConnectionHistoryContent({
                 hostConnected={connected}
                 expanded={view.expandedClientId === device.clientId}
                 setView={setView}
+                onRename={renameSupported ? setRenamingDevice : undefined}
               />
             </View>
           ))}
@@ -187,6 +231,19 @@ function ConnectionHistoryContent({
             </SettingsSection>
           ))
         : null}
+      {renamingDevice ? (
+        <AdaptiveRenameModal
+          visible
+          title={t("pairing.history.renameDevice")}
+          initialValue={deviceDisplayName(renamingDevice)}
+          placeholder={t("pairing.history.deviceName")}
+          submitLabel={t("pairing.history.save")}
+          maxLength={DEVICE_NAME_MAX_LENGTH}
+          onClose={closeRename}
+          onSubmit={rename}
+          testID="history-rename-modal"
+        />
+      ) : null}
     </SettingsSection>
   );
 }
@@ -197,51 +254,27 @@ function DeviceRow({
   hostConnected,
   expanded,
   setView,
+  onRename,
 }: {
   device: ConnectionDevice;
   hostVersion?: string;
   hostConnected: boolean;
   expanded: boolean;
   setView: Dispatch<SetStateAction<HistoryView>>;
-}) {
-  const toggle = useCallback(
-    (next: boolean) =>
-      setView({
-        grouping: HistoryGrouping.Device,
-        expandedClientId: next ? device.clientId : undefined,
-      }),
-    [setView, device.clientId],
-  );
-  const summary = useMemo(
-    () => <DeviceSummary device={device} hostVersion={hostVersion} hostConnected={hostConnected} />,
-    [device, hostVersion, hostConnected],
-  );
-  return (
-    <SettingsCollapsibleRow
-      label={device.label}
-      testID={`history-device-${device.clientId}`}
-      expanded={expanded}
-      onExpandedChange={toggle}
-      summary={summary}
-    >
-      {device.sessions.map((session) => (
-        <SessionRow key={session.id} session={session} hostConnected={hostConnected} />
-      ))}
-    </SettingsCollapsibleRow>
-  );
-}
-
-function DeviceSummary({
-  device,
-  hostVersion,
-  hostConnected,
-}: {
-  device: ConnectionDevice;
-  hostVersion?: string;
-  hostConnected: boolean;
+  onRename?: (device: ConnectionDevice) => void;
 }) {
   const { t } = useTranslation();
+  const toggle = useCallback(
+    () =>
+      setView({
+        grouping: HistoryGrouping.Device,
+        expandedClientId: expanded ? undefined : device.clientId,
+      }),
+    [setView, device.clientId, expanded],
+  );
+  const openRename = useCallback(() => onRename?.(device), [onRename, device]);
   const connected = hostConnected && deviceIsConnected(device);
+  const name = deviceDisplayName(device);
   const Icon = {
     [DeviceKind.Desktop]: ThemedLaptop,
     [DeviceKind.Mobile]: ThemedSmartphone,
@@ -252,29 +285,82 @@ function DeviceSummary({
     : t("pairing.history.lastSeen", {
         time: formatMessageTimestamp(new Date(deviceLastSeen(device))),
       });
-  return (
-    <View style={styles.device}>
-      <View style={styles.icon}>
-        <Icon size={ICON_SIZE.md} uniProps={mutedIconColorMapping} />
+  const menuLabel = t("pairing.history.deviceActions", { name });
+  const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
+  const chevron = useMemo(
+    () => (
+      <View style={expanded && styles.chevronExpanded}>
+        <ThemedChevron size={ICON_SIZE.xs} uniProps={mutedIconColorMapping} />
       </View>
-      <View style={styles.deviceBody}>
-        <View style={styles.titleRow}>
-          <Text style={settingsStyles.rowTitle}>{device.label}</Text>
-          {isOlderAppVersion({ appVersion: device.appVersion, hostVersion }) ? (
-            <StatusBadge variant="warning" size="xs" label={t("pairing.history.oldVersion")} />
-          ) : null}
+    ),
+    [expanded],
+  );
+  return (
+    <View testID={`history-device-${device.clientId}`}>
+      <View style={[settingsStyles.row, styles.device]}>
+        <View style={styles.icon}>
+          <Icon size={ICON_SIZE.md} uniProps={mutedIconColorMapping} />
         </View>
-        <Text style={settingsStyles.rowHint}>
-          {transportLabel(device.transport, t)} · {versionLabel(device.appVersion, t)} ·{" "}
-          {t("pairing.history.connections", { count: device.sessions.length })}
-        </Text>
-        <View style={styles.compactStatus}>
+        <View style={styles.deviceBody}>
+          <View style={styles.titleRow}>
+            <Text style={settingsStyles.rowTitle}>{name}</Text>
+            {isOlderAppVersion({ appVersion: device.appVersion, hostVersion }) ? (
+              <StatusBadge variant="warning" size="xs" label={t("pairing.history.oldVersion")} />
+            ) : null}
+          </View>
+          <View style={styles.metadata}>
+            <Text style={settingsStyles.rowHint}>
+              {transportLabel(device.transport, t)} · {versionLabel(device.appVersion, t)} ·
+            </Text>
+            <Button
+              variant="ghost"
+              size="xs"
+              onPress={toggle}
+              accessibilityLabel={t("pairing.history.deviceConnections", { name })}
+              accessibilityState={accessibilityState}
+              {...(isWeb ? { "aria-expanded": expanded } : {})}
+              style={styles.count}
+              textStyle={settingsStyles.rowHint}
+              trailing={chevron}
+              testID={`history-device-${device.clientId}-toggle`}
+            >
+              {t("pairing.history.connections", { count: device.sessions.length })}
+            </Button>
+          </View>
+          <View style={styles.compactStatus}>
+            <ConnectionStatus label={status} connected={connected} />
+          </View>
+        </View>
+        <View style={styles.wideStatus}>
           <ConnectionStatus label={status} connected={connected} />
         </View>
+        {onRename ? (
+          <DropdownMenu compactMode="sheet">
+            <DropdownMenuTrigger
+              accessibilityRole="button"
+              accessibilityLabel={menuLabel}
+              disabled={!hostConnected}
+              style={styles.menuButton}
+              hitSlop={8}
+              testID={`history-device-${device.clientId}-menu`}
+            >
+              <ThemedMore size={ICON_SIZE.md} uniProps={mutedIconColorMapping} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" width={200} sheetTitle={menuLabel}>
+              <DropdownMenuItem onSelect={openRename}>
+                {t("pairing.history.renameDevice")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </View>
-      <View style={styles.wideStatus}>
-        <ConnectionStatus label={status} connected={connected} />
-      </View>
+      {expanded
+        ? device.sessions.map((session) => (
+            <View key={session.id} style={settingsStyles.rowBorder}>
+              <SessionRow session={session} hostConnected={hostConnected} />
+            </View>
+          ))
+        : null}
     </View>
   );
 }
@@ -324,7 +410,7 @@ function SessionRow({
             textStyle={settingsStyles.rowTitle}
             onPress={selectDevice}
           >
-            {device.label}
+            {deviceDisplayName(device)}
           </Button>
         ) : null}
         <Text style={styles.meta}>
@@ -384,6 +470,15 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface2,
   },
   deviceBody: { flex: 1, minWidth: 0 },
+  metadata: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: theme.spacing[1],
+  },
+  count: { paddingHorizontal: 0, gap: theme.spacing[1] },
+  chevronExpanded: { transform: [{ rotate: "90deg" }] },
+  menuButton: { padding: theme.spacing[1], borderRadius: theme.borderRadius.sm },
   titleRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: theme.spacing[2] },
   wideStatus: { display: { xs: "none", md: "flex" } },
   compactStatus: { display: { xs: "flex", md: "none" }, marginTop: theme.spacing[2] },

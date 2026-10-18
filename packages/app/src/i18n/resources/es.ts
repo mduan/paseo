@@ -1796,6 +1796,12 @@ export const es: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "Cambiar nombre del dispositivo",
+      deviceName: "Nombre del dispositivo",
+      save: "Guardar",
+      deviceActions: "Acciones de {{name}}",
+      deviceConnections: "Conexiones de {{name}}",
+
       title: "Historial de conexiones",
       device: "Dispositivo",
       time: "Hora",

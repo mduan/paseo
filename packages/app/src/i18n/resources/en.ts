@@ -1774,6 +1774,12 @@ export const en = {
   },
   pairing: {
     history: {
+      renameDevice: "Rename device",
+      deviceName: "Device name",
+      save: "Save",
+      deviceActions: "Actions for {{name}}",
+      deviceConnections: "Connections for {{name}}",
+
       title: "Connection history",
       device: "Device",
       time: "Time",

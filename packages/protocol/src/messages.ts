@@ -1432,6 +1432,13 @@ export const DaemonConnectionHistoryGetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const DaemonConnectionHistoryRenameDeviceRequestSchema = z.object({
+  type: z.literal("daemon.connection_history.rename_device.request"),
+  requestId: z.string(),
+  clientId: z.string(),
+  label: z.string(),
+});
+
 export const DaemonPairingOfferResetRequestSchema = z.object({
   type: z.literal("daemon.pairing_offer.reset.request"),
   requestId: z.string(),
@@ -3341,6 +3348,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferRequestSchema,
   DaemonPairingOfferResetRequestSchema,
   DaemonConnectionHistoryGetRequestSchema,
+  DaemonConnectionHistoryRenameDeviceRequestSchema,
   DaemonConfigReloadRequestSchema,
   HubManagementDaemonConnectRequestSchema,
   HubManagementDaemonGetStatusRequestSchema,
@@ -3741,6 +3749,8 @@ export const ServerInfoStatusPayloadSchema = z
         pairingOfferReset: z.boolean().optional(),
         // COMPAT(connectionHistory): added in v0.11.0-fork.24, remove gate after 2027-04-18.
         connectionHistory: z.boolean().optional(),
+        // COMPAT(connectionHistoryRename): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+        connectionHistoryRename: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: z.boolean().optional(),
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
@@ -5217,6 +5227,11 @@ export const DaemonGetPairingOfferResponseSchema = z.object({
 
 export const DaemonConnectionHistoryGetResponseSchema = z.object({
   type: z.literal("daemon.connection_history.get.response"),
+  payload: ConnectionHistorySchema.extend({ requestId: z.string() }),
+});
+
+export const DaemonConnectionHistoryRenameDeviceResponseSchema = z.object({
+  type: z.literal("daemon.connection_history.rename_device.response"),
   payload: ConnectionHistorySchema.extend({ requestId: z.string() }),
 });
 
@@ -7164,6 +7179,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferResponseSchema,
   DaemonPairingOfferResetResponseSchema,
   DaemonConnectionHistoryGetResponseSchema,
+  DaemonConnectionHistoryRenameDeviceResponseSchema,
   DaemonConfigReloadResponseSchema,
   HubManagementDaemonConnectResponseSchema,
   HubManagementDaemonGetStatusResponseSchema,

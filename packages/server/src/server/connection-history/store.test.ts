@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pino from "pino";
@@ -19,6 +19,7 @@ function historyFixture() {
   let timestamp = "2026-10-18T10:00:00.000Z";
   const options = { paseoHome, logger: pino({ level: "silent" }), now: () => new Date(timestamp) };
   return {
+    paseoHome,
     store: new ConnectionHistoryStore(options),
     reopen: () => new ConnectionHistoryStore(options),
     advance: (next: string) => {
@@ -119,4 +120,68 @@ test("prunes closed sessions and reset events after 30 days, including while idl
   fixture.advance("2026-11-18T10:00:00.000Z");
   expect(fixture.store.getHistory()).toEqual({ devices: [], pairingCodeResets: [] });
   expect(fixture.read()).toEqual({ devices: [], pairingCodeResets: [] });
+});
+
+test("custom names survive reconnects, pairing code resets, and reopening the store", () => {
+  const fixture = historyFixture();
+  fixture.store.connect({ hello, sessionId: "first", transport: ConnectionTransport.Relay });
+  fixture.store.connect({
+    hello: { ...hello, clientId: "cid_second", deviceLabel: "iPhone" },
+    sessionId: "other-installation",
+    transport: ConnectionTransport.Relay,
+  });
+  const renamed = fixture.store.renameDevice({ clientId: hello.clientId, label: "  My phone  " });
+  expect(renamed.devices[0].customLabel).toBe("My phone");
+  expect(renamed.devices[1]).toMatchObject({ clientId: "cid_second", label: "iPhone" });
+  expect(renamed.devices[1].customLabel).toBeUndefined();
+  // Returned snapshots must not allow callers to change the saved name.
+  renamed.devices[0].customLabel = "Changed snapshot";
+  fixture.store.connect({
+    hello: { ...hello, deviceLabel: "Android" },
+    sessionId: "second",
+    transport: ConnectionTransport.Relay,
+  });
+  fixture.store.recordPairingCodeReset("2026-10-18T10:00:30.000Z");
+  expect(fixture.reopen().getHistory().devices[0]).toMatchObject({
+    label: "Android",
+    customLabel: "My phone",
+  });
+  expect(fixture.read().devices[0].customLabel).toBe("My phone");
+});
+
+test("rejects invalid names and unknown devices without changing history", () => {
+  const fixture = historyFixture();
+  fixture.store.connect({ hello, sessionId: "first", transport: ConnectionTransport.Relay });
+  const before = fixture.read();
+  expect(() => fixture.store.renameDevice({ clientId: hello.clientId, label: "   " })).toThrow(
+    "Enter a device name",
+  );
+  expect(() =>
+    fixture.store.renameDevice({ clientId: hello.clientId, label: "x".repeat(81) }),
+  ).toThrow("80 characters");
+  expect(() => fixture.store.renameDevice({ clientId: "unknown", label: "Phone" })).toThrow(
+    "Device not found",
+  );
+  expect(fixture.store.getHistory()).toEqual(before);
+  expect(fixture.read()).toEqual(before);
+  expect(
+    fixture.store.renameDevice({ clientId: hello.clientId, label: "x".repeat(80) }).devices[0]
+      .customLabel,
+  ).toHaveLength(80);
+});
+
+test("a failed write preserves the accepted name in memory and permits retry", () => {
+  const fixture = historyFixture();
+  fixture.store.connect({ hello, sessionId: "first", transport: ConnectionTransport.Relay });
+  fixture.store.renameDevice({ clientId: hello.clientId, label: "Saved phone" });
+  const file = join(fixture.paseoHome, "connection-history.json");
+  rmSync(file);
+  mkdirSync(file);
+  expect(() =>
+    fixture.store.renameDevice({ clientId: hello.clientId, label: "Unsaved phone" }),
+  ).toThrow();
+  expect(fixture.store.getHistory().devices[0].customLabel).toBe("Saved phone");
+  rmSync(file, { recursive: true });
+  fixture.store.renameDevice({ clientId: hello.clientId, label: "Retried phone" });
+  expect(fixture.reopen().getHistory().devices[0].customLabel).toBe("Retried phone");
 });

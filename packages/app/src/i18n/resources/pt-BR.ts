@@ -1781,6 +1781,12 @@ export const ptBR: TranslationResources = {
   },
   pairing: {
     history: {
+      renameDevice: "Renomear dispositivo",
+      deviceName: "Nome do dispositivo",
+      save: "Salvar",
+      deviceActions: "Ações de {{name}}",
+      deviceConnections: "Conexões de {{name}}",
+
       title: "Histórico de conexões",
       device: "Dispositivo",
       time: "Hora",

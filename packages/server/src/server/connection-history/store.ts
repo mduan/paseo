@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type pino from "pino";
 import {
   ConnectionHistorySchema,
+  DEVICE_NAME_MAX_LENGTH,
   ConnectionTransport,
   DeviceKind,
   type ConnectionHistory,
@@ -80,6 +81,21 @@ export class ConnectionHistoryStore {
       });
     }
     this.save();
+  }
+
+  renameDevice(options: { clientId: string; label: string }): ConnectionHistory {
+    const label = options.label.trim();
+    if (!label) throw new Error("Enter a device name");
+    if (label.length > DEVICE_NAME_MAX_LENGTH) {
+      throw new Error(`Device name must be ${DEVICE_NAME_MAX_LENGTH} characters or fewer`);
+    }
+    const next = this.getHistory();
+    const device = next.devices.find((entry) => entry.clientId === options.clientId);
+    if (!device) throw new Error("Device not found");
+    device.customLabel = label;
+    writePrivateFileAtomicSync(this.filePath, `${JSON.stringify(next)}\n`);
+    this.history = next;
+    return structuredClone(next);
   }
 
   disconnect(sessionId: string): void {
