@@ -1,3 +1,5 @@
+import { getAppDeviceLabel, getAppDeviceKind } from "@/utils/app-device";
+import { ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import {
   DaemonAuthenticationError,
   DaemonClient,
@@ -152,6 +154,10 @@ export async function buildClientConfig(
     clientId,
     clientType: "mobile" as const,
     appVersion: deps.resolveAppVersion() ?? undefined,
+    deviceLabel: getAppDeviceLabel,
+    deviceKind: getAppDeviceKind(),
+    connectionTransport:
+      connection.type === "remoteSsh" ? ConnectionTransport.SshTunnel : undefined,
     suppressSendErrors: true,
     reconnect: { enabled: false },
     ...resolveConnectionCredentials(connection, options),
@@ -161,7 +167,7 @@ export async function buildClientConfig(
     desktopTransportFactory
       ? { transportFactory: desktopTransportFactory }
       : {}),
-  };
+  } satisfies Omit<DaemonClientConfig, "url">;
 
   if (connection.type === "directSocket" || connection.type === "directPipe") {
     return {

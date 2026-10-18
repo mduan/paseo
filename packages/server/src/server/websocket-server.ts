@@ -1,3 +1,5 @@
+import { ConnectionTransport } from "@getpaseo/protocol/connection-history";
+import type { ConnectionHistoryStore } from "./connection-history/store.js";
 import { stat } from "node:fs/promises";
 import type { CreationSnapshot } from "@getpaseo/protocol/messages";
 import { CreationService } from "./creation/index.js";
@@ -160,6 +162,7 @@ interface WebSocketConnectionIdentity {
 }
 
 interface WebSocketServerConfig {
+  connectionHistory?: ConnectionHistoryStore;
   allowedOrigins?: Set<string>;
   hostnames?: HostnamesConfig;
   getAllowedOrigins?: () => Set<string>;
@@ -530,6 +533,7 @@ function requireWebSocketServices(params: {
  * WebSocket server that only accepts sockets + parses/forwards messages to the session layer.
  */
 export class VoiceAssistantWebSocketServer {
+  private readonly connectionHistory: ConnectionHistoryStore | undefined;
   private readonly logger: pino.Logger;
   private readonly wss: WebSocketServer;
   private readonly pendingConnections: Map<WebSocketLike, PendingConnection> = new Map();
@@ -668,6 +672,7 @@ export class VoiceAssistantWebSocketServer {
     workspaceLabelService?: WorkspaceLabelService,
   ) {
     this.logger = logger.child({ module: "websocket-server" });
+    this.connectionHistory = wsConfig.connectionHistory;
     this.workspaceSetupRuntime = workspaceSetupRuntime;
     this.advertiseDaemonStatusRpc = wsConfig.daemonStatusRpc !== false;
     this.advertiseRelayConfig = wsConfig.relayConfig !== false;
@@ -1101,6 +1106,7 @@ export class VoiceAssistantWebSocketServer {
         connection.externalDisconnectCleanupTimeout = null;
       }
 
+      this.connectionHistory?.disconnect(connection.session.getSessionId());
       cleanupPromises.push(Promise.resolve(connection.session.cleanup()));
       for (const ws of connection.sockets) {
         cleanupPromises.push(
@@ -1545,6 +1551,7 @@ export class VoiceAssistantWebSocketServer {
       serverId: this.serverId,
       daemonVersion: this.daemonVersion,
       daemonRuntimeConfig: this.daemonRuntimeConfig,
+      connectionHistory: this.connectionHistory,
       getWebSocketRuntimeMetrics: () => this.lastRuntimeMetricsSnapshot,
     });
   }
@@ -1639,6 +1646,7 @@ export class VoiceAssistantWebSocketServer {
       this.externalSessionsByKey.set(sessionKey, connection);
     }
     pending.identity.sessionId = connection.session.getSessionId();
+    this.recordAppConnection({ message, pending, sessionId: pending.identity.sessionId });
     this.sendToClient(ws, this.createServerInfoMessage(connection.session));
     connection.connectionLogger.info(
       {
@@ -1768,6 +1776,7 @@ export class VoiceAssistantWebSocketServer {
     existing.sockets.add(ws);
     this.sessions.set(ws, existing);
     pending.identity.sessionId = existing.session.getSessionId();
+    this.recordAppConnection({ message, pending, sessionId: pending.identity.sessionId });
     this.sendToClient(ws, this.createServerInfoMessage(existing.session));
     pending.connectionLogger.info(
       {
@@ -1777,6 +1786,28 @@ export class VoiceAssistantWebSocketServer {
       },
       "Client connected via hello",
     );
+  }
+
+  private recordAppConnection(options: {
+    message: WSHelloMessage;
+    pending: PendingConnection;
+    sessionId: string;
+  }): void {
+    const { message, pending, sessionId } = options;
+    if (pending.identity.transport === "hub" || isPluginClientId(message.clientId)) return;
+    let transport = ConnectionTransport.DirectNetwork;
+    if (pending.identity.peer !== "external") transport = ConnectionTransport.DirectLocal;
+    if (pending.identity.transport === "relay") transport = ConnectionTransport.Relay;
+    const isLocalDirect =
+      pending.identity.transport === "direct" && pending.identity.peer !== "external";
+    if (isLocalDirect && message.connectionTransport === ConnectionTransport.SshTunnel) {
+      transport = ConnectionTransport.SshTunnel;
+    }
+    this.connectionHistory?.connect({
+      hello: { ...message, clientId: message.clientId.trim() },
+      sessionId,
+      transport,
+    });
   }
 
   private buildServerInfoStatusPayload(session: Session): ServerInfoStatusPayload {
@@ -1841,6 +1872,10 @@ export class VoiceAssistantWebSocketServer {
         ...(this.advertiseRelayConfig ? { relayConfig: true } : {}),
         // COMPAT(pairingOfferReset): added in v0.11.0-fork.24, remove gate after 2027-04-18.
         pairingOfferReset: true,
+        // COMPAT(connectionHistory): added in v0.11.0-fork.24, remove gate after 2027-04-18.
+        ...(this.connectionHistory
+          ? { connectionHistory: true, connectionHistoryRename: true }
+          : {}),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: true,
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
@@ -2145,6 +2180,7 @@ export class VoiceAssistantWebSocketServer {
     logMessage: string,
   ): Promise<void> {
     this.incrementRuntimeCounter("sessionCleanup");
+    this.connectionHistory?.disconnect(connection.session.getSessionId());
     if (connection.lifecycle === "reconnectable" && connection.externalDisconnectCleanupTimeout) {
       clearTimeout(connection.externalDisconnectCleanupTimeout);
       connection.externalDisconnectCleanupTimeout = null;

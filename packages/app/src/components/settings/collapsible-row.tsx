@@ -30,7 +30,9 @@ export function SettingsCollapsibleRow({
   children,
 }: SettingsCollapsibleRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const toggle = useCallback(() => setExpanded((value) => !value), []);
+  const toggle = useCallback(() => {
+    setExpanded(!expanded);
+  }, [expanded]);
   const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
   // React Native Web does not map `accessibilityState.expanded` to `aria-expanded`.
   const webExpandedProps = useMemo(

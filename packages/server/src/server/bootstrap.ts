@@ -1,3 +1,4 @@
+import { ConnectionHistoryStore } from "./connection-history/store.js";
 import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
 import express from "express";
 import { createServer as createHTTPServer, type IncomingMessage, type ServerResponse } from "http";
@@ -624,6 +625,7 @@ export async function createPaseoDaemon(
 
   const serverId = getOrCreateServerId(config.paseoHome, { logger });
   let daemonKeyPair = await loadOrCreateDaemonKeyPair(config.paseoHome, logger);
+  const connectionHistory = new ConnectionHistoryStore({ paseoHome: config.paseoHome, logger });
   const managedProcesses = createBootstrapManagedProcessRegistry(config, logger);
   // Reconcile the helper-process ledger in the background so it never blocks the
   // daemon from coming up; terminating a live leftover can take a few seconds.
@@ -1684,6 +1686,7 @@ export async function createPaseoDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
+                connectionHistory,
               },
               workspaceAutoName,
               daemonAuth,
@@ -1731,6 +1734,7 @@ export async function createPaseoDaemon(
                   },
                 resetDaemonKeyPair: async () => {
                   daemonKeyPair = rotateDaemonKeyPair(config.paseoHome, logger);
+                  connectionHistory.recordPairingCodeReset(daemonKeyPair.createdAt);
                   await relayRuntime?.setDaemonKeyPair(daemonKeyPair.keyPair);
                 },
               },

@@ -1,3 +1,4 @@
+import type { ConnectionHistoryStore } from "../../connection-history/store.js";
 import type pino from "pino";
 import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
@@ -41,6 +42,7 @@ export interface DaemonSessionHost {
 }
 
 export interface DaemonSessionOptions {
+  connectionHistory?: ConnectionHistoryStore;
   host: DaemonSessionHost;
   clientId: string;
   paseoHome: string;
@@ -59,15 +61,9 @@ export interface DaemonSessionOptions {
   getSourceTransport?: (source: object) => SocketTransport | undefined;
 }
 
-/**
- * A client's read surface for the daemon process itself: its runtime status
- * (pid-lock start time, listen address, relay config, provider availability) and
- * a fresh local pairing offer for connecting a new client. Owns the `daemon.*`
- * RPCs. Reaches no state beyond the runtime values injected at construction and
- * the outbound channel; resetting the pairing offer mutates the daemon only through
- * the injected `resetDaemonKeyPair`.
- */
+/** Daemon status, pairing, connection history, and Hub management RPCs for one client. */
 export class DaemonSession {
+  private readonly connectionHistory: ConnectionHistoryStore | undefined;
   private readonly host: DaemonSessionHost;
   private readonly clientId: string;
   private readonly paseoHome: string;
@@ -88,6 +84,7 @@ export class DaemonSession {
 
   constructor(options: DaemonSessionOptions) {
     this.host = options.host;
+    this.connectionHistory = options.connectionHistory;
     this.clientId = options.clientId;
     this.paseoHome = options.paseoHome;
     this.serverId = options.serverId;
@@ -217,6 +214,29 @@ export class DaemonSession {
         },
       });
     }
+  }
+
+  handleGetConnectionHistoryRequest(
+    msg: Extract<SessionInboundMessage, { type: "daemon.connection_history.get.request" }>,
+  ): void {
+    if (!this.connectionHistory) throw new Error("Connection history is unavailable");
+    this.host.emit({
+      type: "daemon.connection_history.get.response",
+      payload: { requestId: msg.requestId, ...this.connectionHistory.getHistory() },
+    });
+  }
+
+  handleRenameConnectionDeviceRequest(
+    msg: Extract<
+      SessionInboundMessage,
+      { type: "daemon.connection_history.rename_device.request" }
+    >,
+  ): void {
+    if (!this.connectionHistory) throw new Error("Connection history is unavailable");
+    this.host.emit({
+      type: "daemon.connection_history.rename_device.response",
+      payload: { requestId: msg.requestId, ...this.connectionHistory.renameDevice(msg) },
+    });
   }
 
   async handleGetPairingOfferRequest(

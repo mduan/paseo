@@ -1,3 +1,4 @@
+import { ConnectionTransport, DeviceKind } from "@getpaseo/protocol/connection-history";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, expectTypeOf, test, vi } from "vitest";
 import { z } from "zod";
@@ -989,6 +990,31 @@ test("uses the saved host password when the desktop bridge has no credential for
   expect(JSON.parse(assertStr(mock.sent[0]))).toMatchObject({
     type: "hello",
     auth: { kind: "password", password: "saved-password" },
+  });
+});
+
+test("sends the resolved app device label and SSH tunnel hint in hello", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "desktop-device",
+    clientType: "mobile",
+    deviceLabel: async () => "Paseo Desktop · Test Mac",
+    deviceKind: DeviceKind.Desktop,
+    connectionTransport: ConnectionTransport.SshTunnel,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connected = client.connect();
+  mock.triggerOpen({ preserveSent: true });
+  await connected;
+  await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+  expect(JSON.parse(assertStr(mock.sent[0]))).toMatchObject({
+    type: "hello",
+    deviceLabel: "Paseo Desktop · Test Mac",
+    deviceKind: DeviceKind.Desktop,
+    connectionTransport: ConnectionTransport.SshTunnel,
   });
 });
 

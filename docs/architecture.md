@@ -269,6 +269,10 @@ Every physical send path enforces an 8 MiB outbound high-water mark, including J
 
 Client session RPC waits default to 60s so slow relay or mobile networks do not turn a live but delayed daemon response into a false operation failure. Keep connect timeouts, app-level grace windows, explicit diagnostic latency probes, liveness ping timers, and genuinely long-running RPCs separate from this default.
 
+The Pair device page reads app connection history through the capability-gated
+`daemon.connection_history.get` RPC. Its session and retention rules belong to
+[the data model](data-model.md#connection-history).
+
 New session RPCs use dotted names with `.request` and `.response` suffixes, such as `checkout.forge.set_auto_merge.request` and `checkout.forge.set_auto_merge.response`. See [rpc-namespacing.md](rpc-namespacing.md) for the convention and migration rules for older flat RPC names.
 
 **Notable session message types:**

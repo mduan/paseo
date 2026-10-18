@@ -1,3 +1,4 @@
+import { ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DaemonClientConfig } from "@getpaseo/client/internal/daemon-client";
 import { DaemonAuthenticationError } from "@getpaseo/client/internal/daemon-client";
@@ -166,6 +167,7 @@ describe("test-daemon-connection connectToDaemon", () => {
 
     expect(probe.createdConfigs()[0]).toMatchObject({
       url: "paseo+desktop://ssh?host=deploy%40example.com",
+      connectionTransport: ConnectionTransport.SshTunnel,
       transportFactory,
     });
   });
