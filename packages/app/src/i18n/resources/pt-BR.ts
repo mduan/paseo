@@ -2912,6 +2912,13 @@ export const ptBR: TranslationResources = {
         icon: "Ícone",
         chooseImage: "Escolher imagem",
         useAutomatic: "Usar automático",
+        color: {
+          title: "Cor do ícone",
+          auto: "Automática",
+          custom: "Personalizada",
+          hex: "Cor hexadecimal",
+          done: "Concluído",
+        },
         imageUrl: "URL de imagem ou site",
         save: "Salvar alterações",
         savedToast: "Projeto atualizado",

@@ -990,6 +990,15 @@ export const ProjectIconSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// Null clears the override and reverts to the derived color. The daemon only
+// accepts a 6-digit hex (#rrggbb).
+export const ProjectIconColorSetRequestSchema = z.object({
+  type: z.literal("project.icon.color.set.request"),
+  projectId: z.string(),
+  color: z.string().nullable(),
+  requestId: z.string(),
+});
+
 export const ProjectRemoveRequestSchema = z.object({
   type: z.literal("project.remove.request"),
   projectId: z.string(),
@@ -2147,6 +2156,16 @@ export const ProjectRenameResponseSchema = z.object({
 
 export const ProjectIconSetResponseSchema = z.object({
   type: z.literal("project.icon.set.response"),
+  payload: z.object({
+    requestId: z.string(),
+    projectId: z.string(),
+    accepted: z.boolean(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const ProjectIconColorSetResponseSchema = z.object({
+  type: z.literal("project.icon.color.set.response"),
   payload: z.object({
     requestId: z.string(),
     projectId: z.string(),
@@ -3331,6 +3350,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   UpdateAgentRequestMessageSchema,
   ProjectRenameRequestSchema,
   ProjectIconSetRequestSchema,
+  ProjectIconColorSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
   WorkspacePinSetRequestSchema,
@@ -3867,6 +3887,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceScriptManagement: z.boolean().optional(),
         // COMPAT(projectCustomIcon): added in v0.2.0, remove after 2027-01-20.
         projectCustomIcon: z.boolean().optional(),
+        // COMPAT(projectIconColor): added in v0.11.0, remove gate after 2027-04-19.
+        projectIconColor: z.boolean().optional(),
         // COMPAT(fsEntryOps): added in v0.3.0, remove gate after 2027-02-08.
         fsEntryOps: z.boolean().optional(),
         // COMPAT(fsEntryDuplicate): added in v0.3.0, remove gate after 2027-02-09.
@@ -4360,6 +4382,9 @@ export const WorkspaceProjectDescriptorPayloadSchema = z.object({
   // absence of an icon. Clients may persist icon results against this value.
   // COMPAT(projectIconCache): added in v0.2.7, remove optional after 2027-02-12.
   projectIconRevision: z.string().optional(),
+  // User-chosen #rrggbb for the lettered icon; null means derived.
+  // COMPAT(projectIconColor): added in v0.11.0, remove optional after 2027-04-19.
+  projectIconColor: z.string().nullable().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
   // COMPAT(directorySync): sequence of this latest directory projection.
@@ -7200,6 +7225,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   UpdateAgentResponseMessageSchema,
   ProjectRenameResponseSchema,
   ProjectIconSetResponseSchema,
+  ProjectIconColorSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
   WorkspacePinSetResponseSchema,
@@ -7403,6 +7429,7 @@ export type AgentRewindResponseMessage = z.infer<typeof AgentRewindResponseMessa
 export type UpdateAgentResponseMessage = z.infer<typeof UpdateAgentResponseMessageSchema>;
 export type ProjectRenameResponse = z.infer<typeof ProjectRenameResponseSchema>;
 export type ProjectIconSetResponse = z.infer<typeof ProjectIconSetResponseSchema>;
+export type ProjectIconColorSetResponse = z.infer<typeof ProjectIconColorSetResponseSchema>;
 export type ProjectRemoveResponse = z.infer<typeof ProjectRemoveResponseSchema>;
 export type WorkspaceTitleSetResponse = z.infer<typeof WorkspaceTitleSetResponseSchema>;
 export type WorkspaceTitleSetResponsePayload = z.infer<
@@ -7560,6 +7587,7 @@ export type UpdateAgentRequestMessage = z.infer<typeof UpdateAgentRequestMessage
 export type ProjectIconSource = z.infer<typeof ProjectIconSourceSchema>;
 export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
 export type ProjectIconSetRequest = z.infer<typeof ProjectIconSetRequestSchema>;
+export type ProjectIconColorSetRequest = z.infer<typeof ProjectIconColorSetRequestSchema>;
 export type ProjectRemoveRequest = z.infer<typeof ProjectRemoveRequestSchema>;
 export type WorkspaceTitleSetRequest = z.infer<typeof WorkspaceTitleSetRequestSchema>;
 export type WorkspacePinSetRequest = z.infer<typeof WorkspacePinSetRequestSchema>;

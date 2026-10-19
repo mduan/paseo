@@ -347,6 +347,7 @@ const StoredProjectSchema = z.strictObject({
   projectCustomName: z.string().nullable(),
   projectCustomIconRevision: z.string().nullable(),
   projectIconRevision: z.string().optional(),
+  projectIconColor: z.string().nullable().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
 });
@@ -770,6 +771,7 @@ function serializeProject(project: ProjectDescriptor): StoredProject {
     projectCustomName: project.projectCustomName,
     projectCustomIconRevision: project.projectCustomIconRevision ?? null,
     projectIconRevision: project.projectIconRevision,
+    projectIconColor: project.projectIconColor ?? null,
     projectRootPath: project.projectRootPath,
     projectKind: project.projectKind,
   };

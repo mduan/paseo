@@ -22,6 +22,7 @@ import {
 } from "./selectors";
 import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
+import { parseProjectViewKey } from "@/projects/workspace-structure";
 
 // These are the ONLY supported ways to read workspaces from the session store.
 // Do not write raw `useSessionStore` selectors that return the workspaces Map, a session object,
@@ -153,6 +154,18 @@ export function useHasWorkspaces(serverId: string | null): boolean {
     (state) => selectHasWorkspaces(state, serverId),
     workspaceEqualityFns.identity,
   );
+}
+
+/** The project's chosen icon color, undefined while it uses the derived one. */
+export function useProjectIconColor(projectViewKey: string): string | undefined {
+  return useSessionStore((state) => {
+    const identity = parseProjectViewKey(projectViewKey);
+    if (!identity) return undefined;
+    return (
+      state.sessions[identity.serverId]?.projects.get(identity.projectId)?.projectIconColor ??
+      undefined
+    );
+  });
 }
 
 export function useWorkspaceStatusesForBadges(): DesktopBadgeWorkspaceStatus[] {

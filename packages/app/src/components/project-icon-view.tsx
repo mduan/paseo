@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { type StyleProp, Text, type TextStyle, View } from "react-native";
 import { ProjectIconImage } from "@/components/project-icon-image";
+import { useProjectIconColor } from "@/stores/session-store-hooks";
 import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import { readableLetterColor } from "@/utils/hex-color";
 
-const WHITE_TEXT = { color: "#ffffff" } as const;
 const FALLBACK_LAYOUT = { alignItems: "center", justifyContent: "center" } as const;
 
 /**
@@ -36,13 +37,18 @@ export function ProjectIconView({
   projectViewKey,
   size,
   textStyle,
+  color,
 }: {
   iconDataUri: string | null;
   initial: string;
   projectViewKey: string;
   size: number;
   textStyle: StyleProp<TextStyle>;
+  /** Overrides the project's stored color, e.g. to preview an unsaved choice. */
+  color?: string;
 }) {
+  const storedColor = useProjectIconColor(projectViewKey);
+  const fill = color ?? storedColor ?? identityColor(deriveIdentityColorName(projectViewKey));
   // The uploaded image is sized but never clipped — see projectIconRadius.
   const box = useMemo(() => ({ width: size, height: size }), [size]);
   const fallbackStyles = useMemo(
@@ -50,11 +56,14 @@ export function ProjectIconView({
       box,
       { borderRadius: projectIconRadius(size) },
       FALLBACK_LAYOUT,
-      { backgroundColor: identityColor(deriveIdentityColorName(projectViewKey)) },
+      { backgroundColor: fill },
     ],
-    [box, size, projectViewKey],
+    [box, size, fill],
   );
-  const textStyles = useMemo(() => [textStyle, WHITE_TEXT], [textStyle]);
+  const textStyles = useMemo(
+    () => [textStyle, { color: readableLetterColor(fill) }],
+    [textStyle, fill],
+  );
 
   const fallback = useMemo(
     () => (

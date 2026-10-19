@@ -2896,6 +2896,13 @@ export const ja: TranslationResources = {
         icon: "アイコン",
         chooseImage: "画像を選択",
         useAutomatic: "自動を使う",
+        color: {
+          title: "アイコンの色",
+          auto: "自動",
+          custom: "カスタム",
+          hex: "16進カラー",
+          done: "完了",
+        },
         imageUrl: "画像またはサイトのURL",
         save: "変更を保存",
         savedToast: "プロジェクトを更新しました",

@@ -5,6 +5,7 @@ const derivedName: ProjectEditFormSnapshot = {
   projectName: "grumpy-turtle",
   projectCustomName: null,
   hasCustomIcon: false,
+  iconColor: null,
   currentIconDataUri: "data:image/png;base64,ZGVyaXZlZA==",
 };
 
@@ -12,6 +13,7 @@ const customIcon: ProjectEditFormSnapshot = {
   projectName: "Turtle",
   projectCustomName: "Turtle",
   hasCustomIcon: true,
+  iconColor: null,
   currentIconDataUri: "data:image/png;base64,Y3VzdG9t",
 };
 
@@ -21,8 +23,26 @@ describe("project edit form model", () => {
       name: "",
       canSubmit: false,
       canUseAutomatic: false,
-      submission: { rename: null, icon: null },
+      submission: { rename: null, icon: null, iconColor: null },
     });
+  });
+
+  it("submits a changed icon color, and clearing it back to derived", () => {
+    const model = openProjectEditForm(derivedName);
+
+    model.setIconColor("#3a7bd5");
+    expect(model.getState()).toMatchObject({
+      iconColor: "#3a7bd5",
+      canSubmit: true,
+      submission: { iconColor: { color: "#3a7bd5" } },
+    });
+
+    model.setIconColor(null);
+    expect(model.getState()).toMatchObject({ canSubmit: false, submission: { iconColor: null } });
+
+    const colored = openProjectEditForm({ ...derivedName, iconColor: "#3a7bd5" });
+    colored.setIconColor(null);
+    expect(colored.getState().submission.iconColor).toEqual({ color: null });
   });
 
   it("submits only the name when only the name changed", () => {
@@ -137,6 +157,7 @@ describe("project edit form model", () => {
     expect(model.getState().submission).toEqual({
       rename: { customName: "Renamed" },
       icon: { type: "upload", data: "aW1hZ2U=" },
+      iconColor: null,
     });
   });
 
