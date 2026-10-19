@@ -12,6 +12,8 @@ import { View, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { PaneFind, findShortcutPlatform, isFindShortcut, type PaneFindHandle } from "@/pane-find";
+import { useSessionStore } from "@/stores/session-store";
+import { SearchOptionGroup } from "@/components/sessions/search-options";
 import { Button } from "@/components/ui/button";
 import { usePaneFocus } from "@/panels/pane-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
@@ -60,43 +62,58 @@ export function ChatFind({
   viewportRef,
   revealLoadedMessage,
   visibleMessageIds,
+  expandedTurnKeys,
+  expandTurn,
   children,
 }: ChatFindProps) {
   const { t } = useTranslation();
   const widget = useRef<PaneFindHandle>(null);
   const root = useRef<HTMLDivElement>(null);
-  const bindings = useRef({ viewportRef, revealLoadedMessage, visibleMessageIds });
-  bindings.current = { viewportRef, revealLoadedMessage, visibleMessageIds };
+  const bindings = useRef({
+    viewportRef,
+    revealLoadedMessage,
+    visibleMessageIds,
+    items,
+    expandTurn,
+  });
+  bindings.current = { viewportRef, revealLoadedMessage, visibleMessageIds, items, expandTurn };
+  // COMPAT(chatFindOptions): added in v0.11.x, remove gate after 2027-10-19.
+  const optionsSupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.chatFindOptions === true,
+  );
   const [highlightName] = useState(() => `paseo-chat-find-${++nextHighlightId}`);
   const { isInteractive } = usePaneFocus();
   const active = useRetainedPanelActive();
   const model = useMemo(
     () =>
       new ChatFindModel({
-        search(query, cursor) {
-          const client = getHostRuntimeStore().getClient(serverId);
-          if (!client) return Promise.reject(new Error("Host disconnected"));
-          return client.searchAgentTimeline({ agentId, query, cursor });
+        operations: {
+          search({ query, cursor, options }) {
+            const client = getHostRuntimeStore().getClient(serverId);
+            if (!client) return Promise.reject(new Error("Host disconnected"));
+            return client.searchAgentTimeline({ agentId, query, cursor, options });
+          },
+          load(targetEpoch, seq) {
+            return getHostRuntimeStore().fetchAgentTimeline(
+              serverId,
+              agentId,
+              planTimelinePromptJump({ epoch: targetEpoch, seq }),
+            );
+          },
+          ...createFindViewport({
+            getBindings: () => bindings.current,
+            getRoot: () => root.current,
+            highlightName,
+          }),
         },
-        load(targetEpoch, seq) {
-          return getHostRuntimeStore().fetchAgentTimeline(
-            serverId,
-            agentId,
-            planTimelinePromptJump({ epoch: targetEpoch, seq }),
-          );
-        },
-        ...createFindViewport({
-          getBindings: () => bindings.current,
-          getRoot: () => root.current,
-          highlightName,
-        }),
+        optionsSupported,
       }),
-    [agentId, serverId, highlightName],
+    [agentId, serverId, highlightName, optionsSupported],
   );
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   useEffect(() => {
-    model.updateHistory(epoch, items);
-  }, [model, epoch, items]);
+    model.updateHistory({ epoch, items, expandedTurnKeys });
+  }, [model, epoch, items, expandedTurnKeys]);
   useEffect(() => () => model.close(), [model]);
   useEffect(() => {
     if (!active) model.close();
@@ -120,9 +137,22 @@ export function ChatFind({
     model.close();
     root.current?.focus({ preventScroll: true });
   }, [model]);
+  const options = useMemo(
+    () => (
+      <SearchOptionGroup
+        value={state.options}
+        supported={optionsSupported}
+        onChange={model.setOptions}
+        includeFolded
+        testIDPrefix="chat-find"
+      />
+    ),
+    [state.options, optionsSupported, model],
+  );
   let status = "";
   if (state.phase === "searching") status = t("paneFind.searching");
   else if (state.phase === "loading") status = t("paneFind.loading");
+  else if (state.phase === "invalid") status = t("paneFind.invalidRegex");
   else if (state.phase === "error") status = t("paneFind.failed");
   else if (state.query.trim())
     status = state.count
@@ -138,6 +168,8 @@ export function ChatFind({
             ref={widget}
             query={state.query}
             status={status}
+            invalid={state.phase === "invalid"}
+            options={options}
             canNavigate={state.phase === "ready" && state.count > 0}
             onQueryChange={model.setQuery}
             onNext={model.next}

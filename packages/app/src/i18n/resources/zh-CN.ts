@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const zhCN: TranslationResources = {
   paneFind: {
+    invalidRegex: "无效的正则表达式",
+    includeCollapsedWork: "包含折叠的“工作时长”部分",
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",
     revealFailure: "无法显示此匹配项。请重试。",

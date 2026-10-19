@@ -528,3 +528,53 @@ async function expectCommandCenterOwnsFindShortcut(page: Page, shortcut: string)
   await expect(query(page)).toHaveCount(0);
   await closeCommandCenter(page);
 }
+
+test("find options expand collapsed work before highlighting and reset when closed", async ({
+  page,
+}, testInfo) => {
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "chat-find-folded-",
+    title: "Chat Find collapsed work",
+    initialPrompt: "Replay a codex-shaped foreground shell tool call.",
+  });
+  try {
+    await agent.client.waitForFinish(agent.agentId, 15_000);
+    await openAgentRoute(page, agent);
+    await expect(
+      page
+        .getByTestId("assistant-message")
+        .getByText("Foreground command completed after steering.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toHaveCount(0);
+    await searchChat(page, "foreground");
+    await expect(status(page)).toHaveText("1 of 2");
+    const folded = page.getByTestId("chat-find-includeFolded");
+    await expect(folded).toHaveAttribute("aria-pressed", "false");
+    await folded.click();
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toHaveCount(0);
+    await expectNextMatch(page, "2 of 3", "foreground");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("chat-find-expanded-work.png") });
+    await folded.click();
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await page.getByTestId("chat-find-regex").click();
+    await query(page).fill("(");
+    await expect(status(page)).toHaveText("Invalid regular expression");
+    await expect(query(page)).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("button", { name: "Next match", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Previous match", exact: true })).toBeDisabled();
+    await page.screenshot({ path: testInfo.outputPath("chat-find-invalid-regex.png") });
+    await closeFind(page);
+    await openChatFind(page);
+    await expect(page.getByTestId("chat-find-regex")).toHaveAttribute("aria-pressed", "false");
+    await expect(folded).toHaveAttribute("aria-pressed", "false");
+    await query(page).fill("foreground");
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await closeFind(page);
+  } finally {
+    await agent.cleanup();
+  }
+});

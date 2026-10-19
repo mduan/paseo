@@ -1905,6 +1905,7 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: true,
         agentHistorySearchOptions: true,
+        chatFindOptions: true,
         agentHistoryFilters: true,
         agentHistoryAgentTypeFilter: true,
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.

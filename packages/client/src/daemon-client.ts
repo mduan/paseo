@@ -1,3 +1,4 @@
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { DeviceKind, ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import { legacyUsageIcon } from "./legacy-usage-icons.js";
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
@@ -679,6 +680,7 @@ export interface AgentTimelineSearchOptions {
   agentId: string;
   query: string;
   cursor?: number;
+  options?: SearchOptions;
 }
 
 export interface AgentTurnDiffOptions {
@@ -3305,11 +3307,19 @@ export class DaemonClient {
     agentId,
     query,
     cursor,
+    options,
   }: AgentTimelineSearchOptions): Promise<AgentTimelineSearchPayload> {
     const requestId = this.createRequestId();
     const payload = await this.sendCorrelatedSessionRequest({
       requestId,
-      message: { type: "agent.timeline.search.request", requestId, agentId, query, cursor },
+      message: {
+        type: "agent.timeline.search.request",
+        requestId,
+        agentId,
+        query,
+        cursor,
+        options,
+      },
       responseType: "agent.timeline.search.response",
     });
     if (payload.error) throw new Error(payload.error);

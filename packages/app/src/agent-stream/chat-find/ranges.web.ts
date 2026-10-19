@@ -16,14 +16,13 @@ export function findMessageRows(root: HTMLElement | null, messageId: string): HT
 export function findMessageMatches(
   root: HTMLElement | null,
   messageId: string,
-  query: string,
+  pattern: RegExp,
 ): Range[] {
-  return findMessageRows(root, messageId).flatMap((row) => findRenderedMatches(row, query));
+  return findMessageRows(root, messageId).flatMap((row) => findRenderedMatches(row, pattern));
 }
 
 /** Local offsets belong to the DOM that supplied the text, never to a host parser. */
-export function findRenderedMatches(row: HTMLElement, query: string): Range[] {
-  if (!query.trim()) return [];
+export function findRenderedMatches(row: HTMLElement, pattern: RegExp): Range[] {
   const groups = new Map<Element, Text[]>();
   for (const content of row.querySelectorAll<HTMLElement>('[data-message-text="true"]')) {
     const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
@@ -36,11 +35,6 @@ export function findRenderedMatches(row: HTMLElement, query: string): Range[] {
       groups.set(block, texts);
     }
   }
-  const pattern = query
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("\\s+");
   const ranges: Range[] = [];
   for (const texts of groups.values()) {
     const points = texts.map((node) => ({ node, start: 0, end: 0 }));
@@ -50,7 +44,8 @@ export function findRenderedMatches(row: HTMLElement, query: string): Range[] {
       text += point.node.data;
       point.end = text.length;
     }
-    for (const match of text.matchAll(new RegExp(pattern, "giu"))) {
+    for (const match of text.matchAll(pattern)) {
+      if (!match[0].length) continue;
       const start = points.find((point) => point.start <= match.index && point.end > match.index);
       const endOffset = match.index + match[0].length;
       const end = points.find((point) => point.start < endOffset && point.end >= endOffset);

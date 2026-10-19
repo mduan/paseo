@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const fr: TranslationResources = {
   paneFind: {
+    invalidRegex: "Expression régulière non valide",
+    includeCollapsedWork: "Inclure les sections « Travail effectué pendant » repliées",
     connectionFailure:
       "Impossible de rechercher dans cette conversation. Vérifiez la connexion à l’hôte et réessayez.",
     historyChangedFailure: "La conversation a changé pendant la recherche. Relancez la recherche.",

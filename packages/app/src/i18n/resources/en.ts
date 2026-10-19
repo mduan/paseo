@@ -1,5 +1,7 @@
 export const en = {
   paneFind: {
+    invalidRegex: "Invalid regular expression",
+    includeCollapsedWork: "Include collapsed “Worked for” sections",
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",
     revealFailure: "Could not show this match. Retry.",

@@ -2,11 +2,13 @@
 import { useCallback, useMemo } from "react";
 import { View, Text } from "react-native";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native-unistyles";
+import { ChevronsUpDown } from "lucide-react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { useHistorySearch } from "@/hooks/use-history-search";
 import {
   iconButtonChromeStyle,
+  mutedIconColorMapping,
   type IconButtonChromeState,
 } from "@/components/ui/icon-button-chrome";
 import { isNative } from "@/constants/platform";
@@ -17,6 +19,7 @@ enum SearchOption {
   CaseSensitive = "caseSensitive",
   WholeWord = "wholeWord",
   Regex = "regex",
+  IncludeFolded = "includeFolded",
 }
 
 const OPTIONS = [
@@ -25,10 +28,13 @@ const OPTIONS = [
   { option: SearchOption.Regex, label: ".*" },
 ];
 
+const FoldIcon = withUnistyles(ChevronsUpDown, mutedIconColorMapping);
+type ToggleOptions = SearchOptions & { includeFolded?: boolean };
 type SearchOptionsProps = {
-  value: SearchOptions;
+  value: ToggleOptions;
   supported: boolean;
-  onChange: (value: SearchOptions) => void;
+  onChange: (value: ToggleOptions) => void;
+  testIDPrefix?: string;
 };
 
 function SearchOptionButton({
@@ -37,11 +43,15 @@ function SearchOptionButton({
   onChange,
   option,
   label: symbol,
-}: SearchOptionsProps & (typeof OPTIONS)[number]) {
+  testIDPrefix = "sessions-search",
+}: SearchOptionsProps & { option: SearchOption; label?: string }) {
   const { t } = useTranslation();
   const disabled = !supported;
   const selected = Boolean(value[option]) && !disabled;
-  const label = t(`sessions.searchOptions.${option}`);
+  const label =
+    option === SearchOption.IncludeFolded
+      ? t("paneFind.includeCollapsedWork")
+      : t(`sessions.searchOptions.${option}`);
   let hint = label;
   if (!supported) hint = t("sessions.searchOptions.updateHost");
   const buttonStyle = useCallback(
@@ -62,19 +72,23 @@ function SearchOptionButton({
   return (
     <Tooltip>
       <TooltipTrigger
-        disabled={disabled}
+        aria-disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={hint}
         accessibilityState={accessibilityState}
         aria-pressed={selected}
-        testID={`sessions-search-${option}`}
+        testID={`${testIDPrefix}-${option}`}
         style={buttonStyle}
-        onPress={toggle}
+        onPress={disabled ? undefined : toggle}
       >
-        <Text style={[styles.symbol, option === SearchOption.WholeWord && styles.wholeWord]}>
-          {symbol}
-        </Text>
+        {option === SearchOption.IncludeFolded ? (
+          <FoldIcon size={14} />
+        ) : (
+          <Text style={[styles.symbol, option === SearchOption.WholeWord && styles.wholeWord]}>
+            {symbol}
+          </Text>
+        )}
       </TooltipTrigger>
       <TooltipContent>
         <Text style={styles.tooltip}>{hint}</Text>
@@ -83,13 +97,17 @@ function SearchOptionButton({
   );
 }
 
-function HistorySearchOptions(props: SearchOptionsProps) {
+export function SearchOptionGroup({
+  includeFolded = false,
+  ...props
+}: SearchOptionsProps & { includeFolded?: boolean }) {
   return (
     <View style={styles.options}>
       <View style={styles.separator} />
       {OPTIONS.map(({ option, label }) => (
         <SearchOptionButton key={option} option={option} label={label} {...props} />
       ))}
+      {includeFolded ? <SearchOptionButton option={SearchOption.IncludeFolded} {...props} /> : null}
     </View>
   );
 }
@@ -106,7 +124,7 @@ export function HistorySearchField({
   const { t } = useTranslation();
   const trailing = useMemo(
     () => (
-      <HistorySearchOptions
+      <SearchOptionGroup
         value={search.options}
         supported={supported}
         onChange={search.setOptions}

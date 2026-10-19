@@ -1921,6 +1921,7 @@ export const AgentTimelineSearchRequestMessageSchema = z.object({
   requestId: z.string(),
   query: z.string(),
   cursor: z.number().int().nonnegative().optional(),
+  options: SearchOptionsSchema.optional(),
 });
 
 export const AgentTimelineListPromptsRequestMessageSchema = z.object({
@@ -3786,6 +3787,7 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
         agentHistorySearchOptions: z.boolean().optional(),
+        chatFindOptions: z.boolean().optional(),
         agentHistoryFilters: z.boolean().optional(),
         agentHistoryAgentTypeFilter: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
@@ -4803,6 +4805,8 @@ export const AgentTimelineSearchResponseMessageSchema = z.object({
         // Estimated occurrences in the message; the client verifies against rendered text.
         // COMPAT(timelineSearchCount): added in v0.9.0, remove optional after 2027-09-22.
         count: z.number().int().positive().optional(),
+        folded: z.boolean().optional(),
+        turnId: z.string().optional(),
       }),
     ),
     nextCursor: z.number().int().nonnegative().nullable(),
