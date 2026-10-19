@@ -37,6 +37,7 @@ import { useProjectIcons } from "@/projects/icons";
 import { createProjectIconTarget } from "@/projects/icon-target";
 import { useHostRuntimeClient, useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { useHostFeature } from "@/runtime/host-features";
+import { useProjectIconColor } from "@/stores/session-store-hooks";
 import { useToast } from "@/contexts/toast-context";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import {
@@ -230,6 +231,8 @@ function ProjectSettingsBody({
 
   const data = readQuery.data;
   const supportsCustomIcon = useHostFeature(selectedHost.serverId, "projectCustomIcon");
+  const supportsIconColor = useHostFeature(selectedHost.serverId, "projectIconColor");
+  const storedIconColor = useProjectIconColor(project.viewKey) ?? null;
   const customIconRevision = selectedHost.customIconRevision ?? null;
   const projectIconTargets = useMemo(() => {
     const target = createProjectIconTarget({
@@ -245,10 +248,12 @@ function ProjectSettingsBody({
       projectName: selectedHost.projectName,
       projectCustomName: selectedHost.projectCustomName,
       hasCustomIcon: customIconRevision !== null,
+      iconColor: storedIconColor,
       currentIconDataUri: projectIconDataUri,
     }),
     [
       customIconRevision,
+      storedIconColor,
       projectIconDataUri,
       selectedHost.projectCustomName,
       selectedHost.projectName,
@@ -301,6 +306,7 @@ function ProjectSettingsBody({
         projectViewKey={project.viewKey}
         client={client}
         supportsCustomIcon={supportsCustomIcon}
+        supportsIconColor={supportsIconColor}
         snapshot={editSnapshot}
       />
 

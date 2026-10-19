@@ -3067,6 +3067,19 @@ export class DaemonClient {
     if (!payload.accepted) throw new Error(payload.error ?? "setProjectIcon rejected");
   }
 
+  async setProjectIconColor(
+    projectId: string,
+    color: string | null,
+    requestId?: string,
+  ): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"project.icon.color.set.response">({
+        requestId,
+        message: { type: "project.icon.color.set.request", projectId, color },
+      });
+    if (!payload.accepted) throw new Error(payload.error ?? "setProjectIconColor rejected");
+  }
+
   async removeProject(
     projectId: string,
     requestId?: string,

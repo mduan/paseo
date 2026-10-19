@@ -3040,6 +3040,13 @@ export const en = {
         icon: "Icon",
         chooseImage: "Choose image",
         useAutomatic: "Use automatic",
+        color: {
+          title: "Icon color",
+          auto: "Auto",
+          custom: "Custom",
+          hex: "Hex color",
+          done: "Done",
+        },
         imageUrl: "Image or website URL",
         save: "Save changes",
         savedToast: "Project updated",

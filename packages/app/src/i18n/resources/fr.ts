@@ -2939,6 +2939,13 @@ export const fr: TranslationResources = {
         icon: "Icône",
         chooseImage: "Choisir une image",
         useAutomatic: "Utiliser l'automatique",
+        color: {
+          title: "Couleur de l'icône",
+          auto: "Auto",
+          custom: "Personnalisée",
+          hex: "Couleur hexadécimale",
+          done: "Terminé",
+        },
         imageUrl: "URL d'image ou de site",
         save: "Enregistrer",
         savedToast: "Projet mis à jour",

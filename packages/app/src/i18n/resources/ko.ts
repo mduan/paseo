@@ -2884,6 +2884,13 @@ export const ko: TranslationResources = {
         icon: "아이콘",
         chooseImage: "이미지 선택",
         useAutomatic: "자동 사용",
+        color: {
+          title: "아이콘 색상",
+          auto: "자동",
+          custom: "사용자 지정",
+          hex: "16진수 색상",
+          done: "완료",
+        },
         imageUrl: "이미지 또는 웹사이트 URL",
         save: "변경사항 저장",
         savedToast: "프로젝트가 업데이트되었습니다.",

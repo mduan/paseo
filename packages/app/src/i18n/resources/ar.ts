@@ -2869,6 +2869,13 @@ export const ar: TranslationResources = {
         icon: "الأيقونة",
         chooseImage: "اختيار صورة",
         useAutomatic: "استخدام التلقائي",
+        color: {
+          title: "لون الأيقونة",
+          auto: "تلقائي",
+          custom: "مخصص",
+          hex: "لون سداسي عشري",
+          done: "تم",
+        },
         imageUrl: "رابط صورة أو موقع",
         save: "حفظ التغييرات",
         savedToast: "تم تحديث المشروع",

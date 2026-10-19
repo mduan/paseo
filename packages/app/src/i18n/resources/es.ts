@@ -2930,6 +2930,13 @@ export const es: TranslationResources = {
         icon: "Icono",
         chooseImage: "Elegir imagen",
         useAutomatic: "Usar automático",
+        color: {
+          title: "Color del icono",
+          auto: "Automático",
+          custom: "Personalizado",
+          hex: "Color hexadecimal",
+          done: "Listo",
+        },
         imageUrl: "URL de imagen o sitio web",
         save: "Guardar cambios",
         savedToast: "Proyecto actualizado",

@@ -2922,6 +2922,13 @@ export const ru: TranslationResources = {
         icon: "Значок",
         chooseImage: "Выбрать изображение",
         useAutomatic: "Использовать автоматический значок",
+        color: {
+          title: "Цвет значка",
+          auto: "Авто",
+          custom: "Свой",
+          hex: "Цвет в HEX",
+          done: "Готово",
+        },
         imageUrl: "URL изображения или сайта",
         save: "Сохранить изменения",
         savedToast: "Проект обновлён",

@@ -2836,6 +2836,13 @@ export const zhCN: TranslationResources = {
         icon: "图标",
         chooseImage: "选择图片",
         useAutomatic: "使用自动",
+        color: {
+          title: "图标颜色",
+          auto: "自动",
+          custom: "自定义",
+          hex: "十六进制颜色",
+          done: "完成",
+        },
         imageUrl: "图片或网站 URL",
         save: "保存更改",
         savedToast: "Project 已更新",
