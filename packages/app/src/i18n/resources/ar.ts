@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ar: TranslationResources = {
   paneFind: {
+    invalidRegex: "تعبير نمطي غير صالح",
+    includeCollapsedWork: "تضمين أقسام «عمل لمدة» المطوية",
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",
     revealFailure: "تعذر عرض هذا التطابق. أعد المحاولة.",

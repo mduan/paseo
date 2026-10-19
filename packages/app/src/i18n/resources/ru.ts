@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ru: TranslationResources = {
   paneFind: {
+    invalidRegex: "Недопустимое регулярное выражение",
+    includeCollapsedWork: "Включать свёрнутые разделы «Работал в течение»",
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",
     historyChangedFailure: "Чат изменился во время поиска. Выполните поиск снова.",

@@ -1,4 +1,6 @@
 /* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
+import { createPhrasePattern } from "./phrase.js";
+export { SearchQueryError } from "./phrase.js";
 import type { SearchOptions } from "./options.js";
 import {
   fuzzyPolicyForToken,
@@ -13,8 +15,6 @@ export type TextSearch = {
   matches: (fields: readonly string[]) => boolean;
   ranges: (text: string) => MatchRange[];
 };
-
-export class SearchQueryError extends Error {}
 
 function mergeRanges(ranges: MatchRange[]): MatchRange[] {
   ranges.sort((left, right) => left.start - right.start);
@@ -51,29 +51,12 @@ export function createTextSearch({
   }
   const tokens = options.regex ? [query] : query.trim().split(/\s+/).filter(Boolean);
   // shortcut: native regex can block the main thread; isolate it if runtime limits become required.
-  let patterns: RegExp[];
-  try {
-    patterns = tokens.map((token) => {
-      const pattern = new RegExp(
-        options.regex ? token : token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-        options.caseSensitive ? "gu" : "giu",
-      );
-      return options.wholeWord
-        ? new RegExp(
-            String.raw`(?<![\p{L}\p{M}\p{N}_])(?:${pattern.source})(?![\p{L}\p{M}\p{N}_])`,
-            pattern.flags,
-          )
-        : pattern;
-    });
-  } catch (error) {
-    if (error instanceof SyntaxError) throw new SearchQueryError(error.message);
-    throw error;
-  }
+  const patterns = tokens.map((token) => createPhrasePattern({ query: token, options }));
   function rangesForPattern(pattern: RegExp, text: string): MatchRange[] {
     const ranges: MatchRange[] = [];
     // matchAll clones the expression, so repeated fields cannot inherit lastIndex.
     for (const match of text.matchAll(pattern)) {
-      ranges.push({ start: match.index, length: match[0].length });
+      if (match[0].length) ranges.push({ start: match.index, length: match[0].length });
     }
     return ranges;
   }

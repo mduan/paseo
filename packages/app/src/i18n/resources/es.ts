@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const es: TranslationResources = {
   paneFind: {
+    invalidRegex: "Expresión regular no válida",
+    includeCollapsedWork: "Incluir las secciones «Trabajó durante» contraídas",
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",
     historyChangedFailure: "El chat cambió durante la búsqueda. Vuelve a buscar.",

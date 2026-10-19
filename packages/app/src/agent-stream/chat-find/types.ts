@@ -9,6 +9,8 @@ export interface ChatFindProps {
   items: StreamItem[];
   viewportRef: RefObject<StreamViewportHandle | null>;
   revealLoadedMessage(messageId: string): boolean;
+  expandTurn(turnKey: string): void;
+  expandedTurnKeys: ReadonlySet<string>;
   visibleMessageIds: ReadonlySet<string>;
   children: ReactNode;
 }

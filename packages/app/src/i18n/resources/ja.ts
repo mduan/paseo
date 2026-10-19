@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ja: TranslationResources = {
   paneFind: {
+    invalidRegex: "無効な正規表現",
+    includeCollapsedWork: "折りたたまれた「作業時間」セクションを含める",
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",
     historyChangedFailure: "検索中にチャットが変更されました。もう一度検索してください。",

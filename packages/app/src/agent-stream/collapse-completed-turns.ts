@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, useRef } from "react";
 import type { StreamItem } from "@/types/stream";
 import { getStreamItemMessageId } from "./presentation";
-import { continuesTurn, startsNewTurn } from "./turn-membership";
+import { continuesTurn, completedTurnFolds } from "@getpaseo/protocol/turns";
 
 export interface WorkToggle {
   turnKey: string;
@@ -21,11 +21,6 @@ export interface FoldedTail {
   toggles: ReadonlyMap<string, WorkToggle>;
 }
 
-// Codex separates consecutive assistant messages with a leading rule (see
-// ASSISTANT_MESSAGE_BOUNDARY_MARKDOWN in the codex provider), which renders as its own block
-// row. It folds with the earlier messages so it never sits under the toggle's own line.
-const RULE_BLOCK = /^\s*---\s*$/;
-
 /**
  * In each finished turn, the work before the final assistant message (tools, thoughts,
  * earlier messages) folds behind a "Worked for" toggle. User messages and fork markers stay
@@ -39,40 +34,26 @@ export function foldCompletedTurns(input: {
   expandedTurnKeys: ReadonlySet<string>;
 }): FoldedTail {
   const { tail, head, isTurnActive, activeTurnId, expandedTurnKeys } = input;
-  const turns: StreamItem[][] = [];
-  tail.forEach((item, index) => {
-    if (startsNewTurn(item, tail[index - 1] ?? null)) turns.push([]);
-    turns[turns.length - 1]!.push(item);
-  });
   const lastTurnIsLive =
     (isTurnActive && activeTurnId === null) ||
     (head.length > 0 && continuesTurn(tail[tail.length - 1] ?? null, head[0]!));
 
   const items: StreamItem[] = [];
   const toggles = new Map<string, WorkToggle>();
-  turns.forEach((turn, turnIndex) => {
+  const turns = completedTurnFolds({
+    items: tail,
+    getMessageId: getStreamItemMessageId,
+    lastTurnIsLive,
+    activeTurnId: isTurnActive ? (activeTurnId ?? undefined) : undefined,
+  });
+  turns.forEach(({ items: turn, finalStart, folded }, turnIndex) => {
     const first = turn[0]!;
-    const isLive =
-      (isTurnActive && activeTurnId !== null && first.turnId === activeTurnId) ||
-      (lastTurnIsLive && turnIndex === turns.length - 1);
-    const finalMessage = turn.findLast((item) => item.kind === "assistant_message");
-    if (isLive || !finalMessage) {
+    if (finalStart === null) {
       items.push(...turn);
       return;
     }
-    const finalStart = turn.findIndex(
-      (item) => getStreamItemMessageId(item) === getStreamItemMessageId(finalMessage),
-    );
-    const isVisibleWhenFolded = (item: StreamItem, index: number) =>
-      (index >= finalStart &&
-        !(
-          index === finalStart &&
-          item.kind === "assistant_message" &&
-          RULE_BLOCK.test(item.text)
-        )) ||
-      item.kind === "user_message" ||
-      item.kind === "fork_marker";
-    const firstWorkIndex = turn.findIndex((item, index) => !isVisibleWhenFolded(item, index));
+    const isVisibleWhenFolded = (item: StreamItem) => !folded.has(item);
+    const firstWorkIndex = turn.findIndex((item) => folded.has(item));
     // A turn without a prompt below another turn was started by a hidden system prompt, so it
     // starts at its first row. The first loaded turn may instead be cut off by history paging.
     const startedAt =
@@ -96,7 +77,7 @@ export function foldCompletedTurns(input: {
     // The toggle stays where the work starts, so expanding reveals the work below it.
     const anchor = expanded
       ? turn[firstWorkIndex]!
-      : turn.find((item, index) => index > firstWorkIndex && isVisibleWhenFolded(item, index))!;
+      : turn.find((item, index) => index > firstWorkIndex && isVisibleWhenFolded(item))!;
     toggles.set(anchor.id, { turnKey, expanded, hasWork: true, durationMs });
     items.push(...visible);
   });
@@ -119,7 +100,16 @@ function useExpandedTurnKeys(chatKey: string) {
     },
     [chatKey],
   );
-  return [expandedTurnKeysByChat.get(chatKey) ?? EMPTY_TURN_KEYS, toggle] as const;
+  const expand = useCallback(
+    (turnKey: string) => {
+      const previous = expandedTurnKeysByChat.get(chatKey);
+      if (previous?.has(turnKey)) return;
+      expandedTurnKeysByChat.set(chatKey, new Set([...(previous ?? []), turnKey]));
+      rerender();
+    },
+    [chatKey],
+  );
+  return [expandedTurnKeysByChat.get(chatKey) ?? EMPTY_TURN_KEYS, toggle, expand] as const;
 }
 
 type WorkToggleTarget = Pick<WorkToggle, "turnKey"> & { top?: number };
@@ -133,9 +123,14 @@ export function useFoldedTail(input: {
   isTurnActive: boolean;
   activeTurnId: string | null;
   onBeforeToggle: () => ((delta: number) => void) | undefined;
-}): { tail: StreamItem[]; workToggles: WorkToggleContextValue } {
+}): {
+  tail: StreamItem[];
+  workToggles: WorkToggleContextValue;
+  expandedTurnKeys: ReadonlySet<string>;
+  expand(turnKey: string): void;
+} {
   const { chatKey, tail, head, isTurnActive, activeTurnId, onBeforeToggle } = input;
-  const [expandedTurnKeys, toggleTurnKey] = useExpandedTurnKeys(chatKey);
+  const [expandedTurnKeys, toggleTurnKey, expand] = useExpandedTurnKeys(chatKey);
   const pendingAnchorRef = useRef<PendingWorkToggleAnchor | undefined>(undefined);
   const onToggle = useCallback(
     ({ turnKey, top }: WorkToggleTarget) => {
@@ -156,9 +151,11 @@ export function useFoldedTail(input: {
     const folded = foldCompletedTurns({ tail, head, isTurnActive, activeTurnId, expandedTurnKeys });
     return {
       tail: folded.items,
+      expandedTurnKeys,
+      expand,
       workToggles: { toggles: folded.toggles, onToggle, onToggleLayout },
     };
-  }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle, onToggleLayout]);
+  }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle, onToggleLayout, expand]);
 }
 
 export interface WorkToggleContextValue {

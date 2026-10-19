@@ -60,6 +60,8 @@ export interface PaneFindProps {
   query: string;
   status: string;
   canNavigate: boolean;
+  options?: ReactNode;
+  invalid?: boolean;
   onQueryChange(query: string): void;
   onNext(): void;
   onPrevious(): void;
@@ -86,11 +88,22 @@ const FindField = forwardRef<
     trailing?: ReactNode;
     onChangeText(value: string): void;
     onKeyPress(event: NativeSyntheticEvent<TextInputKeyPressEventData>): void;
+    invalid?: boolean;
     autoFocus?: boolean;
     returnKeyType?: TextInputProps["returnKeyType"];
   }
 >(function FindField(
-  { label, initialValue, height, trailing, onChangeText, onKeyPress, autoFocus, returnKeyType },
+  {
+    label,
+    initialValue,
+    height,
+    trailing,
+    onChangeText,
+    onKeyPress,
+    autoFocus,
+    returnKeyType,
+    invalid,
+  },
   ref,
 ) {
   const [focused, setFocused] = useState(false);
@@ -108,8 +121,9 @@ const FindField = forwardRef<
         },
         { focused },
       ),
+      invalid && styles.invalid,
     ],
-    [focused, height],
+    [focused, height, invalid],
   );
   return (
     <View style={fieldStyle}>
@@ -123,6 +137,7 @@ const FindField = forwardRef<
         onFocus={onFocus}
         onBlur={onBlur}
         accessibilityLabel={label}
+        aria-invalid={invalid}
         placeholder={label}
         autoCapitalize="none"
         autoCorrect={false}
@@ -137,7 +152,18 @@ const FindField = forwardRef<
 
 /** Pane-local chrome. The content owner supplies search state and commands. */
 export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneFind(
-  { query, status, canNavigate, onQueryChange, onNext, onPrevious, onClose, replace },
+  {
+    query,
+    status,
+    canNavigate,
+    onQueryChange,
+    onNext,
+    onPrevious,
+    onClose,
+    replace,
+    options,
+    invalid,
+  },
   ref,
 ) {
   const { t } = useTranslation();
@@ -205,7 +231,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
   const matchCount = useMemo(
     () => (
       <Text
-        style={styles.status}
+        style={[styles.status, invalid && styles.invalidStatus]}
         role="status"
         accessibilityLabel={t("paneFind.matches")}
         accessibilityLiveRegion="polite"
@@ -213,7 +239,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
         {status}
       </Text>
     ),
-    [status, t],
+    [status, t, invalid],
   );
 
   return (
@@ -257,7 +283,13 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
             initialValue={query}
             height={rowHeight}
             returnKeyType="search"
-            trailing={matchCount}
+            invalid={invalid}
+            trailing={
+              <>
+                {invalid ? null : matchCount}
+                {options}
+              </>
+            }
             onChangeText={onQueryChange}
             onKeyPress={onKeyPress}
           />
@@ -281,6 +313,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
             <CloseIcon size={glyphSize} />
           </ToolbarButton>
         </View>
+        {invalid ? matchCount : null}
         {replace && replaceExpanded ? (
           <View style={styles.row}>
             <FindField
@@ -318,7 +351,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
 
 /** Desktop find rows run one step tighter than a form field — this is pane chrome. */
 const COLLAPSED_FIELD_HEIGHT = 28;
-const FIND_WIDGET_WIDTH = 340;
+const FIND_WIDGET_WIDTH = 400;
 
 const styles = StyleSheet.create((theme) => {
   const geometry = createControlGeometry(theme);
@@ -350,6 +383,7 @@ const styles = StyleSheet.create((theme) => {
       backgroundColor: theme.colors.surface2,
       borderRadius: theme.borderRadius.md,
     },
+    invalid: { borderColor: theme.colors.statusDanger, outlineColor: theme.colors.statusDanger },
     controlRest: { ...geometry.controlRest },
     controlHover: { ...geometry.controlHover },
     controlActive: { ...geometry.controlActive },
@@ -368,6 +402,7 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foregroundMuted,
       fontSize: theme.fontSize.sm,
     },
+    invalidStatus: { color: theme.colors.statusDanger },
     // Ghost actions sit on the field's rail, so they carry the field's padding.
     replaceAction: { paddingHorizontal: theme.spacing[2] },
   };

@@ -1,9 +1,15 @@
+import { createPhrasePattern } from "@getpaseo/protocol/search/phrase";
+import { completedTurnFolds } from "@getpaseo/protocol/turns";
+import { getStreamItemMessageId } from "../presentation";
 import type { ChatFindOperations } from "./model";
 import type { ChatFindProps } from "./types";
 import { findMessageMatches, findMessageRows, findRenderedMatches } from "./ranges.web";
 
 interface ViewportInput {
-  getBindings(): Pick<ChatFindProps, "viewportRef" | "revealLoadedMessage" | "visibleMessageIds">;
+  getBindings(): Pick<
+    ChatFindProps,
+    "viewportRef" | "revealLoadedMessage" | "visibleMessageIds" | "items" | "expandTurn"
+  >;
   getRoot(): HTMLElement | null;
   highlightName: string;
 }
@@ -23,7 +29,20 @@ export function createFindViewport({
     },
     // A message renders as one row per Markdown block, so an occurrence can sit in
     // any of them and the chosen one decides where the viewport lands.
-    reveal(messageId, query, occurrence, signal) {
+    reveal({ messageId, query, options, occurrence, signal }) {
+      const pattern = createPhrasePattern({ query, options });
+      const bindings = getBindings();
+      if (!bindings.visibleMessageIds.has(messageId)) {
+        const turns = completedTurnFolds({
+          items: bindings.items,
+          getMessageId: getStreamItemMessageId,
+        });
+        const turn = turns.find(({ folded }) =>
+          [...folded].some((item) => getStreamItemMessageId(item) === messageId),
+        );
+        const first = turn?.items[0];
+        if (first) bindings.expandTurn(first.turnId ?? first.id);
+      }
       return new Promise((resolve, reject) => {
         let frame = 0;
         let started = false;
@@ -52,16 +71,16 @@ export function createFindViewport({
             frame = requestAnimationFrame(poll);
             return;
           }
-          if (!started) {
-            current.viewportRef.current?.scrollToMessage?.(messageId);
-            started = true;
-          }
           const rows = findMessageRows(getRoot(), messageId);
           if (!rows.some((row) => row.getBoundingClientRect().height)) {
+            if (!started) {
+              current.viewportRef.current?.scrollToMessage?.(messageId);
+              started = true;
+            }
             frame = requestAnimationFrame(poll);
             return;
           }
-          const ranges = findMessageMatches(getRoot(), messageId, query);
+          const ranges = findMessageMatches(getRoot(), messageId, pattern);
           const index =
             occurrence < 0 ? ranges.length - 1 : Math.min(occurrence, ranges.length - 1);
           const range = ranges[index];
@@ -81,7 +100,7 @@ export function createFindViewport({
           current.viewportRef.current?.scrollToMessage?.(messageId, {
             signal,
             targetTop() {
-              const selected = row ? findRenderedMatches(row, query)[indexInRow] : undefined;
+              const selected = row ? findRenderedMatches(row, pattern)[indexInRow] : undefined;
               if (!selected) return null;
               CSS.highlights.set(highlightName, new Highlight(selected));
               const widget = getRoot()?.querySelector<HTMLElement>(

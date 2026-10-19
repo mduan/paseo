@@ -1,4 +1,8 @@
+/* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
+import { createPhrasePattern, SearchQueryError } from "@getpaseo/protocol/search/phrase";
 import type { AgentTimelineSearchPayload } from "@getpaseo/client/internal/daemon-client";
+import { completedTurnFolds } from "@getpaseo/protocol/turns";
 import type { StreamItem } from "@/types/stream";
 
 /**
@@ -39,33 +43,55 @@ function tagged<T>(failure: ChatFindFailure, operation: Promise<T>): Promise<T> 
   });
 }
 
-interface Snapshot {
+export type ChatFindOptions = SearchOptions & { includeFolded?: boolean };
+
+export enum ChatFindPhase {
+  Idle = "idle",
+  Searching = "searching",
+  Loading = "loading",
+  Ready = "ready",
+  Error = "error",
+  Invalid = "invalid",
+}
+
+type Snapshot = {
   open: boolean;
   query: string;
-  phase: "idle" | "searching" | "loading" | "ready" | "error";
+  options: ChatFindOptions;
+  phase: ChatFindPhase;
   selectedItemId: string | null;
   /** Position across the whole chat: the search scope, not the selected message. */
   occurrence: number;
   count: number;
   failure: ChatFindFailure | null;
-}
+};
+export type ChatFindSearch = {
+  query: string;
+  cursor?: number;
+  options?: SearchOptions;
+};
+export type ChatFindReveal = {
+  messageId: string;
+  query: string;
+  options: ChatFindOptions;
+  occurrence: number;
+  signal: AbortSignal;
+};
 export interface ChatFindOperations {
-  search(query: string, cursor?: number): Promise<AgentTimelineSearchPayload>;
+  search(input: ChatFindSearch): Promise<AgentTimelineSearchPayload>;
   load(epoch: string, seq: number): Promise<unknown>;
-  reveal(
-    messageId: string,
-    query: string,
-    occurrence: number,
-    signal: AbortSignal,
-  ): Promise<{ occurrence: number; count: number }>;
+  reveal(input: ChatFindReveal): Promise<{ occurrence: number; count: number }>;
   clear(): void;
 }
 
 export class ChatFindModel {
+  private operations: ChatFindOperations;
+  private optionsSupported: boolean;
   private state: Snapshot = {
     open: false,
     query: "",
-    phase: "idle",
+    options: {},
+    phase: ChatFindPhase.Idle,
     selectedItemId: null,
     occurrence: 0,
     count: 0,
@@ -74,6 +100,8 @@ export class ChatFindModel {
   private listeners = new Set<() => void>();
   private historyListeners = new Set<() => void>();
   private items: StreamItem[] = [];
+  private turnKeysBySeq = new Map<number, string>();
+  private expandedTurnKeys: ReadonlySet<string> = new Set();
   private epoch: string | null = null;
   private resultEpoch: string | null = null;
   private locations: Location[] = [];
@@ -82,7 +110,16 @@ export class ChatFindModel {
   private inMessage = { occurrence: 0, count: 0 };
   private abort = new AbortController();
   private timer: ReturnType<typeof setTimeout> | undefined;
-  constructor(private operations: ChatFindOperations) {}
+  constructor({
+    operations,
+    optionsSupported = true,
+  }: {
+    operations: ChatFindOperations;
+    optionsSupported?: boolean;
+  }) {
+    this.operations = operations;
+    this.optionsSupported = optionsSupported;
+  }
   readonly getSnapshot = () => this.state;
   readonly subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -107,7 +144,19 @@ export class ChatFindModel {
   };
   readonly close = () => {
     this.cancel();
-    this.publish({ open: false, phase: "idle", selectedItemId: null, count: 0, failure: null });
+    this.publish({
+      options: {},
+      open: false,
+      phase: ChatFindPhase.Idle,
+      selectedItemId: null,
+      count: 0,
+      failure: null,
+    });
+  };
+  readonly setOptions = (options: ChatFindOptions) => {
+    if (!this.optionsSupported) return;
+    this.publish({ options });
+    this.setQuery(this.state.query);
   };
   readonly setQuery = (query: string) => {
     this.cancel();
@@ -116,15 +165,24 @@ export class ChatFindModel {
     this.resolved.clear();
     this.current = -1;
     this.inMessage = { occurrence: 0, count: 0 };
+    const hasQuery = Boolean(query.trim());
     this.publish({
       query,
-      phase: query.trim() ? "searching" : "idle",
-      selectedItemId: null,
+      phase: hasQuery ? ChatFindPhase.Searching : ChatFindPhase.Idle,
+      // Keep the message expanded while searching so its render cap cannot shift the viewport.
+      selectedItemId: hasQuery ? this.state.selectedItemId : null,
       occurrence: 0,
       count: 0,
       failure: null,
     });
-    if (!query.trim()) return;
+    if (!hasQuery) return;
+    try {
+      createPhrasePattern({ query, options: this.state.options });
+    } catch (error) {
+      if (!(error instanceof SearchQueryError)) throw error;
+      this.publish({ phase: ChatFindPhase.Invalid });
+      return;
+    }
     const signal = this.abort.signal;
     this.timer = setTimeout(() => {
       void this.search(signal);
@@ -135,7 +193,7 @@ export class ChatFindModel {
     if (signal.aborted) return;
     this.cancel();
     this.publish({
-      phase: "error",
+      phase: ChatFindPhase.Error,
       selectedItemId: null,
       // Every operation call site is tagged, so an untagged failure is a bug here
       // rather than a known outcome; `connection` is the least misleading thing to
@@ -147,19 +205,34 @@ export class ChatFindModel {
     try {
       let cursor: number | undefined;
       do {
-        const result = await tagged("connection", this.operations.search(this.state.query, cursor));
+        const result = await tagged(
+          "connection",
+          this.operations.search({
+            query: this.state.query,
+            cursor,
+            options: this.optionsSupported ? this.state.options : undefined,
+          }),
+        );
         if (signal.aborted) return;
         const historyChanged = this.epoch !== null && result.epoch !== this.epoch;
         const searchChanged = this.resultEpoch !== null && result.epoch !== this.resultEpoch;
         if (historyChanged || searchChanged) throw new ChatFindFailureError("historyChanged");
         this.resultEpoch = result.epoch;
         this.locations.push(
-          ...result.locations.map((location) => ({
-            seq: location.seq,
-            role: location.role,
-            // COMPAT(timelineSearchCount): hosts before v0.9.0 send no count; remove after 2027-09-22.
-            count: location.count ?? 1,
-          })),
+          ...result.locations
+            .filter((location) => {
+              const turnKey = location.turnId ?? this.turnKeysBySeq.get(location.seq);
+              const expanded = turnKey !== undefined && this.expandedTurnKeys.has(turnKey);
+              return !location.folded || this.state.options.includeFolded || expanded;
+            })
+            .map((location) => ({
+              folded: location.folded,
+              turnId: location.turnId,
+              seq: location.seq,
+              role: location.role,
+              // COMPAT(timelineSearchCount): hosts before v0.9.0 send no count; remove after 2027-09-22.
+              count: location.count ?? 1,
+            })),
         );
         cursor = result.nextCursor ?? undefined;
       } while (cursor !== undefined);
@@ -168,7 +241,17 @@ export class ChatFindModel {
       this.fail(error, signal);
     }
   }
-  updateHistory(epoch: string | null, items: StreamItem[]) {
+  updateHistory({
+    epoch,
+    items,
+    expandedTurnKeys = this.expandedTurnKeys,
+  }: {
+    epoch: string | null;
+    items: StreamItem[];
+    expandedTurnKeys?: ReadonlySet<string>;
+  }) {
+    const expansionChanged = this.expandedTurnKeys !== expandedTurnKeys;
+    this.expandedTurnKeys = expandedTurnKeys;
     if (
       this.resultEpoch !== null &&
       epoch !== null &&
@@ -178,8 +261,26 @@ export class ChatFindModel {
       this.fail(new ChatFindFailureError("historyChanged"), this.abort.signal);
     }
     this.epoch = epoch;
+    if (this.items !== items) {
+      this.turnKeysBySeq.clear();
+      for (const turn of completedTurnFolds({ items, getMessageId: (item) => item.id })) {
+        const first = turn.items[0]!;
+        const turnKey = first.turnId ?? first.id;
+        for (const item of turn.items) {
+          if (item.timelineCursor) this.turnKeysBySeq.set(item.timelineCursor.seq, turnKey);
+        }
+      }
+    }
     this.items = items;
     this.historyListeners.forEach((listener) => listener());
+    if (
+      expansionChanged &&
+      this.state.open &&
+      this.state.phase === ChatFindPhase.Ready &&
+      !this.state.options.includeFolded
+    ) {
+      this.setQuery(this.state.query);
+    }
   }
   private target(location: Location, exact: boolean): Target | null {
     let before = 0;
@@ -221,7 +322,7 @@ export class ChatFindModel {
   private async navigate(index: number, direction: 1 | -1, signal: AbortSignal) {
     const epoch = this.resultEpoch;
     if (epoch === null) return;
-    this.publish({ phase: "loading", failure: null });
+    this.publish({ phase: ChatFindPhase.Loading, failure: null });
     let remaining = this.locations.length;
     while (remaining-- > 0 && this.locations.length) {
       index = (index + this.locations.length) % this.locations.length;
@@ -251,19 +352,25 @@ export class ChatFindModel {
       this.publish({ selectedItemId: target.id });
       const result = await tagged(
         "reveal",
-        this.operations.reveal(target.id, this.state.query, direction === 1 ? 0 : -1, signal),
+        this.operations.reveal({
+          messageId: target.id,
+          query: this.state.query,
+          options: this.state.options,
+          occurrence: direction === 1 ? 0 : -1,
+          signal,
+        }),
       );
       if (signal.aborted) return;
       if (result.count) {
         this.current = index;
-        this.publish({ phase: "ready", ...this.position(location, result) });
+        this.publish({ phase: ChatFindPhase.Ready, ...this.position(location, result) });
         return;
       }
       this.locations.splice(index, 1);
       if (direction === -1) index--;
     }
     this.operations.clear();
-    this.publish({ phase: "ready", selectedItemId: null, count: 0, occurrence: 0 });
+    this.publish({ phase: ChatFindPhase.Ready, selectedItemId: null, count: 0, occurrence: 0 });
   }
   private position(location: Location, revealed: { occurrence: number; count: number }) {
     this.inMessage = revealed;
@@ -277,20 +384,29 @@ export class ChatFindModel {
     return { occurrence: before + revealed.occurrence, count: total };
   }
   private async move(direction: 1 | -1) {
-    if (this.state.phase !== "ready" || !this.state.count) return;
+    if (this.state.phase !== ChatFindPhase.Ready || !this.state.count) return;
     this.cancel();
     const signal = this.abort.signal;
     try {
       const occurrence = this.inMessage.occurrence + direction;
       if (occurrence >= 0 && occurrence < this.inMessage.count && this.state.selectedItemId) {
-        this.publish({ phase: "loading" });
+        this.publish({ phase: ChatFindPhase.Loading });
         const result = await tagged(
           "reveal",
-          this.operations.reveal(this.state.selectedItemId, this.state.query, occurrence, signal),
+          this.operations.reveal({
+            messageId: this.state.selectedItemId,
+            query: this.state.query,
+            options: this.state.options,
+            occurrence,
+            signal,
+          }),
         );
         if (signal.aborted) return;
         if (result.count) {
-          this.publish({ phase: "ready", ...this.position(this.locations[this.current]!, result) });
+          this.publish({
+            phase: ChatFindPhase.Ready,
+            ...this.position(this.locations[this.current]!, result),
+          });
           return;
         }
       }

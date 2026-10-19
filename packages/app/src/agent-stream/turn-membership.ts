@@ -1,18 +1,7 @@
 import type { StreamItem } from "@/types/stream";
 
-/**
- * Canonical turn IDs take precedence. Timelines without them retain the legacy
- * user-message boundary rule so old daemons and persisted rows need no rewrite.
- */
-export function continuesTurn(previous: StreamItem | null, next: StreamItem | null): boolean {
-  if (!previous || !next) return false;
-  if (previous.turnId !== undefined && next.turnId !== undefined) {
-    return previous.turnId === next.turnId;
-  }
-  // A fork marker opens the turn of the user message that follows it.
-  if (previous.kind === "fork_marker") return true;
-  return !opensTurn(next);
-}
+import { continuesTurn } from "@getpaseo/protocol/turns";
+export { continuesTurn } from "@getpaseo/protocol/turns";
 
 function opensTurn(item: StreamItem): boolean {
   return item.kind === "user_message" || item.kind === "fork_marker";
