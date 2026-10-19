@@ -71,12 +71,12 @@ export function createFindViewport({
             frame = requestAnimationFrame(poll);
             return;
           }
-          if (!started) {
-            current.viewportRef.current?.scrollToMessage?.(messageId);
-            started = true;
-          }
           const rows = findMessageRows(getRoot(), messageId);
           if (!rows.some((row) => row.getBoundingClientRect().height)) {
+            if (!started) {
+              current.viewportRef.current?.scrollToMessage?.(messageId);
+              started = true;
+            }
             frame = requestAnimationFrame(poll);
             return;
           }

@@ -499,3 +499,34 @@ it("sends legacy searches without options on an old host", async () => {
     model.close();
   }
 });
+
+it("keeps the selected message rendered while a replacement search is pending", async () => {
+  const model = new ChatFindModel({
+    operations: {
+      async search({ query }) {
+        return response(query === "target" ? [{ seq: 1, role: "assistant", count: 1 }] : []);
+      },
+      async load() {},
+      async reveal() {
+        return { count: 1, occurrence: 0 };
+      },
+      clear() {},
+    },
+  });
+  try {
+    model.updateHistory({ epoch: "epoch", items: [message(1)] });
+    model.open();
+    model.setQuery("target");
+    await expect.poll(() => model.getSnapshot().phase).toBe("ready");
+    model.setQuery("target refined");
+    expect(model.getSnapshot()).toMatchObject({ phase: "searching", selectedItemId: "row-1" });
+    await expect.poll(() => model.getSnapshot().phase).toBe("ready");
+    expect(model.getSnapshot().selectedItemId).toBeNull();
+    model.setQuery("target");
+    await expect.poll(() => model.getSnapshot().phase).toBe("ready");
+    model.setQuery("");
+    expect(model.getSnapshot().selectedItemId).toBeNull();
+  } finally {
+    model.close();
+  }
+});

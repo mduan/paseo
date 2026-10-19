@@ -165,15 +165,17 @@ export class ChatFindModel {
     this.resolved.clear();
     this.current = -1;
     this.inMessage = { occurrence: 0, count: 0 };
+    const hasQuery = Boolean(query.trim());
     this.publish({
       query,
-      phase: query.trim() ? ChatFindPhase.Searching : ChatFindPhase.Idle,
-      selectedItemId: null,
+      phase: hasQuery ? ChatFindPhase.Searching : ChatFindPhase.Idle,
+      // Keep the message expanded while searching so its render cap cannot shift the viewport.
+      selectedItemId: hasQuery ? this.state.selectedItemId : null,
       occurrence: 0,
       count: 0,
       failure: null,
     });
-    if (!query.trim()) return;
+    if (!hasQuery) return;
     try {
       createPhrasePattern({ query, options: this.state.options });
     } catch (error) {

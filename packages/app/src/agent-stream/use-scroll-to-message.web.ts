@@ -119,11 +119,13 @@ export function useScrollToMessage({
         `[data-message-id="${CSS.escape(messageId)}"]`,
       );
       if (mounted) {
-        const delta =
-          mounted.getBoundingClientRect().top -
-          container.getBoundingClientRect().top -
-          PROMPT_JUMP_TOP_INSET_PX;
-        container.scrollTop += delta;
+        let targetTop: number | null = mounted.getBoundingClientRect().top;
+        if (occurrence) targetTop = occurrence.targetTop();
+        if (targetTop !== null) {
+          const delta =
+            targetTop - container.getBoundingClientRect().top - PROMPT_JUMP_TOP_INSET_PX;
+          container.scrollTop += delta;
+        }
         settleController.start(messageId);
         onNearBottomChange(false);
         return;

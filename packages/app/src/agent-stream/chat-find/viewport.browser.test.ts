@@ -163,6 +163,6 @@ it("expands folded work before revealing its history window and highlighting", a
       signal: new AbortController().signal,
     }),
   ).toEqual({ count: 1, occurrence: 0 });
-  expect(calls).toEqual(["expand:turn", "history", "scroll", "scroll"]);
+  expect(calls).toEqual(["expand:turn", "history", "scroll"]);
   expect(highlightedText()).toEqual(["NEEDLE"]);
 });
