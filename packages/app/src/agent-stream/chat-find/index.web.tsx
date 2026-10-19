@@ -144,6 +144,7 @@ export function ChatFind({
         supported={optionsSupported}
         onChange={model.setOptions}
         includeFolded
+        dense
         testIDPrefix="chat-find"
       />
     ),

@@ -11,6 +11,7 @@ import {
   mutedIconColorMapping,
   type IconButtonChromeState,
 } from "@/components/ui/icon-button-chrome";
+import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
 import { isNative } from "@/constants/platform";
 import { SearchField, type SearchFieldProps } from "@/components/ui/search-field";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -35,6 +36,8 @@ type SearchOptionsProps = {
   supported: boolean;
   onChange: (value: ToggleOptions) => void;
   testIDPrefix?: string;
+  /** Shorter highlight for the pane find row, which is tighter than a form field. */
+  dense?: boolean;
 };
 
 function SearchOptionButton({
@@ -44,6 +47,7 @@ function SearchOptionButton({
   option,
   label: symbol,
   testIDPrefix = "sessions-search",
+  dense = false,
 }: SearchOptionsProps & { option: SearchOption; label?: string }) {
   const { t } = useTranslation();
   const disabled = !supported;
@@ -61,8 +65,9 @@ function SearchOptionButton({
         compact: isNative,
         state: { ...state, active: selected },
         disabled,
+        style: dense ? styles.dense : undefined,
       }),
-    [disabled, selected],
+    [dense, disabled, selected],
   );
   const accessibilityState = useMemo(() => ({ selected, disabled }), [selected, disabled]);
   const toggle = useCallback(
@@ -177,6 +182,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   symbol: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   wholeWord: { textDecorationLine: "underline" },
+  dense: { height: HEADER_CONTROL_HEIGHT - 4 },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
   hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   error: { color: theme.colors.statusDanger, fontSize: theme.fontSize.sm },
