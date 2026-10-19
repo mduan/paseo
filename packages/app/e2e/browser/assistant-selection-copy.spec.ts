@@ -601,3 +601,65 @@ test("copying an assistant selection preserves Markdown structure and links", as
     await agent.cleanup();
   }
 });
+
+test("long strings wrap within user bubbles and assistant responses", async ({ page }) => {
+  const url = `https://calendar.google.com/calendar/u/0/r/settings/calendar/${"calendarId".repeat(32)}`;
+  const token = "unbrokentext".repeat(32);
+  const message = `Created the calendar:\n${url}\n${token}`;
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "message-wrapping-",
+    title: "Message wrapping",
+    initialPrompt: message,
+    featureValues: { mockAssistantResponse: message },
+  });
+
+  try {
+    await agent.client.waitForAgentUpsert(
+      agent.agentId,
+      (snapshot) => snapshot.status === "idle",
+      30_000,
+    );
+    await openAgentRoute(page, agent);
+
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const selector of [
+        '[data-testid="user-message"] [data-message-text="true"]',
+        '[data-testid="assistant-message"]',
+      ]) {
+        const renderedMessage = page.locator(selector).filter({ hasText: token }).last();
+        await expect(renderedMessage).toBeVisible();
+        await expect
+          .soft(async () => {
+            const bounds = await renderedMessage.evaluate((element) => {
+              const rect = element.getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(element);
+              let textLeft = rect.right;
+              let textRight = rect.left;
+              for (const textRect of range.getClientRects()) {
+                textLeft = Math.min(textLeft, textRect.left);
+                textRight = Math.max(textRight, textRect.right);
+              }
+              return {
+                left: rect.left,
+                right: rect.right,
+                textLeft,
+                textRight,
+                scrollWidth: element.scrollWidth,
+                clientWidth: element.clientWidth,
+              };
+            });
+            expect(bounds.left, `${selector} at ${width}px`).toBeGreaterThanOrEqual(0);
+            expect(bounds.right).toBeLessThanOrEqual(width);
+            expect(bounds.textLeft).toBeGreaterThanOrEqual(bounds.left - 1);
+            expect(bounds.textRight).toBeLessThanOrEqual(bounds.right + 1);
+            expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth + 1);
+          })
+          .toPass({ timeout: 5000 });
+      }
+    }
+  } finally {
+    await agent.cleanup();
+  }
+});
