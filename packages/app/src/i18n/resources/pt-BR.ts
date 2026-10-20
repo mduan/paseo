@@ -48,6 +48,7 @@ export const ptBR: TranslationResources = {
       search: "Buscar",
       select: "Selecionar",
       selectAll: "Selecionar tudo",
+      deselectAll: "Desmarcar tudo",
     },
     placeholders: {
       search: "Buscar...",
@@ -308,6 +309,13 @@ export const ptBR: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Nenhum host",
+      noProjects: "Nenhum projeto",
+      noProviders: "Nenhum provedor",
+      noModels: "Nenhum modelo",
+      noAgents: "Nenhum agente",
+      noSessions: "Nenhuma sessão",
+
       agentType: "Tipo de agente",
       allAgents: "Todos os agentes",
       mainAgents: "Agentes principais",

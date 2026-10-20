@@ -20,6 +20,7 @@ export {
   MenuHint,
   MenuItem,
   MenuLabel,
+  MenuSelectionHeader,
   MenuSeparator,
   MenuTextField,
   menuRowContentInset,

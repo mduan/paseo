@@ -110,6 +110,8 @@ describe("openProjectDirectly", () => {
           projectDisplayName: "project",
           projectCustomName: null,
           projectCustomIconRevision: null,
+          projectIconRevision: undefined,
+          projectIconColor: null,
           projectKind: "git",
           projectRootPath: PROJECT_PATH,
         },
@@ -215,6 +217,8 @@ describe("cloneGithubProjectDirectly", () => {
           projectCustomName: null,
           projectKey: null,
           projectCustomIconRevision: null,
+          projectIconRevision: undefined,
+          projectIconColor: null,
         },
       },
     ]);
@@ -270,6 +274,18 @@ describe("registerProjectDescriptor", () => {
       OTHER_PROJECT_VIEW_KEY,
       PROJECT_VIEW_KEY,
     ]);
+  });
+
+  it("shows a newly opened project when every project was deselected", () => {
+    useSidebarViewStore.setState({ projectFilters: null });
+    const session = createFakeSession();
+    registerProjectDescriptor({
+      serverId: SERVER_ID,
+      project: buildProjectPayload(),
+      upsertProject: session.upsertProject,
+      setHasHydratedWorkspaces: session.setHasHydratedWorkspaces,
+    });
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([PROJECT_VIEW_KEY]);
   });
 
   it("keeps All projects selected when adding a project", () => {

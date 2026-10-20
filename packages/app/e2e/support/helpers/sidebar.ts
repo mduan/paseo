@@ -179,9 +179,7 @@ export async function openSidebarProjectFilter(page: Page): Promise<void> {
   await openSidebarDisplayPage(page, "sidebar-display-project-filter");
 }
 
-// The filter rows are keyed by the project's sidebar view key. A project seeded from its own temp
-// repo has a `projectKey` unique on the host, so the view key IS that key — see
-// `buildWorkspaceStructureProjects`.
+// Project filter rows use createProjectViewKey({ serverId, projectId }).
 export async function toggleProjectFilter(page: Page, projectViewKey: string): Promise<void> {
   await page.getByTestId(`sidebar-project-filter-${projectViewKey}`).click();
 }

@@ -48,6 +48,7 @@ export const ja: TranslationResources = {
       search: "検索",
       select: "選択",
       selectAll: "すべて選択",
+      deselectAll: "すべて選択解除",
     },
     placeholders: {
       search: "検索...",
@@ -308,6 +309,13 @@ export const ja: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "ホスト未選択",
+      noProjects: "プロジェクト未選択",
+      noProviders: "プロバイダー未選択",
+      noModels: "モデル未選択",
+      noAgents: "エージェント未選択",
+      noSessions: "セッション未選択",
+
       agentType: "エージェントの種類",
       allAgents: "すべてのエージェント",
       mainAgents: "メインエージェント",

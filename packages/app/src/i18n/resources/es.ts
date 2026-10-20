@@ -48,6 +48,7 @@ export const es: TranslationResources = {
       search: "Buscar",
       select: "Seleccionar",
       selectAll: "Seleccionar todo",
+      deselectAll: "Deseleccionar todo",
     },
     placeholders: {
       search: "Buscar...",
@@ -309,6 +310,13 @@ export const es: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Ningún host",
+      noProjects: "Ningún proyecto",
+      noProviders: "Ningún proveedor",
+      noModels: "Ningún modelo",
+      noAgents: "Ningún agente",
+      noSessions: "Ninguna sesión",
+
       agentType: "Tipo de agente",
       allAgents: "Todos los agentes",
       mainAgents: "Agentes principales",

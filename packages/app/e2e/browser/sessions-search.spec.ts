@@ -331,8 +331,15 @@ test.describe("History search", () => {
         await page
           .getByTestId(compact ? "sessions-filters-trigger" : "sessions-agentType-filter-trigger")
           .click();
-        await page.getByTestId(`sessions-agentType-filter-${type}`).click();
-        if (compact && type !== "all") await closeMenu();
+        const all = page.getByTestId("sessions-agentType-filter-all");
+        if (type === "all") {
+          await all.click();
+        } else {
+          if ((await all.textContent()) === "Select all") await all.click();
+          await all.click();
+          await page.getByTestId(`sessions-agentType-filter-${type}`).click();
+        }
+        await closeMenu();
       }
       await selectType("item-main");
       await expect(rows).toHaveCount(1);

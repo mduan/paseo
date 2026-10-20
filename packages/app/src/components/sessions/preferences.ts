@@ -3,12 +3,14 @@ import { AgentHistoryFilterOptionsSchema } from "@getpaseo/protocol/messages";
 
 export enum HistoryStatus {
   All = "all",
+  None = "none",
   Active = "active",
   Archived = "archived",
 }
 
 export enum HistoryAgentType {
   All = "all",
+  None = "none",
   Main = "main",
   Subagent = "subagent",
 }
@@ -45,10 +47,10 @@ const HistoryFieldsSchema = z.object({
 
 const HistoryFiltersSchema = z.object({
   agentType: z.enum(HistoryAgentType).catch(HistoryAgentType.All),
-  hosts: z.array(z.string()).catch([]),
-  projects: z.array(z.string()).catch([]),
-  providers: z.array(z.string()).catch([]),
-  models: AgentHistoryFilterOptionsSchema.shape.models.catch([]),
+  hosts: z.array(z.string()).nullable().catch([]),
+  projects: z.array(z.string()).nullable().catch([]),
+  providers: z.array(z.string()).nullable().catch([]),
+  models: AgentHistoryFilterOptionsSchema.shape.models.nullable().catch([]),
   status: z.enum(HistoryStatus).catch(HistoryStatus.All),
 });
 

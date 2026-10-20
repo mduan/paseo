@@ -48,6 +48,7 @@ export const ru: TranslationResources = {
       search: "Поиск",
       select: "Выбрать",
       selectAll: "Выбрать все",
+      deselectAll: "Снять выделение",
     },
     placeholders: {
       search: "Поиск...",
@@ -308,6 +309,13 @@ export const ru: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Нет хостов",
+      noProjects: "Нет проектов",
+      noProviders: "Нет провайдеров",
+      noModels: "Нет моделей",
+      noAgents: "Нет агентов",
+      noSessions: "Нет сессий",
+
       agentType: "Тип агента",
       allAgents: "Все агенты",
       mainAgents: "Основные агенты",

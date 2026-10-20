@@ -34,13 +34,6 @@ export function hasActiveSidebarLabelFilter(filter: SidebarLabelFilter): boolean
   return filter.labels.length > 0;
 }
 
-/**
- * Include/exclude toggle over an allowlist, shared by the host and project filters.
- *
- * Both filters answer the same question — "is this one of the things I pinned the sidebar to" —
- * so they share the operation. The label filter does not: its keys go through
- * `workspaceLabelKey` first, which is a different identity.
- */
 function toggleFilterEntry(list: readonly string[], key: string): string[] {
   return list.includes(key) ? list.filter((entry) => entry !== key) : [...list, key];
 }
@@ -50,7 +43,7 @@ interface SidebarViewStoreState {
   // Empty means "all hosts". A non-empty list pins the sidebar to those hosts.
   hostFilters: string[];
   /**
-   * Empty means "all projects". A non-empty list is an allowlist over
+   * Empty means "all projects"; null means none. A non-empty list is an allowlist over
    * `SidebarProjectEntry.viewKey` — the same key the project sections are built from.
    *
    * There is deliberately no `reconcileProjectFilters` counterpart to `reconcileHostFilters`.
@@ -59,12 +52,12 @@ interface SidebarViewStoreState {
    * host-filter change. Stale keys are resolved away at read time instead — see
    * `resolveActiveProjectFilters`.
    */
-  projectFilters: string[];
+  projectFilters: string[] | null;
   labelFilter: SidebarLabelFilter;
   setGroupMode: (mode: SidebarGroupMode) => void;
   toggleHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
-  toggleProjectFilter: (viewKey: string) => void;
+  setProjectFilters: (selection: string[] | null) => void;
   clearProjectFilters: () => void;
   toggleLabelFilter: (name: string) => void;
   clearLabelFilter: () => void;
@@ -75,7 +68,7 @@ interface SidebarViewStoreState {
 interface SidebarViewPersistedState {
   groupMode: SidebarGroupMode;
   hostFilters: string[];
-  projectFilters: string[];
+  projectFilters: string[] | null;
   labelFilter: SidebarLabelFilter;
 }
 
@@ -87,7 +80,7 @@ const SidebarViewPersistedStateSchema = z.strictObject({
   groupMode: PersistedSidebarGroupModeSchema.optional(),
   hostFilters: z.array(z.string()).optional(),
   hostFilter: z.string().nullable().optional(),
-  projectFilters: z.array(z.string()).optional(),
+  projectFilters: z.array(z.string()).nullable().optional(),
   groupModeByServerId: z.record(z.string(), PersistedSidebarGroupModeSchema).optional(),
   labelFilter: SidebarLabelFilterSchema.optional(),
 });
@@ -143,7 +136,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   return {
     groupMode: state.groupMode === "status" ? "status" : "project",
     hostFilters: readHostFilters(state),
-    projectFilters: state.projectFilters ?? [],
+    projectFilters: state.projectFilters === undefined ? [] : state.projectFilters,
     labelFilter: state.labelFilter
       ? normalizeSidebarLabelFilter(state.labelFilter)
       : emptyLabelFilter(),
@@ -186,8 +179,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
       clearHostFilters: () => set({ hostFilters: [] }),
-      toggleProjectFilter: (viewKey) =>
-        set((state) => ({ projectFilters: toggleFilterEntry(state.projectFilters, viewKey) })),
+      setProjectFilters: (projectFilters) => set({ projectFilters }),
       clearProjectFilters: () => set({ projectFilters: [] }),
       toggleLabelFilter: (name) =>
         set((state) => {
