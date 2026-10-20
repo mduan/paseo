@@ -47,6 +47,7 @@ export const ko: TranslationResources = {
       search: "검색",
       select: "선택",
       selectAll: "모두 선택",
+      deselectAll: "모두 선택 해제",
     },
     placeholders: {
       search: "검색...",
@@ -304,6 +305,13 @@ export const ko: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "선택한 호스트 없음",
+      noProjects: "선택한 프로젝트 없음",
+      noProviders: "선택한 제공업체 없음",
+      noModels: "선택한 모델 없음",
+      noAgents: "선택한 에이전트 없음",
+      noSessions: "선택한 세션 없음",
+
       agentType: "에이전트 유형",
       allAgents: "모든 에이전트",
       mainAgents: "메인 에이전트",

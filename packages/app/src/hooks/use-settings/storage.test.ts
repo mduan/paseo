@@ -794,6 +794,42 @@ describe("saveAppSettings", () => {
     expect((await loadAppSettingsFromStorage(deps)).sidebarShowWorkspaceCount).toBe(true);
   });
 
+  it("loads legacy all filters and round trips explicit empty History groups", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          history: {
+            filters: {
+              hosts: [],
+              projects: [],
+              providers: [],
+              models: [],
+              status: "all",
+              agentType: "all",
+            },
+          },
+        }),
+      }),
+    });
+    expect((await loadAppSettingsFromStorage(deps)).history.filters).toEqual(
+      DEFAULT_HISTORY_PREFERENCES.filters,
+    );
+    const filters = {
+      hosts: null,
+      projects: null,
+      providers: null,
+      models: null,
+      status: HistoryStatus.None,
+      agentType: HistoryAgentType.None,
+    };
+    await saveAppSettings({
+      queryClient: new QueryClient(),
+      updates: { history: { ...DEFAULT_HISTORY_PREFERENCES, filters } },
+      deps,
+    });
+    expect((await loadAppSettingsFromStorage(deps)).history.filters).toEqual(filters);
+  });
+
   it.each(Object.values(HistoryField))(
     "persists the History %s field being switched off",
     async (field) => {

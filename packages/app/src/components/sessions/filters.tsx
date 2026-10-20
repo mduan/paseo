@@ -21,9 +21,15 @@ import {
   MenuSurface,
   MenuItem,
   MenuLabel,
+  MenuSelectionHeader,
   MenuSeparator,
   type MenuTriggerState,
 } from "@/components/ui/menu";
+import {
+  allFilterOptionsSelected,
+  toggleFilterOption,
+  type FilterSelection,
+} from "@/utils/filter-selection";
 import { toolbarLabelTriggerStyle } from "@/components/ui/toolbar-label-trigger";
 import { Button } from "@/components/ui/button";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
@@ -62,8 +68,9 @@ type FilterGroup = {
   id: keyof HistoryFilters;
   title: string;
   all: string;
+  none: string;
   options: FilterOption[];
-  selected: string[];
+  selected: FilterSelection;
   icon: ReactElement;
   disabled?: boolean;
 };
@@ -72,67 +79,82 @@ function FilterItems({
   group,
   filters,
   options,
-  closeOnSelect = false,
   onChange,
 }: {
   group: FilterGroup;
   filters: HistoryFilters;
   options: AgentHistoryFilterOptions;
-  closeOnSelect?: boolean;
   onChange: (filters: HistoryFilters) => void;
 }) {
-  const select = useCallback(
-    (id: string) => {
+  const optionIds = group.options.map((option) => option.id);
+  const allSelected = allFilterOptionsSelected({ selection: group.selected, options: optionIds });
+  const changeSelection = useCallback(
+    (selection: string[] | null) => {
       if (group.id === "agentType") {
         let agentType = HistoryAgentType.All;
-        if (id === HistoryAgentType.Main) agentType = HistoryAgentType.Main;
-        if (id === HistoryAgentType.Subagent) agentType = HistoryAgentType.Subagent;
+        if (!selection) agentType = HistoryAgentType.None;
+        else if (selection.includes(HistoryAgentType.Main)) agentType = HistoryAgentType.Main;
+        else if (selection.includes(HistoryAgentType.Subagent))
+          agentType = HistoryAgentType.Subagent;
         onChange({ ...filters, agentType });
-        return;
-      }
-      if (group.id === "status") {
+      } else if (group.id === "status") {
         let status = HistoryStatus.All;
-        if (id === HistoryStatus.Active) status = HistoryStatus.Active;
-        if (id === HistoryStatus.Archived) status = HistoryStatus.Archived;
+        if (!selection) status = HistoryStatus.None;
+        else if (selection.includes(HistoryStatus.Active)) status = HistoryStatus.Active;
+        else if (selection.includes(HistoryStatus.Archived)) status = HistoryStatus.Archived;
         onChange({ ...filters, status });
-        return;
+      } else if (group.id === "models") {
+        const available = new Map(
+          [...options.models, ...(filters.models ?? [])].map((model) => [
+            historyModelKey(model),
+            model,
+          ]),
+        );
+        const models =
+          selection &&
+          [...available.values()].filter((model) => selection.includes(historyModelKey(model)));
+        onChange({ ...filters, models });
+      } else {
+        onChange({ ...filters, [group.id]: selection });
       }
-      if (group.id === "models") {
-        const model = options.models.find((option) => historyModelKey(option) === id);
-        const remaining = filters.models.filter((option) => historyModelKey(option) !== id);
-        const models = group.selected.includes(id) || !model ? remaining : [...remaining, model];
-        onChange({ ...filters, models: id ? models : [] });
-        return;
-      }
-      const current = filters[group.id];
-      const values = current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id];
-      onChange({ ...filters, [group.id]: id ? values : [] });
     },
-    [filters, group.id, group.selected, onChange, options.models],
+    [filters, group.id, onChange, options.models],
   );
-  const selectAll = useCallback(() => select(""), [select]);
+  const toggleAll = useCallback(
+    () => changeSelection(allSelected ? null : []),
+    [changeSelection, allSelected],
+  );
+  const select = useCallback(
+    (id: string) => {
+      changeSelection(
+        toggleFilterOption({
+          selection: group.selected,
+          options: group.options.map((option) => option.id),
+          id,
+        }),
+      );
+    },
+    [changeSelection, group.selected, group.options],
+  );
   const items = useMemo(
     () => group.options.map((option) => ({ ...option, onSelect: () => select(option.id) })),
     [group.options, select],
   );
   return (
     <>
-      <MenuItem
-        selected={!group.selected.length}
-        closeOnSelect
-        onSelect={selectAll}
+      <MenuSelectionHeader
+        allSelected={allSelected}
+        onToggleAll={toggleAll}
         testID={`sessions-${group.id}-filter-all`}
       >
-        {group.all}
-      </MenuItem>
+        {group.title}
+      </MenuSelectionHeader>
       {items.map((option) => (
         <MenuItem
           key={option.id}
           leading={option.leading}
-          selected={group.selected.includes(option.id)}
-          closeOnSelect={closeOnSelect}
+          selected={group.selected?.length === 0 || !!group.selected?.includes(option.id)}
+          closeOnSelect={false}
           onSelect={option.onSelect}
           testID={`sessions-${group.id}-filter-item-${option.id}`}
         >
@@ -145,10 +167,10 @@ function FilterItems({
 
 export function hasHistoryFilters(filters: HistoryFilters): boolean {
   return (
-    filters.hosts.length > 0 ||
-    filters.projects.length > 0 ||
-    filters.providers.length > 0 ||
-    filters.models.length > 0 ||
+    filters.hosts?.length !== 0 ||
+    filters.projects?.length !== 0 ||
+    filters.providers?.length !== 0 ||
+    filters.models?.length !== 0 ||
     filters.status !== HistoryStatus.All ||
     filters.agentType !== HistoryAgentType.All
   );
@@ -156,9 +178,17 @@ export function hasHistoryFilters(filters: HistoryFilters): boolean {
 
 function filterLabel(group: FilterGroup): string {
   if (group.disabled) return group.title;
-  if (!group.selected.length) return group.all;
-  if (group.selected.length === 1)
-    return group.options.find((option) => option.id === group.selected[0])?.label ?? group.title;
+  if (
+    allFilterOptionsSelected({
+      selection: group.selected,
+      options: group.options.map((option) => option.id),
+    })
+  )
+    return group.all;
+  if (!group.selected) return group.none;
+  const selected = group.selected;
+  if (selected.length === 1)
+    return group.options.find((option) => option.id === selected[0])?.label ?? group.title;
   return `${group.title} (${group.selected.length})`;
 }
 
@@ -179,6 +209,12 @@ export function HistoryFilterBar({
   const hosts = useHosts();
   const compact = useIsCompactFormFactor();
   const groups = useMemo<FilterGroup[]>(() => {
+    let agentTypes: FilterSelection = [filters.agentType];
+    if (filters.agentType === HistoryAgentType.All) agentTypes = [];
+    if (filters.agentType === HistoryAgentType.None) agentTypes = null;
+    let statuses: FilterSelection = [filters.status];
+    if (filters.status === HistoryStatus.All) statuses = [];
+    if (filters.status === HistoryStatus.None) statuses = null;
     const projects = new Map(options.projects.map((project) => [project.projectKey, project]));
     const models = new Map(options.models.map((model) => [historyModelKey(model), model]));
     const providers = [...new Set(options.models.map((model) => model.provider))].sort();
@@ -187,6 +223,7 @@ export function HistoryFilterBar({
         id: "hosts",
         title: t("sessions.filters.hosts"),
         all: t("sidebar.display.hostFilter.all"),
+        none: t("sessions.filters.noHosts"),
         selected: filters.hosts,
         icon: <ThemedServer size={14} uniProps={mutedIconMapping} />,
         options: hosts.map((host) => ({
@@ -199,6 +236,7 @@ export function HistoryFilterBar({
         id: "projects",
         title: t("sessions.filters.projects"),
         all: t("sidebar.display.projectFilter.all"),
+        none: t("sessions.filters.noProjects"),
         selected: filters.projects,
         icon: <ThemedPanels size={14} uniProps={mutedIconMapping} />,
         disabled: !supported,
@@ -222,6 +260,7 @@ export function HistoryFilterBar({
         id: "providers",
         title: t("sessions.filters.provider"),
         all: t("sessions.filters.allProviders"),
+        none: t("sessions.filters.noProviders"),
         selected: filters.providers,
         icon: <ThemedBot size={14} uniProps={mutedIconMapping} />,
         disabled: !supported,
@@ -235,7 +274,8 @@ export function HistoryFilterBar({
         id: "models",
         title: t("sessions.filters.model"),
         all: t("sessions.filters.allModels"),
-        selected: filters.models.map(historyModelKey),
+        none: t("sessions.filters.noModels"),
+        selected: filters.models && filters.models.map(historyModelKey),
         icon: <ThemedCpu size={14} uniProps={mutedIconMapping} />,
         disabled: !supported,
         options: [...models.entries()]
@@ -252,7 +292,8 @@ export function HistoryFilterBar({
         id: "agentType",
         title: t("sessions.filters.agentType"),
         all: t("sessions.filters.allAgents"),
-        selected: filters.agentType === HistoryAgentType.All ? [] : [filters.agentType],
+        none: t("sessions.filters.noAgents"),
+        selected: agentTypes,
         icon: <ThemedNetwork size={14} uniProps={mutedIconMapping} />,
         disabled: !supported || !agentTypeSupported,
         options: [
@@ -264,7 +305,8 @@ export function HistoryFilterBar({
         id: "status",
         title: t("sessions.filters.status"),
         all: t("sessions.filters.allSessions"),
-        selected: filters.status === HistoryStatus.All ? [] : [filters.status],
+        none: t("sessions.filters.noSessions"),
+        selected: statuses,
         icon: <ThemedArchive size={14} uniProps={mutedIconMapping} />,
         disabled: !supported,
         options: [
@@ -274,7 +316,14 @@ export function HistoryFilterBar({
       },
     ];
   }, [filters, hosts, options, supported, agentTypeSupported, t]);
-  const activeCount = groups.filter((group) => !group.disabled && group.selected.length).length;
+  const activeCount = groups.filter(
+    (group) =>
+      !group.disabled &&
+      !allFilterOptionsSelected({
+        selection: group.selected,
+        options: group.options.map((option) => option.id),
+      }),
+  ).length;
 
   const clear = useCallback(() => onChange(EMPTY_HISTORY_FILTERS), [onChange]);
 
@@ -300,9 +349,11 @@ export function HistoryFilterBar({
         >
           {groups.map((group) => (
             <View key={group.id}>
-              <MenuLabel>{group.title}</MenuLabel>
               {group.disabled ? (
-                <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text>
+                <>
+                  <MenuLabel>{group.title}</MenuLabel>
+                  <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text>
+                </>
               ) : (
                 <FilterItems
                   group={group}
@@ -338,15 +389,12 @@ export function HistoryFilterBar({
           </MenuTrigger>
           <MenuSurface width={280} maxHeight={400} scrollable>
             {group.disabled ? (
-              <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text>
+              <>
+                <MenuLabel>{group.title}</MenuLabel>
+                <Text style={styles.hint}>{t("sessions.filters.updateHost")}</Text>
+              </>
             ) : (
-              <FilterItems
-                group={group}
-                filters={filters}
-                options={options}
-                closeOnSelect={group.id === "status" || group.id === "agentType"}
-                onChange={onChange}
-              />
+              <FilterItems group={group} filters={filters} options={options} onChange={onChange} />
             )}
           </MenuSurface>
         </MenuRoot>

@@ -226,7 +226,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSi
     pinnedGroups,
     projects,
     hasProjectsBeforeFilter,
-    hasActiveProjectFilter: resolvedProjectFilters.length > 0,
+    hasActiveProjectFilter: resolvedProjectFilters?.length !== 0,
     workspaceEntriesByKey,
     isInitialLoad,
     isRevalidating,

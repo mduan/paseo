@@ -47,6 +47,7 @@ export const ar: TranslationResources = {
       search: "يبحث",
       select: "يختار",
       selectAll: "تحديد الكل",
+      deselectAll: "إلغاء تحديد الكل",
     },
     placeholders: {
       search: "يبحث...",
@@ -303,6 +304,13 @@ export const ar: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "لم يتم تحديد مضيفين",
+      noProjects: "لم يتم تحديد مشاريع",
+      noProviders: "لم يتم تحديد مزوّدين",
+      noModels: "لم يتم تحديد نماذج",
+      noAgents: "لم يتم تحديد وكلاء",
+      noSessions: "لم يتم تحديد جلسات",
+
       agentType: "نوع الوكيل",
       allAgents: "جميع الوكلاء",
       mainAgents: "الوكلاء الرئيسيون",

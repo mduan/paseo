@@ -12,9 +12,12 @@ import {
   View,
   type PressableStateCallbackType,
   type ViewStyle,
+  type TextStyle,
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Check, CheckCircle } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { AdaptiveTextInput } from "@/components/adaptive-modal-sheet";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -83,12 +86,55 @@ export function MenuLabel({
   children,
   style,
   testID,
-}: PropsWithChildren<{ style?: ViewStyle | ViewStyle[]; testID?: string }>): ReactElement {
+  trailing,
+  textStyle,
+}: PropsWithChildren<{
+  style?: ViewStyle | ViewStyle[];
+  testID?: string;
+  trailing?: ReactNode;
+  textStyle?: TextStyle;
+}>): ReactElement {
   const labelContainerStyle = useMemo(() => [styles.labelContainer, style], [style]);
   return (
     <View style={labelContainerStyle} testID={testID}>
-      <Text style={styles.labelText}>{children}</Text>
+      <Text style={[styles.labelText, textStyle]}>{children}</Text>
+      {trailing}
     </View>
+  );
+}
+
+export function MenuSelectionHeader({
+  children,
+  allSelected,
+  onToggleAll,
+  testID,
+}: PropsWithChildren<{
+  allSelected: boolean;
+  onToggleAll: () => void;
+  testID?: string;
+}>): ReactElement {
+  const { t } = useTranslation();
+  const { selectItem } = useMenuContext("MenuSelectionHeader");
+  const toggleAll = useCallback(() => selectItem(onToggleAll, false), [selectItem, onToggleAll]);
+  const action = useMemo(
+    () => (
+      <Button
+        variant="secondary"
+        size="xs"
+        style={styles.selectionAction}
+        textStyle={styles.selectionActionText}
+        onPress={toggleAll}
+        testID={testID}
+      >
+        {allSelected ? t("common.actions.deselectAll") : t("common.actions.selectAll")}
+      </Button>
+    ),
+    [allSelected, t, testID, toggleAll],
+  );
+  return (
+    <MenuLabel style={styles.selectionHeader} textStyle={styles.selectionTitle} trailing={action}>
+      {children}
+    </MenuLabel>
   );
 }
 
@@ -385,7 +431,27 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[1],
     gap: MENU_ROW_GAP,
   },
+  selectionHeader: {
+    paddingBottom: theme.spacing[2],
+  },
+  selectionTitle: {
+    textTransform: "uppercase",
+    fontSize: theme.fontSize.sm,
+    flexShrink: 1,
+  },
+  selectionAction: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    minHeight: 0,
+  },
+  selectionActionText: { color: theme.colors.accent },
   labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
     paddingTop: theme.spacing[2],
     paddingBottom: theme.spacing[1],

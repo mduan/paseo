@@ -34,7 +34,7 @@ interface SidebarModel extends SidebarWorkspacesListResult {
    */
   allProjects: SidebarProjectEntry[];
   /** The project filter as it is actually being applied — see `resolveActiveProjectFilters`. */
-  resolvedProjectFilters: readonly string[];
+  resolvedProjectFilters: readonly string[] | null;
   hasProjectsBeforeFilter: boolean;
   groupMode: SidebarGroupMode;
   workspaceGroups: SidebarWorkspaceGroup[];
@@ -89,7 +89,7 @@ export function SidebarModelProvider({
       ),
     [projectFilters, list.projects],
   );
-  const hasActiveProjectFilter = resolvedProjectFilters.length > 0;
+  const hasActiveProjectFilter = resolvedProjectFilters?.length !== 0;
   // The project filter is deliberately absent from this gate. It reads `projectViewKey`, which
   // lives on the project and the placement, so it can narrow the project list without hydrating
   // anything; the label filter reads `labels`, which only exists on an entry. Hydration opens a
@@ -119,7 +119,7 @@ export function SidebarModelProvider({
   const filteredProjects = useMemo(() => {
     let projects = list.projects;
     if (hasActiveProjectFilter) {
-      const included = new Set(resolvedProjectFilters);
+      const included = new Set(resolvedProjectFilters ?? []);
       projects = projects.filter((project) => included.has(project.viewKey));
     }
     if (hasActiveLabelFilter) {

@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { seedWorkspace } from "../support/helpers/seed-client";
+import { createProjectViewKey } from "../../src/projects/workspace-structure";
 import { getServerId } from "../support/helpers/server-id";
 import {
   closeSidebarDisplayPreferences,
@@ -20,6 +21,7 @@ test.describe("Sidebar project filter", () => {
     const alpha = await seedWorkspace({ repoPrefix: "project-filter-alpha-", title: "Alpha work" });
     const beta = await seedWorkspace({ repoPrefix: "project-filter-beta-", title: "Beta work" });
     const serverId = getServerId();
+    const alphaViewKey = createProjectViewKey({ serverId, projectId: alpha.projectId });
     const alphaRow = page.getByTestId(`sidebar-workspace-row-${serverId}:${alpha.workspaceId}`);
     const betaRow = page.getByTestId(`sidebar-workspace-row-${serverId}:${beta.workspaceId}`);
     const filterTrigger = page.getByTestId("sidebar-display-project-filter");
@@ -30,8 +32,25 @@ test.describe("Sidebar project filter", () => {
       await expect(betaRow).toBeVisible({ timeout: 30_000 });
 
       await openSidebarProjectFilter(page);
-      await expect(page.getByTestId("sidebar-project-filter-all")).toBeVisible();
-      await toggleProjectFilter(page, alpha.projectKey);
+      const all = page.getByTestId("sidebar-project-filter-all");
+      await expect(all).toHaveText("Deselect all");
+      await expect(page.getByTestId(`sidebar-project-filter-${alphaViewKey}`)).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await all.click();
+      await expect(all).toHaveText("Select all");
+      await closeSidebarDisplayPreferences(page);
+      await expect(alphaRow).toHaveCount(0);
+      await expect(betaRow).toHaveCount(0);
+      await page.reload();
+      await expect(page.getByTestId("sidebar-display-preferences-menu")).toBeVisible();
+      await expect(alphaRow).toHaveCount(0);
+      await openSidebarProjectFilter(page);
+      await expect(page.getByTestId("sidebar-project-filter-all")).toHaveText("Select all");
+      await selectAllProjectsFilter(page);
+      await page.getByTestId("sidebar-project-filter-all").click();
+      await toggleProjectFilter(page, alphaViewKey);
       await closeSidebarDisplayPreferences(page);
 
       await expect(alphaRow).toBeVisible();
@@ -80,6 +99,7 @@ test.describe("Sidebar project filter", () => {
     });
     const beta = await seedWorkspace({ repoPrefix: "project-filter-other-", title: "Other work" });
     const serverId = getServerId();
+    const alphaViewKey = createProjectViewKey({ serverId, projectId: alpha.projectId });
     const alphaRow = page.getByTestId(`sidebar-workspace-row-${serverId}:${alpha.workspaceId}`);
 
     try {
@@ -87,7 +107,8 @@ test.describe("Sidebar project filter", () => {
       await expect(alphaRow).toBeVisible({ timeout: 30_000 });
 
       await openSidebarProjectFilter(page);
-      await toggleProjectFilter(page, alpha.projectKey);
+      await page.getByTestId("sidebar-project-filter-all").click();
+      await toggleProjectFilter(page, alphaViewKey);
       await closeSidebarDisplayPreferences(page);
 
       await pinWorkspaceFromSidebar(page, alpha.workspaceId);

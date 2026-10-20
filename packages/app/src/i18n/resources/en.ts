@@ -43,6 +43,7 @@ export const en = {
       search: "Search",
       select: "Select",
       selectAll: "Select all",
+      deselectAll: "Deselect all",
     },
     placeholders: {
       search: "Search...",
@@ -300,6 +301,13 @@ export const en = {
       },
     },
     filters: {
+      noHosts: "No hosts",
+      noProjects: "No projects",
+      noProviders: "No providers",
+      noModels: "No models",
+      noAgents: "No agents",
+      noSessions: "No sessions",
+
       agentType: "Agent type",
       allAgents: "All agents",
       mainAgents: "Main agents",

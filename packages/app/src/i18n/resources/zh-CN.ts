@@ -47,6 +47,7 @@ export const zhCN: TranslationResources = {
       search: "搜索",
       select: "选择",
       selectAll: "全选",
+      deselectAll: "取消全选",
     },
     placeholders: {
       search: "搜索...",
@@ -303,6 +304,13 @@ export const zhCN: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "未选择主机",
+      noProjects: "未选择项目",
+      noProviders: "未选择提供商",
+      noModels: "未选择模型",
+      noAgents: "未选择代理",
+      noSessions: "未选择会话",
+
       agentType: "代理类型",
       allAgents: "所有代理",
       mainAgents: "主代理",
