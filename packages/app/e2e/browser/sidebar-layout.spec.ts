@@ -192,6 +192,51 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
   }
 });
 
+test("settings replaces and restores the sidebar without sliding it", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-settings-transition-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    const retainedSidebar = await sidebar.elementHandle();
+    const sampler = await page.evaluateHandle(() => {
+      const element = document.querySelector('[data-testid="left-sidebar"]');
+      if (!element) throw new Error("Sidebar is not mounted");
+      const positions: number[] = [];
+      let frameId: number;
+      const sample = () => {
+        const { x, width } = element.getBoundingClientRect();
+        if (width > 0 && x < -1 && x > 1 - width) positions.push(x);
+        frameId = requestAnimationFrame(sample);
+      };
+      frameId = requestAnimationFrame(sample);
+      return () => {
+        cancelAnimationFrame(frameId);
+        return positions;
+      };
+    });
+    let positions: number[] = [];
+    try {
+      await page.getByTestId("sidebar-settings").click();
+      await expect(page.getByTestId("settings-sidebar")).toBeVisible();
+      await expect(sidebar).toBeHidden();
+      await page.getByTestId("settings-back-to-workspace").click();
+      await waitForWorkspaceTabsVisible(page);
+      await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+    } finally {
+      positions = await sampler.evaluate((stop) => stop());
+      await sampler.dispose();
+    }
+    expect(positions, "settings transitions must not paint partial sidebar positions").toEqual([]);
+    expect(
+      await sidebar.evaluate((element, original) => element === original, retainedSidebar),
+    ).toBe(true);
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
 test("compact layouts keep the explicit sidebar toggle", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "sidebar-compact-" });
   try {

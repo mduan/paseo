@@ -559,6 +559,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   });
   const sidebarChrome = (
     <SidebarChrome
+      chromeEnabled={chromeEnabled}
       mounted={isCompactLayout ? chromeEnabled : desktopSidebarMounted}
       visible={isCompactLayout ? chromeEnabled : desktopSidebarVisible}
       overlay={sidebarOverlayEnabled}
@@ -652,11 +653,13 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
 }
 
 function SidebarChrome({
+  chromeEnabled,
   mounted,
   visible,
   overlay,
   keyboardShortcutsEnabled,
 }: {
+  chromeEnabled: boolean;
   mounted: boolean;
   visible: boolean;
   overlay: boolean;
@@ -669,7 +672,9 @@ function SidebarChrome({
   });
   const desktopActive = visible || revealed;
   const active = isCompactLayout ? visible && isMobileActive : desktopActive;
-  const sidebar = mounted ? <LeftSidebar active={active} overlay={overlay} /> : null;
+  const sidebar = mounted ? (
+    <LeftSidebar chromeEnabled={chromeEnabled} active={active} overlay={overlay} />
+  ) : null;
   const desktopSidebar = (
     <DesktopSidebarSurface overlay={overlay} active={active} onDismiss={dismiss}>
       {canReveal ? (
