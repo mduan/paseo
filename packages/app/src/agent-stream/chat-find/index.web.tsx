@@ -21,8 +21,10 @@ import { hasActiveWebOverlay } from "@/lib/overlay-root";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { planTimelinePromptJump } from "@/timeline/timeline-sync-plan";
-import { ChatFindModel, type ChatFindFailure } from "./model";
+import { createPhrasePattern } from "@getpaseo/protocol/search/phrase";
+import { ChatFindModel, ChatFindPhase, type ChatFindFailure } from "./model";
 import { createFindViewport } from "./viewport.web";
+import { findRenderedMatches } from "./ranges.web";
 import type { ChatFindProps, ChatFindExpansionProps } from "./types";
 
 const SelectedMessage = createContext<string | null>(null);
@@ -111,6 +113,36 @@ export function ChatFind({
     [agentId, serverId, highlightName, optionsSupported],
   );
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
+  const matchesName = `${highlightName}-matches`;
+  const highlightMatches =
+    active &&
+    state.open &&
+    Boolean(state.query.trim()) &&
+    state.phase !== ChatFindPhase.Invalid &&
+    state.phase !== ChatFindPhase.Error;
+  useEffect(() => {
+    const element = root.current;
+    if (!highlightMatches || !element) return;
+    const pattern = createPhrasePattern({ query: state.query, options: state.options });
+    let frame: number | undefined;
+    function update(container: HTMLElement) {
+      frame = undefined;
+      const matches = new Highlight(...findRenderedMatches(container, pattern));
+      // The selected occurrence must paint above this layer regardless of registration order.
+      matches.priority = -1;
+      CSS.highlights.set(matchesName, matches);
+    }
+    const observer = new MutationObserver(() => {
+      if (frame === undefined) frame = requestAnimationFrame(() => update(element));
+    });
+    observer.observe(element, { subtree: true, childList: true, characterData: true });
+    update(element);
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      CSS.highlights.delete(matchesName);
+    };
+  }, [highlightMatches, matchesName, state.query, state.options]);
   useEffect(() => {
     model.updateHistory({ epoch, items, expandedTurnKeys });
   }, [model, epoch, items, expandedTurnKeys]);
@@ -161,7 +193,10 @@ export function ChatFind({
       : t("paneFind.noMatches");
   return (
     <div ref={root} tabIndex={-1} style={ROOT_STYLE}>
-      <style>{`::highlight(${highlightName}) { background-color: ${styles.highlight.backgroundColor}; color: ${styles.highlight.color}; }`}</style>
+      <style>{`
+        ::highlight(${matchesName}) { background-color: ${styles.match.backgroundColor}; color: ${styles.match.color}; }
+        ::highlight(${highlightName}) { background-color: ${styles.selectedMatch.backgroundColor}; color: ${styles.selectedMatch.color}; }
+      `}</style>
       <SelectedMessage.Provider value={state.selectedItemId}>{children}</SelectedMessage.Provider>
       {state.open && (
         <View style={styles.overlay} dataSet={WIDGET_DATASET}>
@@ -205,5 +240,12 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface1,
   },
   errorText: { color: theme.colors.foreground, fontSize: theme.fontSize.sm, flex: 1 },
-  highlight: { backgroundColor: theme.colors.statusWarning, color: theme.colors.surface0 },
+  match: {
+    backgroundColor: theme.colors.searchMatchBackground,
+    color: theme.colors.searchMatchForeground,
+  },
+  selectedMatch: {
+    backgroundColor: theme.colors.searchSelectedMatchBackground,
+    color: theme.colors.searchSelectedMatchForeground,
+  },
 }));
