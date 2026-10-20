@@ -28,6 +28,22 @@ function chunkFrames(frame: Record<string, unknown>, chunkSize: number) {
 }
 
 describe("JsonlFrameDecoder", () => {
+  it("decodes a large fragmented line and subsequent frames without losing boundaries", () => {
+    const { decoder, frames, problems } = decoderHarness();
+    const frame = { type: "notice", value: "x\u2028\u2029".repeat(1024 * 1024) };
+    const line = JSON.stringify(frame);
+    for (let offset = 0; offset < line.length; offset += 4096) {
+      decoder.write(line.slice(offset, offset + 4096));
+    }
+    expect(frames).toEqual([]);
+    decoder.write("\r");
+    decoder.write('\n \r\ninvalid\n{"type":"ready"}\n{"type":');
+    decoder.write('"last"}');
+    decoder.write("\n");
+    expect(frames).toEqual([frame, { type: "ready" }, { type: "last" }]);
+    expect(problems).toEqual(["invalid-json"]);
+  });
+
   it("publishes ordinary frames across arbitrary stream chunks", () => {
     const { decoder, frames, problems } = decoderHarness();
     decoder.write('{"type":"ready"');

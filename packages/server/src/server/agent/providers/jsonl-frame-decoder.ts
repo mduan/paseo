@@ -78,7 +78,7 @@ function chunkBytes(data: string): Buffer | null {
 }
 
 export class JsonlFrameDecoder {
-  private lineBuffer = "";
+  private lineParts: string[] = [];
   private assembly: ChunkAssembly | null = null;
 
   constructor(
@@ -89,14 +89,22 @@ export class JsonlFrameDecoder {
   ) {}
 
   write(text: string): void {
-    this.lineBuffer += text;
-    let newline = this.lineBuffer.indexOf("\n");
+    let start = 0;
+    let newline = text.indexOf("\n");
     while (newline !== -1) {
-      const line = this.lineBuffer.slice(0, newline).replace(/\r$/, "");
-      this.lineBuffer = this.lineBuffer.slice(newline + 1);
+      let line = text.slice(start, newline);
+      if (this.lineParts.length) {
+        this.lineParts.push(line);
+        line = this.lineParts.join("");
+        this.lineParts = [];
+      }
+      line = line.replace(/\r$/, "");
       if (line.trim()) this.consumeLine(line);
-      newline = this.lineBuffer.indexOf("\n");
+      start = newline + 1;
+      newline = text.indexOf("\n", start);
     }
+    // Keep fragments separate so a large incomplete line is never recopied or rescanned.
+    if (start < text.length) this.lineParts.push(text.slice(start));
   }
 
   private consumeLine(line: string): void {
