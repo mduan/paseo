@@ -454,7 +454,7 @@ function WorkspaceSessionKebab({
         onReloadAgent: () => select("reload-agent"),
         onRenameTab: () => select("rename"),
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
-        renameWithAiPending: aiRename.isPending,
+        renameWithAiPendingIds: aiRename.pendingIds,
         onCloseTab: () => select("close"),
         onCloseTabsBefore: () => select("close-before"),
         onCloseTabsAfter: () => select("close-after"),

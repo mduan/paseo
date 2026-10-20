@@ -1442,7 +1442,7 @@ function ResolvedDesktopTabChip({
         onReloadAgent,
         onRenameTab,
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
-        renameWithAiPending: aiRename.isPending,
+        renameWithAiPendingIds: aiRename.pendingIds,
         onCloseTab,
         onCloseTabsToLeft,
         onCloseTabsToRight,
@@ -1470,7 +1470,7 @@ function ResolvedDesktopTabChip({
       onRenameTab,
       aiRename.supported,
       aiRename.rename,
-      aiRename.isPending,
+      aiRename.pendingIds,
       tabCount,
     ],
   );
