@@ -61,8 +61,8 @@ async function expectHighlight(page: Page, text: string) {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const entries = Array.from(CSS.highlights.entries()).filter(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+        const entries = Array.from(CSS.highlights.entries()).filter(
+          ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
         );
         const texts: string[] = [];
         for (const [, highlight] of entries) {
@@ -75,8 +75,8 @@ async function expectHighlight(page: Page, text: string) {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+        const entry = Array.from(CSS.highlights.entries()).find(
+          ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
         );
         const range = entry && Array.from(entry[1])[0];
         if (!(range instanceof Range)) return false;
@@ -167,8 +167,8 @@ const ACROSS_RESPONSE = "Reply with scope-needle here.\n\nAnd scope-needle again
 /** The test id of the message that holds the current match, so it can be watched crossing one. */
 async function highlightedMessage(page: Page) {
   return page.evaluate(() => {
-    const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-      name.startsWith("paseo-chat-find-"),
+    const entry = Array.from(CSS.highlights.entries()).find(
+      ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
     );
     const range = entry && Array.from(entry[1])[0];
     if (!(range instanceof Range)) return null;
@@ -180,6 +180,30 @@ async function highlightedMessage(page: Page) {
 }
 async function expectHighlightedMessage(page: Page, testId: string) {
   await expect.poll(() => highlightedMessage(page)).toBe(testId);
+}
+
+async function expectAllMatches(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const entry = Array.from(CSS.highlights.entries()).find(
+          ([name]) => name.startsWith("paseo-chat-find-") && name.endsWith("-matches"),
+        );
+        if (!entry) return null;
+        const [name, matches] = entry;
+        const selected = CSS.highlights.get(name.slice(0, -"-matches".length));
+        return {
+          texts: Array.from(matches, (range) => range.toString()),
+          selectedCount: selected?.size,
+          selectedOnTop: selected && selected.priority > matches.priority,
+        };
+      }),
+    )
+    .toEqual({
+      texts: ["scope-needle", "scope-needle", "scope-needle"],
+      selectedCount: 1,
+      selectedOnTop: true,
+    });
 }
 
 test("counts and steps through every match in the chat, not just the selected message", async ({
@@ -200,11 +224,14 @@ test("counts and steps through every match in the chat, not just the selected me
     await expect(status(page)).toHaveText("1 of 3");
     await expectHighlight(page, "scope-needle");
     await expectHighlightedMessage(page, "user-message");
+    await expectAllMatches(page);
     await page.screenshot({ path: testInfo.outputPath("chat-find-across-messages.png") });
     await expectNextMatch(page, "2 of 3", "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await expectNextMatch(page, "3 of 3", "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await page.screenshot({ path: testInfo.outputPath("chat-find-last-match.png") });
     await expectNextMatch(page, "1 of 3", "scope-needle");
     await expectHighlightedMessage(page, "user-message");
@@ -212,6 +239,7 @@ test("counts and steps through every match in the chat, not just the selected me
     await expect(status(page)).toHaveText("3 of 3");
     await expectHighlight(page, "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await closeFind(page);
   } finally {
     await agent.cleanup();
