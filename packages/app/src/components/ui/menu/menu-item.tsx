@@ -132,7 +132,7 @@ export function MenuSelectionHeader({
     [allSelected, t, testID, toggleAll],
   );
   return (
-    <MenuLabel textStyle={styles.selectionTitle} trailing={action}>
+    <MenuLabel style={styles.selectionHeader} textStyle={styles.selectionTitle} trailing={action}>
       {children}
     </MenuLabel>
   );
@@ -430,6 +430,9 @@ const styles = StyleSheet.create((theme) => ({
   page: {
     paddingVertical: theme.spacing[1],
     gap: MENU_ROW_GAP,
+  },
+  selectionHeader: {
+    paddingBottom: theme.spacing[2],
   },
   selectionTitle: {
     textTransform: "uppercase",
