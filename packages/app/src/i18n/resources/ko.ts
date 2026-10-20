@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ko: TranslationResources = {
   paneFind: {
+    invalidRegex: "잘못된 정규식",
+    includeCollapsedWork: "접힌 “작업 시간” 섹션 포함",
     connectionFailure: "이 채팅을 검색할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
     historyChangedFailure: "검색 중에 채팅이 변경되었습니다. 다시 검색하세요.",
     revealFailure: "이 일치 항목을 표시할 수 없습니다. 다시 시도하세요.",
@@ -45,6 +47,7 @@ export const ko: TranslationResources = {
       search: "검색",
       select: "선택",
       selectAll: "모두 선택",
+      deselectAll: "모두 선택 해제",
     },
     placeholders: {
       search: "검색...",
@@ -302,6 +305,13 @@ export const ko: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "선택한 호스트 없음",
+      noProjects: "선택한 프로젝트 없음",
+      noProviders: "선택한 제공업체 없음",
+      noModels: "선택한 모델 없음",
+      noAgents: "선택한 에이전트 없음",
+      noSessions: "선택한 세션 없음",
+
       agentType: "에이전트 유형",
       allAgents: "모든 에이전트",
       mainAgents: "메인 에이전트",
@@ -2882,6 +2892,13 @@ export const ko: TranslationResources = {
         icon: "아이콘",
         chooseImage: "이미지 선택",
         useAutomatic: "자동 사용",
+        color: {
+          title: "아이콘 색상",
+          auto: "자동",
+          custom: "사용자 지정",
+          hex: "16진수 색상",
+          done: "완료",
+        },
         imageUrl: "이미지 또는 웹사이트 URL",
         save: "변경사항 저장",
         savedToast: "프로젝트가 업데이트되었습니다.",

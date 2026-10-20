@@ -1,3 +1,4 @@
+import { allFilterOptionsSelected, toggleFilterOption } from "@/utils/filter-selection";
 import {
   useCallback,
   useMemo,
@@ -29,6 +30,7 @@ import {
 } from "lucide-react-native";
 import {
   MenuItem,
+  MenuSelectionHeader,
   MenuRoot,
   MenuSeparator,
   MenuSubTrigger,
@@ -342,7 +344,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
               {showHostFilter ? null : <MenuSeparator />}
               <MenuSubTrigger
                 id="projectFilter"
-                indicator={resolvedProjectFilters.length > 0}
+                indicator={resolvedProjectFilters?.length !== 0}
                 testID="sidebar-display-project-filter"
               >
                 {t("sidebar.display.projectFilter.label")}
@@ -616,11 +618,6 @@ function ChecksSubTrigger(): ReactElement {
 }
 
 /**
- * Every project the sidebar could show, one row each.
- *
- * A workspace belongs to exactly one project, so this is a plain allowlist — the same shape as the
- * host page, and deliberately not the label page's tri-state.
- *
  * Selection reads `resolvedProjectFilters`, not the stored list. A stored key whose project is not
  * currently visible filters nothing, so showing it as checked here would contradict the sidebar.
  */
@@ -630,7 +627,7 @@ function ProjectFilterPage({
   preferences,
 }: {
   projects: readonly SidebarProjectEntry[];
-  resolvedProjectFilters: readonly string[];
+  resolvedProjectFilters: readonly string[] | null;
   preferences: Preferences;
 }): ReactElement {
   const { t } = useTranslation();
@@ -638,24 +635,43 @@ function ProjectFilterPage({
   // Shares TanStack's cache with the sidebar's own call, so this subscribes rather than refetches.
   const iconByProjectViewKey = useProjectIcons({ projects: iconTargets });
 
+  const optionIds = useMemo(() => projects.map((project) => project.viewKey), [projects]);
+  const allSelected = allFilterOptionsSelected({
+    selection: resolvedProjectFilters,
+    options: optionIds,
+  });
+  const toggleProject = useCallback(
+    (viewKey: string) => {
+      preferences.setProjectFilters(
+        toggleFilterOption({ selection: resolvedProjectFilters, options: optionIds, id: viewKey }),
+      );
+    },
+    [preferences, resolvedProjectFilters, optionIds],
+  );
+  const toggleAll = useCallback(() => {
+    if (allSelected) preferences.setProjectFilters(null);
+    else preferences.clearProjectFilters();
+  }, [allSelected, preferences]);
   return (
     <>
-      <MenuItem
-        selected={resolvedProjectFilters.length === 0}
-        closeOnSelect={false}
-        onSelect={preferences.clearProjectFilters}
+      <MenuSelectionHeader
+        allSelected={allSelected}
+        onToggleAll={toggleAll}
         testID="sidebar-project-filter-all"
       >
-        {t("sidebar.display.projectFilter.all")}
-      </MenuItem>
+        {t("sidebar.display.projectFilter.label")}
+      </MenuSelectionHeader>
       {projects.map((project) => (
         <ProjectFilterItem
           key={project.viewKey}
           viewKey={project.viewKey}
           label={project.projectName}
           iconDataUri={iconByProjectViewKey.get(project.viewKey) ?? null}
-          selected={resolvedProjectFilters.includes(project.viewKey)}
-          onToggle={preferences.toggleProjectFilter}
+          selected={
+            resolvedProjectFilters?.length === 0 ||
+            !!resolvedProjectFilters?.includes(project.viewKey)
+          }
+          onToggle={toggleProject}
         />
       ))}
     </>

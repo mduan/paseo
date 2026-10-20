@@ -569,7 +569,13 @@ describe("buildWorkspaceTabMenuEntries", () => {
       ...sharedInput,
       tab: createAgentTab(),
       onRenameTabWithAi,
-      renameWithAiPending: true,
+      renameWithAiPendingIds: ["agent-123"],
+    });
+    const otherAgentEntries = buildWorkspaceTabMenuEntries({
+      ...sharedInput,
+      tab: { ...createAgentTab(), target: { kind: "agent", agentId: "agent-456" } },
+      onRenameTabWithAi,
+      renameWithAiPendingIds: ["agent-123"],
     });
     const terminalEntries = buildWorkspaceTabMenuEntries({
       ...sharedInput,
@@ -583,6 +589,9 @@ describe("buildWorkspaceTabMenuEntries", () => {
       "rename-separator",
     ]);
     expect(aiRename).toMatchObject({ label: "Rename with AI", disabled: true });
+    expect(otherAgentEntries.find((entry) => entry.key === "rename-ai")).toMatchObject({
+      disabled: false,
+    });
     if (!aiRename || aiRename.kind !== "item") throw new Error("Missing AI rename entry");
     aiRename.onSelect();
     expect(onRenameTabWithAi).toHaveBeenCalledWith("agent-123");

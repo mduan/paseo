@@ -12,6 +12,8 @@ import { View, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { PaneFind, findShortcutPlatform, isFindShortcut, type PaneFindHandle } from "@/pane-find";
+import { useSessionStore } from "@/stores/session-store";
+import { SearchOptionGroup } from "@/components/sessions/search-options";
 import { Button } from "@/components/ui/button";
 import { usePaneFocus } from "@/panels/pane-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
@@ -19,8 +21,10 @@ import { hasActiveWebOverlay } from "@/lib/overlay-root";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { planTimelinePromptJump } from "@/timeline/timeline-sync-plan";
-import { ChatFindModel, type ChatFindFailure } from "./model";
+import { createPhrasePattern } from "@getpaseo/protocol/search/phrase";
+import { ChatFindModel, ChatFindPhase, type ChatFindFailure } from "./model";
 import { createFindViewport } from "./viewport.web";
+import { findRenderedMatches } from "./ranges.web";
 import type { ChatFindProps, ChatFindExpansionProps } from "./types";
 
 const SelectedMessage = createContext<string | null>(null);
@@ -60,43 +64,88 @@ export function ChatFind({
   viewportRef,
   revealLoadedMessage,
   visibleMessageIds,
+  expandedTurnKeys,
+  expandTurn,
   children,
 }: ChatFindProps) {
   const { t } = useTranslation();
   const widget = useRef<PaneFindHandle>(null);
   const root = useRef<HTMLDivElement>(null);
-  const bindings = useRef({ viewportRef, revealLoadedMessage, visibleMessageIds });
-  bindings.current = { viewportRef, revealLoadedMessage, visibleMessageIds };
+  const bindings = useRef({
+    viewportRef,
+    revealLoadedMessage,
+    visibleMessageIds,
+    items,
+    expandTurn,
+  });
+  bindings.current = { viewportRef, revealLoadedMessage, visibleMessageIds, items, expandTurn };
+  // COMPAT(chatFindOptions): added in v0.11.x, remove gate after 2027-10-19.
+  const optionsSupported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.chatFindOptions === true,
+  );
   const [highlightName] = useState(() => `paseo-chat-find-${++nextHighlightId}`);
   const { isInteractive } = usePaneFocus();
   const active = useRetainedPanelActive();
   const model = useMemo(
     () =>
       new ChatFindModel({
-        search(query, cursor) {
-          const client = getHostRuntimeStore().getClient(serverId);
-          if (!client) return Promise.reject(new Error("Host disconnected"));
-          return client.searchAgentTimeline({ agentId, query, cursor });
+        operations: {
+          search({ query, cursor, options }) {
+            const client = getHostRuntimeStore().getClient(serverId);
+            if (!client) return Promise.reject(new Error("Host disconnected"));
+            return client.searchAgentTimeline({ agentId, query, cursor, options });
+          },
+          load(targetEpoch, seq) {
+            return getHostRuntimeStore().fetchAgentTimeline(
+              serverId,
+              agentId,
+              planTimelinePromptJump({ epoch: targetEpoch, seq }),
+            );
+          },
+          ...createFindViewport({
+            getBindings: () => bindings.current,
+            getRoot: () => root.current,
+            highlightName,
+          }),
         },
-        load(targetEpoch, seq) {
-          return getHostRuntimeStore().fetchAgentTimeline(
-            serverId,
-            agentId,
-            planTimelinePromptJump({ epoch: targetEpoch, seq }),
-          );
-        },
-        ...createFindViewport({
-          getBindings: () => bindings.current,
-          getRoot: () => root.current,
-          highlightName,
-        }),
+        optionsSupported,
       }),
-    [agentId, serverId, highlightName],
+    [agentId, serverId, highlightName, optionsSupported],
   );
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
+  const matchesName = `${highlightName}-matches`;
+  const highlightMatches =
+    active &&
+    state.open &&
+    Boolean(state.query.trim()) &&
+    state.phase !== ChatFindPhase.Invalid &&
+    state.phase !== ChatFindPhase.Error;
   useEffect(() => {
-    model.updateHistory(epoch, items);
-  }, [model, epoch, items]);
+    const element = root.current;
+    if (!highlightMatches || !element) return;
+    const pattern = createPhrasePattern({ query: state.query, options: state.options });
+    let frame: number | undefined;
+    function update(container: HTMLElement) {
+      frame = undefined;
+      const matches = new Highlight(...findRenderedMatches(container, pattern));
+      // The selected occurrence must paint above this layer regardless of registration order.
+      matches.priority = -1;
+      CSS.highlights.set(matchesName, matches);
+    }
+    const observer = new MutationObserver(() => {
+      if (frame === undefined) frame = requestAnimationFrame(() => update(element));
+    });
+    observer.observe(element, { subtree: true, childList: true, characterData: true });
+    update(element);
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      CSS.highlights.delete(matchesName);
+    };
+  }, [highlightMatches, matchesName, state.query, state.options]);
+  useEffect(() => {
+    model.updateHistory({ epoch, items, expandedTurnKeys });
+  }, [model, epoch, items, expandedTurnKeys]);
   useEffect(() => () => model.close(), [model]);
   useEffect(() => {
     if (!active) model.close();
@@ -120,9 +169,23 @@ export function ChatFind({
     model.close();
     root.current?.focus({ preventScroll: true });
   }, [model]);
+  const options = useMemo(
+    () => (
+      <SearchOptionGroup
+        value={state.options}
+        supported={optionsSupported}
+        onChange={model.setOptions}
+        includeFolded
+        dense
+        testIDPrefix="chat-find"
+      />
+    ),
+    [state.options, optionsSupported, model],
+  );
   let status = "";
   if (state.phase === "searching") status = t("paneFind.searching");
   else if (state.phase === "loading") status = t("paneFind.loading");
+  else if (state.phase === "invalid") status = t("paneFind.invalidRegex");
   else if (state.phase === "error") status = t("paneFind.failed");
   else if (state.query.trim())
     status = state.count
@@ -130,7 +193,10 @@ export function ChatFind({
       : t("paneFind.noMatches");
   return (
     <div ref={root} tabIndex={-1} style={ROOT_STYLE}>
-      <style>{`::highlight(${highlightName}) { background-color: ${styles.highlight.backgroundColor}; color: ${styles.highlight.color}; }`}</style>
+      <style>{`
+        ::highlight(${matchesName}) { background-color: ${styles.match.backgroundColor}; color: ${styles.match.color}; }
+        ::highlight(${highlightName}) { background-color: ${styles.selectedMatch.backgroundColor}; color: ${styles.selectedMatch.color}; }
+      `}</style>
       <SelectedMessage.Provider value={state.selectedItemId}>{children}</SelectedMessage.Provider>
       {state.open && (
         <View style={styles.overlay} dataSet={WIDGET_DATASET}>
@@ -138,6 +204,8 @@ export function ChatFind({
             ref={widget}
             query={state.query}
             status={status}
+            invalid={state.phase === "invalid"}
+            options={options}
             canNavigate={state.phase === "ready" && state.count > 0}
             onQueryChange={model.setQuery}
             onNext={model.next}
@@ -172,5 +240,12 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface1,
   },
   errorText: { color: theme.colors.foreground, fontSize: theme.fontSize.sm, flex: 1 },
-  highlight: { backgroundColor: theme.colors.statusWarning, color: theme.colors.surface0 },
+  match: {
+    backgroundColor: theme.colors.searchMatchBackground,
+    color: theme.colors.searchMatchForeground,
+  },
+  selectedMatch: {
+    backgroundColor: theme.colors.searchSelectedMatchBackground,
+    color: theme.colors.searchSelectedMatchForeground,
+  },
 }));

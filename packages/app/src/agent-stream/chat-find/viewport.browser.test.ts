@@ -28,12 +28,16 @@ function viewport(root: HTMLElement, capture: Capture) {
       if (occurrence) capture.occurrence = occurrence;
     },
   };
-  const bindings: Pick<ChatFindProps, "viewportRef" | "revealLoadedMessage" | "visibleMessageIds"> =
-    {
-      viewportRef: { current: handle },
-      revealLoadedMessage: () => false,
-      visibleMessageIds: new Set(["message-1"]),
-    };
+  const bindings: Pick<
+    ChatFindProps,
+    "viewportRef" | "revealLoadedMessage" | "visibleMessageIds" | "items" | "expandTurn"
+  > = {
+    items: [],
+    expandTurn() {},
+    viewportRef: { current: handle },
+    revealLoadedMessage: () => false,
+    visibleMessageIds: new Set(["message-1"]),
+  };
   return createFindViewport({
     getBindings: () => bindings,
     getRoot: () => root,
@@ -49,12 +53,13 @@ afterEach(() => {
 it("counts occurrences across every block row of the message", async () => {
   const root = transcript("message-1", ["needle one needle", "no hits", "needle three"]);
   const capture: Capture = {};
-  const found = await viewport(root, capture).reveal(
-    "message-1",
-    "needle",
-    2,
-    new AbortController().signal,
-  );
+  const found = await viewport(root, capture).reveal({
+    messageId: "message-1",
+    query: "needle",
+    options: {},
+    occurrence: 2,
+    signal: new AbortController().signal,
+  });
   expect(found).toEqual({ occurrence: 2, count: 3 });
 });
 
@@ -64,12 +69,13 @@ it("counts occurrences across every block row of the message", async () => {
 it("keeps the chosen occurrence when an earlier row unmounts mid-scroll", async () => {
   const root = transcript("message-1", ["needle one needle", "needle three"]);
   const capture: Capture = {};
-  const found = await viewport(root, capture).reveal(
-    "message-1",
-    "needle",
-    2,
-    new AbortController().signal,
-  );
+  const found = await viewport(root, capture).reveal({
+    messageId: "message-1",
+    query: "needle",
+    options: {},
+    occurrence: 2,
+    signal: new AbortController().signal,
+  });
   expect(found).toEqual({ occurrence: 2, count: 3 });
 
   const settled = capture.occurrence?.targetTop();
@@ -98,3 +104,65 @@ function highlightedRow(): string | undefined {
     );
   return row?.dataset.historyRowId;
 }
+
+it("expands folded work before revealing its history window and highlighting", async () => {
+  const root = document.createElement("div");
+  document.body.append(root);
+  const calls: string[] = [];
+  const items: ChatFindProps["items"] = [
+    { kind: "user_message", id: "prompt", turnId: "turn", text: "Prompt", timestamp: new Date(0) },
+    {
+      kind: "assistant_message",
+      id: "work",
+      turnId: "turn",
+      text: "Hidden NEEDLE",
+      timestamp: new Date(1),
+    },
+    {
+      kind: "assistant_message",
+      id: "final",
+      turnId: "turn",
+      text: "Done",
+      timestamp: new Date(2),
+    },
+  ];
+  const visibleMessageIds = new Set<string>();
+  const handle: StreamViewportHandle = {
+    scrollToBottom() {},
+    prepareForViewportChange() {},
+    scrollToMessage() {
+      calls.push("scroll");
+    },
+  };
+  const find = createFindViewport({
+    getRoot: () => root,
+    highlightName: "paseo-chat-find-test",
+    getBindings: () => ({
+      items,
+      visibleMessageIds,
+      viewportRef: { current: handle },
+      expandTurn(turnKey) {
+        calls.push(`expand:${turnKey}`);
+      },
+      revealLoadedMessage() {
+        calls.push("history");
+        const row = transcript("work", ["Hidden NEEDLE"]);
+        root.append(...row.childNodes);
+        row.remove();
+        visibleMessageIds.add("work");
+        return true;
+      },
+    }),
+  });
+  expect(
+    await find.reveal({
+      messageId: "work",
+      query: "N[A-Z]+",
+      options: { regex: true, caseSensitive: true },
+      occurrence: 0,
+      signal: new AbortController().signal,
+    }),
+  ).toEqual({ count: 1, occurrence: 0 });
+  expect(calls).toEqual(["expand:turn", "history", "scroll"]);
+  expect(highlightedText()).toEqual(["NEEDLE"]);
+});

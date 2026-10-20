@@ -10,6 +10,8 @@ export type ProjectIconIntent = ProjectIconSource | { type: "url"; url: string }
 export interface ProjectEditSubmission {
   rename: { customName: string | null } | null;
   icon: ProjectIconIntent | null;
+  /** A null color clears the override and reverts to the derived one. */
+  iconColor: { color: string | null } | null;
 }
 
 export interface ProjectEditFormError {
@@ -22,6 +24,8 @@ export interface ProjectEditFormState {
   name: string;
   /** The image the icon tile renders, null for the derived letter fallback. */
   previewDataUri: string | null;
+  /** The color the letter fallback renders with, null for the derived one. */
+  iconColor: string | null;
   pickedFileName: string | null;
   /** False once the resulting icon is the automatic one — the reset has nothing to do. */
   canUseAutomatic: boolean;
@@ -39,6 +43,8 @@ export interface ProjectEditFormModel {
   setImageUrl: (url: string) => void;
   setPickedImage: (image: { fileName: string; mimeType: string; data: string }) => void;
   useAutomaticIcon: () => void;
+  /** A #rrggbb hex, or null to revert to the derived color. */
+  setIconColor: (color: string | null) => void;
   setError: (error: ProjectEditFormError | null) => void;
 }
 
@@ -48,6 +54,8 @@ export interface ProjectEditFormSnapshot {
   /** The override in effect, null while the project uses its derived name. */
   projectCustomName: string | null;
   hasCustomIcon: boolean;
+  /** The stored icon color, null while the project uses the derived one. */
+  iconColor: string | null;
   /** The icon the project renders today, custom or derived. */
   currentIconDataUri: string | null;
 }
@@ -65,6 +73,7 @@ export function openProjectEditForm(snapshot: ProjectEditFormSnapshot): ProjectE
   let urlText = "";
   let picked: PickedImage | null = null;
   let iconChoice: IconChoice = "unchanged";
+  let iconColor = snapshot.iconColor;
   let error: ProjectEditFormError | null = null;
   let urlResetKey = 0;
   const listeners = new Set<() => void>();
@@ -100,16 +109,21 @@ export function openProjectEditForm(snapshot: ProjectEditFormSnapshot): ProjectE
   }
 
   function deriveState(): ProjectEditFormState {
-    const submission = { rename: deriveRename(), icon: deriveIcon() };
+    const submission = {
+      rename: deriveRename(),
+      icon: deriveIcon(),
+      iconColor: iconColor === snapshot.iconColor ? null : { color: iconColor },
+    };
     const willBeCustom = submission.icon
       ? submission.icon.type !== "automatic"
       : snapshot.hasCustomIcon;
     return {
       name,
       previewDataUri: derivePreview(),
+      iconColor,
       pickedFileName: iconChoice === "upload" ? (picked?.fileName ?? null) : null,
       canUseAutomatic: willBeCustom,
-      canSubmit: Boolean(submission.rename || submission.icon),
+      canSubmit: Boolean(submission.rename || submission.icon || submission.iconColor),
       error,
       urlResetKey,
       submission,
@@ -156,6 +170,11 @@ export function openProjectEditForm(snapshot: ProjectEditFormSnapshot): ProjectE
       urlText = "";
       urlResetKey += 1;
       iconChoice = snapshot.hasCustomIcon ? "automatic" : "unchanged";
+      error = null;
+      publish();
+    },
+    setIconColor: (color) => {
+      iconColor = color;
       error = null;
       publish();
     },

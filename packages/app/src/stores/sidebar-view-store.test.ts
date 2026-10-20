@@ -39,6 +39,14 @@ describe("sidebar view store", () => {
     });
   });
 
+  it("persists an explicit empty project selection without treating it as all", () => {
+    useSidebarViewStore.getState().setProjectFilters(null);
+    expect(useSidebarViewStore.getState().projectFilters).toBeNull();
+    expect(migrateSidebarViewState({ projectFilters: null }).projectFilters).toBeNull();
+    useSidebarViewStore.getState().clearProjectFilters();
+    expect(useSidebarViewStore.getState().projectFilters).toEqual([]);
+  });
+
   it("toggles multiple hosts into and out of the filter", () => {
     const store = useSidebarViewStore.getState();
     store.toggleHostFilter("host-a");
@@ -178,14 +186,13 @@ describe("sidebar view store", () => {
     ).toEqual({ labels: ["urgent", "blocked"] });
   });
 
-  it("toggles multiple projects into and out of the filter", () => {
+  it("stores selected projects and clears back to all", () => {
     const store = useSidebarViewStore.getState();
-    store.toggleProjectFilter("project-a");
-    store.toggleProjectFilter("project-b");
+    store.setProjectFilters(["project-a", "project-b"]);
 
     expect(useSidebarViewStore.getState().projectFilters).toEqual(["project-a", "project-b"]);
 
-    store.toggleProjectFilter("project-a");
+    store.setProjectFilters(["project-b"]);
 
     expect(useSidebarViewStore.getState().projectFilters).toEqual(["project-b"]);
 

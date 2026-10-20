@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ja: TranslationResources = {
   paneFind: {
+    invalidRegex: "無効な正規表現",
+    includeCollapsedWork: "折りたたまれた「作業時間」セクションを含める",
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",
     historyChangedFailure: "検索中にチャットが変更されました。もう一度検索してください。",
@@ -46,6 +48,7 @@ export const ja: TranslationResources = {
       search: "検索",
       select: "選択",
       selectAll: "すべて選択",
+      deselectAll: "すべて選択解除",
     },
     placeholders: {
       search: "検索...",
@@ -306,6 +309,13 @@ export const ja: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "ホスト未選択",
+      noProjects: "プロジェクト未選択",
+      noProviders: "プロバイダー未選択",
+      noModels: "モデル未選択",
+      noAgents: "エージェント未選択",
+      noSessions: "セッション未選択",
+
       agentType: "エージェントの種類",
       allAgents: "すべてのエージェント",
       mainAgents: "メインエージェント",
@@ -2896,6 +2906,13 @@ export const ja: TranslationResources = {
         icon: "アイコン",
         chooseImage: "画像を選択",
         useAutomatic: "自動を使う",
+        color: {
+          title: "アイコンの色",
+          auto: "自動",
+          custom: "カスタム",
+          hex: "16進カラー",
+          done: "完了",
+        },
         imageUrl: "画像またはサイトのURL",
         save: "変更を保存",
         savedToast: "プロジェクトを更新しました",

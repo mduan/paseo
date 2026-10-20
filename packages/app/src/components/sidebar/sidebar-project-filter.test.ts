@@ -1,3 +1,4 @@
+import { allFilterOptionsSelected, toggleFilterOption } from "@/utils/filter-selection";
 import { describe, expect, test } from "vitest";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import { filterWorkspacesByProjects, resolveActiveProjectFilters } from "./sidebar-project-filter";
@@ -61,7 +62,7 @@ describe("filterWorkspacesByProjects", () => {
     workspace("three", "beta"),
   ];
 
-  function filtered(projectFilters: string[]) {
+  function filtered(projectFilters: string[] | null) {
     return filterWorkspacesByProjects({ workspaces, projectFilters }).map(
       (entry) => entry.workspaceId,
     );
@@ -79,5 +80,29 @@ describe("filterWorkspacesByProjects", () => {
 
   test("keeps nothing for a project with no workspaces", () => {
     expect(filtered(["gamma"])).toEqual([]);
+  });
+});
+
+describe("project checkbox selection", () => {
+  const options = ["alpha", "beta"];
+  test("unchecks one option from all, then matches nothing when the last is unchecked", () => {
+    const selection = toggleFilterOption({ selection: [], options, id: "alpha" });
+    expect(selection).toEqual(["beta"]);
+    const empty = toggleFilterOption({ selection, options, id: "beta" });
+    expect(empty).toBeNull();
+    expect(resolveActiveProjectFilters(empty, new Set(options))).toBeNull();
+    expect(
+      filterWorkspacesByProjects({
+        workspaces: [workspace("one", "alpha")],
+        projectFilters: empty,
+      }),
+    ).toEqual([]);
+  });
+  test("checking every option returns to all, including future options", () => {
+    const selection = toggleFilterOption({ selection: ["alpha"], options, id: "beta" });
+    expect(selection).toEqual([]);
+    expect(allFilterOptionsSelected({ selection, options: [...options, "gamma"] })).toBe(true);
+    expect(allFilterOptionsSelected({ selection: null, options })).toBe(false);
+    expect(toggleFilterOption({ selection: null, options, id: "alpha" })).toEqual(["alpha"]);
   });
 });

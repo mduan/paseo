@@ -61,8 +61,8 @@ async function expectHighlight(page: Page, text: string) {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const entries = Array.from(CSS.highlights.entries()).filter(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+        const entries = Array.from(CSS.highlights.entries()).filter(
+          ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
         );
         const texts: string[] = [];
         for (const [, highlight] of entries) {
@@ -75,8 +75,8 @@ async function expectHighlight(page: Page, text: string) {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-          name.startsWith("paseo-chat-find-"),
+        const entry = Array.from(CSS.highlights.entries()).find(
+          ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
         );
         const range = entry && Array.from(entry[1])[0];
         if (!(range instanceof Range)) return false;
@@ -167,8 +167,8 @@ const ACROSS_RESPONSE = "Reply with scope-needle here.\n\nAnd scope-needle again
 /** The test id of the message that holds the current match, so it can be watched crossing one. */
 async function highlightedMessage(page: Page) {
   return page.evaluate(() => {
-    const entry = Array.from(CSS.highlights.entries()).find(([name]) =>
-      name.startsWith("paseo-chat-find-"),
+    const entry = Array.from(CSS.highlights.entries()).find(
+      ([name]) => name.startsWith("paseo-chat-find-") && !name.endsWith("-matches"),
     );
     const range = entry && Array.from(entry[1])[0];
     if (!(range instanceof Range)) return null;
@@ -180,6 +180,30 @@ async function highlightedMessage(page: Page) {
 }
 async function expectHighlightedMessage(page: Page, testId: string) {
   await expect.poll(() => highlightedMessage(page)).toBe(testId);
+}
+
+async function expectAllMatches(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const entry = Array.from(CSS.highlights.entries()).find(
+          ([name]) => name.startsWith("paseo-chat-find-") && name.endsWith("-matches"),
+        );
+        if (!entry) return null;
+        const [name, matches] = entry;
+        const selected = CSS.highlights.get(name.slice(0, -"-matches".length));
+        return {
+          texts: Array.from(matches, (range) => range.toString()),
+          selectedCount: selected?.size,
+          selectedOnTop: selected && selected.priority > matches.priority,
+        };
+      }),
+    )
+    .toEqual({
+      texts: ["scope-needle", "scope-needle", "scope-needle"],
+      selectedCount: 1,
+      selectedOnTop: true,
+    });
 }
 
 test("counts and steps through every match in the chat, not just the selected message", async ({
@@ -200,11 +224,14 @@ test("counts and steps through every match in the chat, not just the selected me
     await expect(status(page)).toHaveText("1 of 3");
     await expectHighlight(page, "scope-needle");
     await expectHighlightedMessage(page, "user-message");
+    await expectAllMatches(page);
     await page.screenshot({ path: testInfo.outputPath("chat-find-across-messages.png") });
     await expectNextMatch(page, "2 of 3", "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await expectNextMatch(page, "3 of 3", "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await page.screenshot({ path: testInfo.outputPath("chat-find-last-match.png") });
     await expectNextMatch(page, "1 of 3", "scope-needle");
     await expectHighlightedMessage(page, "user-message");
@@ -212,6 +239,7 @@ test("counts and steps through every match in the chat, not just the selected me
     await expect(status(page)).toHaveText("3 of 3");
     await expectHighlight(page, "scope-needle");
     await expectHighlightedMessage(page, "assistant-message");
+    await expectAllMatches(page);
     await closeFind(page);
   } finally {
     await agent.cleanup();
@@ -528,3 +556,134 @@ async function expectCommandCenterOwnsFindShortcut(page: Page, shortcut: string)
   await expect(query(page)).toHaveCount(0);
   await closeCommandCenter(page);
 }
+
+test("find options expand collapsed work before highlighting and reset when closed", async ({
+  page,
+}, testInfo) => {
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "chat-find-folded-",
+    title: "Chat Find collapsed work",
+    initialPrompt: "Replay a codex-shaped foreground shell tool call.",
+  });
+  try {
+    await agent.client.waitForFinish(agent.agentId, 15_000);
+    await openAgentRoute(page, agent);
+    await expect(
+      page
+        .getByTestId("assistant-message")
+        .getByText("Foreground command completed after steering.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toHaveCount(0);
+    await searchChat(page, "foreground");
+    await expect(status(page)).toHaveText("1 of 2");
+    const folded = page.getByTestId("chat-find-includeFolded");
+    await expect(folded).toHaveAttribute("aria-pressed", "false");
+    await folded.click();
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toHaveCount(0);
+    await expectNextMatch(page, "2 of 3", "foreground");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("chat-find-expanded-work.png") });
+    await folded.click();
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await page.getByTestId("chat-find-regex").click();
+    await query(page).fill("(");
+    await expect(status(page)).toHaveText("Invalid regular expression");
+    await expect(query(page)).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("button", { name: "Next match", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Previous match", exact: true })).toBeDisabled();
+    await page.screenshot({ path: testInfo.outputPath("chat-find-invalid-regex.png") });
+    await closeFind(page);
+    await openChatFind(page);
+    await expect(page.getByTestId("chat-find-regex")).toHaveAttribute("aria-pressed", "false");
+    await expect(folded).toHaveAttribute("aria-pressed", "false");
+    await query(page).fill("foreground");
+    await expect(status(page)).toHaveText("1 of 3");
+    await expect(page.getByText("Running the foreground command.", { exact: true })).toBeVisible();
+    await closeFind(page);
+  } finally {
+    await agent.cleanup();
+  }
+});
+
+async function expectStableSearchPosition(page: Page, refine: () => Promise<void>) {
+  const positions = page.evaluate(async () => {
+    const viewport = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+    ).find((element) => element.clientHeight > 0);
+    if (!viewport) throw new Error("Chat viewport is missing");
+    const offsets = [viewport.scrollTop];
+    await new Promise<void>((resolve) => {
+      function sample() {
+        offsets.push(viewport!.scrollTop);
+        if (offsets.length === 90) resolve();
+        else requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    });
+    return offsets;
+  });
+  await refine();
+  const offsets = await positions;
+  expect(Math.max(...offsets) - Math.min(...offsets)).toBeLessThanOrEqual(2);
+}
+
+test("refines a search without flashing the start of the matched message", async ({ page }) => {
+  const response = Array.from(
+    { length: 8 },
+    (_, index) => `Paragraph ${index}. ${PARAGRAPH_PADDING}`,
+  );
+  response.push("Keep the steady-needle visible while refining the query.");
+  response.push(PARAGRAPH_PADDING);
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "chat-find-refine-",
+    title: "Chat Find steady refinement",
+    initialPrompt: "Render a response with a late match",
+    featureValues: { mockAssistantResponse: response.join("\n\n") },
+  });
+  try {
+    await agent.client.waitForFinish(agent.agentId, 15_000);
+    await openAgentRoute(page, agent);
+    await searchChat(page, "steady-needl");
+    await expect(status(page)).toHaveText("1 of 1");
+    await expectHighlight(page, "steady-needl");
+    await expectStableSearchPosition(page, async () => {
+      await query(page).press("End");
+      await query(page).press("e");
+      await expect(status(page)).toHaveText("1 of 1");
+      await expectHighlight(page, "steady-needle");
+    });
+    await expectStableSearchPosition(page, async () => {
+      await page.getByTestId("chat-find-includeFolded").click();
+      await expect(status(page)).toHaveText("1 of 1");
+      await expectHighlight(page, "steady-needle");
+    });
+  } finally {
+    await agent.cleanup();
+  }
+});
+
+test("keeps a match beyond the render cap visible while refining the query", async ({ page }) => {
+  const agent = await seedMockAgentWorkspace({
+    repoPrefix: "chat-find-refine-cap-",
+    title: "Chat Find steady long message",
+    initialPrompt: "Render a long response",
+    featureValues: { mockAssistantResponse: `${"background ".repeat(3100)}steady-needle` },
+  });
+  try {
+    await agent.client.waitForFinish(agent.agentId, 15_000);
+    await openAgentRoute(page, agent);
+    await searchChat(page, "steady-needl");
+    await expect(status(page)).toHaveText("1 of 1");
+    await expectHighlight(page, "steady-needl");
+    await expectStableSearchPosition(page, async () => {
+      await query(page).press("End");
+      await query(page).press("e");
+      await expect(status(page)).toHaveText("1 of 1");
+      await expectHighlight(page, "steady-needle");
+    });
+  } finally {
+    await agent.cleanup();
+  }
+});

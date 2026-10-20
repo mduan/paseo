@@ -2,7 +2,9 @@ import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore }
 import { Pressable, Text, View, type PointerEvent as RNPointerEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useReducedMotion } from "react-native-reanimated";
+import { SIDEBAR_EDGE_WIDTH } from "@/components/desktop-sidebar-layout";
 import { useContainerWidthBelow } from "@/hooks/use-container-width";
+import { usePanelStore } from "@/stores/panel-store";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { createChatOutlineHoverIntent } from "./hover-intent";
 import { promptTickMagnification } from "./model";
@@ -32,6 +34,7 @@ export const ChatOutlineRail = memo(function ChatOutlineRail({
   const activeSeq = useSyncExternalStore(activePrompt.subscribe, activePrompt.getActiveSeq);
   const prefersReducedMotion = useReducedMotion();
   const { onLayout, isBelow: isPanelNarrow } = useContainerWidthBelow(MIN_PANEL_WIDTH);
+  const isSidebarOpen = usePanelStore((state) => state.desktop.agentListOpen);
 
   const hoverIntent = useMemo(
     () =>
@@ -80,7 +83,7 @@ export const ChatOutlineRail = memo(function ChatOutlineRail({
     <View style={styles.panelMeasure} pointerEvents="box-none" onLayout={onLayout}>
       {isPanelNarrow ? null : (
         <View
-          style={styles.rail}
+          style={[styles.rail, !isSidebarOpen && styles.railBesideCollapsedSidebar]}
           role="tablist"
           testID="chat-outline-rail"
           onPointerEnter={handlePointerEnterRail}
@@ -198,6 +201,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,
+  },
+  railBesideCollapsedSidebar: {
+    left: SIDEBAR_EDGE_WIDTH + theme.spacing[2],
   },
   // Slots tile the rail with no gaps, so every pixel of the column belongs to a prompt even
   // when a long conversation squeezes them well below their resting height.

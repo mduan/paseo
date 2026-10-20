@@ -274,6 +274,10 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceSidebarGroupSelected: "#ededee",
     surfaceWorkspace: tint.surface0,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
+    searchMatchBackground: "#fff0a3",
+    searchMatchForeground: "#342600",
+    searchSelectedMatchBackground: "#edaa35",
+    searchSelectedMatchForeground: "#322000",
 
     foreground: tint.foreground,
     foregroundMuted: tint.foregroundMuted,
@@ -406,6 +410,10 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceSidebarGroupSelected: tint.surface0,
     surfaceWorkspace: tint.surface1,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
+    searchMatchBackground: "#50481a",
+    searchMatchForeground: "#fff2b5",
+    searchSelectedMatchBackground: "#e9a43a",
+    searchSelectedMatchForeground: "#322000",
 
     foreground,
     foregroundMuted: tint.foregroundMuted,

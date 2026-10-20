@@ -94,6 +94,25 @@ export function createProjectViewKey(identity: { serverId: string; projectId: st
   return JSON.stringify([identity.serverId, identity.projectId]);
 }
 
+export function parseProjectViewKey(
+  viewKey: string,
+): { serverId: string; projectId: string } | undefined {
+  try {
+    const parsed: unknown = JSON.parse(viewKey);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      typeof parsed[0] === "string" &&
+      typeof parsed[1] === "string"
+    ) {
+      return { serverId: parsed[0], projectId: parsed[1] };
+    }
+  } catch {
+    // Not a view key this module created.
+  }
+  return undefined;
+}
+
 function compareWorkspaces(left: WorkspaceDescriptor, right: WorkspaceDescriptor): number {
   return (
     left.name.localeCompare(right.name, undefined, {

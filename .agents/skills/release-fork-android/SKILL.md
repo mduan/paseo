@@ -1,6 +1,6 @@
 ---
-name: relase-fork-android
-description: Build and sign a Paseo Fork Android release APK, then serve it through a verified LAN download link. Use for "release fork android", "/relase-fork-android", or requests for a Paseo fork APK download.
+name: release-fork-android
+description: Build and sign a Paseo Fork Android release APK, then serve it through a verified LAN download link. Use for "release fork android", "/release-fork-android", or requests for a Paseo fork APK download.
 ---
 
 # Release fork Android

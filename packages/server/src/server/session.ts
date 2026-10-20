@@ -299,6 +299,8 @@ type ProviderSubagentManagerEvent = Extract<
 const LEGACY_PROVIDER_IDS = new Set(["claude", "codex", "opencode"]);
 const MIN_VERSION_ALL_PROVIDERS = "0.1.45";
 const MIN_VERSION_EXPLICIT_WORKSPACE_RECOVERY = "0.1.105";
+const PROJECT_ICON_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
 function errorToFriendlyMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -2962,6 +2964,8 @@ export class Session {
         return this.handleArchiveWorkspaceRequest(msg);
       case "project.remove.request":
         return this.handleProjectRemoveRequest(msg);
+      case "project.icon.color.set.request":
+        return this.handleProjectIconColorSetRequest(msg);
       case "workspace.title.set.request":
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
       case "workspace.pin.set.request":
@@ -3615,6 +3619,42 @@ export class Session {
           projectId,
           accepted: false,
           error: getErrorMessageOr(error, "Failed to update project icon"),
+        },
+      });
+    }
+  }
+
+  private async handleProjectIconColorSetRequest(
+    request: Extract<SessionInboundMessage, { type: "project.icon.color.set.request" }>,
+  ): Promise<void> {
+    const { projectId, requestId } = request;
+    try {
+      if (request.color !== null && !PROJECT_ICON_COLOR_PATTERN.test(request.color)) {
+        throw new Error("Icon color must be a #rrggbb hex value");
+      }
+      const existing = await this.projectRegistry.get(projectId);
+      if (!existing) throw new Error("Project not found");
+
+      const updated = {
+        ...existing,
+        iconColor: request.color?.toLowerCase() ?? null,
+        updatedAt: new Date().toISOString(),
+      };
+      await this.projectRegistry.upsert(updated);
+      this.emit({
+        type: "project.icon.color.set.response",
+        payload: { requestId, projectId, accepted: true, error: null },
+      });
+      // Only project descriptors carry the color, so workspaces need no re-emit.
+      await this.emitProjectUpdate({ kind: "upsert", project: updated });
+    } catch (error) {
+      this.emit({
+        type: "project.icon.color.set.response",
+        payload: {
+          requestId,
+          projectId,
+          accepted: false,
+          error: getErrorMessageOr(error, "Failed to update project icon color"),
         },
       });
     }
@@ -5938,6 +5978,7 @@ export class Session {
       projectCustomName: project.customName ?? null,
       projectCustomIconRevision: project.customIconRevision ?? null,
       projectIconRevision: icon.revision,
+      projectIconColor: project.iconColor ?? null,
       projectRootPath: project.rootPath,
       projectKind: project.kind,
     };
@@ -7898,7 +7939,13 @@ export class Session {
         direction: "tail",
         limit: 1,
       });
-      const result = await searchTimeline({ rows, query: msg.query, cursor: msg.cursor });
+      const result = await searchTimeline({
+        rows,
+        query: msg.query,
+        cursor: msg.cursor,
+        options: msg.options,
+        isRunning: this.agentManager.getAgent(msg.agentId)?.lifecycle === "running",
+      });
       if (
         this.agentManager.fetchTimeline(msg.agentId, { direction: "tail", limit: 1 }).epoch !==
         epoch

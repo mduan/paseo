@@ -26,6 +26,9 @@ async function search(page: Page, query: string): Promise<void> {
 
 async function selectHost(page: Page, serverId: string): Promise<void> {
   await page.getByTestId("sessions-hosts-filter-trigger").click();
+  const all = page.getByTestId("sessions-hosts-filter-all");
+  if ((await all.textContent()) === "Select all") await all.click();
+  await all.click();
   await page.getByTestId(`sessions-hosts-filter-item-${serverId}`).click();
   await page.keyboard.press("Escape");
 }
@@ -129,7 +132,8 @@ test.describe("History search across hosts", () => {
       const rowTop = (await row.boundingBox())?.y;
 
       await page.getByTestId("sessions-status-filter-trigger").click();
-      await page.getByTestId("sessions-status-filter-item-active").click();
+      await page.getByTestId("sessions-status-filter-item-archived").click();
+      await page.keyboard.press("Escape");
       const clear = page.getByRole("button", { name: "Clear filters", exact: true });
       await expect(clear).toBeVisible();
       await expect.poll(async () => (await toolbar.boundingBox())?.height).toBe(toolbarHeight);
@@ -201,9 +205,13 @@ test.describe("History search across hosts", () => {
       await expectChronologicalTitles(page, [weakTitle]);
 
       await selectHost(page, secondaryDaemon.serverId);
+      await expectChronologicalTitles(page, [strongTitle]);
+      await page.getByTestId("sessions-hosts-filter-trigger").click();
+      await page.getByTestId(`sessions-hosts-filter-item-${getServerId()}`).click();
+      await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [weakTitle, strongTitle]);
       await selectHost(page, getServerId());
-      await expectChronologicalTitles(page, [strongTitle]);
+      await expectChronologicalTitles(page, [weakTitle]);
 
       // Back to all hosts, and clearing the query returns every seeded session.
       await page.getByTestId("sessions-hosts-filter-trigger").click();
@@ -257,8 +265,23 @@ test.describe("History search across hosts", () => {
       const filterLabelTop = (await hostFilterLabel.boundingBox())?.y;
       for (const group of ["hosts", "projects", "providers", "models"]) {
         await page.getByTestId(`sessions-${group}-filter-trigger`).click();
+        const all = page.getByTestId(`sessions-${group}-filter-all`);
+        await expect(all).toHaveText("Deselect all");
+        const items = page.getByTestId(new RegExp(`^sessions-${group}-filter-item-`));
+        for (const item of await items.all())
+          await expect(item).toHaveAttribute("aria-checked", "true");
+        await all.click();
+        await expect(all).toHaveText("Select all");
+        await page.keyboard.press("Escape");
+        await expectChronologicalTitles(page, []);
+        await expect(page.getByTestId(`sessions-${group}-filter-trigger`)).toContainText(
+          `No ${group}`,
+        );
+        await page.getByTestId(`sessions-${group}-filter-trigger`).click();
         await page.getByTestId(`sessions-${group}-filter-all`).click();
-        await expect(page.getByTestId(`sessions-${group}-filter-all`)).not.toBeVisible();
+        await expect(page.getByTestId(`sessions-${group}-filter-all`)).toHaveText("Deselect all");
+        await page.keyboard.press("Escape");
+        await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
       }
       const archivedRow = page
         .getByRole("button")
@@ -304,8 +327,9 @@ test.describe("History search across hosts", () => {
         "button",
       );
       await page.getByTestId("sessions-status-filter-trigger").click();
-      await page.getByTestId("sessions-status-filter-item-archived").click();
-      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
+      await page.getByTestId("sessions-status-filter-item-active").click();
+      await expect(page.getByTestId("sessions-status-filter-all")).toBeVisible();
+      await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [archivedTitle]);
       await expect(toolbar).toHaveCSS("height", `${toolbarHeight}px`);
       await expect.poll(async () => (await hostFilterLabel.boundingBox())?.y).toBe(filterLabelTop);
@@ -319,22 +343,32 @@ test.describe("History search across hosts", () => {
       await expect.poll(async () => (await archivedRow.boundingBox())?.y).toBe(filteredListTop);
       await page.getByTestId("sessions-status-filter-trigger").click();
       await page.getByTestId("sessions-status-filter-all").click();
-      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
+      await expect(page.getByTestId("sessions-status-filter-all")).toHaveText("Select all");
+      await page.keyboard.press("Escape");
+      await expectChronologicalTitles(page, []);
+      await expect(page.getByTestId("sessions-status-filter-trigger")).toContainText("No sessions");
+      await page.getByTestId("sessions-status-filter-trigger").click();
+      await page.getByTestId("sessions-status-filter-all").click();
+      await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
       await page.getByTestId("sessions-status-filter-trigger").click();
-      await page.getByTestId("sessions-status-filter-item-active").click();
-      await expect(page.getByTestId("sessions-status-filter-all")).not.toBeVisible();
+      await page.getByTestId("sessions-status-filter-item-archived").click();
+      await expect(page.getByTestId("sessions-status-filter-all")).toBeVisible();
+      await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [activeTitle]);
       await page.getByTestId("sessions-projects-filter-trigger").click();
       const projectItems = page.getByTestId(/^sessions-projects-filter-item-/);
       await expect(projectItems).toHaveCount(2);
+      await page.getByTestId("sessions-projects-filter-all").click();
       await projectItems.filter({ hasText: firstWorkspace.repoPath.split("/").pop()! }).click();
       await projectItems.filter({ hasText: secondWorkspace.repoPath.split("/").pop()! }).click();
       await page.keyboard.press("Escape");
       await page.getByTestId("sessions-providers-filter-trigger").click();
+      await page.getByTestId("sessions-providers-filter-all").click();
       await page.getByTestId("sessions-providers-filter-item-mock").click();
       await page.keyboard.press("Escape");
       await page.getByTestId("sessions-models-filter-trigger").click();
+      await page.getByTestId("sessions-models-filter-all").click();
       await page.getByTestId('sessions-models-filter-item-["mock","e2e-fast-stream"]').click();
       await page.keyboard.press("Escape");
       await expectChronologicalTitles(page, [activeTitle]);
@@ -394,11 +428,12 @@ test.describe("History search across hosts", () => {
       await page.getByTestId("sessions-filters-trigger").click();
       await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
       await page.getByTestId("sessions-hosts-filter-all").click();
-      await expect(page.getByTestId("sessions-filters-sheet-content")).not.toBeVisible();
-      await page.getByTestId("sessions-filters-trigger").click();
+      await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
+      await expect(page.getByTestId("sessions-hosts-filter-all")).toHaveText("Select all");
       await page.getByTestId(`sessions-hosts-filter-item-${getServerId()}`).click();
       await expect(page.getByTestId("sessions-filters-sheet-content")).toBeVisible();
-      await page.getByTestId("sessions-status-filter-item-archived").click();
+      await page.getByTestId("sessions-status-filter-all").click();
+      await page.getByTestId("sessions-status-filter-item-active").click();
       await page.screenshot({ path: testInfo.outputPath("history-compact-filters.png") });
       await page
         .getByRole("button", { name: "Bottom sheet backdrop" })

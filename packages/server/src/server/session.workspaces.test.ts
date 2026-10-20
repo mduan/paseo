@@ -8433,6 +8433,71 @@ test("project.rename.request returns accepted=false when project is not found", 
   expect(response?.payload.error).toBeTruthy();
 });
 
+test("project.icon.color.set.request stores a lowercased hex and emits project.update", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  session.updateClientCapabilities({ [CLIENT_CAPS.projectUpdates]: true });
+
+  const project = createPersistedProjectRecord({
+    projectId: "prj_color",
+    rootPath: REPO_CWD,
+    kind: "non_git",
+    displayName: "repo",
+    createdAt: "2026-10-19T12:00:00.000Z",
+    updatedAt: "2026-10-19T12:00:00.000Z",
+  });
+  const projects = new Map([[project.projectId, project]]);
+  session.projectRegistry.get = async (id: string) => projects.get(id) ?? null;
+  session.projectRegistry.upsert = async (record: unknown) => {
+    const parsed = record as typeof project;
+    projects.set(parsed.projectId, parsed);
+  };
+
+  await session.handleMessage({
+    type: "project.icon.color.set.request",
+    projectId: project.projectId,
+    color: "#3A7BD5",
+    requestId: "req-color",
+  });
+
+  expect(findByType(emitted, "project.icon.color.set.response")?.payload).toEqual({
+    requestId: "req-color",
+    projectId: project.projectId,
+    accepted: true,
+    error: null,
+  });
+  expect(projects.get(project.projectId)?.iconColor).toBe("#3a7bd5");
+  expect(findByType(emitted, "project.update")?.payload).toMatchObject({
+    kind: "upsert",
+    project: { projectId: project.projectId, projectIconColor: "#3a7bd5" },
+  });
+});
+
+test("project.icon.color.set.request rejects a value that is not #rrggbb", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  let upserted = false;
+  session.projectRegistry.upsert = async () => {
+    upserted = true;
+  };
+
+  await session.handleMessage({
+    type: "project.icon.color.set.request",
+    projectId: "prj_color",
+    color: "teal",
+    requestId: "req-color-bad",
+  });
+
+  const response = findByType(emitted, "project.icon.color.set.response");
+  expect(response?.payload).toMatchObject({ requestId: "req-color-bad", accepted: false });
+  expect(response?.payload.error).toBeTruthy();
+  expect(upserted).toBe(false);
+});
+
 test("workspace.title.set.request stores the title and emits an updated descriptor", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = asTestSession(

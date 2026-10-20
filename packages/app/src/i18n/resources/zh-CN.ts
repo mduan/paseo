@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const zhCN: TranslationResources = {
   paneFind: {
+    invalidRegex: "无效的正则表达式",
+    includeCollapsedWork: "包含折叠的“工作时长”部分",
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",
     revealFailure: "无法显示此匹配项。请重试。",
@@ -45,6 +47,7 @@ export const zhCN: TranslationResources = {
       search: "搜索",
       select: "选择",
       selectAll: "全选",
+      deselectAll: "取消全选",
     },
     placeholders: {
       search: "搜索...",
@@ -301,6 +304,13 @@ export const zhCN: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "未选择主机",
+      noProjects: "未选择项目",
+      noProviders: "未选择提供商",
+      noModels: "未选择模型",
+      noAgents: "未选择代理",
+      noSessions: "未选择会话",
+
       agentType: "代理类型",
       allAgents: "所有代理",
       mainAgents: "主代理",
@@ -2834,6 +2844,13 @@ export const zhCN: TranslationResources = {
         icon: "图标",
         chooseImage: "选择图片",
         useAutomatic: "使用自动",
+        color: {
+          title: "图标颜色",
+          auto: "自动",
+          custom: "自定义",
+          hex: "十六进制颜色",
+          done: "完成",
+        },
         imageUrl: "图片或网站 URL",
         save: "保存更改",
         savedToast: "Project 已更新",

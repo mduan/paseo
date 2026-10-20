@@ -1,7 +1,16 @@
 import { router } from "expo-router";
 import { CircleGauge, FolderPlus, GitBranch, Server, Settings, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Pressable,
   StyleSheet as RNStyleSheet,
@@ -115,14 +124,19 @@ interface MobileSidebarProps extends SidebarSharedProps {
 }
 
 interface DesktopSidebarProps extends SidebarSharedProps {
+  chromeEnabled: boolean;
   insetsTop: number;
   active: boolean;
   overlay: boolean;
 }
 
-type LeftSidebarProps = Pick<DesktopSidebarProps, "active" | "overlay">;
+type LeftSidebarProps = Pick<DesktopSidebarProps, "chromeEnabled" | "active" | "overlay">;
 
-export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSidebarProps) {
+export const LeftSidebar = memo(function LeftSidebar({
+  chromeEnabled,
+  active,
+  overlay,
+}: LeftSidebarProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -226,7 +240,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSi
     pinnedGroups,
     projects,
     hasProjectsBeforeFilter,
-    hasActiveProjectFilter: resolvedProjectFilters.length > 0,
+    hasActiveProjectFilter: resolvedProjectFilters?.length !== 0,
     workspaceEntriesByKey,
     isInitialLoad,
     isRevalidating,
@@ -266,6 +280,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active, overlay }: LeftSi
       <RetainedPanelActivity active={active}>
         <DesktopSidebar
           {...sharedProps}
+          chromeEnabled={chromeEnabled}
           insetsTop={insets.top}
           active={active}
           overlay={overlay}
@@ -626,6 +641,7 @@ function MobileSidebar({
 }
 
 function DesktopSidebar({
+  chromeEnabled,
   theme,
   workspaceGroups,
   projectIconTargets,
@@ -665,6 +681,7 @@ function DesktopSidebar({
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
   const revealProgress = useSharedValue(active ? 1 : 0);
+  const wasChromeEnabledRef = useRef(chromeEnabled);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
   const hideResizeGrip = useCallback(() => setResizePressed(false), []);
@@ -673,9 +690,12 @@ function DesktopSidebar({
     resizeWidth.value = visibleSidebarWidth;
   }, [resizeWidth, visibleSidebarWidth]);
 
-  useEffect(() => {
-    revealProgress.value = withTiming(active ? 1 : 0, { duration: 160 });
-  }, [active, revealProgress]);
+  useLayoutEffect(() => {
+    const shouldAnimate = chromeEnabled && wasChromeEnabledRef.current;
+    wasChromeEnabledRef.current = chromeEnabled;
+    const target = active ? 1 : 0;
+    revealProgress.value = shouldAnimate ? withTiming(target, { duration: 160 }) : target;
+  }, [active, chromeEnabled, revealProgress]);
 
   const resizeGesture = useMemo(
     () =>
@@ -718,7 +738,7 @@ function DesktopSidebar({
   );
 
   const resizeAnimatedStyle = useAnimatedStyle(() => {
-    const isVisible = active || revealProgress.value > 0;
+    const isVisible = chromeEnabled && (active || revealProgress.value > 0);
     return {
       width: resizeWidth.value,
       transform: [{ translateX: (revealProgress.value - 1) * resizeWidth.value }],

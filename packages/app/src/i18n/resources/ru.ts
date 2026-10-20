@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ru: TranslationResources = {
   paneFind: {
+    invalidRegex: "Недопустимое регулярное выражение",
+    includeCollapsedWork: "Включать свёрнутые разделы «Работал в течение»",
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",
     historyChangedFailure: "Чат изменился во время поиска. Выполните поиск снова.",
@@ -46,6 +48,7 @@ export const ru: TranslationResources = {
       search: "Поиск",
       select: "Выбрать",
       selectAll: "Выбрать все",
+      deselectAll: "Снять выделение",
     },
     placeholders: {
       search: "Поиск...",
@@ -306,6 +309,13 @@ export const ru: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Нет хостов",
+      noProjects: "Нет проектов",
+      noProviders: "Нет провайдеров",
+      noModels: "Нет моделей",
+      noAgents: "Нет агентов",
+      noSessions: "Нет сессий",
+
       agentType: "Тип агента",
       allAgents: "Все агенты",
       mainAgents: "Основные агенты",
@@ -2920,6 +2930,13 @@ export const ru: TranslationResources = {
         icon: "Значок",
         chooseImage: "Выбрать изображение",
         useAutomatic: "Использовать автоматический значок",
+        color: {
+          title: "Цвет значка",
+          auto: "Авто",
+          custom: "Свой",
+          hex: "Цвет в HEX",
+          done: "Готово",
+        },
         imageUrl: "URL изображения или сайта",
         save: "Сохранить изменения",
         savedToast: "Проект обновлён",

@@ -86,6 +86,32 @@ export function SessionsScreen() {
   return <SessionsScreenContent />;
 }
 
+function useFilteredAgentHistory({
+  filters,
+  ...options
+}: Parameters<typeof useAgentHistory>[0] & { filters: HistoryFilters }) {
+  // Keep fetching options and capabilities so an empty selection can be changed back to all.
+  const history = useAgentHistory({ ...options, serverIds: filters.hosts ?? [] });
+  const matchesNothing =
+    filters.hosts === null ||
+    (history.isFilterSupported &&
+      (filters.projects === null ||
+        filters.providers === null ||
+        filters.models === null ||
+        filters.status === HistoryStatus.None ||
+        (history.isAgentTypeFilterSupported && filters.agentType === HistoryAgentType.None)));
+  if (!matchesNothing) return history;
+  return {
+    ...history,
+    agents: [],
+    hasMore: false,
+    isInitialLoad: false,
+    isLoadingMore: false,
+    isError: false,
+    hostErrors: [],
+  };
+}
+
 function SessionsScreenContent() {
   const { t } = useTranslation();
   const importSession = useImportSession();
@@ -137,9 +163,9 @@ function SessionsScreenContent() {
       ...(filters.agentType === HistoryAgentType.All
         ? {}
         : { isSubagent: filters.agentType === HistoryAgentType.Subagent }),
-      projectKeys: filters.projects,
-      providers: filters.providers,
-      models: filters.models,
+      projectKeys: filters.projects ?? [],
+      providers: filters.providers ?? [],
+      models: filters.models ?? [],
       includeArchived: filters.status !== HistoryStatus.Active,
       ...(filters.status === HistoryStatus.All
         ? {}
@@ -163,8 +189,8 @@ function SessionsScreenContent() {
     hostErrors,
     loadMore,
     refreshAll,
-  } = useAgentHistory({
-    serverIds: filters.hosts,
+  } = useFilteredAgentHistory({
+    filters,
     filter,
     search,
     searchOptions: historySearch.queryOptions,
@@ -173,12 +199,12 @@ function SessionsScreenContent() {
   const isSearching = isSearchSupported && search.length > 0;
 
   useEffect(() => {
-    if (!hostsLoaded) return;
+    if (!hostsLoaded || !filters.hosts) return;
     const hostsStillPresent = filters.hosts.filter((id) =>
       hosts.some((host) => host.serverId === id),
     );
     if (hostsStillPresent.length !== filters.hosts.length) {
-      setFilters({ ...filters, hosts: hostsStillPresent });
+      setFilters({ ...filters, hosts: hostsStillPresent.length ? hostsStillPresent : null });
     }
   }, [hosts, hostsLoaded, filters, setFilters]);
 
@@ -189,7 +215,7 @@ function SessionsScreenContent() {
     void refreshAll().finally(() => setIsManualRefresh(false));
   }, [refreshAll]);
 
-  const isFiltering = isFilterSupported ? hasHistoryFilters(filters) : filters.hosts.length > 0;
+  const isFiltering = isFilterSupported ? hasHistoryFilters(filters) : filters.hosts?.length !== 0;
   const emptyText = isSearching || isFiltering ? t("sessions.noMatches") : t("sessions.empty");
   const showLoadError = isError && agents.length === 0;
   const showResults = !isInitialLoad && !showLoadError;

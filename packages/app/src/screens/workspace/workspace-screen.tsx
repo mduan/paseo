@@ -612,7 +612,7 @@ function MobileWorkspaceTabOption({
     onReloadAgent,
     onRenameTab,
     onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
-    renameWithAiPending: aiRename.isPending,
+    renameWithAiPendingIds: aiRename.pendingIds,
     onCloseTab,
     onCloseTabsBefore: onCloseTabsAbove,
     onCloseTabsAfter: onCloseTabsBelow,
@@ -3092,7 +3092,7 @@ function WorkspaceScreenContent({
         },
         onReloadAgent: handleReloadAgent,
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
-        renameWithAiPending: aiRename.isPending,
+        renameWithAiPendingIds: aiRename.pendingIds,
         // The rename modal only renders on the focused workspace, so bring this one forward.
         onRenameTab: (renameTab) => {
           navigateToWorkspace({
@@ -3122,7 +3122,7 @@ function WorkspaceScreenContent({
     allTabDescriptorsById,
     aiRename.supported,
     aiRename.rename,
-    aiRename.isPending,
+    aiRename.pendingIds,
     handleCloseOtherTabsInPane,
     handleCloseTabById,
     handleCloseTabsToLeftInPane,

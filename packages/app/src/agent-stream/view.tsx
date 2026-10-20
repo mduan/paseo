@@ -630,7 +630,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           : undefined,
       [onOpenTurnDiff, presentation.tail, turnDiffs, turnDiffsEnabled],
     );
-    const { tail: displayTail, workToggles } = useFoldedTail({
+    const {
+      tail: displayTail,
+      workToggles,
+      expandedTurnKeys,
+      expand: expandTurn,
+    } = useFoldedTail({
       chatKey: `${resolvedServerId}:${agentId}`,
       tail: presentation.tail,
       head: presentation.head,
@@ -1193,6 +1198,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         viewportRef={viewportRef}
         revealLoadedMessage={revealLoadedHistory}
         visibleMessageIds={visibleMessageIds}
+        expandedTurnKeys={expandedTurnKeys}
+        expandTurn={expandTurn}
       >
         <ToolCallSheetProvider>
           <AssistantSelectionCopySurface style={stylesheet.container}>

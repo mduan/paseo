@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ptBR: TranslationResources = {
   paneFind: {
+    invalidRegex: "Expressão regular inválida",
+    includeCollapsedWork: "Incluir seções “Trabalhou por” recolhidas",
     connectionFailure:
       "Não foi possível pesquisar nesta conversa. Verifique a conexão com o host e tente novamente.",
     historyChangedFailure: "A conversa mudou durante a busca. Busque novamente.",
@@ -46,6 +48,7 @@ export const ptBR: TranslationResources = {
       search: "Buscar",
       select: "Selecionar",
       selectAll: "Selecionar tudo",
+      deselectAll: "Desmarcar tudo",
     },
     placeholders: {
       search: "Buscar...",
@@ -306,6 +309,13 @@ export const ptBR: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Nenhum host",
+      noProjects: "Nenhum projeto",
+      noProviders: "Nenhum provedor",
+      noModels: "Nenhum modelo",
+      noAgents: "Nenhum agente",
+      noSessions: "Nenhuma sessão",
+
       agentType: "Tipo de agente",
       allAgents: "Todos os agentes",
       mainAgents: "Agentes principais",
@@ -2912,6 +2922,13 @@ export const ptBR: TranslationResources = {
         icon: "Ícone",
         chooseImage: "Escolher imagem",
         useAutomatic: "Usar automático",
+        color: {
+          title: "Cor do ícone",
+          auto: "Automática",
+          custom: "Personalizada",
+          hex: "Cor hexadecimal",
+          done: "Concluído",
+        },
         imageUrl: "URL de imagem ou site",
         save: "Salvar alterações",
         savedToast: "Projeto atualizado",

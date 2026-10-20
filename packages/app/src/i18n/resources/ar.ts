@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const ar: TranslationResources = {
   paneFind: {
+    invalidRegex: "تعبير نمطي غير صالح",
+    includeCollapsedWork: "تضمين أقسام «عمل لمدة» المطوية",
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",
     revealFailure: "تعذر عرض هذا التطابق. أعد المحاولة.",
@@ -45,6 +47,7 @@ export const ar: TranslationResources = {
       search: "يبحث",
       select: "يختار",
       selectAll: "تحديد الكل",
+      deselectAll: "إلغاء تحديد الكل",
     },
     placeholders: {
       search: "يبحث...",
@@ -301,6 +304,13 @@ export const ar: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "لم يتم تحديد مضيفين",
+      noProjects: "لم يتم تحديد مشاريع",
+      noProviders: "لم يتم تحديد مزوّدين",
+      noModels: "لم يتم تحديد نماذج",
+      noAgents: "لم يتم تحديد وكلاء",
+      noSessions: "لم يتم تحديد جلسات",
+
       agentType: "نوع الوكيل",
       allAgents: "جميع الوكلاء",
       mainAgents: "الوكلاء الرئيسيون",
@@ -2867,6 +2877,13 @@ export const ar: TranslationResources = {
         icon: "الأيقونة",
         chooseImage: "اختيار صورة",
         useAutomatic: "استخدام التلقائي",
+        color: {
+          title: "لون الأيقونة",
+          auto: "تلقائي",
+          custom: "مخصص",
+          hex: "لون سداسي عشري",
+          done: "تم",
+        },
         imageUrl: "رابط صورة أو موقع",
         save: "حفظ التغييرات",
         savedToast: "تم تحديث المشروع",

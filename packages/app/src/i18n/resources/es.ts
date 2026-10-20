@@ -3,6 +3,8 @@ import { pluginSettings } from "./plugin-settings";
 
 export const es: TranslationResources = {
   paneFind: {
+    invalidRegex: "Expresión regular no válida",
+    includeCollapsedWork: "Incluir las secciones «Trabajó durante» contraídas",
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",
     historyChangedFailure: "El chat cambió durante la búsqueda. Vuelve a buscar.",
@@ -46,6 +48,7 @@ export const es: TranslationResources = {
       search: "Buscar",
       select: "Seleccionar",
       selectAll: "Seleccionar todo",
+      deselectAll: "Deseleccionar todo",
     },
     placeholders: {
       search: "Buscar...",
@@ -307,6 +310,13 @@ export const es: TranslationResources = {
       },
     },
     filters: {
+      noHosts: "Ningún host",
+      noProjects: "Ningún proyecto",
+      noProviders: "Ningún proveedor",
+      noModels: "Ningún modelo",
+      noAgents: "Ningún agente",
+      noSessions: "Ninguna sesión",
+
       agentType: "Tipo de agente",
       allAgents: "Todos los agentes",
       mainAgents: "Agentes principales",
@@ -2928,6 +2938,13 @@ export const es: TranslationResources = {
         icon: "Icono",
         chooseImage: "Elegir imagen",
         useAutomatic: "Usar automático",
+        color: {
+          title: "Color del icono",
+          auto: "Automático",
+          custom: "Personalizado",
+          hex: "Color hexadecimal",
+          done: "Listo",
+        },
         imageUrl: "URL de imagen o sitio web",
         save: "Guardar cambios",
         savedToast: "Proyecto actualizado",

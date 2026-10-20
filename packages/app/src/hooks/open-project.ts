@@ -69,10 +69,10 @@ export function registerProjectDescriptor(input: RegisterProjectDescriptorInput)
   if (!serverId) return false;
   input.upsertProject(serverId, normalizeProjectDescriptor(input.project));
   input.setHasHydratedWorkspaces(serverId, true);
-  const { projectFilters, toggleProjectFilter } = useSidebarViewStore.getState();
+  const { projectFilters, setProjectFilters } = useSidebarViewStore.getState();
   const viewKey = createProjectViewKey({ serverId, projectId: input.project.projectId });
-  if (projectFilters.length > 0 && !projectFilters.includes(viewKey)) {
-    toggleProjectFilter(viewKey);
+  if (projectFilters?.length !== 0 && !projectFilters?.includes(viewKey)) {
+    setProjectFilters([...(projectFilters ?? []), viewKey]);
   }
   return true;
 }

@@ -1,14 +1,17 @@
 import { Buffer } from "buffer";
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { Pressable, View } from "react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { Pencil } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { ProjectIconSource } from "@getpaseo/protocol/messages";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
+import { ProjectIconColorPicker } from "@/components/project-icon-color-picker";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { Button } from "@/components/ui/button";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { FieldControlSize } from "@/components/ui/control-geometry";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -22,7 +25,16 @@ import {
   type ProjectIconIntent,
 } from "@/projects/edit-form";
 import { importProjectIconFromUrl } from "@/projects/import-project-icon";
+import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import type { Theme } from "@/styles/theme";
 import { toErrorMessage } from "@/utils/error-messages";
+
+const EMPTY_COMBOBOX_OPTIONS: ComboboxOption[] = [];
+const COLOR_PICKER_WIDTH = 236;
+const ThemedPencil = withUnistyles(Pencil);
+const pencilColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
+
+function noop() {}
 
 export interface ProjectEditSheetProps {
   visible: boolean;
@@ -33,6 +45,8 @@ export interface ProjectEditSheetProps {
   client: DaemonClient;
   /** False on hosts that predate custom project icons — the icon field is hidden. */
   supportsCustomIcon: boolean;
+  /** False on hosts that predate custom icon colors — the icon isn't tappable. */
+  supportsIconColor: boolean;
   snapshot: ProjectEditFormSnapshot;
 }
 
@@ -44,6 +58,7 @@ export function ProjectEditSheet({
   projectViewKey,
   client,
   supportsCustomIcon,
+  supportsIconColor,
   snapshot,
 }: ProjectEditSheetProps) {
   const { t } = useTranslation();
@@ -89,7 +104,19 @@ export function ProjectEditSheet({
     void chooseImage();
   }, [chooseImage]);
 
+  const colorAnchorRef = useRef<View>(null);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const openColorPicker = useCallback(() => setIsColorPickerOpen(true), []);
+  const closeColorPicker = useCallback(() => setIsColorPickerOpen(false), []);
+  // The color only shows on the lettered fallback, so an image makes the icon inert.
+  const canPickColor = supportsIconColor && !state.previewDataUri && !isSaving;
+  const derivedColor = identityColor(deriveIdentityColorName(projectViewKey));
+
   const header = useMemo<SheetHeader>(() => ({ title: t("settings.project.edit.title") }), [t]);
+  const colorPickerHeader = useMemo<SheetHeader>(
+    () => ({ title: t("settings.project.edit.color.title") }),
+    [t],
+  );
 
   const footer = useMemo(
     () => (
@@ -156,13 +183,25 @@ export function ProjectEditSheet({
         >
           <View style={styles.iconField}>
             <View style={styles.iconRow}>
-              <ProjectIconView
-                iconDataUri={state.previewDataUri}
-                initial={projectInitial(snapshot.projectName)}
-                projectViewKey={projectViewKey}
-                size={40}
-                textStyle={styles.previewText}
-              />
+              <View ref={colorAnchorRef} collapsable={false}>
+                <Pressable
+                  onPress={openColorPicker}
+                  disabled={!canPickColor}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("settings.project.edit.color.title")}
+                  testID="project-edit-icon-color"
+                >
+                  <ProjectIconView
+                    iconDataUri={state.previewDataUri}
+                    initial={projectInitial(snapshot.projectName)}
+                    projectViewKey={projectViewKey}
+                    size={40}
+                    textStyle={styles.previewText}
+                    color={state.iconColor ?? derivedColor}
+                  />
+                  {canPickColor ? <ColorBadge /> : null}
+                </Pressable>
+              </View>
               <Button
                 variant="outline"
                 size={size}
@@ -200,7 +239,36 @@ export function ProjectEditSheet({
           </View>
         </Field>
       ) : null}
+      <Combobox
+        options={EMPTY_COMBOBOX_OPTIONS}
+        value=""
+        onSelect={noop}
+        open={isColorPickerOpen}
+        onOpenChange={setIsColorPickerOpen}
+        anchorRef={colorAnchorRef}
+        header={colorPickerHeader}
+        desktopMinWidth={COLOR_PICKER_WIDTH}
+        desktopLockWidth
+        desktopChildrenScrollEnabled={false}
+        mobileChildrenScrollEnabled={false}
+      >
+        <ProjectIconColorPicker
+          value={state.iconColor}
+          derivedColor={derivedColor}
+          onChange={form.setIconColor}
+          onCommit={closeColorPicker}
+        />
+      </Combobox>
     </AdaptiveModalSheet>
+  );
+}
+
+/** Marks the icon as tappable: it opens the color picker. */
+function ColorBadge() {
+  return (
+    <View style={styles.colorBadge}>
+      <ThemedPencil size={10} uniProps={pencilColorMapping} />
+    </View>
   );
 }
 
@@ -227,8 +295,8 @@ async function step<T>(scope: ProjectEditFormError["scope"], run: () => Promise<
 }
 
 /**
- * One submit, up to two RPCs. Icon bytes are acquired before either RPC runs
- * because that is the step most likely to fail; past that point both RPCs take
+ * One submit, up to three RPCs. Icon bytes are acquired before any RPC runs
+ * because that is the step most likely to fail; past that point every RPC takes
  * the same inputs on a retry, so a failure between them is safe to submit again.
  */
 async function submitProjectEdit(input: {
@@ -237,7 +305,7 @@ async function submitProjectEdit(input: {
   submission: ProjectEditSubmission;
 }): Promise<void> {
   const { client, projectId, submission } = input;
-  const { rename, icon } = submission;
+  const { rename, icon, iconColor } = submission;
 
   const source = icon ? await step("icon", () => acquireIconSource(icon)) : null;
   if (rename) {
@@ -245,6 +313,9 @@ async function submitProjectEdit(input: {
   }
   if (source) {
     await step("icon", () => client.setProjectIcon(projectId, source));
+  }
+  if (iconColor) {
+    await step("icon", () => client.setProjectIconColor(projectId, iconColor.color));
   }
 }
 
@@ -269,6 +340,19 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     flexWrap: "wrap",
     gap: theme.spacing[2],
+  },
+  colorBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface0,
+    borderWidth: theme.borderWidth[1],
+    borderColor: theme.colors.border,
   },
   previewText: {
     fontSize: theme.fontSize.base,

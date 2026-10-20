@@ -1,3 +1,6 @@
+import { createPhrasePattern } from "@getpaseo/protocol/search/phrase";
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
+import { completedTurnFolds } from "@getpaseo/protocol/turns";
 import MarkdownIt from "markdown-it";
 import { setImmediate } from "node:timers/promises";
 import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
@@ -9,11 +12,15 @@ interface SearchLocation {
   seq: number;
   role: "user" | "assistant";
   count: number;
+  folded: boolean;
+  turnId?: string;
 }
 interface SearchInput {
   rows: readonly AgentTimelineRow[];
   query: string;
   cursor?: number;
+  options?: SearchOptions;
+  isRunning?: boolean;
 }
 
 // Discovery is deliberately approximate. Only the client can verify displayed text, so
@@ -41,27 +48,42 @@ function searchableBlocks(text: string): string[] {
     .filter(Boolean);
 }
 
-function searchPattern(query: string): RegExp {
-  const source = query
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("\\s+");
-  return new RegExp(source, "giu");
-}
-
 function countMatches(text: string, pattern: RegExp): number {
   let count = 0;
-  for (const _ of text.matchAll(pattern)) count += 1;
+  for (const match of text.matchAll(pattern)) {
+    if (match[0].length) count += 1;
+  }
   return count;
 }
 
-export async function searchTimeline({ rows, query, cursor = 0 }: SearchInput) {
+export async function searchTimeline({
+  rows,
+  query,
+  cursor = 0,
+  options,
+  isRunning = false,
+}: SearchInput) {
   const locations: SearchLocation[] = [];
   if (!query.trim()) return { locations, nextCursor: null };
-  const pattern = searchPattern(query);
+  const pattern = createPhrasePattern({ query, options });
+  const entries = projectTimelineRows({ rows, mode: "projected" });
+  const foldItems = entries.map((entry) => ({
+    entry,
+    kind: entry.item.type,
+    turnId: entry.turnId,
+    text: entry.item.type === "assistant_message" ? entry.item.text : undefined,
+  }));
+  const folds = completedTurnFolds({
+    items: foldItems,
+    getMessageId: ({ entry }) => String(entry.seqEnd),
+    lastTurnIsLive: isRunning,
+  });
+  const foldedEntries = new Set(
+    folds.flatMap((turn) => [...turn.folded].map(({ entry }) => entry)),
+  );
+
   let lastYield = performance.now();
-  for (const entry of projectTimelineRows({ rows, mode: "projected" })) {
+  for (const entry of entries) {
     if (entry.seqEnd <= cursor) continue;
     const item = entry.item;
     if (item.type !== "user_message" && item.type !== "assistant_message") continue;
@@ -76,6 +98,8 @@ export async function searchTimeline({ rows, query, cursor = 0 }: SearchInput) {
         seq: entry.seqEnd,
         role: item.type === "user_message" ? "user" : "assistant",
         count,
+        folded: foldedEntries.has(entry),
+        turnId: entry.turnId,
       });
     }
     if (performance.now() - lastYield >= 8) {

@@ -113,7 +113,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onRenameTabWithAi?: (agentId: string) => void;
-  renameWithAiPending?: boolean;
+  renameWithAiPendingIds?: readonly string[];
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsBefore: (tabId: string) => Promise<void> | void;
   onCloseTabsAfter: (tabId: string) => Promise<void> | void;
@@ -135,7 +135,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onRenameTabWithAi?: (agentId: string) => void;
-  renameWithAiPending?: boolean;
+  renameWithAiPendingIds?: readonly string[];
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
@@ -336,7 +336,7 @@ export function buildWorkspaceTabMenuEntries(
         key: "rename-ai",
         label: i18n.t("workspace.tabs.menu.renameWithAi"),
         icon: "sparkles",
-        disabled: input.renameWithAiPending,
+        disabled: input.renameWithAiPendingIds?.includes(agentId),
         testID: `${menuTestIDBase}-rename-ai`,
         onSelect: () => renameWithAi(agentId),
       });
@@ -489,7 +489,7 @@ export function buildWorkspaceDesktopTabActions(
       onReloadAgent: input.onReloadAgent,
       onRenameTab: input.onRenameTab,
       onRenameTabWithAi: input.onRenameTabWithAi,
-      renameWithAiPending: input.renameWithAiPending,
+      renameWithAiPendingIds: input.renameWithAiPendingIds,
       onCloseTab: input.onCloseTab,
       onCloseTabsBefore: input.onCloseTabsToLeft,
       onCloseTabsAfter: input.onCloseTabsToRight,

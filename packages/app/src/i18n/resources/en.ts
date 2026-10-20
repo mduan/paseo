@@ -1,5 +1,7 @@
 export const en = {
   paneFind: {
+    invalidRegex: "Invalid regular expression",
+    includeCollapsedWork: "Include collapsed “Worked for” sections",
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",
     revealFailure: "Could not show this match. Retry.",
@@ -41,6 +43,7 @@ export const en = {
       search: "Search",
       select: "Select",
       selectAll: "Select all",
+      deselectAll: "Deselect all",
     },
     placeholders: {
       search: "Search...",
@@ -298,6 +301,13 @@ export const en = {
       },
     },
     filters: {
+      noHosts: "No hosts",
+      noProjects: "No projects",
+      noProviders: "No providers",
+      noModels: "No models",
+      noAgents: "No agents",
+      noSessions: "No sessions",
+
       agentType: "Agent type",
       allAgents: "All agents",
       mainAgents: "Main agents",
@@ -3038,6 +3048,13 @@ export const en = {
         icon: "Icon",
         chooseImage: "Choose image",
         useAutomatic: "Use automatic",
+        color: {
+          title: "Icon color",
+          auto: "Auto",
+          custom: "Custom",
+          hex: "Hex color",
+          done: "Done",
+        },
         imageUrl: "Image or website URL",
         save: "Save changes",
         savedToast: "Project updated",

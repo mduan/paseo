@@ -354,6 +354,7 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
     borderRadius: 20,
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[4],
+    maxWidth: "100%",
     minWidth: 0,
     flexShrink: 1,
   },
