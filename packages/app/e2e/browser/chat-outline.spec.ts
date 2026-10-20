@@ -138,6 +138,21 @@ test.describe("desktop chat outline", () => {
       await expectNoChatOutlinePreviewWhileCrossingToSidebar(page);
     });
 
+    test("keeps outline hover targets clear of the collapsed sidebar trigger", async ({ page }) => {
+      await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+      await page.mouse.move(700, 300);
+      const sidebar = page.getByTestId("left-sidebar");
+      await expect(sidebar).toBeHidden();
+      const trigger = await page.getByTestId("sidebar-edge-trigger").boundingBox();
+      const rail = await chatOutlineRail(page).boundingBox();
+      if (!trigger || !rail) throw new Error("Sidebar trigger or chat outline has no bounds");
+      expect(rail.x).toBeGreaterThan(trigger.x + trigger.width);
+
+      await hoverChatOutlinePrompt(page, 2);
+      await expectChatOutlinePreview(page, agent.prompts[1]);
+      await expect(sidebar).toBeHidden();
+    });
+
     test("closes the preview when the pointer leaves after a jump", async ({ page }) => {
       await clickChatOutlineRowEdge(page, 4);
       await movePointerOffChatOutline(page);
