@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { useSessionStore } from "@/stores/session-store";
-import { useMutation, useIsMutating, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useIsMutating,
+  useMutationState,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   ConversationTitleTarget,
@@ -16,7 +21,10 @@ export function useAiRename(serverId: string | undefined, target: ConversationTi
   const queryClient = useQueryClient();
   const supported = useHostFeature(serverId, "conversationTitleGeneration");
   const mutationKey = ["aiRename", serverId, target];
-  const isPending = useIsMutating({ mutationKey }) > 0;
+  const pendingIds = useMutationState({
+    filters: { mutationKey, status: "pending" },
+    select: (mutation) => mutation.state.variables as string,
+  });
   const mutation = useMutation({
     mutationKey,
     mutationFn: async (id: string) => {
@@ -57,7 +65,7 @@ export function useAiRename(serverId: string | undefined, target: ConversationTi
     },
     [mutate, queryClient, serverId, target],
   );
-  return { supported, rename, isPending };
+  return { supported, rename, pendingIds };
 }
 
 type AiRenamePendingInput = Pick<ConversationTitleRequestMessage, "target"> & {
