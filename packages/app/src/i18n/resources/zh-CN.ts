@@ -291,6 +291,7 @@ export const zhCN: TranslationResources = {
       fields: {
         subagent: "子代理标签",
         project: "项目",
+        workspaceName: "工作区",
         workspace: "文件夹",
         branch: "分支",
         host: "主机",

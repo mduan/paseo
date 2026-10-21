@@ -291,6 +291,7 @@ export const ar: TranslationResources = {
       fields: {
         subagent: "شارة الوكيل الفرعي",
         project: "المشروع",
+        workspaceName: "مساحة العمل",
         workspace: "مجلد",
         branch: "الفرع",
         host: "المضيف",

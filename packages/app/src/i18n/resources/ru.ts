@@ -296,6 +296,7 @@ export const ru: TranslationResources = {
       fields: {
         subagent: "Метка субагента",
         project: "Проект",
+        workspaceName: "Рабочее пространство",
         workspace: "Папка",
         branch: "Ветка",
         host: "Хост",

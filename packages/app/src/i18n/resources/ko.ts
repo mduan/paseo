@@ -292,6 +292,7 @@ export const ko: TranslationResources = {
       fields: {
         subagent: "하위 에이전트 배지",
         project: "프로젝트",
+        workspaceName: "워크스페이스",
         workspace: "폴더",
         branch: "브랜치",
         host: "호스트",
