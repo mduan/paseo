@@ -81,6 +81,29 @@ it("combines exact quoted history phrases with existing fuzzy tokens across fiel
   ]);
 });
 
+it("starts exact history matching at an opening quote", () => {
+  for (const query of ['"mai', '"mai"']) {
+    const search = createTextSearch({ query });
+    expect(search.matches(["main"])).toBe(true);
+    expect(search.matches(["maki"])).toBe(false);
+    expect(search.ranges("main")).toEqual([{ start: 0, length: 3 }]);
+  }
+  const mixed = createTextSearch({ query: 'mian "stripe bill' });
+  expect(mixed.matches(["main", "Stripe billing"])).toBe(true);
+  expect(mixed.matches(["main", "Stripe extra billing"])).toBe(false);
+  expect(mixed.matches(["main", "Stripe  billing"])).toBe(false);
+  const options = createTextSearch({
+    query: '"Bill',
+    options: { caseSensitive: true, wholeWord: true },
+  });
+  expect(options.matches(["Bill!"])).toBe(true);
+  expect(options.matches(["bill"])).toBe(false);
+  expect(options.matches(["Billing"])).toBe(false);
+  const regex = createTextSearch({ query: '"mai', options: { regex: true } });
+  expect(regex.matches(["main"])).toBe(false);
+  expect(regex.matches(['"main'])).toBe(true);
+});
+
 it("supports multiple quoted phrases, partial substrings, options, and unfinished quotes", () => {
   const search = createTextSearch({ query: '"bill" "export usage"' });
   expect(search.matches(["billing export usage"])).toBe(true);

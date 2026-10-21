@@ -38,8 +38,8 @@ export function createTextSearch({
   options?: SearchOptions;
 }): TextSearch {
   if (!options.regex) {
-    const parts = query.split(/("[^"]*")/g).map((text, index) => ({
-      text: index % 2 ? text.slice(1, -1) : text,
+    const parts = query.split('"').map((text, index) => ({
+      text,
       quoted: index % 2 === 1,
     }));
     if (parts.some((part) => part.quoted)) {

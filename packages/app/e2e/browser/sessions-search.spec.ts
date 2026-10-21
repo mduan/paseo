@@ -178,6 +178,10 @@ test.describe("History search", () => {
       const wholeWord = page.getByTestId("sessions-search-wholeWord");
       const regex = page.getByTestId("sessions-search-regex");
 
+      await search(page, `${NONCE} "mai`);
+      await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
+      await search(page, `${NONCE} "Stripe bill`);
+      await expectVisibleTitles(page, [TITLES.billing]);
       await search(page, `${NONCE} "Stripe billing"`);
       await expectVisibleTitles(page, [TITLES.billing]);
       await search(page, `${NONCE} "Stripe  billing"`);
