@@ -121,6 +121,7 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 ## Critical rules
 
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
+- **When the user asks you to merge a worktree branch into `main`, stop all dev processes started for that worktree** (dev app, dev daemon, watchers, etc.), including their child processes, unless the user instructs you to keep them running. Verify the processes selected for cleanup have exited before reporting the merge complete. Leave pre-existing and shared services running.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.
 - **NEVER add auth checks to tests** — agent providers handle their own auth.
 - **Before changing app routes, startup routing, remembered workspace restore, or active workspace selection, read [docs/expo-router.md](docs/expo-router.md).**
