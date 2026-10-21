@@ -544,6 +544,9 @@ export const ja: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "使用中のポート ({{count}})",
+      portsAccessibility: "使用中のポート: {{ports}}",
+      openInBrowser: "ブラウザーで開く",
       scriptsAccessibility: "ワークスペーススクリプト",
       copyPath: "パスをコピー",
       copyBranchName: "ブランチ名をコピー",
@@ -1226,6 +1229,7 @@ export const ja: TranslationResources = {
         branch: "ブランチ名",
       },
       show: {
+        ports: "使用中のポート",
         label: "表示項目",
         branch: "ブランチ",
         project: "プロジェクト",

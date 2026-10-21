@@ -21,6 +21,7 @@ import {
   Folder,
   GitBranch,
   GitPullRequest,
+  Plug,
   Globe,
   Hash,
   Server,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/menu";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { isWeb } from "@/constants/platform";
+import { useHostFeatureMap } from "@/runtime/host-features";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import { ProjectIconView } from "@/components/project-icon-view";
@@ -107,6 +109,7 @@ const ROW_ITEM_ICONS: Record<SidebarRowItem, OptionIcon> = {
   project: withUnistyles(Folder),
   host: withUnistyles(Server),
   changeRequest: withUnistyles(GitPullRequest),
+  ports: withUnistyles(Plug),
   services: withUnistyles(Globe),
   labels: withUnistyles(Tag),
 };
@@ -143,6 +146,7 @@ const ROW_ITEM_LABEL_KEYS: Record<SidebarRowItem, string> = {
   project: "sidebar.display.show.project",
   host: "sidebar.display.show.host",
   changeRequest: "sidebar.display.show.changeRequest",
+  ports: "sidebar.display.show.ports",
   services: "sidebar.display.show.services",
   labels: "sidebar.display.show.labels",
 };
@@ -552,6 +556,10 @@ function OptionList<Value extends string>({
  * column you are running down with your eyes ticking things on and off.
  */
 function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
+  const hosts = useHosts();
+  const hostIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
+  const portsFeatures = useHostFeatureMap(hostIds, "workspacePorts");
+  const supportsPorts = [...portsFeatures.values()].some(Boolean);
   const { t } = useTranslation();
   const countIcon = useMemo(
     () => <ThemedHash size={OPTION_ICON_SIZE} uniProps={mutedIconMapping} />,
@@ -569,7 +577,7 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
         {t("sidebar.display.show.workspaceCount")}
       </MenuItem>
       <MenuSeparator />
-      {SIDEBAR_ROW_ITEMS.map((item) => (
+      {SIDEBAR_ROW_ITEMS.filter((item) => item !== "ports" || supportsPorts).map((item) => (
         <OptionItem
           key={item}
           value={item}

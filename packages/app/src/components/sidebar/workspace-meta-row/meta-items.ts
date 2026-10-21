@@ -1,3 +1,4 @@
+import type { WorkspacePort } from "@getpaseo/protocol/messages";
 import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
 import type { SidebarChecksDisplay } from "@/components/sidebar/display-preferences/checks-display";
@@ -11,9 +12,7 @@ import type { WorkspaceServiceSummary } from "./service-summary";
  * running, and what someone filed it under. Identity first, then the work, then the work's
  * state, then the labels a person put on it.
  *
- * Labels are one item rather than one per label: they are drawn as a run of chips with a single
- * separator in front of them, so the line reads as four peers however many labels a workspace
- * carries.
+ * Labels are one item rather than one per label, so their chips stay together.
  */
 export type MetaRowItem =
   | { kind: "branch"; name: string }
@@ -21,6 +20,7 @@ export type MetaRowItem =
   | { kind: "host" }
   | { kind: "changeRequest"; hint: PrHint }
   | { kind: "checks"; summary: CheckSummary; label: boolean }
+  | { kind: "ports"; ports: readonly WorkspacePort[] }
   | { kind: "services"; summary: WorkspaceServiceSummary }
   | { kind: "labels"; labels: readonly WorkspaceLabelDefinition[] };
 
@@ -41,6 +41,7 @@ export function selectMetaRowItems(input: {
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels: readonly WorkspaceLabelDefinition[];
+  ports?: readonly WorkspacePort[];
   visible: SidebarRowItems;
   checksDisplay: SidebarChecksDisplay;
 }): MetaRowItem[] {
@@ -78,6 +79,10 @@ export function selectMetaRowItems(input: {
     if (summary) {
       items.push({ kind: "checks", summary, label: checksDisplay === "iconAndText" });
     }
+  }
+
+  if (input.ports?.length && visible.ports) {
+    items.push({ kind: "ports", ports: input.ports });
   }
 
   if (serviceSummary && visible.services) {

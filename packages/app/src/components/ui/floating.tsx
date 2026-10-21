@@ -8,6 +8,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated from "react-native-reanimated";
+import { isWeb } from "@/constants/platform";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 
 export interface FloatingSurfaceProps extends Omit<ComponentProps<typeof Animated.View>, "style"> {
@@ -21,7 +22,12 @@ export const FloatingSurface = forwardRef<View, FloatingSurfaceProps>(function F
 ): ReactElement {
   const inlineFrameStyle = useMemo(() => {
     const flattened = StyleSheet.flatten(frameStyle);
-    return flattened ? inlineUnistylesStyle(stripUnistylesMetadata(flattened)) : undefined;
+    if (!flattened && !isWeb) return undefined;
+    return inlineUnistylesStyle({
+      ...stripUnistylesMetadata(flattened ?? {}),
+      // Native drag regions intercept mouse input even beneath a portal.
+      ...(isWeb ? { WebkitAppRegion: "no-drag" } : {}),
+    });
   }, [frameStyle]);
   const surfaceStyle = useMemo(
     () => appendStyle(style, inlineFrameStyle),

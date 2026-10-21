@@ -17,38 +17,39 @@ import {
   Anchor,
   Check,
   Copy,
-  ExternalLink,
   FileDiff,
   Folder,
   GitBranch,
+  Plug,
+  ChevronRight,
+  ExternalLink,
   Server,
   Tag,
 } from "lucide-react-native";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
-import { getForgePresentation, normalizeForge } from "@/git/forge";
-import { ForgeBrandIcon } from "@/git/forge-icon";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
 import { Pressable } from "react-native";
-import type { GestureResponderEvent } from "react-native";
+import type { GestureResponderEvent, PointerEvent as NativePointerEvent } from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
+import { useToast } from "@/contexts/toast-context";
 import { PrBadge } from "@/components/sidebar-workspace-list";
+import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
+import { useHoverIntent } from "@/hooks/use-hover-intent";
+import { useCopyFeedback } from "@/hooks/use-copy-feedback";
+import { CheckIndicator } from "@/components/sidebar/workspace-meta-row/check-indicator";
+import { selectCheckSummary } from "@/components/sidebar/workspace-meta-row/check-summary";
+import type { WorkspacePort } from "@getpaseo/protocol/messages";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { FloatingSurface } from "@/components/ui/floating";
 import { isWeb } from "@/constants/platform";
 import { useHosts } from "@/runtime/host-runtime";
-import {
-  COUNTED_CHECK_PRESENTATIONS,
-  countCheckPresentations,
-  type CountedCheckPresentation,
-} from "@/git/check-presentation";
-import { formatCheckPresentationCountsLabel } from "@/git/check-presentation-copy";
-import { CheckPresentationIcon, getCheckPresentationTone } from "@/git/check-presentation.view";
 import { buildForgeChecksUrl } from "@/git/forge-url";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 import { WorkspaceLabelChip } from "@/workspace-labels/chip";
@@ -214,6 +215,21 @@ function WorkspaceHoverCardContent({
     serverId: workspace.serverId,
     cwd: workspace.workspaceDirectory,
   });
+  const ports = workspace.ports;
+  const portsPanel = useHoverIntent();
+  const portsRowRef = useRef<View>(null);
+  const schedulePanelClose = portsPanel.scheduleClose;
+  const handleMainPointerMove = useCallback(
+    (event: NativePointerEvent) => {
+      const target: unknown = event.target;
+      const portsRow = portsRowRef.current;
+      // Keep document pointer events intact: the hovercard safe zone also reads them.
+      if (isWeb && portsRow instanceof Node && target instanceof Node && portsRow.contains(target))
+        return;
+      schedulePanelClose();
+    },
+    [schedulePanelClose],
+  );
   const [triggerRect, setTriggerRect] = useState<Rect | null>(null);
   const [contentSize, setContentSize] = useState<{ width: number; height: number } | null>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -279,62 +295,99 @@ function WorkspaceHoverCardContent({
         style={styles.card}
         frameStyle={frameStyle}
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle} testID="hover-card-workspace-name">
-            {workspace.name}
-          </Text>
-        </View>
-        {prHint ? <PrBadge hint={prHint} style={styles.cardInfoRow} /> : null}
-        {workspace.diffStat ? (
-          <View style={styles.cardInfoRow}>
-            <ThemedFileDiff size={12} uniProps={foregroundMutedColorMapping} />
-            <DiffStat
-              additions={workspace.diffStat.additions}
-              deletions={workspace.diffStat.deletions}
-            />
+        <View style={styles.cardColumns}>
+          <View
+            style={styles.cardMain}
+            onPointerEnter={portsPanel.scheduleClose}
+            onPointerMove={handleMainPointerMove}
+            onPointerLeave={portsPanel.cancelClose}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle} testID="hover-card-workspace-name">
+                {workspace.name}
+              </Text>
+            </View>
+            {prHint ? <PullRequestRow hint={prHint} /> : null}
+            {workspace.diffStat ? (
+              <View style={styles.cardInfoRow}>
+                <ThemedFileDiff size={12} uniProps={foregroundMutedColorMapping} />
+                <DiffStat
+                  additions={workspace.diffStat.additions}
+                  deletions={workspace.diffStat.deletions}
+                />
+              </View>
+            ) : null}
+            <HostRow serverId={workspace.serverId} />
+            {workspace.currentBranch ? (
+              <CopyableInfoRow
+                icon={ThemedGitBranch}
+                value={workspace.currentBranch}
+                copyValue={workspace.currentBranch}
+                copyLabel={t("workspace.hoverCard.copyBranchName")}
+                testID="hover-card-workspace-branch"
+              />
+            ) : null}
+            {status?.baseRefLabel ? (
+              <CopyableInfoRow
+                icon={ThemedAnchor}
+                value={status.baseRefLabel}
+                copyValue={status.baseRefLabel}
+                copyLabel={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}. ${t("workspace.hoverCard.copyBranchName")}`}
+                testID="hover-card-workspace-base-branch"
+              />
+            ) : null}
+            {workspace.workspaceDirectoryLabel ? (
+              <CopyableInfoRow
+                icon={ThemedFolder}
+                value={workspace.workspaceDirectoryLabel}
+                copyValue={workspace.workspaceDirectory}
+                copyLabel={t("workspace.hoverCard.copyPath")}
+                testID="hover-card-workspace-cwd"
+              />
+            ) : null}
+            {ports?.length ? (
+              <View ref={portsRowRef} onPointerEnter={portsPanel.openNow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("workspace.hoverCard.portsAccessibility", {
+                    ports: ports.map((port) => port.port).join(", "),
+                  })}
+                  onPress={portsPanel.openNow}
+                  style={styles.cardInfoRow}
+                  testID="hover-card-workspace-ports"
+                >
+                  <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
+                  <Text style={styles.cardInfoText} numberOfLines={1}>
+                    {ports.map((port) => port.port).join(", ")}
+                  </Text>
+                  <ThemedChevronRight size={12} uniProps={foregroundMutedColorMapping} />
+                </Pressable>
+              </View>
+            ) : null}
+            <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
           </View>
-        ) : null}
-        <HostRow serverId={workspace.serverId} />
-        {workspace.currentBranch ? (
-          <CopyableInfoRow
-            icon={ThemedGitBranch}
-            value={workspace.currentBranch}
-            copyValue={workspace.currentBranch}
-            copyLabel={t("workspace.hoverCard.copyBranchName")}
-            testID="hover-card-workspace-branch"
-          />
-        ) : null}
-        {status?.baseRefLabel ? (
-          <CopyableInfoRow
-            icon={ThemedAnchor}
-            value={status.baseRefLabel}
-            copyValue={status.baseRefLabel}
-            copyLabel={`${t("baseRefSwitcher.title")}: ${status.baseRefLabel}. ${t("workspace.hoverCard.copyBranchName")}`}
-            testID="hover-card-workspace-base-branch"
-          />
-        ) : null}
-        {workspace.workspaceDirectoryLabel ? (
-          <CopyableInfoRow
-            icon={ThemedFolder}
-            value={workspace.workspaceDirectoryLabel}
-            copyValue={workspace.workspaceDirectory}
-            copyLabel={t("workspace.hoverCard.copyPath")}
-            testID="hover-card-workspace-cwd"
-          />
-        ) : null}
-        <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
-        {prHint?.checks && prHint.checks.length > 0 ? (
-          <>
-            <View style={styles.separator} />
-            <ChecksSummaryPressable checks={prHint.checks} url={prHint.url} forge={prHint.forge} />
-          </>
-        ) : null}
+          {portsPanel.open && ports?.length ? (
+            <View
+              style={styles.portsPanel}
+              onPointerEnter={portsPanel.cancelClose}
+              testID="hover-card-ports-panel"
+            >
+              <Text style={styles.portsTitle}>
+                {t("workspace.hoverCard.livePorts", { count: ports.length })}
+              </Text>
+              <PortsList ports={ports} serverId={workspace.serverId} />
+            </View>
+          ) : null}
+        </View>
       </FloatingSurface>
     </View>,
     getOverlayRoot(),
   );
 }
 
+const ThemedExternalLink = withUnistyles(ExternalLink);
+const ThemedPlug = withUnistyles(Plug);
+const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedAnchor = withUnistyles(Anchor);
 const ThemedFolder = withUnistyles(Folder);
@@ -374,7 +427,6 @@ function LabelsRow({
   );
 }
 
-const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedCheck = withUnistyles(Check);
 
@@ -400,10 +452,6 @@ function InfoRow({
   );
 }
 
-function renderChecksSummaryForgeIcon(icon: string, iconUniProps: typeof foregroundColorMapping) {
-  return <ForgeBrandIcon iconKind={icon} size={12} uniProps={iconUniProps} />;
-}
-
 function CopyableInfoRow({
   icon: Icon,
   value,
@@ -418,7 +466,7 @@ function CopyableInfoRow({
   testID: string;
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied } = useCopyFeedback();
 
   const handlePressIn = useCallback((event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -426,11 +474,8 @@ function CopyableInfoRow({
 
   const handlePress = useCallback(() => {
     void copyToClipboard(copyValue);
-    setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-  }, [copyValue]);
+    markCopied();
+  }, [copyValue, markCopied]);
 
   const handleHoverIn = useCallback(() => setIsHovered(true), []);
   const handleHoverOut = useCallback(() => setIsHovered(false), []);
@@ -469,110 +514,125 @@ function CopyableInfoRow({
   );
 }
 
-function ChecksSummaryPill({
-  count,
-  presentation,
-}: {
-  count: number;
-  presentation: CountedCheckPresentation;
-}) {
-  if (count === 0) return null;
+const PR_BADGE_VARIANTS: Record<PrHint["state"], StatusBadgeVariant> = {
+  open: "success",
+  merged: "merged",
+  closed: "error",
+  draft: "muted",
+};
+
+function PullRequestRow({ hint }: { hint: PrHint }) {
+  const { t } = useTranslation();
+  const summary = selectCheckSummary(hint);
+  const openChecks = useCallback(() => {
+    void openExternalUrl(buildForgeChecksUrl(hint.forge, hint.url) ?? hint.url);
+  }, [hint.forge, hint.url]);
   return (
-    <View style={styles.checksSummaryPill}>
-      <CheckPresentationIcon presentation={presentation} size={12} />
-      <Text style={checksSummaryTextStyle(presentation)}>{count}</Text>
+    <View style={styles.cardInfoRow}>
+      <PrBadge hint={hint} />
+      {summary ? (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={t("workspace.git.pr.sections.checks")}
+          onPress={openChecks}
+          hitSlop={4}
+          testID="hover-card-checks"
+        >
+          <CheckIndicator summary={summary} size={12} />
+        </Pressable>
+      ) : null}
+      <StatusBadge
+        label={t(`workspace.git.pr.states.${hint.state}`)}
+        variant={PR_BADGE_VARIANTS[hint.state]}
+        size="xs"
+      />
     </View>
   );
 }
 
-function checksSummaryTextStyle(presentation: CountedCheckPresentation) {
-  const tone = getCheckPresentationTone(presentation);
-  if (tone === "success") return styles.checksStatusTextPassed;
-  if (tone === "danger") return styles.checksStatusTextFailed;
-  if (tone === "warning") return styles.checksStatusTextPending;
-  return styles.checksStatusTextMuted;
-}
-
-function ChecksSummaryContent({
-  checks,
-  forge,
-  hovered,
-}: {
-  checks: NonNullable<PrHint["checks"]>;
-  forge: PrHint["forge"];
-  hovered: boolean;
-}) {
-  const { t } = useTranslation();
-  const counts = countCheckPresentations(checks);
-
-  const labelStyle = hovered
-    ? [styles.checksSummaryLabel, styles.checksSummaryLabelHovered]
-    : styles.checksSummaryLabel;
-  const iconUniProps = hovered ? foregroundColorMapping : foregroundMutedColorMapping;
-  const icon = getForgePresentation(normalizeForge(forge)).icon;
-
+function PortsList({ ports, serverId }: { ports: readonly WorkspacePort[]; serverId: string }) {
+  const isLocal = useIsLocalDaemon(serverId);
   return (
     <>
-      {hovered ? (
-        <ThemedExternalLink size={12} uniProps={iconUniProps} />
-      ) : (
-        renderChecksSummaryForgeIcon(icon, iconUniProps)
-      )}
-      <Text style={labelStyle}>{t("workspace.git.pr.sections.checks")}</Text>
-      <View style={styles.checksSummaryCounts}>
-        {COUNTED_CHECK_PRESENTATIONS.map((presentation) => (
-          <ChecksSummaryPill
-            key={presentation}
-            count={counts[presentation]}
-            presentation={presentation}
-          />
-        ))}
-      </View>
+      {ports.map((port) => (
+        <PortRow key={`${port.host}:${port.port}:${port.pid}`} port={port} isLocal={isLocal} />
+      ))}
     </>
   );
 }
 
-function ChecksSummaryPressable({
-  checks,
-  forge,
-  url,
-}: {
-  checks: NonNullable<PrHint["checks"]>;
-  forge: PrHint["forge"];
-  url: string;
-}) {
+function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const { t } = useTranslation();
-  const counts = countCheckPresentations(checks);
-  const accessibilityLabel = formatCheckPresentationCountsLabel(
-    counts,
-    t("workspace.git.pr.sections.checks"),
-    t,
+  const toast = useToast();
+  const { copied, markCopied } = useCopyFeedback();
+  const [hovered, setHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => setHovered(false), []);
+  const host = port.host.includes(":") ? `[${port.host}]` : port.host;
+  const address = `${host}:${port.port}`;
+  const copyAddress = useCallback(() => {
+    void copyToClipboard(address)
+      .then(markCopied)
+      .catch(() => toast.error(t("workspace.tabs.toasts.copyFailed")));
+  }, [address, markCopied, t, toast]);
+  const openPort = useCallback(
+    () => void openExternalUrl(`http://localhost:${port.port}`),
+    [port.port],
   );
-  const handlePress = useCallback(() => {
-    void openExternalUrl(buildForgeChecksUrl(forge, url) ?? url);
-  }, [forge, url]);
-
-  const renderChildren = useCallback(
-    ({ hovered }: { pressed: boolean; hovered?: boolean }) => (
-      <ChecksSummaryContent checks={checks} forge={forge} hovered={Boolean(hovered)} />
-    ),
-    [checks, forge],
-  );
-
   return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="link"
-      style={checksSummaryPressableStyle}
-      onPress={handlePress}
+    <View
+      style={styles.portHoverTarget}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
     >
-      {renderChildren}
-    </Pressable>
+      <View style={[styles.portRow, hovered && styles.listRowHovered]}>
+        <Text style={styles.portNumber} pointerEvents="none">
+          {port.port}
+        </Text>
+        <Text style={styles.portProcess} selectable={false} pointerEvents="none">
+          {port.processName}
+        </Text>
+        <View style={styles.portAddressSlot}>
+          <Text
+            style={[styles.portAddress, hovered && styles.hidden]}
+            numberOfLines={1}
+            pointerEvents="none"
+          >
+            {address}
+          </Text>
+          <View
+            style={[styles.portActions, !hovered && styles.hidden]}
+            pointerEvents={hovered ? "auto" : "none"}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${copied ? t("common.states.copied") : t("common.actions.copy")}: ${address}`}
+              onPress={copyAddress}
+              style={styles.portAction}
+              tabIndex={hovered ? 0 : -1}
+            >
+              {copied ? (
+                <ThemedCheck size={12} uniProps={foregroundColorMapping} />
+              ) : (
+                <ThemedCopy size={12} uniProps={foregroundMutedColorMapping} />
+              )}
+            </Pressable>
+            {isLocal ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`${address}, ${t("workspace.hoverCard.openInBrowser")}`}
+                onPress={openPort}
+                style={styles.portAction}
+                tabIndex={hovered ? 0 : -1}
+              >
+                <ThemedExternalLink size={12} uniProps={foregroundMutedColorMapping} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    </View>
   );
-}
-
-function checksSummaryPressableStyle({ hovered = false }: { pressed: boolean; hovered?: boolean }) {
-  return [styles.checksSummaryRow, hovered && styles.listRowHovered];
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -590,7 +650,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.borderAccent,
     borderRadius: theme.borderRadius.lg,
     paddingTop: theme.spacing[2],
-    width: HOVER_CARD_WIDTH,
+
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -598,6 +658,64 @@ const styles = StyleSheet.create((theme) => ({
     elevation: 8,
     zIndex: 1000,
   },
+  cardColumns: { flexDirection: "row" },
+  cardMain: { width: HOVER_CARD_WIDTH },
+  portsPanel: {
+    maxWidth: 290,
+    minWidth: 0,
+    flexShrink: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: theme.colors.border,
+    paddingBottom: theme.spacing[2],
+  },
+  portsTitle: {
+    paddingHorizontal: theme.spacing[3],
+    paddingBottom: theme.spacing[2],
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foregroundMuted,
+  },
+  portHoverTarget: { position: "relative" },
+  portRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    minHeight: 28,
+    paddingHorizontal: theme.spacing[3],
+  },
+  portNumber: {
+    flexShrink: 0,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    fontVariant: ["tabular-nums"],
+    color: theme.colors.foreground,
+  },
+  portProcess: {
+    flexGrow: 1,
+    flexShrink: 1,
+    overflowWrap: "anywhere",
+    minWidth: 0,
+    paddingVertical: theme.spacing[1],
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
+  portAddressSlot: {
+    flexShrink: 0,
+    minWidth: 48,
+    minHeight: 24,
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
+  portAddress: { maxWidth: 130, fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
+  portActions: {
+    position: "absolute",
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
+  portAction: { padding: theme.spacing[1] },
+  hidden: { opacity: 0 },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -636,59 +754,7 @@ const styles = StyleSheet.create((theme) => ({
   cardInfoTextHovered: {
     color: theme.colors.foreground,
   },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-  },
   listRowHovered: {
     backgroundColor: theme.colors.surface2,
-  },
-  checksSummaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: 6,
-    minHeight: 28,
-  },
-  checksSummaryLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.foregroundMuted,
-  },
-  checksSummaryLabelHovered: {
-    color: theme.colors.foreground,
-  },
-  checksSummaryCounts: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  checksSummaryPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  checksStatusTextFailed: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.statusDanger,
-  },
-  checksStatusTextPending: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.statusWarning,
-  },
-  checksStatusTextPassed: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.statusSuccess,
-  },
-  checksStatusTextMuted: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.foregroundMuted,
   },
 }));

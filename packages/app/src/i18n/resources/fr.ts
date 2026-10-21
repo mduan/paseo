@@ -545,6 +545,9 @@ export const fr: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "Ports actifs ({{count}})",
+      portsAccessibility: "Ports actifs : {{ports}}",
+      openInBrowser: "Ouvrir dans le navigateur",
       scriptsAccessibility: "ScriptsWorkspace",
       copyPath: "Copier le chemin",
       copyBranchName: "Copier le nom de la branche",
@@ -1249,6 +1252,7 @@ export const fr: TranslationResources = {
         branch: "Nom de branche",
       },
       show: {
+        ports: "Ports actifs",
         label: "Afficher",
         branch: "Branche",
         project: "Projet",

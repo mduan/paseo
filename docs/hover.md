@@ -1,6 +1,7 @@
 # Hover
 
-Read this before writing any hover code. Every hover regression we ship is one of the three failure modes below, and every one of them is solved by the same canonical pattern. The pattern is hardwon — it survived every other shape we tried — so copy it, don't reinvent it.
+Use the canonical pattern below for hover-driven controls.
+For Electron input failures, follow the [native drag-region checks](floating-panels.md#electron-drag-regions) before adding event workarounds.
 
 ## The pattern
 

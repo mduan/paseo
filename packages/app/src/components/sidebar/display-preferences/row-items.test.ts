@@ -12,6 +12,7 @@ describe("parseSidebarRowItems", () => {
       project: false,
       host: true,
       changeRequest: true,
+      ports: true,
       services: true,
       labels: true,
     });

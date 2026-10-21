@@ -539,6 +539,9 @@ export const ko: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "활성 포트 ({{count}})",
+      portsAccessibility: "활성 포트: {{ports}}",
+      openInBrowser: "브라우저에서 열기",
       scriptsAccessibility: "워크스페이스 스크립트",
       copyPath: "경로 복사",
       copyBranchName: "브랜치 이름 복사",
@@ -1220,6 +1223,7 @@ export const ko: TranslationResources = {
         branch: "브랜치 이름",
       },
       show: {
+        ports: "활성 포트",
         label: "표시 항목",
         branch: "브랜치",
         project: "프로젝트",

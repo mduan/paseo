@@ -3856,6 +3856,8 @@ export const ServerInfoStatusPayloadSchema = z
         projectGithubClone: z.boolean().optional(),
         // COMPAT(workspaceGithubRepositorySearch): added in v0.1.108, remove gate after 2027-01-15.
         workspaceGithubRepositorySearch: z.boolean().optional(),
+        // COMPAT(workspacePorts): added in v0.11.0-fork.27, remove after 2027-04-20 once daemon floor includes workspace ports.
+        workspacePorts: z.boolean().optional(),
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: z.boolean().optional(),
         // COMPAT(projectList): added in v0.2.4, drop the gate when floor >= v0.2.4.
@@ -4176,6 +4178,15 @@ export const WorkspaceGitHubRuntimePayloadSchema = z
   .optional()
   .nullable();
 
+export const WorkspacePortSchema = z.object({
+  workspaceId: z.string(),
+  port: z.number().int().min(1).max(65535),
+  host: z.string(),
+  pid: z.number().int().positive().optional(),
+  processName: z.string().optional(),
+});
+export type WorkspacePort = z.infer<typeof WorkspacePortSchema>;
+
 export const WorkspaceDescriptorPayloadSchema = z
   .object({
     id: z.string(),
@@ -4226,6 +4237,7 @@ export const WorkspaceDescriptorPayloadSchema = z
       })
       .nullable()
       .optional(),
+    ports: z.array(WorkspacePortSchema).optional(),
     scripts: z.array(WorkspaceScriptPayloadSchema).default([]),
     gitRuntime: WorkspaceGitRuntimePayloadSchema,
     // COMPAT(githubRuntimeName): legacy wire-field name now carries

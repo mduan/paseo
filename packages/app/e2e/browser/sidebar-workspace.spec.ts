@@ -1,4 +1,6 @@
 import path from "node:path";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import type { Page, TestInfo } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
@@ -20,6 +22,7 @@ import {
 import { escapeRegex } from "../support/helpers/regex";
 import { openFilesPanel } from "../support/helpers/workspace-tabs";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+import { killProcessTree } from "../support/helpers/spawn-node";
 
 const GITHUB_REMOTE_URL = "https://github.com/test-owner/test-repo.git";
 
@@ -437,6 +440,59 @@ test.describe("Sidebar workspace list", () => {
       await expect(page.getByTestId("hover-card-workspace-host")).toHaveText("localhost");
       await expect(hoverCard).not.toContainText(/\b(Online|Connecting|Offline|Error|Idle)\b/);
     } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  test("port hovercard excludes its whole surface from window dragging", async ({ page }) => {
+    test.skip(process.platform === "win32", "Port discovery supports macOS and Linux");
+    test.setTimeout(90_000);
+    const workspace = await seedWorkspace({ repoPrefix: "sidebar-port-hover-" });
+    const listeners = spawn(
+      process.execPath,
+      [
+        "-e",
+        `const net = require('node:net');
+         Promise.all([0, 1].map(() => new Promise(resolve => {
+           net.createServer().listen(0, '127.0.0.1', resolve);
+         }))).then(() => process.send('ready'));`,
+      ],
+      { cwd: workspace.repoPath, stdio: ["ignore", "ignore", "inherit", "ipc"] },
+    );
+
+    try {
+      await once(listeners, "message");
+      await gotoAppShell(page);
+      const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
+      const ports = card.getByTestId("hover-card-workspace-ports");
+      await expect(ports).toBeVisible({ timeout: 45_000 });
+      await ports.hover();
+      const panel = card.getByTestId("hover-card-ports-panel");
+      const rows = panel.locator(":scope > div").filter({ has: page.getByRole("button") });
+      await expect(rows).toHaveCount(2);
+      const actions = panel.getByRole("button").locator("..");
+
+      await expect(card).toHaveCSS("-webkit-app-region", "no-drag");
+      for (const index of [0, 1, 0]) {
+        const current = rows.nth(index);
+        const bounds = await current.boundingBox();
+        if (!bounds) throw new Error("Port row has no bounds");
+        for (const position of [
+          { x: 1, y: 1 },
+          { x: bounds.width / 2, y: bounds.height / 2 },
+          { x: bounds.width - 1, y: bounds.height - 1 },
+        ]) {
+          await current.hover({ position });
+          await expect(actions.nth(index)).toHaveCSS("opacity", "1");
+          await expect(actions.nth(1 - index)).toHaveCSS("opacity", "0");
+        }
+      }
+
+      await panel.getByText("Live ports (2)", { exact: true }).hover();
+      await expect(actions.nth(0)).toHaveCSS("opacity", "0");
+      await expect(actions.nth(1)).toHaveCSS("opacity", "0");
+    } finally {
+      await killProcessTree(listeners);
       await workspace.cleanup();
     }
   });

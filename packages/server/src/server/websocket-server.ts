@@ -1,3 +1,4 @@
+import { WorkspacePortsService } from "./workspace-ports/service.js";
 import { ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import type { ConnectionHistoryStore } from "./connection-history/store.js";
 import { stat } from "node:fs/promises";
@@ -557,6 +558,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly checkoutDiffManager: CheckoutDiffManager;
   private readonly github: ForgeService;
   private readonly workspaceGitService: WorkspaceGitService;
+  private readonly workspacePorts: WorkspacePortsService;
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly downloadTokenStore: DownloadTokenStore;
   private readonly paseoHome: string;
@@ -709,6 +711,18 @@ export class VoiceAssistantWebSocketServer {
     this.checkoutDiffManager = requiredServices.checkoutDiffManager;
     this.github = github ?? createGitHubService();
     this.workspaceGitService = workspaceGitService ?? createFallbackWorkspaceGitService();
+    this.workspacePorts = new WorkspacePortsService({
+      logger: this.logger,
+      listWorkspaces: async () =>
+        (await this.workspaceRegistry.list()).filter((workspace) => !workspace.archivedAt),
+      onChange: async (workspaceIds) => {
+        await Promise.all(
+          this.listSessions().map((session) =>
+            Promise.all(workspaceIds.map((id) => session.emitWorkspaceUpdateForWorkspaceId(id))),
+          ),
+        );
+      },
+    });
     this.workspaceAutoName = workspaceAutoName;
     this.downloadTokenStore = downloadTokenStore;
     this.paseoHome = paseoHome;
@@ -1087,6 +1101,7 @@ export class VoiceAssistantWebSocketServer {
     this.eventLoopDelayMonitor?.disable();
     this.eventLoopDelayMonitor = null;
 
+    this.workspacePorts.dispose();
     const uniqueConnections = new Set<SessionConnection>([
       ...this.sessions.values(),
       ...this.externalSessionsByKey.values(),
@@ -1500,6 +1515,7 @@ export class VoiceAssistantWebSocketServer {
       checkoutDiffManager: this.checkoutDiffManager,
       github: this.github,
       workspaceGitService: this.workspaceGitService,
+      workspacePorts: this.workspacePorts,
       workspaceAutoName: this.workspaceAutoName,
       daemonConfigStore: this.daemonConfigStore,
       pluginRuntime: this.pluginRuntime,
@@ -1643,6 +1659,7 @@ export class VoiceAssistantWebSocketServer {
       admission: admitted,
     });
     this.sessions.set(ws, connection);
+    this.workspacePorts.setConnected(true);
     if (connection.lifecycle === "reconnectable") {
       this.externalSessionsByKey.set(sessionKey, connection);
     }
@@ -1776,6 +1793,7 @@ export class VoiceAssistantWebSocketServer {
     }
     existing.sockets.add(ws);
     this.sessions.set(ws, existing);
+    this.workspacePorts.setConnected(true);
     pending.identity.sessionId = existing.session.getSessionId();
     this.recordAppConnection({ message, pending, sessionId: pending.identity.sessionId });
     this.sendToClient(ws, this.createServerInfoMessage(existing.session));
@@ -1957,6 +1975,7 @@ export class VoiceAssistantWebSocketServer {
         projectGithubClone: true,
         // COMPAT(workspaceGithubRepositorySearch): added in v0.1.108, remove gate after 2027-01-15.
         workspaceGithubRepositorySearch: true,
+        workspacePorts: true,
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: true,
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
@@ -2118,6 +2137,7 @@ export class VoiceAssistantWebSocketServer {
     }
 
     this.sessions.delete(ws);
+    this.workspacePorts.setConnected(this.sessions.size > 0);
     connection.sockets.delete(ws);
     connection.session.clearAgentTimelineSubscription(ws);
     this.socketIdentities.delete(ws);
@@ -2194,6 +2214,7 @@ export class VoiceAssistantWebSocketServer {
       this.sessions.delete(socket);
       this.socketIdentities.delete(socket);
     }
+    this.workspacePorts.setConnected(this.sessions.size > 0);
     connection.sockets.clear();
     if (connection.lifecycle === "reconnectable") {
       const existing = this.externalSessionsByKey.get(connection.sessionKey);

@@ -105,6 +105,19 @@ function findUntranslatedConnectionErrors(): string[] {
 }
 
 describe("translation resources", () => {
+  it.each([en, ar, es, fr, ja, ko, ptBR, ru, zhCN])(
+    "renders port counts and lists without untranslated placeholders",
+    async (resource) => {
+      const instance = createInstance();
+      await instance.init({ lng: "test", resources: { test: { translation: resource } } });
+      expect(instance.t("workspace.hoverCard.livePorts", { count: 3 })).toContain("3");
+      expect(
+        instance.t("workspace.hoverCard.portsAccessibility", { ports: "3000, 8000" }),
+      ).toContain("3000, 8000");
+      expect(instance.t("workspace.hoverCard.openInBrowser")).not.toContain("workspace.hoverCard");
+      expect(instance.t("sidebar.display.show.ports")).not.toContain("sidebar.display");
+    },
+  );
   it.each([
     { lng: "ru", expected: ["Подключений: 2", "Подключений: 5", "Подключений: 11"] },
     { lng: "ar", expected: ["عدد الاتصالات: 2", "عدد الاتصالات: 5", "عدد الاتصالات: 11"] },

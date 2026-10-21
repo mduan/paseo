@@ -535,6 +535,9 @@ export const en = {
       },
     },
     hoverCard: {
+      livePorts: "Live ports ({{count}})",
+      portsAccessibility: "Live ports: {{ports}}",
+      openInBrowser: "Open in browser",
       scriptsAccessibility: "Workspace scripts",
       copyPath: "Copy path",
       copyBranchName: "Copy branch name",
@@ -1221,6 +1224,7 @@ export const en = {
         branch: "Branch name",
       },
       show: {
+        ports: "Live ports",
         label: "Show",
         branch: "Branch",
         project: "Project",

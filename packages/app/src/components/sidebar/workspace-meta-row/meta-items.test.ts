@@ -35,6 +35,21 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
 const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item) => item.kind);
 
 describe("selectMetaRowItems", () => {
+  it("places ports after checks, and respects the ports preference and empty results", () => {
+    const ports = [{ workspaceId: "app", host: "*", port: 3000 }];
+    expect(kinds(select({ ports }))).toEqual([
+      "host",
+      "changeRequest",
+      "checks",
+      "ports",
+      "services",
+      "labels",
+    ]);
+    expect(
+      kinds(select({ ports, visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, ports: false } })),
+    ).not.toContain("ports");
+    expect(kinds(select({ ports: [] }))).not.toContain("ports");
+  });
   it("puts the enabled branch and project badges first", () => {
     const visible = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: true, project: true };
     expect(kinds(select({ visible }))).toEqual([
@@ -78,7 +93,7 @@ describe("selectMetaRowItems", () => {
     ]);
   });
 
-  it("carries every label as one item, so the line keeps one separator however many there are", () => {
+  it("carries every label as one item, so the line keeps the same gap however many there are", () => {
     const labels: WorkspaceLabelDefinition[] = [
       { name: "Urgent", color: "red" },
       { name: "Backend", color: "sky" },

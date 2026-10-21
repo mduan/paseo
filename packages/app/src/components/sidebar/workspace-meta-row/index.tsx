@@ -1,8 +1,9 @@
-import { Fragment, useCallback, useState, type ReactNode } from "react";
+import type { WorkspacePort } from "@getpaseo/protocol/messages";
+import { useCallback, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ExternalLink, Folder, GitBranch, Globe, Split } from "lucide-react-native";
+import { Folder, GitBranch, Globe, Plug, Split } from "lucide-react-native";
 import {
   workspaceLabelKey,
   type WorkspaceLabelDefinition,
@@ -34,16 +35,15 @@ export {
  */
 const META_ICON_SIZE = HOST_BADGE_ICON_SIZE;
 
-const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
+const ThemedPlug = withUnistyles(Plug);
 const ThemedSplit = withUnistyles(Split);
 
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
 const EMPTY_LABELS: readonly WorkspaceLabelDefinition[] = [];
 
-const foregroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const mutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
 
@@ -51,10 +51,6 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  * The subtitle under a workspace title: which host it lives on, its change request, that
  * change request's CI, any running service, and the labels someone put on it. Everything the
  * row knows about a workspace that isn't its name.
- *
- * Items are peers separated by a dot rather than ranked by chrome. The host used to be a
- * tinted pill on the title line, which made it the loudest thing in a row whose subject is
- * the title; flattening it lets the line read as one piece of secondary text.
  *
  * Labels are the one exception, and a deliberate one. Everything else here reports state, and
  * state has its own colors — a label is a name a person chose, so it carries its own identity
@@ -67,6 +63,7 @@ export function WorkspaceMetaRow({
   hostBadge,
   prHint,
   serviceSummary,
+  ports,
   labels = EMPTY_LABELS,
   isWorktree = false,
 }: {
@@ -75,6 +72,7 @@ export function WorkspaceMetaRow({
   hostBadge: HostBadgeModel | null;
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
+  ports?: readonly WorkspacePort[];
   labels?: readonly WorkspaceLabelDefinition[];
   isWorktree?: boolean;
 }) {
@@ -85,6 +83,7 @@ export function WorkspaceMetaRow({
     hasHostBadge: hostBadge !== null,
     prHint,
     serviceSummary,
+    ports,
     labels,
     visible: rowItems,
     checksDisplay,
@@ -95,15 +94,13 @@ export function WorkspaceMetaRow({
   return (
     <View style={styles.row}>
       {items.map((item, index) => (
-        <Fragment key={item.kind}>
-          {index > 0 ? <Text style={styles.separator}>·</Text> : null}
-          <MetaItemNode
-            item={item}
-            hostBadge={hostBadge}
-            leading={index === 0}
-            showWorktree={isWorktree}
-          />
-        </Fragment>
+        <MetaItemNode
+          key={item.kind}
+          item={item}
+          hostBadge={hostBadge}
+          leading={index === 0}
+          showWorktree={isWorktree}
+        />
       ))}
     </View>
   );
@@ -135,6 +132,9 @@ function MetaItemNode({
   }
   if (item.kind === "checks") {
     return <ChecksItem summary={item.summary} label={item.label} />;
+  }
+  if (item.kind === "ports") {
+    return <PortsItem ports={item.ports} />;
   }
   if (item.kind === "labels") {
     return <LabelsItem labels={item.labels} leading={leading} />;
@@ -193,21 +193,13 @@ function LabelsItem({
   );
 }
 
-/**
- * The only thing on the line that navigates, so it is the only thing that answers the
- * pointer: it brightens to full foreground and its icon becomes an external-link arrow,
- * saying where the click goes before you spend it.
- *
- * `onHoverIn`/`onHoverOut` with local state is safe here despite the usual rule in
- * docs/hover.md — the state never leaves this Pressable, and nothing pressable is nested
- * inside it, so there is no second hover state machine to fight. Both icons are the same
- * size, so the swap can't move the target out from under the cursor.
- */
 function PullRequestItem({ hint }: { hint: PrHint }) {
   const { t } = useTranslation();
-  const [isHovered, setIsHovered] = useState(false);
   const presentation = getForgePresentation(normalizeForge(hint.forge));
-
+  const label = t("workspace.git.pr.accessibility.pullRequest", {
+    number: hint.number,
+    context: presentation.changeRequestContext,
+  });
   const handlePress = useCallback(
     (event: GestureResponderEvent) => {
       event.stopPropagation();
@@ -216,35 +208,32 @@ function PullRequestItem({ hint }: { hint: PrHint }) {
     [hint.url],
   );
   const handlePressIn = useCallback((event: GestureResponderEvent) => event.stopPropagation(), []);
-  const handleHoverIn = useCallback(() => setIsHovered(true), []);
-  const handleHoverOut = useCallback(() => setIsHovered(false), []);
-
   return (
     <Pressable
       accessibilityRole="link"
-      accessibilityLabel={t("workspace.git.pr.accessibility.pullRequest", {
-        number: hint.number,
-        context: presentation.changeRequestContext,
-      })}
+      accessibilityLabel={`${label}, ${t(`workspace.git.pr.states.${hint.state}`)}`}
       hitSlop={4}
       onPressIn={handlePressIn}
       onPress={handlePress}
-      onHoverIn={handleHoverIn}
-      onHoverOut={handleHoverOut}
       style={pressableItemStyle}
     >
-      {isHovered ? (
-        <ThemedExternalLink size={META_ICON_SIZE} uniProps={foregroundMapping} />
-      ) : (
-        <PullRequestStateIcon state={hint.state} size={META_ICON_SIZE} />
-      )}
-      <Text style={isHovered ? styles.prTextHovered : styles.prText} numberOfLines={1}>
-        {hint.number}
-        {/* An open change request is the unremarkable case and says nothing extra; a merged
-            or closed one is why the row still looks like it has work in it. */}
-        {hint.state === "open" ? "" : ` ${t(PR_STATE_LABEL_KEYS[hint.state])}`}
-      </Text>
+      <PullRequestStateIcon state={hint.state} size={META_ICON_SIZE} />
     </Pressable>
+  );
+}
+
+function PortsItem({ ports }: { ports: readonly WorkspacePort[] }) {
+  const { t } = useTranslation();
+  return (
+    <View
+      style={styles.item}
+      testID="sidebar-workspace-ports"
+      accessibilityLabel={t("workspace.hoverCard.portsAccessibility", {
+        ports: ports.map((port) => port.port).join(", "),
+      })}
+    >
+      <ThemedPlug size={META_ICON_SIZE} uniProps={mutedMapping} />
+    </View>
   );
 }
 
@@ -318,11 +307,6 @@ function ServiceItem({ summary }: { summary: WorkspaceServiceSummary }) {
 
 const successMapping = (theme: Theme) => ({ color: theme.colors.statusSuccess });
 
-const PR_STATE_LABEL_KEYS = {
-  merged: "workspace.git.pr.states.merged",
-  closed: "workspace.git.pr.states.closed",
-} as const;
-
 function pressableItemStyle({ pressed }: { pressed: boolean }) {
   return [styles.item, pressed && styles.itemPressed];
 }
@@ -360,12 +344,6 @@ const styles = StyleSheet.create((theme) => ({
   itemPressed: {
     opacity: 0.82,
   },
-  separator: {
-    color: theme.colors.foregroundExtraMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 0,
-  },
   // Tighter than the line's own gap so a run of chips reads as one item — see `LabelsItem`.
   // Shrinks at the same weight as the service name: both are arbitrary text somebody chose, so
   // a crowded line takes from the two of them in proportion rather than emptying one of them.
@@ -399,18 +377,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 16,
     flexShrink: 1,
-  },
-  prText: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 0,
-  },
-  prTextHovered: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 0,
   },
   // Matches the indicator — see COLOR_MAPPINGS in check-indicator.tsx.
   checksTextPassed: {

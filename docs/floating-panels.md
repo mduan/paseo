@@ -104,6 +104,28 @@ action and has no component context to carry, resolve the host layer with
 current top registered layer before the new host joins the stack; do not give a
 global dialog a fixed root-derived modal layer.
 
+## Electron drag regions
+
+The shared `FloatingSurface` must apply `-webkit-app-region: no-drag` across its full bounds.
+Native drag regions beneath a portal can swallow pointer events regardless of `z-index`,
+even when individual buttons have `no-drag` exclusions.
+
+Symptoms include hover limited to buttons, unresponsive text or padding, and hover stuck on the previous row.
+A `pointerout` with no destination but coordinates inside the overlay can indicate this boundary.
+Ignoring it can preserve stale hover state without restoring input.
+
+CDP mouse injection bypasses native hit testing, so automated sweeps can pass while physical hover fails.
+DevTools styles can disappear when the overlay remounts.
+
+Before adding hover workarounds:
+
+1. Record `pointermove`, `pointerover`, and `pointerout` at the document boundary.
+2. Compare the last event coordinates with the row bounds and `document.elementFromPoint()`.
+3. Inspect computed `-webkit-app-region` values on the floating surface and drag regions beneath it.
+4. After a full reload, reopen the overlay. Verify physical movement across row text, padding, and actions in both directions.
+
+Keep a regression for the surface exclusion.
+
 ## Gotcha 2 — Portal breaks lifecycle and coordinate-system inheritance
 
 A Portal escapes Android's hit-test, but it also escapes two things you were

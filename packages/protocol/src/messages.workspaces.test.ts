@@ -10,6 +10,36 @@ import {
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
+  test("keeps workspace ports optional and carries full and anonymous listeners on existing updates", () => {
+    const workspace = {
+      id: "ws-ports",
+      projectId: "project",
+      projectDisplayName: "repo",
+      projectRootPath: "/repo",
+      projectKind: "git",
+      workspaceKind: "worktree",
+      name: "feature",
+      status: "done",
+      activityAt: null,
+      scripts: [],
+    };
+    expect(WorkspaceDescriptorPayloadSchema.parse(workspace).ports).toBeUndefined();
+    const ports = [
+      { workspaceId: workspace.id, port: 3000, host: "127.0.0.1", pid: 42, processName: "node" },
+      { workspaceId: workspace.id, port: 8000, host: "::" },
+    ];
+    const parsed = SessionOutboundMessageSchema.parse({
+      type: "workspace_update",
+      payload: { kind: "upsert", workspace: { ...workspace, ports } },
+    });
+    expect(parsed).toMatchObject({ type: "workspace_update", payload: { workspace: { ports } } });
+    expect(
+      WorkspaceDescriptorPayloadSchema.safeParse({
+        ...workspace,
+        ports: [{ ...ports[0], port: 65536 }],
+      }).success,
+    ).toBe(false);
+  });
   test("parses mark-unread request and response", () => {
     expect(
       SessionInboundMessageSchema.parse({

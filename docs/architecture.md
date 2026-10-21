@@ -71,6 +71,8 @@ server to capability-aware sessions. It deliberately does not use the broad recu
 watcher or the per-session Git observer: those are checkout/status mechanisms and intentionally do
 not retain non-Git directories.
 
+Workspace port discovery belongs to the daemon. A connected client reads the latest result through the existing workspace stream. Hovercards do not start scans. The 30-second timer stops when the last client disconnects. On macOS, `lsof` uses `-b -w` and a command timeout because an unavailable network mount can block discovery. Process directories take precedence over command-line paths when the scanner assigns listeners to workspaces.
+
 **Key modules:**
 
 | Module                          | Responsibility                                                                 |

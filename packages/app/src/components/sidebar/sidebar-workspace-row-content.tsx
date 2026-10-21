@@ -183,6 +183,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
             hostBadge={hostBadge ?? null}
             prHint={workspace.prHint}
             serviceSummary={serviceSummary}
+            ports={workspace.ports}
             labels={labels}
             isWorktree={workspace.workspaceKind === "worktree"}
           />

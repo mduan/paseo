@@ -1,3 +1,4 @@
+import { useHostFeatureMap } from "@/runtime/host-features";
 import { useMemo, useRef } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
@@ -23,6 +24,8 @@ export function useSidebarWorkspaceEntries(
     () => Array.from(new Set(placements.map((placement) => placement.serverId))),
     [placements],
   );
+  // COMPAT(workspacePorts): added in v0.11.0-fork.27, remove gate after 2027-04-20 once daemon floor includes workspace ports.
+  const portsFeatures = useHostFeatureMap(serverIds, "workspacePorts");
   const sessions = useStoreWithEqualityFn(
     useSessionStore,
     (state) =>
@@ -50,8 +53,9 @@ export function useSidebarWorkspaceEntries(
       sessions,
       pendingCreateAttempts,
       previousEntries: previousEntriesRef.current,
+      portsFeatures,
     });
     previousEntriesRef.current = entries;
     return entries;
-  }, [enabled, pendingCreateAttempts, placements, sessions]);
+  }, [enabled, pendingCreateAttempts, placements, sessions, portsFeatures]);
 }

@@ -538,6 +538,9 @@ export const zhCN: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "活动端口 ({{count}})",
+      portsAccessibility: "活动端口：{{ports}}",
+      openInBrowser: "在浏览器中打开",
       scriptsAccessibility: "Workspace scripts",
       copyPath: "复制路径",
       copyBranchName: "复制分支名称",
@@ -1205,6 +1208,7 @@ export const zhCN: TranslationResources = {
         branch: "分支名称",
       },
       show: {
+        ports: "活动端口",
         label: "显示",
         branch: "分支",
         project: "项目",

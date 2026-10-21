@@ -545,6 +545,9 @@ export const es: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "Puertos activos ({{count}})",
+      portsAccessibility: "Puertos activos: {{ports}}",
+      openInBrowser: "Abrir en el navegador",
       scriptsAccessibility: "GuionesWorkspace",
       copyPath: "Copiar ruta",
       copyBranchName: "Copiar nombre de rama",
@@ -1250,6 +1253,7 @@ export const es: TranslationResources = {
         branch: "Nombre de rama",
       },
       show: {
+        ports: "Puertos activos",
         label: "Mostrar",
         branch: "Rama",
         project: "Proyecto",
