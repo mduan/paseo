@@ -125,7 +125,7 @@ export interface WorkspaceDescriptor {
   archivingAt: string | null;
   diffStat: { additions: number; deletions: number } | null;
   ports?: WorkspaceDescriptorPayload["ports"];
-  linearTickets?: WorkspaceDescriptorPayload["linearTickets"];
+  linearIssues?: WorkspaceDescriptorPayload["linearIssues"];
   scripts: WorkspaceDescriptorPayload["scripts"];
   gitRuntime?: WorkspaceDescriptorPayload["gitRuntime"];
   githubRuntime?: WorkspaceDescriptorPayload["githubRuntime"];
@@ -165,7 +165,7 @@ export function normalizeWorkspaceDescriptor(
     archivingAt: payload.archivingAt ?? null,
     diffStat: payload.diffStat ?? null,
     ports: payload.ports,
-    linearTickets: payload.linearTickets,
+    linearIssues: payload.linearIssues,
     scripts: (payload.scripts ?? []).map((s) => Object.assign({}, s)),
     gitRuntime: payload.gitRuntime,
     githubRuntime: payload.githubRuntime,

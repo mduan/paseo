@@ -1,4 +1,4 @@
-import type { LinearTicket, WorkspacePort } from "@getpaseo/protocol/messages";
+import type { LinearIssue, WorkspacePort } from "@getpaseo/protocol/messages";
 import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
 import type { SidebarChecksDisplay } from "@/components/sidebar/display-preferences/checks-display";
@@ -20,7 +20,7 @@ export type MetaRowItem =
   | { kind: "host" }
   | { kind: "changeRequest"; hint: PrHint }
   | { kind: "checks"; summary: CheckSummary; label: boolean }
-  | { kind: "linearTickets"; tickets: readonly LinearTicket[] }
+  | { kind: "linearIssues"; issues: readonly LinearIssue[] }
   | { kind: "ports"; ports: readonly WorkspacePort[] }
   | { kind: "services"; summary: WorkspaceServiceSummary }
   | { kind: "labels"; labels: readonly WorkspaceLabelDefinition[] };
@@ -41,7 +41,7 @@ export function selectMetaRowItems(input: {
   projectName: string | null;
   hasHostBadge: boolean;
   prHint: PrHint | null;
-  linearTickets?: readonly LinearTicket[];
+  linearIssues?: readonly LinearIssue[];
   serviceSummary: WorkspaceServiceSummary | null;
   labels: readonly WorkspaceLabelDefinition[];
   ports?: readonly WorkspacePort[];
@@ -84,8 +84,8 @@ export function selectMetaRowItems(input: {
     }
   }
 
-  if (input.linearTickets?.length && visible.linearTickets) {
-    items.push({ kind: "linearTickets", tickets: input.linearTickets });
+  if (input.linearIssues?.length && visible.linearIssues) {
+    items.push({ kind: "linearIssues", issues: input.linearIssues });
   }
 
   if (input.ports?.length && visible.ports) {

@@ -1014,7 +1014,7 @@ export enum LinearIssueStateType {
   Canceled = "canceled",
 }
 
-export const LinearTicketSchema = z.object({
+export const LinearIssueSchema = z.object({
   identifier: z.string(),
   url: z.string(),
   title: z.string().optional(),
@@ -1023,7 +1023,7 @@ export const LinearTicketSchema = z.object({
   project: z.object({ name: z.string(), color: z.string() }).optional(),
 });
 
-export type LinearTicket = z.infer<typeof LinearTicketSchema>;
+export type LinearIssue = z.infer<typeof LinearIssueSchema>;
 
 export enum LinearConnectionStatus {
   Disconnected = "disconnected",
@@ -1091,7 +1091,7 @@ export const WorkspaceLinearIssuesUpdateResponseSchema = z.object({
     requestId: z.string(),
     workspaceId: z.string(),
     accepted: z.boolean(),
-    linearTickets: z.array(LinearTicketSchema),
+    linearIssues: z.array(LinearIssueSchema),
     error: z.string().nullable(),
   }),
 });
@@ -4235,7 +4235,7 @@ const WorkspaceGitRuntimePayloadSchema = z
 
 export const WorkspacePullRequestPayloadSchema = z.object({
   number: z.number().optional(),
-  linearTickets: z.array(LinearTicketSchema).optional(),
+  linearIssues: z.array(LinearIssueSchema).optional(),
   url: z.string(),
   title: z.string(),
   state: z.string(),
@@ -4330,7 +4330,7 @@ export const WorkspaceDescriptorPayloadSchema = z
     pinnedAt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
-    linearTickets: z.array(LinearTicketSchema).optional(),
+    linearIssues: z.array(LinearIssueSchema).optional(),
     archivingAt: z.string().nullable().optional().default(null),
     status: WorkspaceStateBucketSchema,
     // Best-effort workspace status entry timestamp. Old daemons omit the
@@ -4437,7 +4437,7 @@ export type AgentSearchMatch = z.infer<typeof AgentSearchMatchSchema>;
 const AgentDirectoryResponseEntrySchema = z.object({
   agent: AgentSnapshotPayloadSchema,
   project: ProjectPlacementPayloadSchema,
-  workspaceLinearTickets: z.array(LinearTicketSchema).optional(),
+  workspaceLinearIssues: z.array(LinearIssueSchema).optional(),
   workspacePullRequest: WorkspacePullRequestSummarySchema.nullable().optional(),
   // Legacy relevance metadata remains accepted from older daemons.
   // Current history responses use the requested chronological sort.
@@ -5700,7 +5700,7 @@ export const CheckoutPrStatusSchema = z.object({
   repoName: z.string().optional(),
   github: CheckoutPrGithubStatusSchema,
   forgeSpecific: CheckoutPrForgeSpecificSchema,
-  linearTickets: z.array(LinearTicketSchema).optional(),
+  linearIssues: z.array(LinearIssueSchema).optional(),
 });
 
 // Why a forge's PR/MR features are (un)available, so the client can offer the

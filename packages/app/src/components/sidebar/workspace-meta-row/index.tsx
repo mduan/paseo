@@ -1,5 +1,5 @@
 import { LinearIcon } from "@/components/icons/linear-icon";
-import type { LinearTicket, WorkspacePort } from "@getpaseo/protocol/messages";
+import type { LinearIssue, WorkspacePort } from "@getpaseo/protocol/messages";
 import { useCallback, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
@@ -64,7 +64,7 @@ export function WorkspaceMetaRow({
   projectName,
   hostBadge,
   prHint,
-  linearTickets,
+  linearIssues,
   serviceSummary,
   ports,
   labels = EMPTY_LABELS,
@@ -74,7 +74,7 @@ export function WorkspaceMetaRow({
   projectName: string | null;
   hostBadge: HostBadgeModel | null;
   prHint: PrHint | null;
-  linearTickets?: readonly LinearTicket[];
+  linearIssues?: readonly LinearIssue[];
   serviceSummary: WorkspaceServiceSummary | null;
   ports?: readonly WorkspacePort[];
   labels?: readonly WorkspaceLabelDefinition[];
@@ -86,7 +86,7 @@ export function WorkspaceMetaRow({
     projectName,
     hasHostBadge: hostBadge !== null,
     prHint,
-    linearTickets,
+    linearIssues,
     serviceSummary,
     ports,
     labels,
@@ -138,8 +138,8 @@ function MetaItemNode({
   if (item.kind === "checks") {
     return <ChecksItem summary={item.summary} label={item.label} />;
   }
-  if (item.kind === "linearTickets") {
-    return <LinearTicketsItem tickets={item.tickets} />;
+  if (item.kind === "linearIssues") {
+    return <LinearIssuesItem issues={item.issues} />;
   }
   if (item.kind === "ports") {
     return <PortsItem ports={item.ports} />;
@@ -230,14 +230,14 @@ function PullRequestItem({ hint }: { hint: PrHint }) {
   );
 }
 
-function LinearTicketsItem({ tickets }: { tickets: readonly LinearTicket[] }) {
+function LinearIssuesItem({ issues }: { issues: readonly LinearIssue[] }) {
   const { t } = useTranslation();
   return (
     <View
       style={styles.item}
-      testID="sidebar-workspace-linear-tickets"
-      accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
-        tickets: tickets.map((ticket) => ticket.identifier).join(", "),
+      testID="sidebar-workspace-linear-issues"
+      accessibilityLabel={t("workspace.hoverCard.issuesAccessibility", {
+        issues: issues.map((issue) => issue.identifier).join(", "),
       })}
     >
       <ThemedLinear size={META_ICON_SIZE} uniProps={mutedMapping} />

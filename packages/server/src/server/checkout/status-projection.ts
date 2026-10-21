@@ -149,7 +149,7 @@ export function normalizeCheckoutPrStatusPayload(
     checks: status.checks ?? [],
     checksStatus: status.checksStatus,
     reviewDecision: status.reviewDecision,
-    linearTickets: status.linearTickets,
+    linearIssues: status.linearIssues,
   };
   if (status.projectPath) {
     payload.projectPath = status.projectPath;

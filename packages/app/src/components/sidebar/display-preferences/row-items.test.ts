@@ -12,7 +12,7 @@ describe("parseSidebarRowItems", () => {
       project: false,
       host: true,
       changeRequest: true,
-      linearTickets: true,
+      linearIssues: true,
       ports: true,
       services: true,
       labels: true,
@@ -20,10 +20,10 @@ describe("parseSidebarRowItems", () => {
   });
 
   it("applies stored overrides", () => {
-    expect(parseSidebarRowItems({ services: false, linearTickets: false })).toEqual({
+    expect(parseSidebarRowItems({ services: false, linearIssues: false })).toEqual({
       ...DEFAULT_SIDEBAR_ROW_ITEMS,
       services: false,
-      linearTickets: false,
+      linearIssues: false,
     });
   });
 

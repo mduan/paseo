@@ -1,5 +1,5 @@
 import equal from "fast-deep-equal";
-import { mergeLinearTickets } from "@getpaseo/protocol/linear-tickets";
+import { mergeLinearIssues } from "@getpaseo/protocol/linear-issues";
 import type { PrHint } from "@/git/pr-hint";
 import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { type HostProjectListItem } from "@/projects/host-project-model";
@@ -50,7 +50,7 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   archivingAt: string | null;
   diffStat: { additions: number; deletions: number } | null;
   prHint: PrHint | null;
-  linearTickets?: WorkspaceDescriptor["linearTickets"];
+  linearIssues?: WorkspaceDescriptor["linearIssues"];
   archiveHasUncommittedChanges: boolean | null;
   archiveUnpushedCommitCount: number | null;
   ports?: WorkspaceDescriptor["ports"];
@@ -182,9 +182,9 @@ export function createSidebarWorkspaceEntry(input: {
       input.workspace.githubRuntime?.pullRequest,
       input.workspace.forge,
     ),
-    linearTickets: mergeLinearTickets(
-      input.workspace.linearTickets,
-      input.workspace.githubRuntime?.pullRequest?.linearTickets,
+    linearIssues: mergeLinearIssues(
+      input.workspace.linearIssues,
+      input.workspace.githubRuntime?.pullRequest?.linearIssues,
     ),
     archiveHasUncommittedChanges: input.workspace.gitRuntime?.isDirty ?? null,
     archiveUnpushedCommitCount: input.workspace.gitRuntime?.aheadOfOrigin ?? null,
@@ -423,7 +423,7 @@ function areSidebarWorkspaceEntriesEqual(
   const keys = Object.keys(left) as Array<keyof SidebarWorkspaceEntry>;
   if (keys.length !== Object.keys(right).length) return false;
   return keys.every((key) => {
-    if (key === "linearTickets") return equal(left.linearTickets, right.linearTickets);
+    if (key === "linearIssues") return equal(left.linearIssues, right.linearIssues);
     if (key !== "prHint") return Object.is(left[key], right[key]);
     const leftHint = left.prHint;
     const rightHint = right.prHint;
@@ -435,7 +435,7 @@ function areSidebarWorkspaceEntriesEqual(
         leftHint.number === rightHint.number &&
         leftHint.state === rightHint.state &&
         leftHint.checks === rightHint.checks &&
-        leftHint.linearTickets === rightHint.linearTickets &&
+        leftHint.linearIssues === rightHint.linearIssues &&
         leftHint.checksStatus === rightHint.checksStatus &&
         leftHint.reviewDecision === rightHint.reviewDecision)
     );

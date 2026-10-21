@@ -1,5 +1,5 @@
 import { selectPrHintFromStatus } from "@/git/pr-hint";
-import { mergeLinearTickets } from "@getpaseo/protocol/linear-tickets";
+import { mergeLinearIssues } from "@getpaseo/protocol/linear-issues";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { AgentHistoryFilterOptions } from "@getpaseo/protocol/messages";
 import type {
@@ -139,7 +139,7 @@ export async function fetchAgentHistoryPage(input: {
       lastActivityAt: agent.lastActivityAt,
       cwd: agent.cwd,
       workspaceId: agent.workspaceId,
-      workspaceLinearTickets: workspaceContexts.get(agent.id)?.workspaceLinearTickets,
+      workspaceLinearIssues: workspaceContexts.get(agent.id)?.workspaceLinearIssues,
       workspacePullRequest: selectPrHintFromStatus(
         workspaceContexts.get(agent.id)?.workspacePullRequest,
         workspaceContexts.get(agent.id)?.workspacePullRequest?.forge,
@@ -315,14 +315,13 @@ export function useAgentHistory(options: {
         Object.entries(liveWorkspacesByServer).flatMap(([serverId, workspaces]) =>
           Array.from(workspaces?.values() ?? [])
             .filter(
-              (workspace) =>
-                workspace.linearTickets?.length || workspace.githubRuntime?.pullRequest,
+              (workspace) => workspace.linearIssues?.length || workspace.githubRuntime?.pullRequest,
             )
             .map((workspace) => [
               serverId,
               workspace.id,
-              workspace.linearTickets,
-              workspace.githubRuntime?.pullRequest?.linearTickets,
+              workspace.linearIssues,
+              workspace.githubRuntime?.pullRequest?.linearIssues,
               workspace.githubRuntime?.pullRequest?.url,
               workspace.githubRuntime?.pullRequest?.title,
               workspace.githubRuntime?.pullRequest?.state,
@@ -536,9 +535,9 @@ export function useAgentHistory(options: {
         : agent.workspacePullRequest;
       current.workspacePullRequest = isPullRequestSupported ? pullRequest : undefined;
       if (workspace) {
-        current.workspaceLinearTickets = mergeLinearTickets(
-          workspace.linearTickets,
-          workspace.githubRuntime?.pullRequest?.linearTickets,
+        current.workspaceLinearIssues = mergeLinearIssues(
+          workspace.linearIssues,
+          workspace.githubRuntime?.pullRequest?.linearIssues,
         );
       }
       if (live) {

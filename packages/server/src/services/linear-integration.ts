@@ -7,11 +7,11 @@ import { z } from "zod";
 import type { Logger } from "pino";
 import {
   LinearConnectionStatus,
-  LinearTicketSchema,
+  LinearIssueSchema,
   type LinearConnection,
-  type LinearTicket,
+  type LinearIssue,
 } from "@getpaseo/protocol/messages";
-import { parseLinearTicketUrl } from "@getpaseo/protocol/linear-tickets";
+import { parseLinearIssueUrl } from "@getpaseo/protocol/linear-issues";
 import { writeFileAtomic } from "../server/atomic-file.js";
 
 const StoredConnectionSchema = z.object({
@@ -42,7 +42,7 @@ const AttachmentsResponseSchema = z.object({
     attachmentsForURL: z.object({
       nodes: z.array(
         z.object({
-          issue: LinearTicketSchema.pick({ identifier: true, title: true, url: true }).required(),
+          issue: LinearIssueSchema.pick({ identifier: true, title: true, url: true }).required(),
         }),
       ),
       pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
@@ -50,15 +50,15 @@ const AttachmentsResponseSchema = z.object({
   }),
 });
 type StoredConnection = z.infer<typeof StoredConnectionSchema>;
-type CachedIssue = { pending: Promise<LinearTicket | undefined>; expiresAt: number };
-type CachedPullRequestTickets = { pending: Promise<LinearTicket[]>; expiresAt: number };
+type CachedIssue = { pending: Promise<LinearIssue | undefined>; expiresAt: number };
+type CachedPullRequestIssues = { pending: Promise<LinearIssue[]>; expiresAt: number };
 
 export type LinearIntegrationService = {
   getConnection(): Promise<LinearConnection>;
   setKey(apiKey: string): Promise<LinearConnection>;
   disconnect(): Promise<LinearConnection>;
-  getPullRequestTickets(url?: string): Promise<LinearTicket[]>;
-  resolve(tickets?: readonly LinearTicket[]): Promise<LinearTicket[] | undefined>;
+  getPullRequestIssues(url?: string): Promise<LinearIssue[]>;
+  resolve(issues?: readonly LinearIssue[]): Promise<LinearIssue[] | undefined>;
 };
 type Options = {
   paseoHome: string;
@@ -71,7 +71,7 @@ type GraphqlRequest = {
   query: string;
   variables?: Record<string, string>;
 };
-type IssueLookup = { ticket: LinearTicket; apiKey: string };
+type IssueLookup = { issue: LinearIssue; apiKey: string };
 type PullRequestLookup = { url: string; apiKey: string };
 
 class LinearIntegrationError extends Error {
@@ -89,7 +89,7 @@ export function createLinearIntegrationService({
 }: Options): LinearIntegrationService {
   const file = join(paseoHome, "integrations", "linear.json");
   const cache = new LRUCache<string, CachedIssue>({ max: 256 });
-  const pullRequestCache = new LRUCache<string, CachedPullRequestTickets>({ max: 256 });
+  const pullRequestCache = new LRUCache<string, CachedPullRequestIssues>({ max: 256 });
   const limitRequests = pLimit(4);
   const mutate = pLimit(1);
   let stored: Promise<StoredConnection | undefined> | undefined;
@@ -152,7 +152,7 @@ export function createLinearIntegrationService({
       throw new LinearIntegrationError("Could not reach Linear. Try again.");
     }
   }
-  async function loadIssue({ ticket, apiKey }: IssueLookup): Promise<LinearTicket | undefined> {
+  async function loadIssue({ issue, apiKey }: IssueLookup): Promise<LinearIssue | undefined> {
     try {
       const result = IssueResponseSchema.parse(
         await graphql({
@@ -165,32 +165,29 @@ export function createLinearIntegrationService({
               project { name color }
             }
           }`,
-          variables: { id: ticket.identifier },
+          variables: { id: issue.identifier },
         }),
       );
-      const issue = result.data.issue;
+      const details = result.data.issue;
       // Identifiers are only unique within a Linear organization.
-      if (!issue || parseLinearTicketUrl(issue.url)?.url !== ticket.url) return undefined;
+      if (!details || parseLinearIssueUrl(details.url)?.url !== issue.url) return undefined;
       return {
-        ...ticket,
-        title: issue.title,
-        state: issue.state,
-        assignee: issue.assignee
-          ? { name: issue.assignee.name, avatarUrl: issue.assignee.avatarUrl ?? undefined }
+        ...issue,
+        title: details.title,
+        state: details.state,
+        assignee: details.assignee
+          ? { name: details.assignee.name, avatarUrl: details.assignee.avatarUrl ?? undefined }
           : undefined,
-        project: issue.project ?? undefined,
+        project: details.project ?? undefined,
       };
     } catch {
-      logger.warn({ identifier: ticket.identifier }, "Unable to load Linear issue metadata");
+      logger.warn({ identifier: issue.identifier }, "Unable to load Linear issue metadata");
       return undefined;
     }
   }
 
-  async function loadPullRequestTickets({
-    url,
-    apiKey,
-  }: PullRequestLookup): Promise<LinearTicket[]> {
-    const tickets = new Map<string, LinearTicket>();
+  async function loadPullRequestIssues({ url, apiKey }: PullRequestLookup): Promise<LinearIssue[]> {
+    const issues = new Map<string, LinearIssue>();
     let after: string | undefined;
     do {
       const response = AttachmentsResponseSchema.parse(
@@ -207,8 +204,8 @@ export function createLinearIntegrationService({
       );
       const page = response.data.attachmentsForURL;
       for (const { issue } of page.nodes) {
-        const normalized = parseLinearTicketUrl(issue.url);
-        if (normalized) tickets.set(normalized.url, { ...normalized, title: issue.title });
+        const normalized = parseLinearIssueUrl(issue.url);
+        if (normalized) issues.set(normalized.url, { ...normalized, title: issue.title });
       }
       if (!page.pageInfo.hasNextPage) break;
       const cursor = page.pageInfo.endCursor;
@@ -217,7 +214,7 @@ export function createLinearIntegrationService({
       }
       after = cursor;
     } while (after);
-    return [...tickets.values()];
+    return [...issues.values()];
   }
 
   return {
@@ -259,7 +256,7 @@ export function createLinearIntegrationService({
         return describe(undefined);
       });
     },
-    async getPullRequestTickets(url) {
+    async getPullRequestIssues(url) {
       if (!url) return [];
       try {
         const connection = await load();
@@ -267,14 +264,14 @@ export function createLinearIntegrationService({
         let entry = pullRequestCache.get(url);
         if (!entry || entry.expiresAt <= now()) {
           const pending = limitRequests(() =>
-            loadPullRequestTickets({ url, apiKey: connection.apiKey }),
+            loadPullRequestIssues({ url, apiKey: connection.apiKey }),
           );
           entry = { pending, expiresAt: Number.POSITIVE_INFINITY };
           const current = entry;
           current.pending = pending.then(
-            (tickets) => {
+            (issues) => {
               current.expiresAt = now() + 300_000;
-              return tickets;
+              return issues;
             },
             () => {
               current.expiresAt = now() + 60_000;
@@ -284,41 +281,43 @@ export function createLinearIntegrationService({
           );
           pullRequestCache.set(url, current);
         }
-        const tickets = await entry.pending;
-        return (await load()) === connection ? tickets : [];
+        const issues = await entry.pending;
+        return (await load()) === connection ? issues : [];
       } catch {
         logger.warn("Unable to read Linear connection for pull request issues");
         return [];
       }
     },
-    async resolve(tickets) {
-      if (!tickets?.length) return tickets ? [...tickets] : undefined;
+    async resolve(issues) {
+      if (!issues?.length) return issues ? [...issues] : undefined;
       let connection: StoredConnection | undefined;
       try {
         connection = await load();
       } catch {
         logger.warn("Unable to read Linear connection for issue metadata");
-        return [...tickets];
+        return [...issues];
       }
-      if (!connection) return [...tickets];
+      if (!connection) return [...issues];
       const { apiKey } = connection;
       return Promise.all(
-        tickets.map(async (ticket) => {
-          const normalized = parseLinearTicketUrl(ticket.url);
-          if (!normalized) return ticket;
+        issues.map(async (issue) => {
+          const normalized = parseLinearIssueUrl(issue.url);
+          if (!normalized) return issue;
           let entry = cache.get(normalized.url);
           if (!entry || entry.expiresAt <= now()) {
-            const pending = limitRequests(() => loadIssue({ ticket: normalized, apiKey }));
+            const pending = limitRequests(() => loadIssue({ issue: normalized, apiKey }));
             entry = { pending, expiresAt: Number.POSITIVE_INFINITY };
             cache.set(normalized.url, entry);
             const current = entry;
-            void pending.then((issue) => {
-              current.expiresAt = now() + (issue ? 300_000 : 60_000);
+            void pending.then((details) => {
+              current.expiresAt = now() + (details ? 300_000 : 60_000);
               return undefined;
             });
           }
-          const issue = await entry.pending;
-          return issue ? { ...ticket, ...issue, title: ticket.title || issue.title } : ticket;
+          const resolvedIssue = await entry.pending;
+          return resolvedIssue
+            ? { ...issue, ...resolvedIssue, title: issue.title || resolvedIssue.title }
+            : issue;
         }),
       );
     },

@@ -36,26 +36,26 @@ const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item)
 
 describe("selectMetaRowItems", () => {
   it("places Linear after checks and before ports with independent visibility", () => {
-    const linearTickets = [
+    const linearIssues = [
       { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
     ];
     const input = {
       prHint: PR_HINT,
-      linearTickets,
+      linearIssues,
       ports: [{ workspaceId: "app", host: "*", port: 3000 }],
     };
     expect(kinds(select(input))).toEqual([
       "host",
       "changeRequest",
       "checks",
-      "linearTickets",
+      "linearIssues",
       "ports",
       "services",
       "labels",
     ]);
     expect(
-      kinds(select({ ...input, visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, linearTickets: false } })),
-    ).not.toContain("linearTickets");
+      kinds(select({ ...input, visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, linearIssues: false } })),
+    ).not.toContain("linearIssues");
     expect(
       kinds(
         select({
@@ -64,9 +64,9 @@ describe("selectMetaRowItems", () => {
           visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, changeRequest: false, ports: false },
         }),
       ),
-    ).toEqual(["host", "linearTickets", "services", "labels"]);
-    expect(kinds(select({ prHint: null, linearTickets }))).toContain("linearTickets");
-    expect(kinds(select({ linearTickets: [] }))).not.toContain("linearTickets");
+    ).toEqual(["host", "linearIssues", "services", "labels"]);
+    expect(kinds(select({ prHint: null, linearIssues }))).toContain("linearIssues");
+    expect(kinds(select({ linearIssues: [] }))).not.toContain("linearIssues");
   });
   it("places ports after checks, and respects the ports preference and empty results", () => {
     const ports = [{ workspaceId: "app", host: "*", port: 3000 }];

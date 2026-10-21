@@ -5,7 +5,7 @@ import { Box, UserRound } from "lucide-react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import { LinearIssueStateType, type LinearTicket } from "@getpaseo/protocol/messages";
+import { LinearIssueStateType, type LinearIssue } from "@getpaseo/protocol/messages";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
@@ -26,9 +26,9 @@ function MetadataTooltip({ label, children }: PropsWithChildren<{ label: string 
   );
 }
 
-export function LinearTicketMetadata({ ticket }: { ticket: LinearTicket }) {
+export function LinearIssueMetadata({ issue }: { issue: LinearIssue }) {
   const { t } = useTranslation();
-  const { state, assignee, project } = ticket;
+  const { state, assignee, project } = issue;
   const imageSource = useMemo(
     () => (assignee?.avatarUrl ? { uri: assignee.avatarUrl } : undefined),
     [assignee?.avatarUrl],

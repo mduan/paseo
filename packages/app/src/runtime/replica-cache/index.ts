@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LinearTicketSchema } from "@getpaseo/protocol/messages";
+import { LinearIssueSchema } from "@getpaseo/protocol/messages";
 import {
   AgentRuntimeInfoSchema,
   AgentAttachmentSchema,
@@ -313,7 +313,7 @@ const WorkspaceGitRuntimeSchema = z
   .optional();
 
 const StoredWorkspaceSchema = z.strictObject({
-  linearTickets: z.array(LinearTicketSchema).optional(),
+  linearIssues: z.array(LinearIssueSchema).optional(),
   id: z.string(),
   projectId: z.string(),
   projectDisplayName: z.string(),
@@ -741,7 +741,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     title: workspace.title ?? null,
     pinnedAt: workspace.pinnedAt ?? null,
     labels: workspace.labels,
-    linearTickets: workspace.linearTickets,
+    linearIssues: workspace.linearIssues,
     status: workspace.status,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,
     activityAt: null,

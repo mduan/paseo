@@ -9,7 +9,7 @@ import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 export interface AggregatedAgent extends AgentDirectoryEntry {
   serverId: string;
   serverLabel: string;
-  workspaceLinearTickets?: import("@getpaseo/protocol/messages").LinearTicket[];
+  workspaceLinearIssues?: import("@getpaseo/protocol/messages").LinearIssue[];
   workspacePullRequest?: import("@/git/pr-hint").PrHint | null;
 }
 

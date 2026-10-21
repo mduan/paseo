@@ -51,7 +51,7 @@ function makeDeps(
 }
 
 describe("loadAppSettingsFromStorage", () => {
-  it.each(["ports", "linearTickets"] as const)(
+  it.each(["ports", "linearIssues"] as const)(
     "enables %s for old settings and preserves an explicit opt-out",
     async (item) => {
       const deps = makeDeps();
@@ -67,7 +67,7 @@ describe("loadAppSettingsFromStorage", () => {
       expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems[item]).toBe(false);
     },
   );
-  it.each([HistoryField.LinearTickets, HistoryField.PullRequest])(
+  it.each([HistoryField.LinearIssues, HistoryField.PullRequest])(
     "enables %s in legacy History preferences without resetting other display choices",
     async (field) => {
       const deps = makeDeps({

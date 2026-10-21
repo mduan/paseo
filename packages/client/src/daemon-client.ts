@@ -3152,7 +3152,7 @@ export class DaemonClient {
       });
     if (!payload.accepted)
       throw new Error(payload.error ?? "Workspace Linear issue update rejected");
-    return { workspaceId: payload.workspaceId, linearTickets: payload.linearTickets };
+    return { workspaceId: payload.workspaceId, linearIssues: payload.linearIssues };
   }
 
   async setWorkspaceTitle(
