@@ -68,6 +68,7 @@ export function Field({ label, children, trailing, hint, error, testID }: FieldP
 
 type FormTextInputProps = AdaptiveTextInputProps & {
   size?: FieldControlSize;
+  chromeStyle?: ViewStyle;
 };
 
 type FlatFormTextInputStyle = ViewStyle & TextStyle;
@@ -159,7 +160,10 @@ function assignTextInputRef(
 }
 
 export const FormTextInput = forwardRef<EditingTextInputHandle, FormTextInputProps>(
-  function FormTextInput({ size = "md", style, onFocus, onBlur, editable, ...props }, ref) {
+  function FormTextInput(
+    { size = "md", style, chromeStyle: chromeOverride, onFocus, onBlur, editable, ...props },
+    ref,
+  ) {
     const [focused, setFocused] = useState(false);
     const isDisabled = editable === false;
     const chromeSizeStyle = size === "sm" ? formInputStyles.chromeSm : formInputStyles.chromeMd;
@@ -207,8 +211,9 @@ export const FormTextInput = forwardRef<EditingTextInputHandle, FormTextInputPro
           },
         ),
         splitStyle.chromeStyle,
+        chromeOverride,
       ],
-      [chromeSizeStyle, focused, isDisabled, splitStyle.chromeStyle],
+      [chromeSizeStyle, focused, isDisabled, splitStyle.chromeStyle, chromeOverride],
     );
 
     return (

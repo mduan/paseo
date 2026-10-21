@@ -24,6 +24,14 @@ import { openLinearKeyForm } from "./linear-key-form-model";
 const ThemedLinear = withUnistyles(LinearIcon);
 const ThemedFormTextInput = withUnistyles(FormTextInput);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const keyInputAppearance = (theme: Theme) => ({
+  chromeStyle: {
+    backgroundColor: theme.colors.surface0,
+    paddingRight: theme.spacing[12],
+    borderWidth: theme.borderWidth[1],
+    borderColor: theme.colors.border,
+  },
+});
 const connectionKey = (serverId: string) => ["linear-connection", serverId] as const;
 
 type KeyFormProps = {
@@ -78,7 +86,7 @@ function LinearKeyForm({ client, enabled, onCancel, onSaved }: KeyFormProps) {
             secureTextEntry={!state.isVisible}
             editable={!disabled}
             onSubmitEditing={submit}
-            style={styles.keyInput}
+            uniProps={keyInputAppearance}
           />
           <View style={styles.visibility}>
             <Button
@@ -262,12 +270,6 @@ const styles = StyleSheet.create((theme) => ({
   identity: { flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
   form: { padding: theme.spacing[4], gap: theme.spacing[3] },
-  keyInput: {
-    backgroundColor: theme.colors.surface0,
-    paddingRight: theme.spacing[12],
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
-  },
   visibility: {
     position: "absolute",
     right: theme.spacing[1],
