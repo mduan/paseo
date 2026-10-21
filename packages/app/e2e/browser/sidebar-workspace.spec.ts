@@ -1,7 +1,7 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import {
@@ -78,6 +78,51 @@ async function openWorkspaceHoverCard(page: import("@playwright/test").Page, wor
   const hoverCard = page.getByRole("menu", { name: "Workspace scripts" });
   await expect(hoverCard).toBeVisible({ timeout: 30_000 });
   return hoverCard;
+}
+
+async function expectHoverPanelCloseDelay({
+  page,
+  card,
+  source,
+  panel,
+}: {
+  page: Page;
+  card: Locator;
+  source: Locator;
+  panel: Locator;
+}) {
+  const time = Date.now();
+  await page.clock.install({ time });
+  await page.clock.pauseAt(time + 1_000);
+  const otherRow = card.getByTestId("hover-card-workspace-host");
+  await source.hover();
+  await otherRow.hover();
+  const bounds = await otherRow.boundingBox();
+  if (!bounds) throw new Error("Host row has no bounds");
+
+  for (let step = 0; step < 5; step++) {
+    await page.mouse.move(bounds.x + step + 1, bounds.y + bounds.height / 2);
+    await page.clock.runFor(100);
+    await expect(panel).toHaveCount(step < 4 ? 1 : 0);
+  }
+
+  await source.hover();
+  await otherRow.hover();
+  await page.clock.runFor(250);
+  await source.hover();
+  await page.clock.runFor(600);
+  await expect(panel).toBeVisible();
+
+  await otherRow.hover();
+  await page.clock.runFor(250);
+  await panel.hover();
+  await page.clock.runFor(600);
+  await expect(panel).toBeVisible();
+
+  await otherRow.hover();
+  await page.clock.runFor(500);
+  await expect(panel).toHaveCount(0);
+  await page.clock.resume();
 }
 
 interface PaseoOwnedWorktree {
@@ -545,6 +590,7 @@ test.describe("Sidebar workspace list", () => {
       const lastIssue = panel.getByTestId("hover-card-linear-issue-COR-1509");
       await lastIssue.scrollIntoViewIfNeeded();
       await expect(lastIssue).toBeVisible();
+      await expectHoverPanelCloseDelay({ page, card, source, panel });
       await page.getByTestId("sidebar-display-preferences-menu").click();
       await page.getByTestId("sidebar-display-show").click();
       await page.getByTestId("sidebar-row-item-linearIssues").click();
@@ -605,6 +651,7 @@ test.describe("Sidebar workspace list", () => {
       await panel.getByText("Live ports", { exact: true }).hover();
       await expect(actions.nth(0)).toHaveCSS("opacity", "0");
       await expect(actions.nth(1)).toHaveCSS("opacity", "0");
+      await expectHoverPanelCloseDelay({ page, card, source: ports, panel });
     } finally {
       await killProcessTree(listeners);
       await workspace.cleanup();

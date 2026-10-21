@@ -34,11 +34,7 @@ import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
 import { Pressable } from "react-native";
-import type {
-  GestureResponderEvent,
-  LayoutChangeEvent,
-  PointerEvent as NativePointerEvent,
-} from "react-native";
+import type { GestureResponderEvent, LayoutChangeEvent } from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -246,21 +242,6 @@ function WorkspaceHoverCardContent({
     setActivePanel(HoverPanel.LinearIssues);
     openPanelNow();
   }, [openPanelNow]);
-  const issuesRowRef = useRef<View>(null);
-  const portsRowRef = useRef<View>(null);
-  const schedulePanelClose = sidePanel.scheduleClose;
-  const handleMainPointerMove = useCallback(
-    (event: NativePointerEvent) => {
-      const target: unknown = event.target;
-      const sourceRows = [portsRowRef.current, issuesRowRef.current];
-      // Keep document pointer events intact: the hovercard safe zone also reads them.
-      if (isWeb && target instanceof Node) {
-        if (sourceRows.some((row) => row instanceof Node && row.contains(target))) return;
-      }
-      schedulePanelClose();
-    },
-    [schedulePanelClose],
-  );
   const [triggerRect, setTriggerRect] = useState<Rect | null>(null);
   const [contentSize, setContentSize] = useState<{ width: number; height: number } | null>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -327,20 +308,19 @@ function WorkspaceHoverCardContent({
         frameStyle={frameStyle}
       >
         <View style={styles.cardColumns}>
-          <View
-            style={styles.cardMain}
-            onLayout={handleMainLayout}
-            onPointerEnter={sidePanel.scheduleClose}
-            onPointerMove={handleMainPointerMove}
-            onPointerLeave={sidePanel.cancelClose}
-          >
+          <View style={styles.cardMain} onLayout={handleMainLayout}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle} testID="hover-card-workspace-name">
                 {workspace.name}
               </Text>
             </View>
             {issues?.length ? (
-              <View ref={issuesRowRef} onPointerEnter={openIssues}>
+              <View
+                {...(isWeb && {
+                  onMouseEnter: openIssues,
+                  onMouseLeave: sidePanel.scheduleClose,
+                })}
+              >
                 <LinearIssuesSummary issues={issues} onOpen={openIssues} />
               </View>
             ) : null}
@@ -383,7 +363,12 @@ function WorkspaceHoverCardContent({
               />
             ) : null}
             {ports?.length ? (
-              <View ref={portsRowRef} onPointerEnter={openPorts}>
+              <View
+                {...(isWeb && {
+                  onMouseEnter: openPorts,
+                  onMouseLeave: sidePanel.scheduleClose,
+                })}
+              >
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("workspace.hoverCard.portsAccessibility", {
@@ -410,6 +395,7 @@ function WorkspaceHoverCardContent({
               issues={issues}
               serverId={workspace.serverId}
               cancelClose={sidePanel.cancelClose}
+              scheduleClose={sidePanel.scheduleClose}
               maxHeight={mainHeight}
             />
           ) : null}
@@ -457,6 +443,7 @@ function WorkspaceDetailsPanel({
   issues,
   serverId,
   cancelClose,
+  scheduleClose,
   maxHeight,
 }: {
   maxHeight?: number;
@@ -465,11 +452,16 @@ function WorkspaceDetailsPanel({
   issues?: readonly LinearIssue[];
   serverId: string;
   cancelClose: () => void;
+  scheduleClose: () => void;
 }) {
   const { t } = useTranslation();
   if (activePanel === HoverPanel.Ports && ports?.length) {
     return (
-      <View style={styles.portsPanel} onPointerEnter={cancelClose} testID="hover-card-ports-panel">
+      <View
+        style={styles.portsPanel}
+        {...(isWeb && { onMouseEnter: cancelClose, onMouseLeave: scheduleClose })}
+        testID="hover-card-ports-panel"
+      >
         <View style={styles.panelHeader}>
           <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
           <Text style={styles.panelTitle}>{t("workspace.hoverCard.livePorts")}</Text>
@@ -482,7 +474,7 @@ function WorkspaceDetailsPanel({
     return (
       <View
         style={styles.issuesPanel(maxHeight)}
-        onPointerEnter={cancelClose}
+        {...(isWeb && { onMouseEnter: cancelClose, onMouseLeave: scheduleClose })}
         testID="hover-card-linear-panel"
       >
         <View style={styles.panelHeader}>

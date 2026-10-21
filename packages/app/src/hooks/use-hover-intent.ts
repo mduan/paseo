@@ -14,11 +14,11 @@ export function useHoverIntent() {
     setOpen(true);
   }, [cancelClose]);
   const scheduleClose = useCallback(() => {
-    cancelClose();
+    if (closeTimer.current) return;
     closeTimer.current = setTimeout(() => {
       closeTimer.current = undefined;
       setOpen(false);
-    }, 300);
-  }, [cancelClose]);
+    }, 500);
+  }, []);
   return { open, openNow, scheduleClose, cancelClose };
 }
