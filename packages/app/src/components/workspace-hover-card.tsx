@@ -389,7 +389,7 @@ function WorkspaceHoverCardContent({
                     ports: ports.map((port) => port.port).join(", "),
                   })}
                   onPress={openPorts}
-                  style={styles.cardInfoRow}
+                  style={[styles.cardInfoRow, styles.defaultCursor]}
                   testID="hover-card-workspace-ports"
                 >
                   <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
@@ -428,7 +428,10 @@ function LinearTicketsSummary({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.cardInfoRow} testID="hover-card-workspace-linear-tickets">
+    <View
+      style={[styles.cardInfoRow, styles.defaultCursor]}
+      testID="hover-card-workspace-linear-tickets"
+    >
       <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
       <Text style={styles.cardInfoText} numberOfLines={1}>
         {tickets.map((ticket, index) => (
@@ -443,6 +446,7 @@ function LinearTicketsSummary({
       <Pressable
         accessibilityRole="button"
         onPress={onOpen}
+        style={styles.defaultCursor}
         accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
           tickets: tickets.map((ticket) => ticket.identifier).join(", "),
         })}
@@ -941,6 +945,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minWidth: 0,
   },
+  defaultCursor: { cursor: "auto" },
   cardInfoRow: {
     flexDirection: "row",
     alignItems: "center",

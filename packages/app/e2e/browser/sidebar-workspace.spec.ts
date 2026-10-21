@@ -475,6 +475,12 @@ ${Array.from({ length: 10 }, (_, index) => `<a href="https://linear.app/acme/iss
       const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
       const source = card.getByTestId("hover-card-workspace-linear-tickets");
       await expect(source).toContainText("COR-1401, COR-1404");
+      await expect(source).toHaveCSS("cursor", "auto");
+      await expect(source.getByRole("button")).toHaveCSS("cursor", "auto");
+      await expect(source.getByRole("link", { name: "COR-1401", exact: true })).toHaveCSS(
+        "cursor",
+        "pointer",
+      );
       await expect
         .soft(source.getByRole("link", { name: "COR-1401", exact: true }))
         .toHaveAttribute("href", "https://linear.app/acme/issue/COR-1401");
@@ -553,6 +559,7 @@ ${Array.from({ length: 10 }, (_, index) => `<a href="https://linear.app/acme/iss
       const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
       const ports = card.getByTestId("hover-card-workspace-ports");
       await expect(ports).toBeVisible({ timeout: 45_000 });
+      await expect(ports).toHaveCSS("cursor", "auto");
       await ports.hover();
       const panel = card.getByTestId("hover-card-ports-panel");
       const rows = panel.locator(":scope > div").filter({ has: page.getByRole("button") });
