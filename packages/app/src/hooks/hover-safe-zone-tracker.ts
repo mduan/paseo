@@ -46,7 +46,7 @@ export function createHoverSafeZoneTracker(input: HoverSafeZoneTrackerInput): Ho
   };
 }
 
-function isInsideRect(rect: RectLike | null, x: number, y: number): boolean {
+export function isInsideRect(rect: RectLike | null, x: number, y: number): boolean {
   if (!rect) return false;
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
