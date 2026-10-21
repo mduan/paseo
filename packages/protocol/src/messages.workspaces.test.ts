@@ -9,9 +9,29 @@ import {
   WorkspaceScriptPayloadSchema,
   WorkspaceGitHubRuntimePayloadSchema,
   CheckoutPrStatusSchema,
+  LinearTicketSchema,
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
+  test("carries optional Linear issue details without requiring them on existing links", () => {
+    const ticket = { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1" };
+    expect(LinearTicketSchema.parse(ticket)).toEqual(ticket);
+    const details = {
+      ...ticket,
+      title: "Fix",
+      state: { name: "In Progress", type: "started", color: "#e2b53e" },
+      assignee: { name: "Alex", avatarUrl: "https://example.com/alex.png" },
+      project: { name: "External Queries", color: "#ee6666" },
+    };
+    expect(LinearTicketSchema.parse(details)).toEqual(details);
+    expect(LinearTicketSchema.parse({ ...details, assignee: { name: "Alex" } }).assignee).toEqual({
+      name: "Alex",
+    });
+    expect(
+      LinearTicketSchema.parse({ ...details, state: { ...details.state, type: "future-state" } })
+        .state?.type,
+    ).toBe("future-state");
+  });
   test("keeps Linear ticket metadata optional in workspace and checkout updates", () => {
     const status = {
       url: "https://github.com/acme/repo/pull/1",

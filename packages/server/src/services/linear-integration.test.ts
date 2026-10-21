@@ -9,6 +9,11 @@ const homes: string[] = [];
 const logger = { warn() {} };
 const url = "https://linear.app/acme/issue/ENG-123";
 const ticket = { identifier: "ENG-123", url };
+const metadata = {
+  state: { name: "In Progress", type: "started", color: "#e2b53e" },
+  assignee: { name: "Alex Morgan", avatarUrl: "https://example.com/alex.png" },
+  project: { name: "External Queries", color: "#ee6666" },
+};
 const connected = {
   status: LinearConnectionStatus.Connected,
   organizationName: "Acme",
@@ -77,7 +82,7 @@ test("rejected replacement keys preserve the saved connection", async () => {
   expect(await service.getConnection()).toEqual(connected);
 });
 
-test("fills missing titles, deduplicates concurrent lookups, and keeps organizations distinct", async () => {
+test("enriches linked issues, deduplicates concurrent lookups, and keeps organizations distinct", async () => {
   let calls = 0;
   const service = createLinearIntegrationService({
     paseoHome: await home(),
@@ -88,12 +93,12 @@ test("fills missing titles, deduplicates concurrent lookups, and keeps organizat
       if (!body.variables) return connectionResponse();
       expect(body.variables).toEqual({ id: "ENG-123" });
       return Response.json({
-        data: { issue: { title: "Retry uploads", url: `${url}/retry-uploads` } },
+        data: { issue: { title: "Retry uploads", url: `${url}/retry-uploads`, ...metadata } },
       });
     },
   });
   await service.setKey("key");
-  const titled = { ...ticket, title: "Retry uploads" };
+  const titled = { ...ticket, title: "Retry uploads", ...metadata };
   expect(await Promise.all([service.resolve([ticket]), service.resolve([ticket])])).toEqual([
     [titled],
     [titled],
@@ -102,7 +107,7 @@ test("fills missing titles, deduplicates concurrent lookups, and keeps organizat
   const other = { ...ticket, url: "https://linear.app/other/issue/ENG-123" };
   expect(await service.resolve([other])).toEqual([other]);
   expect(await service.resolve([{ ...ticket, title: "From PR" }])).toEqual([
-    { ...ticket, title: "From PR" },
+    { ...ticket, title: "From PR", ...metadata },
   ]);
   expect(calls).toBe(3);
 });
@@ -118,7 +123,7 @@ test("lookup errors preserve links and retry after the failure cache expires", a
       if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
       lookups += 1;
       if (lookups === 1) return Response.json({ errors: [{ message: "unavailable" }] });
-      return Response.json({ data: { issue: { title: "Retry uploads", url } } });
+      return Response.json({ data: { issue: { title: "Retry uploads", url, ...metadata } } });
     },
   });
   await service.setKey("key");
@@ -126,11 +131,13 @@ test("lookup errors preserve links and retry after the failure cache expires", a
   expect(await service.resolve([ticket])).toEqual([ticket]);
   expect(lookups).toBe(1);
   now = 60_001;
-  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title: "Retry uploads" }]);
+  expect(await service.resolve([ticket])).toEqual([
+    { ...ticket, title: "Retry uploads", ...metadata },
+  ]);
   expect(lookups).toBe(2);
 });
 
-test("replacement and disconnect clear cached titles without restarting", async () => {
+test("replacement and disconnect clear cached metadata without restarting", async () => {
   let title = "First title";
   let calls = 0;
   const paseoHome = await home();
@@ -140,14 +147,14 @@ test("replacement and disconnect clear cached titles without restarting", async 
     request: async (_url, init) => {
       calls += 1;
       if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
-      return Response.json({ data: { issue: { title, url } } });
+      return Response.json({ data: { issue: { title, url, ...metadata } } });
     },
   });
   await service.setKey("first");
-  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title }]);
+  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title, ...metadata }]);
   title = "Second title";
   await service.setKey("second");
-  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title }]);
+  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title, ...metadata }]);
   expect(await service.disconnect()).toEqual({ status: LinearConnectionStatus.Disconnected });
   expect(await service.resolve([ticket])).toEqual([ticket]);
   expect(calls).toBe(4);
@@ -172,3 +179,59 @@ test.each([401, 429, 503])(
     });
   },
 );
+
+test("refreshes metadata on titled issues and clears removed assignees and projects", async () => {
+  let now = 0;
+  let lookups = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    now: () => now,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      lookups += 1;
+      const issue = { title: "Retry uploads", url, ...metadata };
+      if (lookups === 1) return Response.json({ data: { issue } });
+      return Response.json({ data: { issue: { ...issue, assignee: null, project: null } } });
+    },
+  });
+  await service.setKey("key");
+  const resolved = await service.resolve([{ ...ticket, title: "From PR" }]);
+  expect(resolved).toEqual([{ ...ticket, title: "From PR", ...metadata }]);
+  expect(await service.resolve(resolved)).toEqual(resolved);
+  expect(lookups).toBe(1);
+  now = 300_001;
+  expect(await service.resolve(resolved)).toEqual([
+    { ...ticket, title: "From PR", state: metadata.state, assignee: undefined, project: undefined },
+  ]);
+  expect(lookups).toBe(2);
+});
+
+test("keeps an assigned user's name when Linear has no avatar photo", async () => {
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      return Response.json({
+        data: {
+          issue: {
+            title: "Retry uploads",
+            url,
+            ...metadata,
+            assignee: { name: "Alex Morgan", avatarUrl: null },
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("key");
+  expect(await service.resolve([ticket])).toEqual([
+    {
+      ...ticket,
+      title: "Retry uploads",
+      ...metadata,
+      assignee: { name: "Alex Morgan", avatarUrl: undefined },
+    },
+  ]);
+});

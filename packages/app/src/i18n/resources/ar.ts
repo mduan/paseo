@@ -543,6 +543,7 @@ export const ar: TranslationResources = {
       linearTickets: "تذاكر Linear",
       ticketsAccessibility: "تذاكر Linear: {{tickets}}",
       openInLinear: "فتح في Linear",
+      unassigned: "غير معين",
       ticketTitleUnavailable: "العنوان غير متاح",
       livePorts: "المنافذ النشطة",
       portsAccessibility: "المنافذ النشطة: {{ports}}",
