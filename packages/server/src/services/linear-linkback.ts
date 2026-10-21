@@ -1,5 +1,6 @@
 /* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import type { LinearTicket } from "@getpaseo/protocol/messages";
+import { parseLinearTicketUrl } from "@getpaseo/protocol/linear-tickets";
 import MarkdownIt from "markdown-it";
 
 const markdown = new MarkdownIt();
@@ -29,33 +30,19 @@ export function extractLinearTickets(comments: readonly LinearLinkbackComment[])
       ),
     ];
     for (const link of links) {
-      let url: URL;
-      try {
-        url = new URL(markdown.utils.unescapeAll(link.url));
-      } catch {
-        continue;
-      }
-      if (
-        url.protocol !== "https:" ||
-        url.hostname !== "linear.app" ||
-        url.port ||
-        url.username ||
-        url.password
-      ) {
-        continue;
-      }
-      const match = /^\/([^/]+)\/issue\/([a-z][a-z0-9_]*-\d+)(?:\/[^/]*)?\/?$/i.exec(url.pathname);
-      if (!match) continue;
-      const identifier = match[2].toUpperCase();
+      const url = markdown.utils.unescapeAll(link.url);
+      const ticket = parseLinearTicketUrl(url);
+      if (!ticket) continue;
+      const { identifier } = ticket;
       const label = markdown.utils
         .unescapeAll(link.label.replace(/<[^>]*>/g, ""))
         .replace(/\s+/g, " ")
         .trim();
       const title = label.replace(new RegExp(`^${identifier}\\b[\\s:–—-]*`, "i"), "").trim();
-      const key = `${match[1].toLowerCase()}/${identifier}`;
+      const key = ticket.url;
       const existing = tickets.get(key);
       if (!existing || (!existing.title && title)) {
-        tickets.set(key, { identifier, url: url.href, ...(title ? { title } : {}) });
+        tickets.set(key, { identifier, url, ...(title ? { title } : {}) });
       }
     }
   }

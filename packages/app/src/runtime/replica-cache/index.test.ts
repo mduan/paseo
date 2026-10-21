@@ -189,6 +189,7 @@ function workspacePayload(): WorkspaceDescriptorPayload {
     archivingAt: null,
     diffStat: null,
     scripts: [],
+    linearTickets: [{ identifier: "ENG-123", url: "https://linear.app/acme/issue/ENG-123" }],
   };
 }
 
@@ -293,6 +294,9 @@ describe("ReplicaCache", () => {
     const restored = await reader.readDirectory(SERVER_ID);
     expect(restored.checkpoint).toBeUndefined();
     expect([...restored.workspaces.keys()]).toEqual([...baseline.workspaces.keys()]);
+    expect(restored.workspaces.get("workspace-1")?.linearTickets).toEqual(
+      workspacePayload().linearTickets,
+    );
     expect([...restored.projects.keys()]).toEqual([...baseline.projects.keys()]);
     expect([...restored.agents.keys()]).toEqual([...baseline.agents.keys()]);
     expect(await reader.readTimeline(SERVER_ID, "agent-1")).toEqual(timeline());

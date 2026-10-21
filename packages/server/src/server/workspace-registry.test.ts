@@ -1,3 +1,4 @@
+import { updateLinearTickets } from "@getpaseo/protocol/linear-tickets";
 import os from "node:os";
 import path from "node:path";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
@@ -64,6 +65,40 @@ describe("workspace registries", () => {
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("preserves concurrent manual Linear additions across persistence and archive", async () => {
+    await workspaceRegistry.initialize();
+    await workspaceRegistry.upsert(
+      createPersistedWorkspaceRecord({
+        workspaceId: "ws-issues",
+        projectId: "project",
+        cwd: "/same/path",
+        kind: "directory",
+        displayName: "issues",
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      }),
+    );
+    const addIssue = (number: number) =>
+      workspaceRegistry.update("ws-issues", (workspace) => ({
+        ...workspace,
+        linearTickets: updateLinearTickets({
+          current: workspace.linearTickets,
+          add: [`https://linear.app/acme/issue/ENG-${number}`],
+        }),
+      }));
+    await Promise.all([addIssue(1), addIssue(2), addIssue(1)]);
+    await workspaceRegistry.archive("ws-issues", "2026-10-21");
+    const reopened = new FileBackedWorkspaceRegistry(
+      path.join(tmpDir, "projects", "workspaces.json"),
+      logger,
+    );
+    await reopened.initialize();
+    const record = await reopened.get("ws-issues");
+    expect(record?.linearTickets?.map((ticket) => ticket.identifier)).toEqual(["ENG-1", "ENG-2"]);
+    expect(record?.archivedAt).toBe("2026-10-21");
+    expect(record?.cwd).toBe("/same/path");
   });
 
   test("creates, updates, archives, deletes, and lists project records", async () => {

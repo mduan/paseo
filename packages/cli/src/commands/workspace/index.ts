@@ -4,8 +4,13 @@ import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
 import { runArchiveCommand } from "./archive.js";
 import { runCreateCommand } from "./create.js";
 import { runLsCommand } from "./ls.js";
+import { runUpdateCommand } from "./update.js";
 import { runRenameCommand } from "./rename.js";
 import { runSetupCommand } from "./setup.js";
+
+function collectUrls(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
 
 export function createWorkspaceCommand(): Command {
   const workspace = new Command("workspace").description("Manage workspaces");
@@ -59,6 +64,21 @@ export function createWorkspaceCommand(): Command {
       .description("Archive a workspace and everything it owns")
       .argument("<workspace-id>", "Workspace id"),
   ).action(withOutput(runArchiveCommand));
+
+  addJsonAndDaemonHostOptions(
+    workspace
+      .command("update")
+      .description("Update workspace Linear issue associations")
+      .argument("<workspace-id>", "Workspace id")
+      .allowExcessArguments(false)
+      .option("--add-linear-issue <full-url>", "Add a Linear issue (repeatable)", collectUrls, [])
+      .option(
+        "--remove-linear-issue <full-url>",
+        "Remove a manual Linear issue (repeatable)",
+        collectUrls,
+        [],
+      ),
+  ).action(withOutput(runUpdateCommand));
 
   return workspace;
 }

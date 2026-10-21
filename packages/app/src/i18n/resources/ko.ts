@@ -295,6 +295,8 @@ export const ko: TranslationResources = {
         workspaceName: "워크스페이스",
         workspace: "폴더",
         branch: "브랜치",
+        pullRequest: "풀 리퀘스트",
+        linearTickets: "Linear 이슈",
         host: "호스트",
         provider: "공급자",
         model: "모델",

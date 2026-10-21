@@ -301,6 +301,8 @@ export const fr: TranslationResources = {
         workspaceName: "Espace de travail",
         workspace: "Dossier",
         branch: "Branche",
+        pullRequest: "Pull request",
+        linearTickets: "Tickets Linear",
         host: "Hôte",
         provider: "Fournisseur",
         model: "Modèle",

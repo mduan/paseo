@@ -41,6 +41,7 @@ export function selectMetaRowItems(input: {
   projectName: string | null;
   hasHostBadge: boolean;
   prHint: PrHint | null;
+  linearTickets?: readonly LinearTicket[];
   serviceSummary: WorkspaceServiceSummary | null;
   labels: readonly WorkspaceLabelDefinition[];
   ports?: readonly WorkspacePort[];
@@ -83,8 +84,8 @@ export function selectMetaRowItems(input: {
     }
   }
 
-  if (prHint?.linearTickets?.length && visible.linearTickets) {
-    items.push({ kind: "linearTickets", tickets: prHint.linearTickets });
+  if (input.linearTickets?.length && visible.linearTickets) {
+    items.push({ kind: "linearTickets", tickets: input.linearTickets });
   }
 
   if (input.ports?.length && visible.ports) {

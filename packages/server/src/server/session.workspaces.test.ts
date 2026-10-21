@@ -9903,3 +9903,210 @@ test("workspace.create.request reports an archived explicit project", async () =
     errorCode: "archived_project",
   });
 });
+
+test("workspace Linear links use exact IDs and history searches workspace context before pagination", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) });
+  const project = createPersistedProjectRecord({
+    projectId: "issues-project",
+    rootPath: REPO_CWD,
+    kind: "non_git",
+    displayName: "repo",
+    createdAt: "2026-01-01",
+    updatedAt: "2026-01-01",
+  });
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "issues-workspace",
+    projectId: project.projectId,
+    cwd: REPO_CWD,
+    kind: "directory",
+    displayName: "workspace",
+    createdAt: "2026-01-01",
+    updatedAt: "2026-01-01",
+  });
+  const sibling = { ...workspace, workspaceId: "same-cwd" };
+  const records = new Map([
+    [workspace.workspaceId, workspace],
+    [sibling.workspaceId, sibling],
+  ]);
+  session.projectRegistry.get = async () => project;
+  session.workspaceRegistry.list = async () => [...records.values()];
+  session.workspaceRegistry.get = async (id) => records.get(id) ?? null;
+  session.workspaceRegistry.update = async (id, updater) => {
+    const record = records.get(id);
+    if (!record) return null;
+    const next = updater(record);
+    records.set(id, next);
+    return next;
+  };
+  session.listAgentPayloads = async () => [
+    makeAgent({
+      id: "unrelated",
+      cwd: REPO_CWD,
+      workspaceId: sibling.workspaceId,
+      status: "idle",
+      updatedAt: "2026-10-22T00:00:00.000Z",
+    }),
+    makeAgent({
+      id: "first",
+      cwd: REPO_CWD,
+      workspaceId: workspace.workspaceId,
+      status: "idle",
+      updatedAt: "2026-10-21T00:00:00.000Z",
+    }),
+    {
+      ...makeAgent({
+        id: "archived",
+        cwd: REPO_CWD,
+        workspaceId: workspace.workspaceId,
+        status: "idle",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+      }),
+      archivedAt: "2026-10-21T00:00:00.000Z",
+    },
+  ];
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "observe-issues",
+    subscribe: { subscriptionId: "observe-issues" },
+  });
+  const url = "https://linear.app/acme/issue/ENG-123";
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "add",
+    add: [url, `${url}/title?query#fragment`],
+  });
+  expect(findByType(emitted, "workspace.linear_issues.update.response")?.payload).toEqual({
+    requestId: "add",
+    workspaceId: workspace.workspaceId,
+    accepted: true,
+    error: null,
+    linearTickets: [{ identifier: "ENG-123", url }],
+  });
+  expect(records.get(sibling.workspaceId)?.linearTickets).toBeUndefined();
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: "missing",
+    requestId: "missing",
+    add: [url],
+  });
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "invalid",
+    add: ["https://linear.app/acme/issue/ENG-999", "ENG-1"],
+  });
+  expect(
+    filterByType(emitted, "workspace.linear_issues.update.response")
+      .slice(1)
+      .map((message) => message.payload.accepted),
+  ).toEqual([false, false]);
+  expect(records.get(workspace.workspaceId)?.linearTickets).toHaveLength(1);
+  // Archived workspaces retain their context even after their directory is gone.
+  records.set(workspace.workspaceId, {
+    ...records.get(workspace.workspaceId)!,
+    archivedAt: "2026-10-21",
+  });
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "history-first",
+    search: "ENG-123",
+    page: { limit: 1 },
+  });
+  const first = filterByType(emitted, "fetch_agent_history_response")[0].payload;
+  expect(first.entries.map((entry) => entry.agent.id)).toEqual(["first"]);
+  expect(first.entries[0].workspaceLinearTickets).toEqual([{ identifier: "ENG-123", url }]);
+  expect(first.pageInfo.hasMore).toBe(true);
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "history-next",
+    search: "ENG-123",
+    page: { limit: 1, cursor: first.pageInfo.nextCursor! },
+  });
+  expect(
+    filterByType(emitted, "fetch_agent_history_response")[1].payload.entries.map(
+      (entry) => entry.agent.id,
+    ),
+  ).toEqual(["archived"]);
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "remove",
+    remove: [`${url}/old-title`],
+  });
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "history-removed",
+    search: "ENG-123",
+  });
+  expect(filterByType(emitted, "fetch_agent_history_response")[2].payload.entries).toEqual([]);
+  const removals = filterByType(emitted, "workspace_update").filter(
+    (message) => message.payload.kind === "remove",
+  ).length;
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "remove-again",
+    remove: [url],
+  });
+  expect(
+    filterByType(emitted, "workspace_update").filter(
+      (message) => message.payload.kind === "remove",
+    ),
+  ).toHaveLength(removals + 1);
+  const snapshot = await session.workspaceGitService.getSnapshot(REPO_CWD);
+  snapshot.forge.pullRequest = {
+    url: "https://github.com/acme/repo/pull/482",
+    number: 482,
+    title: "Change",
+    state: "open",
+    baseRefName: "main",
+    headRefName: "feature",
+    isMerged: false,
+    linearTickets: [{ identifier: "ENG-123", url, title: "Retry uploads" }],
+  };
+  session.workspaceGitService.peekSnapshot = () => snapshot;
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-context",
+    search: "Retry uploads",
+  });
+  const prHistory = filterByType(emitted, "fetch_agent_history_response")[3].payload.entries;
+  expect(prHistory.map((entry) => entry.agent.id)).toEqual(["unrelated", "first", "archived"]);
+  expect(prHistory[1].workspaceLinearTickets).toEqual([
+    { identifier: "ENG-123", url, title: "Retry uploads" },
+  ]);
+  expect(records.get(workspace.workspaceId)?.linearTickets).toEqual([]);
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-search",
+    search: "#482",
+    page: { limit: 1 },
+  });
+  const prPage = filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload;
+  expect(prPage.entries.map((entry) => entry.agent.id)).toEqual(["unrelated"]);
+  expect(prPage.entries[0].workspacePullRequest).toMatchObject({
+    number: 482,
+    url: "https://github.com/acme/repo/pull/482",
+  });
+  expect(prPage.pageInfo.hasMore).toBe(true);
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-next",
+    search: "#482",
+    page: { limit: 1, cursor: prPage.pageInfo.nextCursor! },
+  });
+  expect(
+    filterByType(emitted, "fetch_agent_history_response")
+      .at(-1)!
+      .payload.entries.map((entry) => entry.agent.id),
+  ).toEqual(["first"]);
+  snapshot.forge.pullRequest = null;
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-gone",
+    search: "#482",
+  });
+  expect(filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload.entries).toEqual([]);
+});

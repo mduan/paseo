@@ -1,3 +1,8 @@
+import { pullRequestNumberRanges } from "@getpaseo/protocol/pull-request";
+import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
+import { LinearTicketLinks } from "@/components/linear-ticket-links";
+import { LinearIcon } from "@/components/icons/linear-icon";
 import {
   View,
   Text,
@@ -49,6 +54,7 @@ const refreshColorMapping = (theme: Theme) => ({
   tintColor: theme.colors.foregroundMuted,
   colors: [theme.colors.foregroundMuted],
 });
+const ThemedLinear = withUnistyles(LinearIcon);
 const ThemedArchive = withUnistyles(Archive);
 const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
@@ -390,6 +396,39 @@ function SessionRowContext({
             numberOfLines={1}
             testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
           />
+        </View>
+      ) : null}
+      {fields.pullRequest && agent.workspacePullRequest ? (
+        <View
+          style={styles.metaItem}
+          testID={`agent-row-pull-request-${agent.serverId}-${agent.id}`}
+        >
+          <PullRequestStateIcon state={agent.workspacePullRequest.state} size={14} />
+          <MarkdownLinkText href={agent.workspacePullRequest.url} style={styles.sessionMetaText}>
+            <HighlightedText
+              text={String(agent.workspacePullRequest.number)}
+              ranges={pullRequestNumberRanges({
+                number: agent.workspacePullRequest.number,
+                forge: agent.workspacePullRequest.forge,
+                search,
+              })}
+            />
+          </MarkdownLinkText>
+        </View>
+      ) : null}
+      {fields.linearTickets && agent.workspaceLinearTickets?.length ? (
+        <View
+          style={styles.metaItem}
+          testID={`agent-row-linear-tickets-${agent.serverId}-${agent.id}`}
+        >
+          <ThemedLinear size={14} uniProps={mutedIconMapping} />
+          <Text style={styles.sessionMetaText} numberOfLines={1}>
+            <LinearTicketLinks
+              tickets={agent.workspaceLinearTickets}
+              style={styles.sessionMetaText}
+              search={search}
+            />
+          </Text>
         </View>
       ) : null}
       {fields.host ? (

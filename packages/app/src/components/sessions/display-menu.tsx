@@ -25,6 +25,8 @@ const FIELD_GROUPS = [
     HistoryField.WorkspaceName,
     HistoryField.Workspace,
     HistoryField.Branch,
+    HistoryField.PullRequest,
+    HistoryField.LinearTickets,
     HistoryField.Host,
   ],
   [
@@ -39,6 +41,7 @@ const FIELD_GROUPS = [
 
 type HistoryDisplayMenuProps = {
   fields: HistoryFields;
+  supportsPullRequests?: boolean;
   onToggle: (field: HistoryField) => void;
 };
 
@@ -62,7 +65,11 @@ function HistoryFieldItem({ field, selected, onToggle }: HistoryFieldItemProps) 
   );
 }
 
-export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps) {
+export function HistoryDisplayMenu({
+  fields,
+  onToggle,
+  supportsPullRequests,
+}: HistoryDisplayMenuProps) {
   const { t } = useTranslation();
   return (
     <MenuRoot compactMode="sheet">
@@ -84,14 +91,16 @@ export function HistoryDisplayMenu({ fields, onToggle }: HistoryDisplayMenuProps
         {FIELD_GROUPS.map((group, index) => (
           <Fragment key={group[0]}>
             {index > 0 ? <MenuSeparator /> : null}
-            {group.map((field) => (
-              <HistoryFieldItem
-                key={field}
-                field={field}
-                selected={fields[field]}
-                onToggle={onToggle}
-              />
-            ))}
+            {group
+              .filter((field) => field !== HistoryField.PullRequest || supportsPullRequests)
+              .map((field) => (
+                <HistoryFieldItem
+                  key={field}
+                  field={field}
+                  selected={fields[field]}
+                  onToggle={onToggle}
+                />
+              ))}
           </Fragment>
         ))}
       </MenuSurface>

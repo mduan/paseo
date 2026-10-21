@@ -50,6 +50,7 @@ import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
+import { mergeLinearTickets, updateLinearTickets } from "@getpaseo/protocol/linear-tickets";
 import { createAgentHistorySearch } from "./agent-history-search.js";
 import type { SpeechToTextProvider, TextToSpeechProvider } from "./speech/speech-provider.js";
 import type { TurnDetectionProvider } from "./speech/turn-detection-provider.js";
@@ -644,6 +645,8 @@ interface ArchivedRecordSnapshot {
 }
 
 interface WorkspaceUpdateOptions {
+  // Archived context changes still invalidate history after the active row is gone.
+  forceRemoval?: boolean;
   removedProjectId?: string;
   optimisticStatus?: WorkspaceDescriptorPayload["status"];
 }
@@ -1760,10 +1763,10 @@ export class Session {
       if (this.isCleanedUp) {
         return;
       }
-      await this.emitWorkspaceUpdatesForWorkspaceIds(
-        [mutation.workspaceId],
-        mutation.expectsInitialAgent ? { optimisticStatus: "running" } : undefined,
-      );
+      await this.emitWorkspaceUpdatesForWorkspaceIds([mutation.workspaceId], {
+        optimisticStatus: mutation.expectsInitialAgent ? "running" : undefined,
+        forceRemoval: Boolean(mutation.workspace?.archivedAt && mutation.workspace.linearTickets),
+      });
     } catch (error) {
       this.sessionLogger.warn(
         { err: error, workspaceId: mutation.workspaceId, mutationKind: mutation.kind },
@@ -2971,6 +2974,8 @@ export class Session {
         return this.handleProjectRemoveRequest(msg);
       case "project.icon.color.set.request":
         return this.handleProjectIconColorSetRequest(msg);
+      case "workspace.linear_issues.update.request":
+        return this.handleWorkspaceLinearIssuesUpdate(msg);
       case "workspace.title.set.request":
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
       case "workspace.pin.set.request":
@@ -3780,6 +3785,54 @@ export class Session {
         },
       });
     }
+  }
+
+  private async handleWorkspaceLinearIssuesUpdate(
+    request: Extract<SessionInboundMessage, { type: "workspace.linear_issues.update.request" }>,
+  ): Promise<void> {
+    const { workspaceId, requestId, add, remove } = request;
+    let updated: PersistedWorkspaceRecord;
+    try {
+      // Validate the entire change before entering the atomic update.
+      updateLinearTickets({ add, remove });
+      const result = await this.workspaceRegistry.update(workspaceId, (workspace) => ({
+        ...workspace,
+        linearTickets: updateLinearTickets({ current: workspace.linearTickets, add, remove }),
+        updatedAt: new Date().toISOString(),
+      }));
+      if (!result) throw new Error("Workspace not found");
+      updated = result;
+    } catch (error) {
+      this.emit({
+        type: "workspace.linear_issues.update.response",
+        payload: {
+          workspaceId,
+          requestId,
+          accepted: false,
+          linearTickets: [],
+          error: getErrorMessage(error),
+        },
+      });
+      return;
+    }
+    this.emit({
+      type: "workspace.linear_issues.update.response",
+      payload: {
+        workspaceId: updated.workspaceId,
+        requestId,
+        accepted: true,
+        linearTickets: updated.linearTickets ?? [],
+        error: null,
+      },
+    });
+    await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId], {
+      forceRemoval: Boolean(updated.archivedAt),
+    }).catch((error) => {
+      this.sessionLogger.warn(
+        { err: error, workspaceId },
+        "Failed to publish workspace Linear issue update",
+      );
+    });
   }
 
   private async handleWorkspaceTitleSetRequest(
@@ -5491,6 +5544,42 @@ export class Session {
     const matchesSearch = search
       ? createAgentHistorySearch({ query: search, options: searchOptions })
       : undefined;
+    type WorkspaceContext = Pick<
+      FetchAgentsResponseEntry,
+      "workspaceLinearTickets" | "workspacePullRequest"
+    >;
+    const contextByWorkspaceId = new Map<string, Promise<WorkspaceContext>>();
+    const getWorkspaceContext = (workspaceId: string | undefined): Promise<WorkspaceContext> => {
+      if (!workspaceId) return Promise.resolve({});
+      let context = contextByWorkspaceId.get(workspaceId);
+      if (!context) {
+        context = this.workspaceRegistry.get(workspaceId).then((workspace) => {
+          const snapshot = workspace
+            ? this.workspaceGitService.peekSnapshot(workspace.cwd)
+            : undefined;
+          const pullRequest = snapshot?.forge.pullRequest;
+          return {
+            workspaceLinearTickets: mergeLinearTickets(
+              workspace?.linearTickets,
+              pullRequest?.linearTickets,
+            ),
+            workspacePullRequest: pullRequest
+              ? {
+                  url: pullRequest.url,
+                  number: pullRequest.number,
+                  title: pullRequest.title,
+                  state: pullRequest.state,
+                  isMerged: pullRequest.isMerged,
+                  isDraft: pullRequest.isDraft,
+                  forge: snapshot?.forge.forge,
+                }
+              : null,
+          };
+        });
+        contextByWorkspaceId.set(workspaceId, context);
+      }
+      return context;
+    };
     const matchedEntries: FetchAgentsResponseEntry[] = [];
     const batchSize = 25;
     for (
@@ -5502,7 +5591,8 @@ export class Session {
       const batchEntries = await Promise.all(
         batch.map(async (agent) => {
           const project = await getPlacement(agent.workspaceId);
-          return project ? { agent, project } : null;
+          const context = await getWorkspaceContext(agent.workspaceId);
+          return project ? Object.assign({ agent, project }, context) : null;
         }),
       );
       for (const entry of batchEntries) {
@@ -5723,6 +5813,7 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
+      linearTickets: workspace.linearTickets,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       archivingAt: null,
       status: "done",
@@ -6173,7 +6264,10 @@ export class Session {
       const lastEmitted = subscription.lastEmittedByWorkspaceId.get(workspaceId);
       this.workspaceGitObserver.recordDescriptorState(workspaceId, nextWorkspace);
       if (!nextWorkspace) {
-        if (this.shouldSkipWorkspaceRemoval(lastEmitted, options?.removedProjectId)) {
+        if (
+          !options?.forceRemoval &&
+          this.shouldSkipWorkspaceRemoval(lastEmitted, options?.removedProjectId)
+        ) {
           continue;
         }
         if (this.workspaceUpdatesSubscriptions.get(subscription.subscriptionId) !== subscription) {

@@ -1853,6 +1853,7 @@ export class VoiceAssistantWebSocketServer {
         ...(this.workspaceLabelService ? { workspaceLabels: true } : {}),
         // COMPAT(workspaceSetupRun): added in v0.7.3, remove gate after 2027-09-02.
         workspaceSetupRun: true,
+        workspaceLinearIssues: true,
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
         turnDiffs: true,
         // COMPAT(diffExpandContext): added in v0.11.0, remove gate after 2027-10-03.
@@ -1923,6 +1924,7 @@ export class VoiceAssistantWebSocketServer {
         agentTimelinePromptIndex: true,
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: true,
+        agentHistoryPullRequests: true,
         agentHistorySearchOptions: true,
         chatFindOptions: true,
         agentHistoryFilters: true,

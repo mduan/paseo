@@ -42,6 +42,48 @@ function candidate(input: {
 }
 
 describe("matchesAgentHistoryQuery", () => {
+  it("matches current workspace PR numbers, prefixed IDs, titles, and URLs", () => {
+    const workspacePullRequest = {
+      url: "https://github.com/acme/repo/pull/482",
+      number: 482,
+      title: "Retry uploads",
+      state: "open",
+      isMerged: false,
+      forge: "github",
+    };
+    const entry = { ...candidate({ title: "Work" }), workspacePullRequest };
+    for (const query of ["482", "#482", "uploads", workspacePullRequest.url])
+      expect(matchesAgentHistoryQuery(query, entry)).toBe(true);
+    expect(matchesAgentHistoryQuery("#999", entry)).toBe(false);
+    expect(matchesAgentHistoryQuery("#482", { ...entry, workspacePullRequest: null })).toBe(false);
+    expect(
+      matchesAgentHistoryQuery("!482", {
+        ...entry,
+        workspacePullRequest: { ...workspacePullRequest, forge: "gitlab" },
+      }),
+    ).toBe(true);
+    expect(
+      matchesAgentHistoryQuery("#482", {
+        ...entry,
+        workspacePullRequest: { ...workspacePullRequest, number: undefined },
+      }),
+    ).toBe(true);
+  });
+  it("matches workspace issue identifiers and available titles", () => {
+    const entry = {
+      ...candidate({ title: "Work" }),
+      workspaceLinearTickets: [
+        {
+          identifier: "ENG-123",
+          url: "https://linear.app/acme/issue/ENG-123",
+          title: "Retry uploads",
+        },
+      ],
+    };
+    expect(matchesAgentHistoryQuery("eng-123", entry)).toBe(true);
+    expect(matchesAgentHistoryQuery("uploads", entry)).toBe(true);
+    expect(matchesAgentHistoryQuery("ENG-999", entry)).toBe(false);
+  });
   it("rejects scattered letters across words while keeping within-word subsequences", () => {
     expect(
       matchesAgentHistoryQuery(

@@ -1,3 +1,4 @@
+import { parsePullRequestNumber } from "@getpaseo/protocol/pull-request";
 import type { LinearTicket } from "@getpaseo/protocol/messages";
 /* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import { normalizeForge, type Forge } from "@/git/forge";
@@ -30,23 +31,6 @@ interface PrStatusLike {
   checksStatus?: string;
   reviewDecision?: string | null;
   forge?: string;
-}
-
-function parsePullRequestNumber(url: string): number | null {
-  try {
-    const pathname = new URL(url).pathname;
-    // GitHub uses /pull/N, Gitea/Forgejo /pulls/N, GitLab /-/merge_requests/N.
-    // Match any so a non-GitHub change-request summary yields a hint (and brand mark).
-    const match = pathname.match(/\/(?:pull|pulls|merge_requests)\/(\d+)(?:\/|$)/);
-    if (!match) {
-      return null;
-    }
-
-    const number = Number.parseInt(match[1], 10);
-    return Number.isFinite(number) ? number : null;
-  } catch {
-    return null;
-  }
 }
 
 export function selectPrHintFromStatus(

@@ -23,6 +23,64 @@ try {
   assert.strictEqual(created.exitCode, 0, created.stderr);
   const workspaceId = JSON.parse(created.stdout).workspaceId as string;
 
+  const issueUrl = "https://linear.app/acme/issue/ENG-123";
+  const linked = await ctx.paseo([
+    "workspace",
+    "update",
+    workspaceId,
+    "--add-linear-issue",
+    issueUrl,
+    "--add-linear-issue",
+    `${issueUrl}/a-title?query#fragment`,
+    "--json",
+  ]);
+  assert.strictEqual(linked.exitCode, 0, linked.stderr);
+  assert.deepStrictEqual(JSON.parse(linked.stdout), {
+    workspaceId,
+    linearTickets: [{ identifier: "ENG-123", url: issueUrl }],
+  });
+  for (const id of ["missing-workspace", ""]) {
+    const invalid = await ctx.paseo([
+      "workspace",
+      "update",
+      id,
+      "--add-linear-issue",
+      issueUrl,
+      "--json",
+    ]);
+    assert.notStrictEqual(invalid.exitCode, 0);
+  }
+  const invalidUrl = await ctx.paseo([
+    "workspace",
+    "update",
+    workspaceId,
+    "--add-linear-issue",
+    "https://linear.app/acme/issue/ENG-999",
+    "--add-linear-issue",
+    "ENG-1",
+    "--json",
+  ]);
+  assert.notStrictEqual(invalidUrl.exitCode, 0);
+  const unchanged = await ctx.paseo([
+    "workspace",
+    "update",
+    workspaceId,
+    "--add-linear-issue",
+    issueUrl,
+    "--json",
+  ]);
+  assert.deepStrictEqual(JSON.parse(unchanged.stdout), JSON.parse(linked.stdout));
+  const unlinked = await ctx.paseo([
+    "workspace",
+    "update",
+    workspaceId,
+    "--remove-linear-issue",
+    `${issueUrl}/old-title#comment`,
+    "--json",
+  ]);
+  assert.strictEqual(unlinked.exitCode, 0, unlinked.stderr);
+  assert.deepStrictEqual(JSON.parse(unlinked.stdout), { workspaceId, linearTickets: [] });
+
   const renamed = await ctx.paseo(["workspace", "rename", workspaceId, "Auth rework", "--json"]);
   assert.strictEqual(renamed.exitCode, 0, renamed.stderr);
   assert.deepStrictEqual(JSON.parse(renamed.stdout), {

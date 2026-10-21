@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
 import { z } from "zod";
+import { LinearTicketSchema } from "@getpaseo/protocol/messages";
 
 import { writeJsonFileAtomic } from "./atomic-file.js";
 import { areEquivalentPaths } from "../utils/path.js";
@@ -107,6 +108,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
+  linearTickets: z.array(LinearTicketSchema).optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
 });
 

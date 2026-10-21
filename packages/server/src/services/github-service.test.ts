@@ -1,3 +1,8 @@
+import {
+  parseLinearTicketUrl,
+  mergeLinearTickets,
+  updateLinearTickets,
+} from "@getpaseo/protocol/linear-tickets";
 import { extractLinearTickets } from "./linear-linkback.js";
 import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -4891,5 +4896,46 @@ describe("Linear PR linkbacks", () => {
     } finally {
       service.dispose?.();
     }
+  });
+});
+
+describe("workspace Linear issue identities", () => {
+  test("normalizes full URLs and rejects ambiguous or unsafe inputs", () => {
+    expect(
+      parseLinearTicketUrl("https://linear.app/Acme/issue/eng-123/a-title?x=1#comment"),
+    ).toEqual({ identifier: "ENG-123", url: "https://linear.app/acme/issue/ENG-123" });
+    for (const value of [
+      "ENG-123",
+      "http://linear.app/acme/issue/ENG-123",
+      "https://linear.app.evil/acme/issue/ENG-123",
+      "https://user@linear.app/acme/issue/ENG-123",
+      "https://linear.app/acme/issue/ENG-123/extra/path",
+    ]) {
+      expect(parseLinearTicketUrl(value)).toBeUndefined();
+    }
+  });
+
+  test("adds idempotently, keeps organizations distinct, and removes only manual context", () => {
+    const url = "https://linear.app/acme/issue/ENG-123";
+    const current = updateLinearTickets({
+      add: [
+        url,
+        "https://linear.app/ACME/issue/eng-123/title?x#y",
+        "https://linear.app/other/issue/ENG-123",
+      ],
+    });
+    expect(current).toHaveLength(2);
+    const pr = [{ identifier: "ENG-123", url: `${url}/title`, title: "Handle retries" }];
+    expect(mergeLinearTickets(current, pr)).toEqual([
+      { identifier: "ENG-123", url, title: "Handle retries" },
+      current[1],
+    ]);
+    const removed = updateLinearTickets({ current, remove: [`${url}/old-title#comment`] });
+    expect(removed).toEqual([current[1]]);
+    expect(mergeLinearTickets(removed, pr)).toHaveLength(2);
+    expect(() => updateLinearTickets({ current, add: [url, "ENG-999"] })).toThrow(
+      "Invalid Linear issue URL",
+    );
+    expect(current).toHaveLength(2);
   });
 });

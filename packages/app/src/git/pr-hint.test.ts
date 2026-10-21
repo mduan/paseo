@@ -1,3 +1,5 @@
+import { createTextSearch } from "@getpaseo/protocol/search/query";
+import { pullRequestNumberRanges } from "@getpaseo/protocol/pull-request";
 import { describe, expect, it } from "vitest";
 
 import { selectPrHintFromStatus } from "./pr-hint";
@@ -58,5 +60,26 @@ describe("selectPrHintFromStatus", () => {
     expect(
       selectPrHintFromStatus({ url: "https://example.com/x", state: "open", isMerged: false }),
     ).toBeNull();
+  });
+});
+
+describe("pullRequestNumberRanges", () => {
+  it("highlights numeric and prefixed queries against a number-only badge", () => {
+    expect(
+      pullRequestNumberRanges({ number: 482, search: createTextSearch({ query: "48" }) }),
+    ).toEqual([{ start: 0, length: 2 }]);
+    expect(
+      pullRequestNumberRanges({ number: 482, search: createTextSearch({ query: "#48" }) }),
+    ).toEqual([{ start: 0, length: 2 }]);
+    expect(
+      pullRequestNumberRanges({
+        number: 482,
+        forge: "gitlab",
+        search: createTextSearch({ query: "!482", options: { wholeWord: true } }),
+      }),
+    ).toEqual([{ start: 0, length: 3 }]);
+    expect(
+      pullRequestNumberRanges({ number: 482, search: createTextSearch({ query: "#999" }) }),
+    ).toEqual([]);
   });
 });
