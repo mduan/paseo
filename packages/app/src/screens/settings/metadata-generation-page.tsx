@@ -8,6 +8,7 @@ import type {
   ProviderSnapshotEntry,
 } from "@getpaseo/protocol/agent-types";
 import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
+import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { Alert } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -41,7 +42,7 @@ function MetadataEffortOption({ option, selected, disabled, onSelect }: Metadata
   const handleSelect = useCallback(() => onSelect(option.id), [onSelect, option.id]);
   return (
     <DropdownMenuItem selected={selected} disabled={disabled} onSelect={handleSelect}>
-      {option.label}
+      {formatThinkingOptionLabel(option)}
     </DropdownMenuItem>
   );
 }
@@ -76,7 +77,9 @@ function MetadataEffortRow({ provider, entries, disabled, onSelect }: MetadataEf
           disabled={disabled}
           testID="metadata-generation-effort"
         >
-          {selectedOption?.label ?? t("agentControls.thinking.select")}
+          {selectedOption
+            ? formatThinkingOptionLabel(selectedOption)
+            : t("agentControls.thinking.select")}
         </DropdownTrigger>
         <DropdownMenuContent side="bottom" align="end" width={200}>
           {options.map((option) => (
