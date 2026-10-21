@@ -2431,6 +2431,7 @@ export const ar: TranslationResources = {
     shortcuts: {
       dialogTitle: "الاختصارات",
       searchPlaceholder: "البحث في الاختصارات",
+      clearSearch: "مسح البحث",
       unavailableOnMobile: "اختصارات لوحة المفاتيح متاحة فقط على سطح المكتب",
       capturePrompt: "اضغط على الاختصار...",
       unassigned: "غير معين",

@@ -118,14 +118,7 @@ export function MenuSelectionHeader({
   const toggleAll = useCallback(() => selectItem(onToggleAll, false), [selectItem, onToggleAll]);
   const action = useMemo(
     () => (
-      <Button
-        variant="secondary"
-        size="xs"
-        style={styles.selectionAction}
-        textStyle={styles.selectionActionText}
-        onPress={toggleAll}
-        testID={testID}
-      >
+      <Button variant="link" size="xs" onPress={toggleAll} testID={testID}>
         {allSelected ? t("common.actions.deselectAll") : t("common.actions.selectAll")}
       </Button>
     ),
@@ -439,14 +432,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     flexShrink: 1,
   },
-  selectionAction: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    minHeight: 0,
-  },
-  selectionActionText: { color: theme.colors.accent },
   labelContainer: {
     flexDirection: "row",
     alignItems: "center",

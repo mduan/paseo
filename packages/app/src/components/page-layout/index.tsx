@@ -14,6 +14,8 @@ interface PageLayoutProps {
   titleTestID?: string;
   /** Controls for the whole page: right of the title on desktop, in the back header on compact. */
   actions?: ReactNode;
+  /** Sit `actions` on the title's text baseline, for text-link actions. Centered otherwise. */
+  baselineActions?: boolean;
   children: ReactNode;
 }
 
@@ -28,6 +30,7 @@ export function PageLayout({
   testID,
   titleTestID,
   actions,
+  baselineActions,
   children,
 }: PageLayoutProps) {
   const isCompact = useIsCompactFormFactor();
@@ -45,7 +48,10 @@ export function PageLayout({
       <ScrollView style={styles.scroll} contentContainerStyle={scrollContentStyle} testID={testID}>
         <View style={styles.content}>
           {showTitle ? (
-            <View style={styles.titleRow} testID={titleTestID}>
+            <View
+              style={[styles.titleRow, baselineActions && styles.titleRowBaseline]}
+              testID={titleTestID}
+            >
               <Text style={styles.title} testID="page-title">
                 {title}
               </Text>
@@ -80,6 +86,9 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     gap: theme.spacing[4],
     marginBottom: theme.spacing[6],
+  },
+  titleRowBaseline: {
+    alignItems: "baseline",
   },
   title: {
     // Line up with the section titles, which sit inset from their cards.

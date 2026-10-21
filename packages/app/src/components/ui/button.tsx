@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/control-geometry";
 import type { Theme } from "@/styles/theme";
 
-type ButtonVariant = "default" | "secondary" | "outline" | "ghost" | "destructive";
+type ButtonVariant = "default" | "secondary" | "outline" | "ghost" | "destructive" | "link";
 type ButtonSize = ButtonControlSize;
 
 type LeftIcon =
@@ -133,6 +133,14 @@ const styles = StyleSheet.create((theme) => {
       backgroundColor: theme.colors.destructive,
       borderColor: theme.colors.destructive,
     },
+    // Accent text with no chrome, for inline actions like "Select all".
+    link: {
+      backgroundColor: "transparent",
+      borderWidth: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      minHeight: 0,
+    },
     pressed: {
       opacity: 0.85,
     },
@@ -152,6 +160,9 @@ const styles = StyleSheet.create((theme) => {
     },
     textDestructive: {
       color: theme.colors.destructiveForeground,
+    },
+    textLink: {
+      color: theme.colors.accent,
     },
     textGhost: {
       color: theme.colors.foregroundMuted,
@@ -198,6 +209,8 @@ export function Button({
     variantStyle = styles.outline;
   } else if (variant === "ghost") {
     variantStyle = styles.ghost;
+  } else if (variant === "link") {
+    variantStyle = styles.link;
   } else {
     variantStyle = styles.destructive;
   }
@@ -238,6 +251,7 @@ export function Button({
       variant === "default" ? styles.textDefault : null,
       variant === "destructive" ? styles.textDestructive : null,
       variant === "ghost" ? styles.textGhost : null,
+      variant === "link" ? styles.textLink : null,
       textStyle,
       isGhostHovered ? styles.textGhostHovered : null,
     ],
