@@ -113,6 +113,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
   },
   trigger: {
+    cursor: "auto",
     height: 22,
     minWidth: METADATA_SIZE,
     alignItems: "center",
@@ -144,6 +145,7 @@ const styles = StyleSheet.create((theme) => ({
   project: { flexShrink: 1, minWidth: 0 },
   projectIcon: { width: METADATA_SIZE, height: METADATA_SIZE, flexShrink: 0 },
   projectTrigger: {
+    cursor: "auto",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
