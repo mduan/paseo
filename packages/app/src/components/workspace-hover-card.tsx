@@ -47,6 +47,7 @@ import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useToast } from "@/contexts/toast-context";
 import { PrBadge } from "@/components/sidebar-workspace-list";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { useHoverIntent } from "@/hooks/use-hover-intent";
 import { useCopyFeedback } from "@/hooks/use-copy-feedback";
@@ -646,15 +647,24 @@ function PullRequestRow({ hint }: { hint: PrHint }) {
     <View style={styles.cardInfoRow}>
       <PrBadge hint={hint} />
       {summary ? (
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={t("workspace.git.pr.sections.checks")}
-          onPress={openChecks}
-          hitSlop={4}
-          testID="hover-card-checks"
-        >
-          <CheckIndicator summary={summary} size={12} />
-        </Pressable>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t(`workspace.git.pr.checksSummary.${summary.state}Accessible`)}
+              onPress={openChecks}
+              hitSlop={4}
+              testID="hover-card-checks"
+            >
+              <CheckIndicator summary={summary} size={12} />
+            </Pressable>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Text style={styles.checksTooltipText}>
+              {t(`workspace.git.pr.checksSummary.${summary.state}Accessible`)}
+            </Text>
+          </TooltipContent>
+        </Tooltip>
       ) : null}
       <StatusBadge
         label={t(`workspace.git.pr.states.${hint.state}`)}
@@ -818,6 +828,10 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  checksTooltipText: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+  },
   portalOverlay: {
     position: "absolute",
     top: 0,
