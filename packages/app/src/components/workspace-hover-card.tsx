@@ -581,10 +581,19 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
     [port.port],
   );
   return (
-    <View style={styles.portHoverTarget} onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
+    <View
+      style={styles.portHoverTarget}
+      onPointerEnter={handleEnter}
+      onPointerMove={handleEnter}
+      onPointerLeave={handleLeave}
+    >
       <View style={[styles.portRow, hovered && styles.listRowHovered]}>
-        <Text style={styles.portNumber}>{port.port}</Text>
-        <Text style={styles.portProcess}>{port.processName}</Text>
+        <Text style={styles.portNumber} pointerEvents="none">
+          {port.port}
+        </Text>
+        <Text style={styles.portProcess} selectable={false} pointerEvents="none">
+          {port.processName}
+        </Text>
         <View style={styles.portAddressSlot}>
           <Text
             style={[styles.portAddress, hovered && styles.hidden]}
