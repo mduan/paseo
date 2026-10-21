@@ -444,7 +444,7 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
-  test("port actions follow the pointer after an ignored native exit", async ({ page }) => {
+  test("port hovercard excludes its whole surface from window dragging", async ({ page }) => {
     test.skip(process.platform === "win32", "Port discovery supports macOS and Linux");
     test.setTimeout(90_000);
     const workspace = await seedWorkspace({ repoPrefix: "sidebar-port-hover-" });
@@ -472,31 +472,20 @@ test.describe("Sidebar workspace list", () => {
       await expect(rows).toHaveCount(2);
       const actions = panel.getByRole("button").locator("..");
 
-      for (const index of [0, 1]) {
+      await expect(card).toHaveCSS("-webkit-app-region", "no-drag");
+      for (const index of [0, 1, 0]) {
         const current = rows.nth(index);
-        const next = rows.nth(1 - index);
-        await current.hover();
-        await expect(actions.nth(index)).toHaveCSS("opacity", "1");
-        await current.evaluate((row) => {
-          const r = row.getBoundingClientRect();
-          row.dispatchEvent(
-            new PointerEvent("pointerout", {
-              bubbles: true,
-              pointerType: "mouse",
-              relatedTarget: null,
-              clientX: r.left + r.width / 2,
-              clientY: r.top + r.height / 2,
-            }),
-          );
-        });
-        await expect(actions.nth(index)).toHaveCSS("opacity", "1");
-
-        // Electron may re-enter on the adjacent row without another exit from the old row.
-        await next.dispatchEvent("pointerover", { pointerType: "mouse", relatedTarget: null });
-        await expect(actions.nth(1 - index)).toHaveCSS("opacity", "1");
-        await expect(actions.nth(index)).toHaveCSS("opacity", "0");
-        await next.hover();
-        await expect(actions.nth(1 - index)).toHaveCSS("opacity", "1");
+        const bounds = await current.boundingBox();
+        if (!bounds) throw new Error("Port row has no bounds");
+        for (const position of [
+          { x: 1, y: 1 },
+          { x: bounds.width / 2, y: bounds.height / 2 },
+          { x: bounds.width - 1, y: bounds.height - 1 },
+        ]) {
+          await current.hover({ position });
+          await expect(actions.nth(index)).toHaveCSS("opacity", "1");
+          await expect(actions.nth(1 - index)).toHaveCSS("opacity", "0");
+        }
       }
 
       await panel.getByText("Live ports (2)", { exact: true }).hover();

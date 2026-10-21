@@ -81,6 +81,10 @@ of `z-index`. It can hide app toasts and tooltips behind menus.
 The shared overlay scale keeps menus below toasts and
 lets tooltip portals paint above both.
 
+On Electron, a floating surface must set `-webkit-app-region: no-drag` across its full bounds.
+A drag region beneath a portal can swallow native pointer events regardless of `z-index`.
+CDP mouse injection bypasses this native hit test, so it cannot prove that physical hover works.
+
 The shared overlay scale is relative for interactive surfaces: a base floating
 panel is below a base modal, while a floating panel rendered from inside a modal
 inherits that modal's layer and paints above it. Wrap portal content in

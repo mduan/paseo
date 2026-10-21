@@ -42,7 +42,6 @@ import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-bad
 import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { useHoverIntent } from "@/hooks/use-hover-intent";
 import { useCopyFeedback } from "@/hooks/use-copy-feedback";
-import { useRowHover } from "@/hooks/use-row-hover";
 import { CheckIndicator } from "@/components/sidebar/workspace-meta-row/check-indicator";
 import { selectCheckSummary } from "@/components/sidebar/workspace-meta-row/check-summary";
 import type { WorkspacePort } from "@getpaseo/protocol/messages";
@@ -566,7 +565,9 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { copied, markCopied } = useCopyFeedback();
-  const { hovered, ...hoverProps } = useRowHover();
+  const [hovered, setHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => setHovered(false), []);
   const host = port.host.includes(":") ? `[${port.host}]` : port.host;
   const address = `${host}:${port.port}`;
   const copyAddress = useCallback(() => {
@@ -579,7 +580,11 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
     [port.port],
   );
   return (
-    <View style={styles.portHoverTarget} {...hoverProps}>
+    <View
+      style={styles.portHoverTarget}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+    >
       <View style={[styles.portRow, hovered && styles.listRowHovered]}>
         <Text style={styles.portNumber} pointerEvents="none">
           {port.port}
