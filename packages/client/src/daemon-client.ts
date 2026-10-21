@@ -1,3 +1,4 @@
+import type { LinearConnection } from "@getpaseo/protocol/messages";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { DeviceKind, ConnectionTransport } from "@getpaseo/protocol/connection-history";
 import { legacyUsageIcon } from "./legacy-usage-icons.js";
@@ -3095,6 +3096,45 @@ export class DaemonClient {
       throw new Error(payload.error ?? "removeProject rejected");
     }
     return { removedWorkspaceIds: payload.removedWorkspaceIds };
+  }
+
+  private requireLinearIntegration(): void {
+    // COMPAT(linearIntegration): added in v0.11.0-fork.28, remove gate after 2027-04-21.
+    if (!this.lastServerInfoMessage?.features?.linearIntegration) {
+      throw new Error("Update the host to configure Linear.");
+    }
+  }
+
+  async getLinearConnection(): Promise<LinearConnection> {
+    this.requireLinearIntegration();
+    const result =
+      await this.sendNamespacedCorrelatedSessionRequest<"integrations.linear.get_connection.response">(
+        {
+          message: { type: "integrations.linear.get_connection.request" },
+        },
+      );
+    if (!result.connection) throw new Error(result.error ?? "Unable to load Linear connection.");
+    return result.connection;
+  }
+
+  async setLinearKey(apiKey: string): Promise<LinearConnection> {
+    this.requireLinearIntegration();
+    const result =
+      await this.sendNamespacedCorrelatedSessionRequest<"integrations.linear.set_key.response">({
+        message: { type: "integrations.linear.set_key.request", apiKey },
+      });
+    if (!result.connection) throw new Error(result.error ?? "Unable to save Linear key.");
+    return result.connection;
+  }
+
+  async disconnectLinear(): Promise<LinearConnection> {
+    this.requireLinearIntegration();
+    const result =
+      await this.sendNamespacedCorrelatedSessionRequest<"integrations.linear.disconnect.response">({
+        message: { type: "integrations.linear.disconnect.request" },
+      });
+    if (!result.connection) throw new Error(result.error ?? "Unable to disconnect Linear.");
+    return result.connection;
   }
 
   async updateWorkspaceLinearIssues(input: {

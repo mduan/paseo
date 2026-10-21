@@ -593,6 +593,11 @@ default; pass `--server <server-id>` when targeting another server.
 
 ### Linear issue context for agents
 
+Configure Linear in **Settings → Host → Integrations**. Each host needs its own API key,
+including remote SSH and relay hosts. Select **Disconnect** before adding a different key.
+Saving a key takes effect without a restart. Missing ticket titles load from Linear when
+that host has a key.
+
 When `PASEO_WORKSPACE_ID` is set and you begin work on a specific Linear issue, attempt to link its full URL:
 
 ```bash

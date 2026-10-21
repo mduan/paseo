@@ -18,6 +18,7 @@ import { setImmediate as waitForImmediate } from "node:timers/promises";
 import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 
+import { LinearConnectionStatus } from "@getpaseo/protocol/messages";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { Session } from "./session.js";
@@ -566,6 +567,7 @@ function createSessionForWorkspaceTests(
     projectRegistry?: SessionOptions["projectRegistry"];
     workspaceRegistry?: SessionOptions["workspaceRegistry"];
     github?: ForgeService;
+    linearIntegration?: SessionOptions["linearIntegration"];
     paseoHome?: string;
     worktreesRoot?: string;
     renameCurrentBranch?: (
@@ -726,6 +728,7 @@ function createSessionForWorkspaceTests(
         dispose: () => {},
       }),
       github: options.github,
+      linearIntegration: options.linearIntegration,
       workspaceGitService,
       workspaceAutoName: new WorkspaceAutoName({
         agentManager,
@@ -9901,6 +9904,50 @@ test("workspace.create.request reports an archived explicit project", async () =
     requestId: "req-archived-project",
     workspace: null,
     errorCode: "archived_project",
+  });
+});
+
+test("workspace Linear titles are resolved for saved links and association responses", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const url = "https://linear.app/acme/issue/ENG-123";
+  const title = "Retry uploads";
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    linearIntegration: {
+      getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
+      setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
+      disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
+      async resolve(tickets) {
+        return tickets?.map((ticket) => ({ ...ticket, title }));
+      },
+    },
+  });
+  let workspace = createPersistedWorkspaceRecord({
+    workspaceId: "linear-titles",
+    projectId: "project",
+    cwd: REPO_CWD,
+    kind: "directory",
+    displayName: "workspace",
+    createdAt: "2026-01-01",
+    updatedAt: "2026-01-01",
+    linearTickets: [{ identifier: "ENG-123", url }],
+  });
+  session.workspaceRegistry.list = async () => [workspace];
+  session.workspaceRegistry.get = async () => workspace;
+  session.workspaceRegistry.update = async (_id, update) => (workspace = update(workspace));
+  await session.handleMessage({ type: "fetch_workspaces_request", requestId: "saved" });
+  expect(
+    findByType(emitted, "fetch_workspaces_response")?.payload.entries[0].linearTickets,
+  ).toEqual([{ identifier: "ENG-123", url, title }]);
+  await session.handleMessage({
+    type: "workspace.linear_issues.update.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "add",
+    add: [url],
+  });
+  expect(findByType(emitted, "workspace.linear_issues.update.response")?.payload).toMatchObject({
+    accepted: true,
+    linearTickets: [{ identifier: "ENG-123", url, title }],
   });
 });
 

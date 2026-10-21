@@ -1,3 +1,5 @@
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
 import { getE2EDaemonPort } from "../support/helpers/daemon-port";
@@ -150,5 +152,107 @@ test.describe("Settings host page", () => {
     await openHostSection(page, serverId, "host");
     await expectHostLabelDisplayed(page);
     await expectHostActionCards(page, serverId);
+  });
+});
+
+test("Linear integration keeps saved keys private and exposes disconnect failures", async ({
+  page,
+}, testInfo) => {
+  const serverId = getServerId();
+  const home = process.env.E2E_PASEO_HOME;
+  if (!home) throw new Error("Missing isolated daemon home");
+  const file = path.join(home, "integrations", "linear.json");
+  const saved = JSON.stringify({
+    apiKey: "saved-test-key",
+    organizationName: "Mixpanel",
+  });
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, saved, { mode: 0o600 });
+  await gotoAppShell(page);
+  await openSettings(page);
+  await openSettingsHost(page, serverId);
+  await openHostSection(page, serverId, "integrations");
+  await expect(page.getByTestId("linear-connection-status")).toHaveText("Connected · Mixpanel");
+  await expect(page.getByTestId("linear-api-key")).toHaveCount(0);
+  await rm(file);
+  await mkdir(file);
+  await writeFile(path.join(file, "prevent-removal"), "test");
+  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(page.getByTestId("linear-disconnect-error")).toBeVisible();
+  await expect(page.getByTestId("linear-connection-status")).toHaveText("Connected · Mixpanel");
+  await rm(file, { recursive: true });
+  await writeFile(file, saved, { mode: 0o600 });
+  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await expect(page.getByTestId("linear-connection-status")).toHaveText("Not connected");
+  const input = page.getByTestId("linear-api-key");
+  await expect(input).toHaveValue("");
+  await expect(input).toHaveAttribute("type", "password");
+  await expect(page.getByText(/Stored on/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Create API key" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("linear-inline-card.png"), fullPage: true });
+  await input.fill("draft-test-key");
+  await page.getByRole("button", { name: "Show API key" }).click();
+  await expect(input).toHaveJSProperty("type", "text");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Add API key", exact: true }).click();
+  await expect(page.getByTestId("linear-api-key")).toHaveValue("");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(readFile(file)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test("Linear integration isolates hosts and retries a failed connection read", async ({ page }) => {
+  const secondary = await startIsolatedHostDaemon("srv_linear_settings_second");
+  try {
+    const file = path.join(secondary.paseoHome, "integrations", "linear.json");
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, "invalid JSON");
+    await seedSavedSettingsHosts(page, [
+      { serverId: getServerId(), label: "First host", endpoint: `127.0.0.1:${getE2EDaemonPort()}` },
+      {
+        serverId: secondary.serverId,
+        label: "Second host",
+        endpoint: `127.0.0.1:${secondary.port}`,
+      },
+    ]);
+    await page.reload();
+    await openSettings(page);
+    await openSettingsHost(page, getServerId());
+    await openHostSection(page, getServerId(), "integrations");
+    await expect(page.getByTestId("linear-connection-status")).toHaveText("Not connected");
+    await selectSettingsHost(page, secondary.serverId);
+    await expect(page.getByRole("alert")).toContainText(
+      "Unable to read the saved Linear connection",
+    );
+    await writeFile(
+      file,
+      JSON.stringify({
+        apiKey: "second-host-key",
+        organizationName: "Other workspace",
+      }),
+      { mode: 0o600 },
+    );
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(page.getByTestId("linear-connection-status")).toHaveText(
+      "Connected · Other workspace",
+    );
+    await selectSettingsHost(page, getServerId());
+    await expect(page.getByTestId("linear-connection-status")).toHaveText("Not connected");
+  } finally {
+    await secondary.close();
+  }
+});
+
+test("Linear integration shows the inline form on a compact screen", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoAppShell(page);
+  await page.goto(`/settings/hosts/${getServerId()}/integrations`);
+  await expect(page.getByTestId("linear-key-form")).toBeVisible();
+  await expect(page.getByTestId("linear-api-key")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create API key" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save key", exact: true })).toBeVisible();
+  await expect(page.getByText(/Stored on/)).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("linear-inline-card-compact.png"),
+    fullPage: true,
   });
 });
