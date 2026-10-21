@@ -10,6 +10,30 @@ export type LinearLinkbackComment = {
   author?: { login?: string } | null;
 };
 
+// Issue cards embed descriptions whose related links are not PR associations.
+function linkedIssueContent(body: string): string {
+  const source = body.replace(/<!--[\s\S]*?-->/g, "");
+  const sections: string[] = [];
+  let depth = 0;
+  let inSummary = false;
+  let cursor = 0;
+  for (const tag of source.matchAll(/<\/?(details|summary)\b[^>]*>/gi)) {
+    if (!depth || (depth === 1 && inSummary)) {
+      sections.push(source.slice(cursor, tag.index));
+    }
+    const closing = tag[0].startsWith("</");
+    if (tag[1].toLowerCase() === "details") {
+      depth = closing ? Math.max(0, depth - 1) : depth + 1;
+      if (!depth) inSummary = false;
+    } else if (depth === 1) {
+      inSummary = !closing;
+    }
+    cursor = tag.index + tag[0].length;
+  }
+  if (!depth || (depth === 1 && inSummary)) sections.push(source.slice(cursor));
+  return sections.join("\n");
+}
+
 export function extractLinearTickets(comments: readonly LinearLinkbackComment[]): LinearTicket[] {
   const tickets = new Map<string, LinearTicket>();
   for (const comment of comments) {
@@ -19,13 +43,14 @@ export function extractLinearTickets(comments: readonly LinearLinkbackComment[])
     ) {
       continue;
     }
+    const body = linkedIssueContent(comment.body);
     const links = [
       ...Array.from(
-        comment.body.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a\s*>/gi),
+        body.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a\s*>/gi),
         (match) => ({ url: match[2], label: match[3] }),
       ),
       ...Array.from(
-        comment.body.matchAll(/\[([^\]]+)\]\((https:\/\/linear\.app\/[^\s)]+)\)/g),
+        body.matchAll(/\[([^\]]+)\]\((https:\/\/linear\.app\/[^\s)]+)\)/g),
         (match) => ({ url: match[2], label: match[1] }),
       ),
     ];
