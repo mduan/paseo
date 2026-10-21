@@ -184,7 +184,7 @@ export interface WorkspaceGitRuntimeSnapshot {
      */
     forge?: string;
     pullRequest: {
-      linearTickets?: CurrentPullRequestStatus["linearTickets"];
+      linearIssues?: CurrentPullRequestStatus["linearIssues"];
       number?: number;
       repoOwner?: string;
       repoName?: string;

@@ -37,7 +37,7 @@ try {
   assert.strictEqual(linked.exitCode, 0, linked.stderr);
   assert.deepStrictEqual(JSON.parse(linked.stdout), {
     workspaceId,
-    linearTickets: [{ identifier: "ENG-123", url: issueUrl }],
+    linearIssues: [{ identifier: "ENG-123", url: issueUrl }],
   });
   for (const id of ["missing-workspace", ""]) {
     const invalid = await ctx.paseo([
@@ -79,7 +79,7 @@ try {
     "--json",
   ]);
   assert.strictEqual(unlinked.exitCode, 0, unlinked.stderr);
-  assert.deepStrictEqual(JSON.parse(unlinked.stdout), { workspaceId, linearTickets: [] });
+  assert.deepStrictEqual(JSON.parse(unlinked.stdout), { workspaceId, linearIssues: [] });
 
   const renamed = await ctx.paseo(["workspace", "rename", workspaceId, "Auth rework", "--json"]);
   assert.strictEqual(renamed.exitCode, 0, renamed.stderr);

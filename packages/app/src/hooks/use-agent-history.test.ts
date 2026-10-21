@@ -141,7 +141,7 @@ function historyEntry(input: {
 
 describe("fetchAgentHistoryPage", () => {
   it("projects workspace issues for every historical chat without editing agent snapshots", async () => {
-    const tickets = [
+    const issues = [
       {
         identifier: "ENG-123",
         url: "https://linear.app/acme/issue/ENG-123",
@@ -150,7 +150,7 @@ describe("fetchAgentHistoryPage", () => {
     ];
     const entries = ["first", "second"].map((id) =>
       Object.assign(historyEntry({ id, cwd: "/repo", updatedAt: "2026-10-21T00:00:00.000Z" }), {
-        workspaceLinearTickets: tickets,
+        workspaceLinearIssues: issues,
       }),
     );
     const result = await fetchAgentHistoryPage({
@@ -158,8 +158,8 @@ describe("fetchAgentHistoryPage", () => {
       serverId: "server",
       cursor: null,
     });
-    expect(result.agents.map((agent) => agent.workspaceLinearTickets)).toEqual([tickets, tickets]);
-    expect(entries[0].agent).not.toHaveProperty("linearTickets");
+    expect(result.agents.map((agent) => agent.workspaceLinearIssues)).toEqual([issues, issues]);
+    expect(entries[0].agent).not.toHaveProperty("linearIssues");
   });
 
   it("projects current workspace PR state into history without storing it on agent snapshots", async () => {

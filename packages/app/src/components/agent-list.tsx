@@ -1,7 +1,7 @@
 import { pullRequestNumberRanges } from "@getpaseo/protocol/pull-request";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { MarkdownLinkText } from "@/components/markdown/link-text";
-import { LinearTicketLinks } from "@/components/linear-ticket-links";
+import { LinearIssueLinks } from "@/components/linear-issue-links";
 import { LinearIcon } from "@/components/icons/linear-icon";
 import {
   View,
@@ -437,15 +437,15 @@ function SessionRowContext({
           </MarkdownLinkText>
         </View>
       ) : null}
-      {fields.linearTickets && agent.workspaceLinearTickets?.length ? (
+      {fields.linearIssues && agent.workspaceLinearIssues?.length ? (
         <View
           style={styles.metaItem}
-          testID={`agent-row-linear-tickets-${agent.serverId}-${agent.id}`}
+          testID={`agent-row-linear-issues-${agent.serverId}-${agent.id}`}
         >
           <ThemedLinear size={14} uniProps={mutedIconMapping} />
           <Text style={styles.sessionMetaText} numberOfLines={1}>
-            <LinearTicketLinks
-              tickets={agent.workspaceLinearTickets}
+            <LinearIssueLinks
+              issues={agent.workspaceLinearIssues}
               style={styles.sessionMetaText}
               search={search}
             />

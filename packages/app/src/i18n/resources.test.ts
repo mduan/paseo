@@ -112,9 +112,9 @@ describe("translation resources", () => {
       await instance.init({ lng: "test", resources: { test: { translation: resource } } });
       expect(instance.t("workspace.hoverCard.livePorts")).not.toMatch(/\(|\{\{/);
       expect(
-        instance.t("workspace.hoverCard.ticketsAccessibility", { tickets: "COR-1401, COR-1404" }),
+        instance.t("workspace.hoverCard.issuesAccessibility", { issues: "COR-1401, COR-1404" }),
       ).toContain("COR-1401, COR-1404");
-      expect(instance.t("sidebar.display.show.linearTickets")).not.toContain("sidebar.display");
+      expect(instance.t("sidebar.display.show.linearIssues")).not.toContain("sidebar.display");
       expect(
         instance.t("workspace.hoverCard.portsAccessibility", { ports: "3000, 8000" }),
       ).toContain("3000, 8000");

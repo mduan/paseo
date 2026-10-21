@@ -17,14 +17,14 @@ const gitlabStatus = {
 };
 
 describe("selectPrHintFromStatus", () => {
-  it("carries linked tickets and leaves them absent for older daemons", () => {
-    const linearTickets = [
+  it("carries linked issues and leaves them absent for older daemons", () => {
+    const linearIssues = [
       { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
     ];
-    expect(selectPrHintFromStatus({ ...githubStatus, linearTickets })?.linearTickets).toBe(
-      linearTickets,
+    expect(selectPrHintFromStatus({ ...githubStatus, linearIssues })?.linearIssues).toBe(
+      linearIssues,
     );
-    expect(selectPrHintFromStatus(githubStatus)?.linearTickets).toBeUndefined();
+    expect(selectPrHintFromStatus(githubStatus)?.linearIssues).toBeUndefined();
   });
   it("keeps draft separate from open without overriding merged or closed", () => {
     expect(selectPrHintFromStatus({ ...githubStatus, isDraft: true })?.state).toBe("draft");

@@ -1,5 +1,5 @@
-import { LinearTicketLinks } from "@/components/linear-ticket-links";
-import { LinearTicketMetadata } from "@/components/linear-ticket-metadata";
+import { LinearIssueLinks } from "@/components/linear-issue-links";
+import { LinearIssueMetadata } from "@/components/linear-issue-metadata";
 import {
   useCallback,
   useEffect,
@@ -28,7 +28,7 @@ import {
   Server,
   Tag,
 } from "lucide-react-native";
-import type { LinearTicket } from "@getpaseo/protocol/messages";
+import type { LinearIssue } from "@getpaseo/protocol/messages";
 import { LinearIcon } from "@/components/icons/linear-icon";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
@@ -114,7 +114,7 @@ const HOVER_CARD_WIDTH = 260;
 
 enum HoverPanel {
   Ports,
-  LinearTickets,
+  LinearIssues,
 }
 
 interface WorkspaceHoverCardProps {
@@ -232,7 +232,7 @@ function WorkspaceHoverCardContent({
   const ports = workspace.ports;
   const sidePanel = useHoverIntent();
   const [activePanel, setActivePanel] = useState<HoverPanel>();
-  const tickets = workspace.linearTickets;
+  const issues = workspace.linearIssues;
   const [mainHeight, setMainHeight] = useState<number>();
   const handleMainLayout = useCallback((event: LayoutChangeEvent) => {
     setMainHeight(event.nativeEvent.layout.height);
@@ -242,17 +242,17 @@ function WorkspaceHoverCardContent({
     setActivePanel(HoverPanel.Ports);
     openPanelNow();
   }, [openPanelNow]);
-  const openTickets = useCallback(() => {
-    setActivePanel(HoverPanel.LinearTickets);
+  const openIssues = useCallback(() => {
+    setActivePanel(HoverPanel.LinearIssues);
     openPanelNow();
   }, [openPanelNow]);
-  const ticketsRowRef = useRef<View>(null);
+  const issuesRowRef = useRef<View>(null);
   const portsRowRef = useRef<View>(null);
   const schedulePanelClose = sidePanel.scheduleClose;
   const handleMainPointerMove = useCallback(
     (event: NativePointerEvent) => {
       const target: unknown = event.target;
-      const sourceRows = [portsRowRef.current, ticketsRowRef.current];
+      const sourceRows = [portsRowRef.current, issuesRowRef.current];
       // Keep document pointer events intact: the hovercard safe zone also reads them.
       if (isWeb && target instanceof Node) {
         if (sourceRows.some((row) => row instanceof Node && row.contains(target))) return;
@@ -339,9 +339,9 @@ function WorkspaceHoverCardContent({
                 {workspace.name}
               </Text>
             </View>
-            {tickets?.length ? (
-              <View ref={ticketsRowRef} onPointerEnter={openTickets}>
-                <LinearTicketsSummary tickets={tickets} onOpen={openTickets} />
+            {issues?.length ? (
+              <View ref={issuesRowRef} onPointerEnter={openIssues}>
+                <LinearIssuesSummary issues={issues} onOpen={openIssues} />
               </View>
             ) : null}
             {prHint ? <PullRequestRow hint={prHint} /> : null}
@@ -407,7 +407,7 @@ function WorkspaceHoverCardContent({
             <WorkspaceDetailsPanel
               activePanel={activePanel}
               ports={ports}
-              tickets={tickets}
+              issues={issues}
               serverId={workspace.serverId}
               cancelClose={sidePanel.cancelClose}
               maxHeight={mainHeight}
@@ -420,29 +420,29 @@ function WorkspaceHoverCardContent({
   );
 }
 
-function LinearTicketsSummary({
-  tickets,
+function LinearIssuesSummary({
+  issues,
   onOpen,
 }: {
-  tickets: readonly LinearTicket[];
+  issues: readonly LinearIssue[];
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <View
       style={[styles.cardInfoRow, styles.defaultCursor]}
-      testID="hover-card-workspace-linear-tickets"
+      testID="hover-card-workspace-linear-issues"
     >
       <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
       <Text style={styles.cardInfoText} numberOfLines={1}>
-        <LinearTicketLinks tickets={tickets} style={styles.ticketSummaryLink} />
+        <LinearIssueLinks issues={issues} style={styles.issueSummaryLink} />
       </Text>
       <Pressable
         accessibilityRole="button"
         onPress={onOpen}
         style={styles.defaultCursor}
-        accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
-          tickets: tickets.map((ticket) => ticket.identifier).join(", "),
+        accessibilityLabel={t("workspace.hoverCard.issuesAccessibility", {
+          issues: issues.map((issue) => issue.identifier).join(", "),
         })}
       >
         <ThemedChevronRight size={12} uniProps={foregroundMutedColorMapping} />
@@ -454,7 +454,7 @@ function LinearTicketsSummary({
 function WorkspaceDetailsPanel({
   activePanel,
   ports,
-  tickets,
+  issues,
   serverId,
   cancelClose,
   maxHeight,
@@ -462,7 +462,7 @@ function WorkspaceDetailsPanel({
   maxHeight?: number;
   activePanel?: HoverPanel;
   ports?: readonly WorkspacePort[];
-  tickets?: readonly LinearTicket[];
+  issues?: readonly LinearIssue[];
   serverId: string;
   cancelClose: () => void;
 }) {
@@ -478,20 +478,20 @@ function WorkspaceDetailsPanel({
       </View>
     );
   }
-  if (activePanel === HoverPanel.LinearTickets && tickets?.length && maxHeight) {
+  if (activePanel === HoverPanel.LinearIssues && issues?.length && maxHeight) {
     return (
       <View
-        style={styles.ticketsPanel(maxHeight)}
+        style={styles.issuesPanel(maxHeight)}
         onPointerEnter={cancelClose}
         testID="hover-card-linear-panel"
       >
         <View style={styles.panelHeader}>
           <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
-          <Text style={styles.panelTitle}>{t("workspace.hoverCard.linearTickets")}</Text>
+          <Text style={styles.panelTitle}>{t("workspace.hoverCard.linearIssues")}</Text>
         </View>
-        <ScrollView style={styles.ticketList}>
-          {tickets.map((ticket) => (
-            <LinearTicketRow key={ticket.url} ticket={ticket} />
+        <ScrollView style={styles.issueList}>
+          {issues.map((issue) => (
+            <LinearIssueRow key={issue.url} issue={issue} />
           ))}
         </ScrollView>
       </View>
@@ -760,7 +760,7 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   );
 }
 
-function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
+function LinearIssueRow({ issue }: { issue: LinearIssue }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { copied, markCopied } = useCopyFeedback();
@@ -768,11 +768,11 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
   const handlePointerEnter = useCallback(() => setHovered(true), []);
   const handlePointerLeave = useCallback(() => setHovered(false), []);
   const copyIdentifier = useCallback(() => {
-    void copyToClipboard(ticket.identifier)
+    void copyToClipboard(issue.identifier)
       .then(markCopied)
       .catch(() => toast.error(t("workspace.tabs.toasts.copyFailed")));
-  }, [ticket.identifier, markCopied, t, toast]);
-  const openTicket = useCallback(() => void openExternalUrl(ticket.url), [ticket.url]);
+  }, [issue.identifier, markCopied, t, toast]);
+  const openIssue = useCallback(() => void openExternalUrl(issue.url), [issue.url]);
 
   return (
     <View
@@ -781,24 +781,24 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
       onPointerLeave={handlePointerLeave}
     >
       <View
-        style={[styles.ticketRow, hovered && styles.listRowHovered]}
-        testID={`hover-card-linear-ticket-${ticket.identifier}`}
+        style={[styles.issueRow, hovered && styles.listRowHovered]}
+        testID={`hover-card-linear-issue-${issue.identifier}`}
       >
-        <View style={styles.ticketHeader}>
-          <View style={styles.ticketIdentity}>
-            <Text style={styles.ticketIdentifier} selectable={false} pointerEvents="none">
-              {ticket.identifier}
+        <View style={styles.issueHeader}>
+          <View style={styles.issueIdentity}>
+            <Text style={styles.issueIdentifier} selectable={false} pointerEvents="none">
+              {issue.identifier}
             </Text>
-            <LinearTicketMetadata ticket={ticket} />
+            <LinearIssueMetadata issue={issue} />
           </View>
           <View
-            style={[styles.ticketActions, !hovered && styles.hidden]}
+            style={[styles.issueActions, !hovered && styles.hidden]}
             pointerEvents={hovered ? "auto" : "none"}
           >
             <Pressable
               accessibilityRole="button"
               onPress={copyIdentifier}
-              accessibilityLabel={`${copied ? t("common.states.copied") : t("common.actions.copy")}: ${ticket.identifier}`}
+              accessibilityLabel={`${copied ? t("common.states.copied") : t("common.actions.copy")}: ${issue.identifier}`}
               style={styles.portAction}
               tabIndex={hovered ? 0 : -1}
             >
@@ -810,8 +810,8 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
             </Pressable>
             <Pressable
               accessibilityRole="link"
-              onPress={openTicket}
-              accessibilityLabel={`${ticket.identifier}, ${t("workspace.hoverCard.openInLinear")}`}
+              onPress={openIssue}
+              accessibilityLabel={`${issue.identifier}, ${t("workspace.hoverCard.openInLinear")}`}
               style={styles.portAction}
               tabIndex={hovered ? 0 : -1}
             >
@@ -819,8 +819,8 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
             </Pressable>
           </View>
         </View>
-        <Text style={styles.ticketTitle} selectable={false} pointerEvents="none">
-          {ticket.title || t("workspace.hoverCard.ticketTitleUnavailable")}
+        <Text style={styles.issueTitle} selectable={false} pointerEvents="none">
+          {issue.title || t("workspace.hoverCard.issueTitleUnavailable")}
         </Text>
       </View>
     </View>
@@ -880,7 +880,7 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
   },
-  ticketsPanel: (maxHeight: number) => ({
+  issuesPanel: (maxHeight: number) => ({
     maxHeight,
     width: 340,
     minWidth: 0,
@@ -889,39 +889,39 @@ const styles = StyleSheet.create((theme) => ({
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
   }),
-  ticketList: { flexShrink: 1 },
-  ticketSummaryLink: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
-  ticketRow: {
+  issueList: { flexShrink: 1 },
+  issueSummaryLink: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  issueRow: {
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
     gap: theme.spacing[1],
   },
-  ticketHeader: {
+  issueHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[1],
   },
-  ticketIdentity: {
+  issueIdentity: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
     flexShrink: 1,
     minWidth: 0,
   },
-  ticketIdentifier: {
+  issueIdentifier: {
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
     flexShrink: 0,
   },
-  ticketActions: {
+  issueActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
     flexShrink: 0,
   },
-  ticketTitle: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
+  issueTitle: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   portHoverTarget: { position: "relative" },
   portRow: {
     flexDirection: "row",

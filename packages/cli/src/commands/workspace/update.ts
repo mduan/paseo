@@ -1,14 +1,14 @@
 /* oxlint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
 import type { Command } from "commander";
-import type { LinearTicket } from "@getpaseo/protocol/messages";
-import { updateLinearTickets } from "@getpaseo/protocol/linear-tickets";
+import type { LinearIssue } from "@getpaseo/protocol/messages";
+import { updateLinearIssues } from "@getpaseo/protocol/linear-issues";
 import { connectToDaemon } from "../../utils/client.js";
 import type { DaemonTarget } from "../../utils/daemon-target.js";
 import type { CommandError, OutputSchema, SingleResult } from "../../output/index.js";
 
 type WorkspaceUpdateResult = {
   workspaceId: string;
-  linearTickets: LinearTicket[];
+  linearIssues: LinearIssue[];
 };
 
 type WorkspaceUpdateOptions = {
@@ -23,7 +23,7 @@ const schema: OutputSchema<WorkspaceUpdateResult> = {
     { header: "WORKSPACE ID", field: "workspaceId", width: 24 },
     {
       header: "LINEAR ISSUES",
-      field: (result) => result.linearTickets.map((ticket) => ticket.identifier).join(", "),
+      field: (result) => result.linearIssues.map((issue) => issue.identifier).join(", "),
     },
   ],
 };
@@ -43,7 +43,7 @@ export async function runUpdateCommand(
     } satisfies CommandError;
   }
   try {
-    updateLinearTickets({ add, remove });
+    updateLinearIssues({ add, remove });
   } catch (error) {
     throw {
       code: "INVALID_OPTIONS",

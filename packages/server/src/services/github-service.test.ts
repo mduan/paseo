@@ -1,8 +1,8 @@
 import {
-  parseLinearTicketUrl,
-  mergeLinearTickets,
-  updateLinearTickets,
-} from "@getpaseo/protocol/linear-tickets";
+  parseLinearIssueUrl,
+  mergeLinearIssues,
+  updateLinearIssues,
+} from "@getpaseo/protocol/linear-issues";
 import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1158,7 +1158,7 @@ describe("ForgeService", () => {
         forgeSpecific: expect.objectContaining({ forge: "github", mergeStateStatus: "CLEAN" }),
       }),
     ]);
-    expect(statusesA[0]?.linearTickets).toBeUndefined();
+    expect(statusesA[0]?.linearIssues).toBeUndefined();
     expect(runner.calls[0]?.args[3]).not.toContain("comments(");
     expect(statusesB).toEqual([
       expect.objectContaining({ number: 52, state: "merged", checksStatus: "success" }),
@@ -4802,7 +4802,7 @@ describe("ForgeService", () => {
 describe("workspace Linear issue identities", () => {
   test("normalizes full URLs and rejects ambiguous or unsafe inputs", () => {
     expect(
-      parseLinearTicketUrl("https://linear.app/Acme/issue/eng-123/a-title?x=1#comment"),
+      parseLinearIssueUrl("https://linear.app/Acme/issue/eng-123/a-title?x=1#comment"),
     ).toEqual({ identifier: "ENG-123", url: "https://linear.app/acme/issue/ENG-123" });
     for (const value of [
       "ENG-123",
@@ -4811,13 +4811,13 @@ describe("workspace Linear issue identities", () => {
       "https://user@linear.app/acme/issue/ENG-123",
       "https://linear.app/acme/issue/ENG-123/extra/path",
     ]) {
-      expect(parseLinearTicketUrl(value)).toBeUndefined();
+      expect(parseLinearIssueUrl(value)).toBeUndefined();
     }
   });
 
   test("adds idempotently, keeps organizations distinct, and removes only manual context", () => {
     const url = "https://linear.app/acme/issue/ENG-123";
-    const current = updateLinearTickets({
+    const current = updateLinearIssues({
       add: [
         url,
         "https://linear.app/ACME/issue/eng-123/title?x#y",
@@ -4826,14 +4826,14 @@ describe("workspace Linear issue identities", () => {
     });
     expect(current).toHaveLength(2);
     const pr = [{ identifier: "ENG-123", url: `${url}/title`, title: "Handle retries" }];
-    expect(mergeLinearTickets(current, pr)).toEqual([
+    expect(mergeLinearIssues(current, pr)).toEqual([
       { identifier: "ENG-123", url, title: "Handle retries" },
       current[1],
     ]);
-    const removed = updateLinearTickets({ current, remove: [`${url}/old-title#comment`] });
+    const removed = updateLinearIssues({ current, remove: [`${url}/old-title#comment`] });
     expect(removed).toEqual([current[1]]);
-    expect(mergeLinearTickets(removed, pr)).toHaveLength(2);
-    expect(() => updateLinearTickets({ current, add: [url, "ENG-999"] })).toThrow(
+    expect(mergeLinearIssues(removed, pr)).toHaveLength(2);
+    expect(() => updateLinearIssues({ current, add: [url, "ENG-999"] })).toThrow(
       "Invalid Linear issue URL",
     );
     expect(current).toHaveLength(2);

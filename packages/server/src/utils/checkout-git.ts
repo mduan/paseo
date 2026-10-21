@@ -4149,7 +4149,7 @@ export interface CreatePullRequestOptions {
 }
 
 export interface PullRequestStatus {
-  linearTickets?: CurrentPullRequestStatus["linearTickets"];
+  linearIssues?: CurrentPullRequestStatus["linearIssues"];
   number?: number;
   repoOwner?: string;
   repoName?: string;

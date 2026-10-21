@@ -9,30 +9,30 @@ import {
   WorkspaceScriptPayloadSchema,
   WorkspaceGitHubRuntimePayloadSchema,
   CheckoutPrStatusSchema,
-  LinearTicketSchema,
+  LinearIssueSchema,
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
   test("carries optional Linear issue details without requiring them on existing links", () => {
-    const ticket = { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1" };
-    expect(LinearTicketSchema.parse(ticket)).toEqual(ticket);
+    const issue = { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1" };
+    expect(LinearIssueSchema.parse(issue)).toEqual(issue);
     const details = {
-      ...ticket,
+      ...issue,
       title: "Fix",
       state: { name: "In Progress", type: "started", color: "#e2b53e" },
       assignee: { name: "Alex", avatarUrl: "https://example.com/alex.png" },
       project: { name: "External Queries", color: "#ee6666" },
     };
-    expect(LinearTicketSchema.parse(details)).toEqual(details);
-    expect(LinearTicketSchema.parse({ ...details, assignee: { name: "Alex" } }).assignee).toEqual({
+    expect(LinearIssueSchema.parse(details)).toEqual(details);
+    expect(LinearIssueSchema.parse({ ...details, assignee: { name: "Alex" } }).assignee).toEqual({
       name: "Alex",
     });
     expect(
-      LinearTicketSchema.parse({ ...details, state: { ...details.state, type: "future-state" } })
+      LinearIssueSchema.parse({ ...details, state: { ...details.state, type: "future-state" } })
         .state?.type,
     ).toBe("future-state");
   });
-  test("keeps Linear ticket metadata optional in workspace and checkout updates", () => {
+  test("keeps Linear issue metadata optional in workspace and checkout updates", () => {
     const status = {
       url: "https://github.com/acme/repo/pull/1",
       title: "Fix",
@@ -41,20 +41,19 @@ describe("workspace message schemas", () => {
       headRefName: "fix",
       isMerged: false,
     };
-    const linearTickets = [
+    const linearIssues = [
       { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
     ];
-    expect(CheckoutPrStatusSchema.parse(status).linearTickets).toBeUndefined();
+    expect(CheckoutPrStatusSchema.parse(status).linearIssues).toBeUndefined();
     expect(
-      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: status })?.pullRequest
-        ?.linearTickets,
+      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: status })?.pullRequest?.linearIssues,
     ).toBeUndefined();
     expect(
-      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: { ...status, linearTickets } })
-        ?.pullRequest?.linearTickets,
-    ).toEqual(linearTickets);
-    expect(CheckoutPrStatusSchema.parse({ ...status, linearTickets }).linearTickets).toEqual(
-      linearTickets,
+      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: { ...status, linearIssues } })
+        ?.pullRequest?.linearIssues,
+    ).toEqual(linearIssues);
+    expect(CheckoutPrStatusSchema.parse({ ...status, linearIssues }).linearIssues).toEqual(
+      linearIssues,
     );
   });
   test("keeps workspace ports optional and carries full and anonymous listeners on existing updates", () => {

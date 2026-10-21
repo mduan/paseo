@@ -1,7 +1,7 @@
 /* eslint-disable typescript/consistent-type-definitions -- Workspace instructions require type aliases. */
 import type {
   AgentSnapshotPayload,
-  LinearTicket,
+  LinearIssue,
   ProjectPlacementPayload,
   WorkspacePullRequestSummary,
 } from "@getpaseo/protocol/messages";
@@ -13,7 +13,7 @@ import type { SearchOptions } from "@getpaseo/protocol/search/options";
 export type AgentHistorySearchCandidate = {
   agent: AgentSnapshotPayload;
   project: ProjectPlacementPayload;
-  workspaceLinearTickets?: readonly LinearTicket[];
+  workspaceLinearIssues?: readonly LinearIssue[];
   workspacePullRequest?: WorkspacePullRequestSummary | null;
 };
 
@@ -29,7 +29,7 @@ export function createAgentHistorySearch({
   return ({
     agent,
     project,
-    workspaceLinearTickets,
+    workspaceLinearIssues,
     workspacePullRequest,
   }: AgentHistorySearchCandidate): boolean => {
     const number =
@@ -45,10 +45,7 @@ export function createAgentHistorySearch({
       project.projectName,
       ...(workspacePullRequest ? [workspacePullRequest.title, workspacePullRequest.url] : []),
       ...(number ? [String(number), `${prefix}${number}`] : []),
-      ...(workspaceLinearTickets ?? []).flatMap((ticket) => [
-        ticket.identifier,
-        ticket.title ?? "",
-      ]),
+      ...(workspaceLinearIssues ?? []).flatMap((issue) => [issue.identifier, issue.title ?? ""]),
     ]);
   };
 }

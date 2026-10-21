@@ -72,7 +72,7 @@ describe("matchesAgentHistoryQuery", () => {
   it("matches workspace issue identifiers and available titles", () => {
     const entry = {
       ...candidate({ title: "Work" }),
-      workspaceLinearTickets: [
+      workspaceLinearIssues: [
         {
           identifier: "ENG-123",
           url: "https://linear.app/acme/issue/ENG-123",

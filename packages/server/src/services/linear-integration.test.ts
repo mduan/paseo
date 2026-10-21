@@ -8,7 +8,7 @@ import { createLinearIntegrationService } from "./linear-integration.js";
 const homes: string[] = [];
 const logger = { warn() {} };
 const url = "https://linear.app/acme/issue/ENG-123";
-const ticket = { identifier: "ENG-123", url };
+const issue = { identifier: "ENG-123", url };
 const metadata = {
   state: { name: "In Progress", type: "started", color: "#e2b53e" },
   assignee: { name: "Alex Morgan", avatarUrl: "https://example.com/alex.png" },
@@ -98,16 +98,16 @@ test("enriches linked issues, deduplicates concurrent lookups, and keeps organiz
     },
   });
   await service.setKey("key");
-  const titled = { ...ticket, title: "Retry uploads", ...metadata };
-  expect(await Promise.all([service.resolve([ticket]), service.resolve([ticket])])).toEqual([
+  const titled = { ...issue, title: "Retry uploads", ...metadata };
+  expect(await Promise.all([service.resolve([issue]), service.resolve([issue])])).toEqual([
     [titled],
     [titled],
   ]);
   expect(calls).toBe(2);
-  const other = { ...ticket, url: "https://linear.app/other/issue/ENG-123" };
+  const other = { ...issue, url: "https://linear.app/other/issue/ENG-123" };
   expect(await service.resolve([other])).toEqual([other]);
-  expect(await service.resolve([{ ...ticket, title: "From PR" }])).toEqual([
-    { ...ticket, title: "From PR", ...metadata },
+  expect(await service.resolve([{ ...issue, title: "From PR" }])).toEqual([
+    { ...issue, title: "From PR", ...metadata },
   ]);
   expect(calls).toBe(3);
 });
@@ -127,12 +127,12 @@ test("lookup errors preserve links and retry after the failure cache expires", a
     },
   });
   await service.setKey("key");
-  expect(await service.resolve([ticket])).toEqual([ticket]);
-  expect(await service.resolve([ticket])).toEqual([ticket]);
+  expect(await service.resolve([issue])).toEqual([issue]);
+  expect(await service.resolve([issue])).toEqual([issue]);
   expect(lookups).toBe(1);
   now = 60_001;
-  expect(await service.resolve([ticket])).toEqual([
-    { ...ticket, title: "Retry uploads", ...metadata },
+  expect(await service.resolve([issue])).toEqual([
+    { ...issue, title: "Retry uploads", ...metadata },
   ]);
   expect(lookups).toBe(2);
 });
@@ -151,12 +151,12 @@ test("replacement and disconnect clear cached metadata without restarting", asyn
     },
   });
   await service.setKey("first");
-  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title, ...metadata }]);
+  expect(await service.resolve([issue])).toEqual([{ ...issue, title, ...metadata }]);
   title = "Second title";
   await service.setKey("second");
-  expect(await service.resolve([ticket])).toEqual([{ ...ticket, title, ...metadata }]);
+  expect(await service.resolve([issue])).toEqual([{ ...issue, title, ...metadata }]);
   expect(await service.disconnect()).toEqual({ status: LinearConnectionStatus.Disconnected });
-  expect(await service.resolve([ticket])).toEqual([ticket]);
+  expect(await service.resolve([issue])).toEqual([issue]);
   expect(calls).toBe(4);
   await expect(readFile(join(paseoHome, "integrations", "linear.json"))).rejects.toMatchObject({
     code: "ENOENT",
@@ -192,8 +192,8 @@ test("PR issues require a Linear connection", async () => {
       return connectionResponse();
     },
   });
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
-  expect(await service.getPullRequestTickets()).toEqual([]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestIssues()).toEqual([]);
   expect(calls).toBe(0);
 });
 
@@ -205,7 +205,7 @@ test("loads all PR-linked issues with titles and caches concurrent lookups", asy
     url: "https://linear.app/acme/issue/ENG-124",
     title: "Cancel uploads",
   };
-  const titled = { ...ticket, title: "Retry uploads" };
+  const titled = { ...issue, title: "Retry uploads" };
   const service = createLinearIntegrationService({
     paseoHome: await home(),
     logger,
@@ -232,18 +232,18 @@ test("loads all PR-linked issues with titles and caches concurrent lookups", asy
   await service.setKey("key");
   expect(
     await Promise.all([
-      service.getPullRequestTickets(pullRequestUrl),
-      service.getPullRequestTickets(pullRequestUrl),
+      service.getPullRequestIssues(pullRequestUrl),
+      service.getPullRequestIssues(pullRequestUrl),
     ]),
   ).toEqual([
     [titled, second],
     [titled, second],
   ]);
   expect(lookups).toEqual([{ url: pullRequestUrl }, { url: pullRequestUrl, after: "next" }]);
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([titled, second]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([titled, second]);
   expect(lookups).toHaveLength(2);
   now = 300_001;
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([titled, second]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([titled, second]);
   expect(lookups).toHaveLength(4);
 });
 
@@ -261,7 +261,7 @@ test("PR lookup failures hide issues and retry after the failure cache expires",
       return Response.json({
         data: {
           attachmentsForURL: {
-            nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+            nodes: [{ issue: { ...issue, title: "Retry uploads" } }],
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },
@@ -269,12 +269,12 @@ test("PR lookup failures hide issues and retry after the failure cache expires",
     },
   });
   await service.setKey("key");
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([]);
   expect(lookups).toBe(1);
   now = 60_001;
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
-    { ...ticket, title: "Retry uploads" },
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([
+    { ...issue, title: "Retry uploads" },
   ]);
   expect(lookups).toBe(2);
 });
@@ -291,7 +291,7 @@ test("PR issues follow key replacement and disappear on disconnect", async () =>
       return Response.json({
         data: {
           attachmentsForURL: {
-            nodes: [{ issue: { ...ticket, title } }],
+            nodes: [{ issue: { ...issue, title } }],
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },
@@ -299,15 +299,15 @@ test("PR issues follow key replacement and disappear on disconnect", async () =>
     },
   });
   await service.setKey("first");
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
-    { ...ticket, title: "first" },
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([
+    { ...issue, title: "first" },
   ]);
   await service.setKey("second");
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
-    { ...ticket, title: "second" },
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([
+    { ...issue, title: "second" },
   ]);
   await service.disconnect();
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([]);
   expect(lookups).toBe(2);
 });
 
@@ -324,14 +324,14 @@ test("disconnect discards PR issues from an in-flight lookup", async () => {
     },
   });
   await service.setKey("key");
-  const lookup = service.getPullRequestTickets(pullRequestUrl);
+  const lookup = service.getPullRequestIssues(pullRequestUrl);
   await started.promise;
   await service.disconnect();
   response.resolve(
     Response.json({
       data: {
         attachmentsForURL: {
-          nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+          nodes: [{ issue: { ...issue, title: "Retry uploads" } }],
           pageInfo: { hasNextPage: false, endCursor: null },
         },
       },
@@ -351,7 +351,7 @@ test("incomplete PR attachment pagination never returns partial issues", async (
       return Response.json({
         data: {
           attachmentsForURL: {
-            nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+            nodes: [{ issue: { ...issue, title: "Retry uploads" } }],
             pageInfo: { hasNextPage: true, endCursor: "stuck" },
           },
         },
@@ -359,7 +359,7 @@ test("incomplete PR attachment pagination never returns partial issues", async (
     },
   });
   await service.setKey("key");
-  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestIssues(pullRequestUrl)).toEqual([]);
   expect(lookups).toBe(2);
 });
 
@@ -373,19 +373,19 @@ test("refreshes metadata on titled issues and clears removed assignees and proje
     request: async (_url, init) => {
       if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
       lookups += 1;
-      const issue = { title: "Retry uploads", url, ...metadata };
-      if (lookups === 1) return Response.json({ data: { issue } });
-      return Response.json({ data: { issue: { ...issue, assignee: null, project: null } } });
+      const details = { title: "Retry uploads", url, ...metadata };
+      if (lookups === 1) return Response.json({ data: { issue: details } });
+      return Response.json({ data: { issue: { ...details, assignee: null, project: null } } });
     },
   });
   await service.setKey("key");
-  const resolved = await service.resolve([{ ...ticket, title: "From PR" }]);
-  expect(resolved).toEqual([{ ...ticket, title: "From PR", ...metadata }]);
+  const resolved = await service.resolve([{ ...issue, title: "From PR" }]);
+  expect(resolved).toEqual([{ ...issue, title: "From PR", ...metadata }]);
   expect(await service.resolve(resolved)).toEqual(resolved);
   expect(lookups).toBe(1);
   now = 300_001;
   expect(await service.resolve(resolved)).toEqual([
-    { ...ticket, title: "From PR", state: metadata.state, assignee: undefined, project: undefined },
+    { ...issue, title: "From PR", state: metadata.state, assignee: undefined, project: undefined },
   ]);
   expect(lookups).toBe(2);
 });
@@ -409,9 +409,9 @@ test("keeps an assigned user's name when Linear has no avatar photo", async () =
     },
   });
   await service.setKey("key");
-  expect(await service.resolve([ticket])).toEqual([
+  expect(await service.resolve([issue])).toEqual([
     {
-      ...ticket,
+      ...issue,
       title: "Retry uploads",
       ...metadata,
       assignee: { name: "Alex Morgan", avatarUrl: undefined },

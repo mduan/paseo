@@ -18,7 +18,7 @@ import { setImmediate as waitForImmediate } from "node:timers/promises";
 import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 
-import { LinearConnectionStatus, type LinearTicket } from "@getpaseo/protocol/messages";
+import { LinearConnectionStatus, type LinearIssue } from "@getpaseo/protocol/messages";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { Session } from "./session.js";
@@ -732,8 +732,8 @@ function createSessionForWorkspaceTests(
         getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
         setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
         disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
-        getPullRequestTickets: async () => [],
-        resolve: async (tickets) => (tickets ? [...tickets] : undefined),
+        getPullRequestIssues: async () => [],
+        resolve: async (issues) => (issues ? [...issues] : undefined),
       },
       workspaceGitService,
       workspaceAutoName: new WorkspaceAutoName({
@@ -9923,9 +9923,9 @@ test("workspace Linear titles are resolved for saved links and association respo
       getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
       setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
       disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
-      getPullRequestTickets: async () => [],
-      async resolve(tickets) {
-        return tickets?.map((ticket) => ({ ...ticket, title }));
+      getPullRequestIssues: async () => [],
+      async resolve(issues) {
+        return issues?.map((issue) => ({ ...issue, title }));
       },
     },
   });
@@ -9937,15 +9937,15 @@ test("workspace Linear titles are resolved for saved links and association respo
     displayName: "workspace",
     createdAt: "2026-01-01",
     updatedAt: "2026-01-01",
-    linearTickets: [{ identifier: "ENG-123", url }],
+    linearIssues: [{ identifier: "ENG-123", url }],
   });
   session.workspaceRegistry.list = async () => [workspace];
   session.workspaceRegistry.get = async () => workspace;
   session.workspaceRegistry.update = async (_id, update) => (workspace = update(workspace));
   await session.handleMessage({ type: "fetch_workspaces_request", requestId: "saved" });
-  expect(
-    findByType(emitted, "fetch_workspaces_response")?.payload.entries[0].linearTickets,
-  ).toEqual([{ identifier: "ENG-123", url, title }]);
+  expect(findByType(emitted, "fetch_workspaces_response")?.payload.entries[0].linearIssues).toEqual(
+    [{ identifier: "ENG-123", url, title }],
+  );
   await session.handleMessage({
     type: "workspace.linear_issues.update.request",
     workspaceId: workspace.workspaceId,
@@ -9954,25 +9954,25 @@ test("workspace Linear titles are resolved for saved links and association respo
   });
   expect(findByType(emitted, "workspace.linear_issues.update.response")?.payload).toMatchObject({
     accepted: true,
-    linearTickets: [{ identifier: "ENG-123", url, title }],
+    linearIssues: [{ identifier: "ENG-123", url, title }],
   });
 });
 
 test("workspace Linear links use exact IDs and history searches workspace context before pagination", async () => {
   const emitted: SessionOutboundMessage[] = [];
-  let pullRequestTickets: LinearTicket[] = [];
-  let issueDetails: Pick<LinearTicket, "state" | "assignee" | "project"> = {};
+  let pullRequestIssues: LinearIssue[] = [];
+  let issueDetails: Pick<LinearIssue, "state" | "assignee" | "project"> = {};
   const session = createSessionForWorkspaceTests({
     onMessage: (message) => emitted.push(message),
     linearIntegration: {
       getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
       setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
       disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
-      resolve: async (tickets) => tickets?.map((ticket) => ({ ...ticket, ...issueDetails })),
-      getPullRequestTickets: async (prUrl) => {
+      resolve: async (issues) => issues?.map((issue) => ({ ...issue, ...issueDetails })),
+      getPullRequestIssues: async (prUrl) => {
         if (!prUrl) return [];
         expect(prUrl).toBe("https://github.com/acme/repo/pull/482");
-        return pullRequestTickets;
+        return pullRequestIssues;
       },
     },
   });
@@ -10051,9 +10051,9 @@ test("workspace Linear links use exact IDs and history searches workspace contex
     workspaceId: workspace.workspaceId,
     accepted: true,
     error: null,
-    linearTickets: [{ identifier: "ENG-123", url }],
+    linearIssues: [{ identifier: "ENG-123", url }],
   });
-  expect(records.get(sibling.workspaceId)?.linearTickets).toBeUndefined();
+  expect(records.get(sibling.workspaceId)?.linearIssues).toBeUndefined();
   await session.handleMessage({
     type: "workspace.linear_issues.update.request",
     workspaceId: "missing",
@@ -10071,7 +10071,7 @@ test("workspace Linear links use exact IDs and history searches workspace contex
       .slice(1)
       .map((message) => message.payload.accepted),
   ).toEqual([false, false]);
-  expect(records.get(workspace.workspaceId)?.linearTickets).toHaveLength(1);
+  expect(records.get(workspace.workspaceId)?.linearIssues).toHaveLength(1);
   // Archived workspaces retain their context even after their directory is gone.
   records.set(workspace.workspaceId, {
     ...records.get(workspace.workspaceId)!,
@@ -10085,7 +10085,7 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   });
   const first = filterByType(emitted, "fetch_agent_history_response")[0].payload;
   expect(first.entries.map((entry) => entry.agent.id)).toEqual(["first"]);
-  expect(first.entries[0].workspaceLinearTickets).toEqual([{ identifier: "ENG-123", url }]);
+  expect(first.entries[0].workspaceLinearIssues).toEqual([{ identifier: "ENG-123", url }]);
   expect(first.pageInfo.hasMore).toBe(true);
   await session.handleMessage({
     type: "fetch_agent_history_request",
@@ -10135,7 +10135,7 @@ test("workspace Linear links use exact IDs and history searches workspace contex
     baseRefName: "main",
     headRefName: "feature",
     isMerged: false,
-    linearTickets: [{ identifier: "ENG-123", url, title: "Retry uploads" }],
+    linearIssues: [{ identifier: "ENG-123", url, title: "Retry uploads" }],
   };
   session.workspaceGitService.peekSnapshot = () => snapshot;
   await session.handleMessage({
@@ -10147,18 +10147,18 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   await session.handleMessage({ type: "fetch_workspaces_request", requestId: "pr-disconnected" });
   const disconnectedWorkspaces = filterByType(emitted, "fetch_workspaces_response").at(-1)!.payload;
   expect(
-    disconnectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearTickets,
+    disconnectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearIssues,
   ).toBeUndefined();
   issueDetails = {
     state: { name: "In Progress", type: "started", color: "#e2b53e" },
     assignee: { name: "Alex", avatarUrl: "https://example.com/alex.png" },
     project: { name: "External Queries", color: "#ee6666" },
   };
-  pullRequestTickets = [{ identifier: "ENG-123", url, title: "Retry uploads" }];
+  pullRequestIssues = [{ identifier: "ENG-123", url, title: "Retry uploads" }];
   await session.handleMessage({ type: "fetch_workspaces_request", requestId: "pr-connected" });
   const connectedWorkspaces = filterByType(emitted, "fetch_workspaces_response").at(-1)!.payload;
-  expect(connectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearTickets).toEqual([
-    { ...pullRequestTickets[0], ...issueDetails },
+  expect(connectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearIssues).toEqual([
+    { ...pullRequestIssues[0], ...issueDetails },
   ]);
   await session.handleMessage({
     type: "fetch_agent_history_request",
@@ -10167,10 +10167,10 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   });
   const prHistory = filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload.entries;
   expect(prHistory.map((entry) => entry.agent.id)).toEqual(["unrelated", "first", "archived"]);
-  expect(prHistory[1].workspaceLinearTickets).toEqual([
+  expect(prHistory[1].workspaceLinearIssues).toEqual([
     { identifier: "ENG-123", url, title: "Retry uploads", ...issueDetails },
   ]);
-  expect(records.get(workspace.workspaceId)?.linearTickets).toEqual([]);
+  expect(records.get(workspace.workspaceId)?.linearIssues).toEqual([]);
   await session.handleMessage({
     type: "fetch_agent_history_request",
     requestId: "pr-search",

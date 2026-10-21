@@ -50,7 +50,7 @@ import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
-import { mergeLinearTickets, updateLinearTickets } from "@getpaseo/protocol/linear-tickets";
+import { mergeLinearIssues, updateLinearIssues } from "@getpaseo/protocol/linear-issues";
 import { createAgentHistorySearch } from "./agent-history-search.js";
 import type { SpeechToTextProvider, TextToSpeechProvider } from "./speech/speech-provider.js";
 import type { TurnDetectionProvider } from "./speech/turn-detection-provider.js";
@@ -1781,7 +1781,7 @@ export class Session {
       }
       await this.emitWorkspaceUpdatesForWorkspaceIds([mutation.workspaceId], {
         optimisticStatus: mutation.expectsInitialAgent ? "running" : undefined,
-        forceRemoval: Boolean(mutation.workspace?.archivedAt && mutation.workspace.linearTickets),
+        forceRemoval: Boolean(mutation.workspace?.archivedAt && mutation.workspace.linearIssues),
       });
     } catch (error) {
       this.sessionLogger.warn(
@@ -3863,10 +3863,10 @@ export class Session {
     let updated: PersistedWorkspaceRecord;
     try {
       // Validate the entire change before entering the atomic update.
-      updateLinearTickets({ add, remove });
+      updateLinearIssues({ add, remove });
       const result = await this.workspaceRegistry.update(workspaceId, (workspace) => ({
         ...workspace,
-        linearTickets: updateLinearTickets({ current: workspace.linearTickets, add, remove }),
+        linearIssues: updateLinearIssues({ current: workspace.linearIssues, add, remove }),
         updatedAt: new Date().toISOString(),
       }));
       if (!result) throw new Error("Workspace not found");
@@ -3878,7 +3878,7 @@ export class Session {
           workspaceId,
           requestId,
           accepted: false,
-          linearTickets: [],
+          linearIssues: [],
           error: getErrorMessage(error),
         },
       });
@@ -3890,7 +3890,7 @@ export class Session {
         workspaceId: updated.workspaceId,
         requestId,
         accepted: true,
-        linearTickets: (await this.linearIntegration.resolve(updated.linearTickets)) ?? [],
+        linearIssues: (await this.linearIntegration.resolve(updated.linearIssues)) ?? [],
         error: null,
       },
     });
@@ -5615,7 +5615,7 @@ export class Session {
       : undefined;
     type WorkspaceContext = Pick<
       FetchAgentsResponseEntry,
-      "workspaceLinearTickets" | "workspacePullRequest"
+      "workspaceLinearIssues" | "workspacePullRequest"
     >;
     const contextByWorkspaceId = new Map<string, Promise<WorkspaceContext>>();
     const getWorkspaceContext = (workspaceId: string | undefined): Promise<WorkspaceContext> => {
@@ -5627,12 +5627,12 @@ export class Session {
             ? this.workspaceGitService.peekSnapshot(workspace.cwd)
             : undefined;
           const pullRequest = snapshot?.forge.pullRequest;
-          const pullRequestTickets = await this.linearIntegration.getPullRequestTickets(
+          const pullRequestIssues = await this.linearIntegration.getPullRequestIssues(
             pullRequest?.url,
           );
           return {
-            workspaceLinearTickets: await this.linearIntegration.resolve(
-              mergeLinearTickets(workspace?.linearTickets, pullRequestTickets),
+            workspaceLinearIssues: await this.linearIntegration.resolve(
+              mergeLinearIssues(workspace?.linearIssues, pullRequestIssues),
             ),
             workspacePullRequest: pullRequest
               ? {
@@ -5884,7 +5884,7 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
-      linearTickets: await this.linearIntegration.resolve(workspace.linearTickets),
+      linearIssues: await this.linearIntegration.resolve(workspace.linearIssues),
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       archivingAt: null,
       status: "done",
@@ -5923,12 +5923,12 @@ export class Session {
     snapshot: WorkspaceGitRuntimeSnapshot,
   ): Promise<NonNullable<WorkspaceDescriptorPayload["githubRuntime"]>> {
     const pullRequest = snapshot.forge.pullRequest;
-    const pullRequestTickets = await this.linearIntegration.getPullRequestTickets(pullRequest?.url);
-    const linearTickets = await this.linearIntegration.resolve(pullRequestTickets);
+    const pullRequestIssues = await this.linearIntegration.getPullRequestIssues(pullRequest?.url);
+    const linearIssues = await this.linearIntegration.resolve(pullRequestIssues);
     const resolvedPullRequest = pullRequest
       ? {
           ...pullRequest,
-          linearTickets: linearTickets?.length ? linearTickets : undefined,
+          linearIssues: linearIssues?.length ? linearIssues : undefined,
         }
       : pullRequest;
     return {

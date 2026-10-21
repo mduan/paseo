@@ -1,4 +1,4 @@
-import { updateLinearTickets } from "@getpaseo/protocol/linear-tickets";
+import { updateLinearIssues } from "@getpaseo/protocol/linear-issues";
 import os from "node:os";
 import path from "node:path";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
@@ -83,8 +83,8 @@ describe("workspace registries", () => {
     const addIssue = (number: number) =>
       workspaceRegistry.update("ws-issues", (workspace) => ({
         ...workspace,
-        linearTickets: updateLinearTickets({
-          current: workspace.linearTickets,
+        linearIssues: updateLinearIssues({
+          current: workspace.linearIssues,
           add: [`https://linear.app/acme/issue/ENG-${number}`],
         }),
       }));
@@ -96,7 +96,7 @@ describe("workspace registries", () => {
     );
     await reopened.initialize();
     const record = await reopened.get("ws-issues");
-    expect(record?.linearTickets?.map((ticket) => ticket.identifier)).toEqual(["ENG-1", "ENG-2"]);
+    expect(record?.linearIssues?.map((issue) => issue.identifier)).toEqual(["ENG-1", "ENG-2"]);
     expect(record?.archivedAt).toBe("2026-10-21");
     expect(record?.cwd).toBe("/same/path");
   });
