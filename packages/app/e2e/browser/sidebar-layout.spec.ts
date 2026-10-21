@@ -192,6 +192,39 @@ test("a collapsed sidebar slides over content and dismisses when the mouse leave
   }
 });
 
+test("a hover-revealed sidebar stays open while its Hosts picker is open", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-hover-hosts-" });
+  try {
+    await gotoWorkspace(page, workspace.workspaceId);
+    await waitForWorkspaceTabsVisible(page);
+    const sidebar = page.getByTestId("left-sidebar");
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.mouse.move(600, 300);
+    await expect(sidebar).toBeHidden();
+    await page.mouse.move(2, 300);
+    await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0);
+
+    const trigger = sidebar.getByTestId("sidebar-hosts-trigger");
+    const triggerBounds = await trigger.boundingBox();
+    if (!triggerBounds) throw new Error("Hosts trigger has no bounds");
+    await trigger.click();
+    const picker = page.getByTestId("combobox-desktop-container");
+    await expect(picker).toBeVisible();
+    await page.mouse.move(triggerBounds.x + 2, triggerBounds.y + 2);
+    await page.waitForTimeout(250);
+    await expect(sidebar).toBeVisible();
+    await page.getByTestId("sidebar-host-add").hover();
+    await expect(sidebar).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(picker).toBeHidden();
+    await page.mouse.move(900, 300);
+    await expect(sidebar).toBeHidden();
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
 test("settings replaces and restores the sidebar without sliding it", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "sidebar-settings-transition-" });
   try {

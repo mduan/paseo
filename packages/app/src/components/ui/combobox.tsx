@@ -59,6 +59,7 @@ import {
   type SheetHeader,
 } from "@/components/adaptive-modal-sheet";
 import { FloatingSurface } from "@/components/ui/floating";
+import { useKeepSidebarRevealed } from "@/components/sidebar/hover-context";
 import { useDismissKeyboardOnOpen } from "@/components/ui/keyboard-dismiss";
 import {
   getOverlayRoot,
@@ -1331,6 +1332,7 @@ export function Combobox({
 
   const [internalOpen, setInternalOpen] = useState(false);
   const { isControlled, isOpen } = resolveControlledOpen(open, internalOpen);
+  useKeepSidebarRevealed(isOpen);
 
   const setOpen = useCallback(
     (nextOpen: boolean) => applySetOpen(isControlled, setInternalOpen, onOpenChange, nextOpen),
