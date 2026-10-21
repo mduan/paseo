@@ -125,9 +125,8 @@ export function runDefaultSendAction(ctx: SendActionContext): void {
   ctx.handleSendMessage();
 }
 
-/** The behavior Mod+Enter runs. Queue's alternate interrupts, matching the composer's submit path. */
 export function resolveAlternateSendBehavior(defaultSendBehavior: SendBehavior): SendBehavior {
-  return defaultSendBehavior === "queue" ? "interrupt" : "queue";
+  return defaultSendBehavior === "queue" ? "steer" : "queue";
 }
 
 export function runSendBehaviorAction(behavior: SendBehavior, ctx: SendActionContext): void {

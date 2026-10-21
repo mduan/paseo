@@ -269,7 +269,7 @@ describe("composer send behavior", () => {
     expect(action.calls).toEqual(["send:interrupt", "send:steer", "queue"]);
   });
 
-  it("uses Enter to queue and Mod+Enter to submit when queue is selected", () => {
+  it("uses Enter to queue and Mod+Enter to steer when queue is selected", () => {
     const defaultAction = actions();
     runDefaultSendAction({
       defaultSendBehavior: "queue",
@@ -289,7 +289,7 @@ describe("composer send behavior", () => {
     });
 
     expect(defaultAction.calls).toEqual(["queue"]);
-    expect(alternateAction.calls).toEqual(["send:interrupt"]);
+    expect(alternateAction.calls).toEqual(["send:steer"]);
   });
 });
 
