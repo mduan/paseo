@@ -7,8 +7,9 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { LinearIssueStateType, type LinearTicket } from "@getpaseo/protocol/messages";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Theme } from "@/styles/theme";
+import { ICON_SIZE, type Theme } from "@/styles/theme";
 
+const METADATA_SIZE = ICON_SIZE.lg;
 const ThemedUser = withUnistyles(UserRound);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -42,7 +43,7 @@ export function LinearTicketMetadata({ ticket }: { ticket: LinearTicket }) {
   return (
     <View style={styles.metadata}>
       <MetadataTooltip label={state.name}>
-        <Svg width={14} height={14} viewBox="0 0 24 24">
+        <Svg width={METADATA_SIZE} height={METADATA_SIZE} viewBox="1 1 22 22">
           <Circle
             cx={12}
             cy={12}
@@ -111,15 +112,15 @@ const styles = StyleSheet.create((theme) => ({
   },
   trigger: {
     height: 22,
-    minWidth: 18,
+    minWidth: METADATA_SIZE,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   tooltip: { fontSize: theme.fontSize.sm, color: theme.colors.foreground },
   avatar: {
-    width: 18,
-    height: 18,
+    width: METADATA_SIZE,
+    height: METADATA_SIZE,
     borderRadius: theme.borderRadius.full,
     overflow: "hidden",
     alignItems: "center",
@@ -129,8 +130,8 @@ const styles = StyleSheet.create((theme) => ({
   initial: { fontSize: 10, color: theme.colors.foregroundMuted },
   photo: { position: "absolute", width: "100%", height: "100%" },
   unassigned: {
-    width: 18,
-    height: 18,
+    width: METADATA_SIZE,
+    height: METADATA_SIZE,
     borderRadius: theme.borderRadius.full,
     borderWidth: 1,
     borderStyle: "dashed",
@@ -149,7 +150,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surface2,
     paddingHorizontal: theme.spacing[1.5],
-    height: 22,
+    height: METADATA_SIZE,
     minWidth: 0,
   },
   projectName: {
