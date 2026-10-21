@@ -41,6 +41,7 @@ import { PrBadge } from "@/components/sidebar-workspace-list";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { useHoverIntent } from "@/hooks/use-hover-intent";
+import { useCopyFeedback } from "@/hooks/use-copy-feedback";
 import { CheckIndicator } from "@/components/sidebar/workspace-meta-row/check-indicator";
 import { selectCheckSummary } from "@/components/sidebar/workspace-meta-row/check-summary";
 import type { WorkspacePort } from "@getpaseo/protocol/messages";
@@ -465,7 +466,7 @@ function CopyableInfoRow({
   testID: string;
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, markCopied } = useCopyFeedback();
 
   const handlePressIn = useCallback((event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -473,11 +474,8 @@ function CopyableInfoRow({
 
   const handlePress = useCallback(() => {
     void copyToClipboard(copyValue);
-    setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-  }, [copyValue]);
+    markCopied();
+  }, [copyValue, markCopied]);
 
   const handleHoverIn = useCallback(() => setIsHovered(true), []);
   const handleHoverOut = useCallback(() => setIsHovered(false), []);
@@ -566,6 +564,7 @@ function PortsList({ ports, serverId }: { ports: readonly WorkspacePort[]; serve
 function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const { copied, markCopied } = useCopyFeedback();
   const [hovered, setHovered] = useState(false);
   const handleEnter = useCallback(() => setHovered(true), []);
   const handleLeave = useCallback(() => setHovered(false), []);
@@ -573,9 +572,9 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const address = `${host}:${port.port}`;
   const copyAddress = useCallback(() => {
     void copyToClipboard(address)
-      .then(() => toast.copied(address))
+      .then(markCopied)
       .catch(() => toast.error(t("workspace.tabs.toasts.copyFailed")));
-  }, [address, t, toast]);
+  }, [address, markCopied, t, toast]);
   const openPort = useCallback(
     () => void openExternalUrl(`http://localhost:${port.port}`),
     [port.port],
@@ -608,12 +607,16 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`${t("common.actions.copy")}: ${address}`}
+              accessibilityLabel={`${copied ? t("common.states.copied") : t("common.actions.copy")}: ${address}`}
               onPress={copyAddress}
               style={styles.portAction}
               tabIndex={hovered ? 0 : -1}
             >
-              <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />
+              {copied ? (
+                <ThemedCheck size={14} uniProps={foregroundColorMapping} />
+              ) : (
+                <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />
+              )}
             </Pressable>
             {isLocal ? (
               <Pressable
