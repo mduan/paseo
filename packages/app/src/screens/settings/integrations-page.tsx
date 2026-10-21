@@ -175,27 +175,15 @@ function LinearIntegrationCard({ client, serverId, connection, enabled }: CardPr
           </View>
         </View>
         {!editing ? (
-          <View style={styles.actions}>
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={startEditing}
-              disabled={!enabled || disconnect.isPending}
-            >
-              {connected ? t("settings.linear.replaceKey") : t("settings.linear.addKey")}
-            </Button>
-            {connected ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={handleDisconnect}
-                loading={disconnect.isPending}
-                disabled={!enabled || disconnect.isPending}
-              >
-                {t("settings.linear.disconnect")}
-              </Button>
-            ) : null}
-          </View>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={connected ? handleDisconnect : startEditing}
+            loading={disconnect.isPending}
+            disabled={!enabled || disconnect.isPending}
+          >
+            {connected ? t("settings.linear.disconnect") : t("settings.linear.addKey")}
+          </Button>
         ) : null}
       </View>
       {editing ? (
@@ -271,7 +259,6 @@ export function HostIntegrationsPage({ serverId }: { serverId: string }) {
 const styles = StyleSheet.create((theme) => ({
   header: { flexWrap: "wrap", gap: theme.spacing[3] },
   identity: { flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[2] },
   form: { padding: theme.spacing[4], gap: theme.spacing[3] },
   visibility: {
     position: "absolute",

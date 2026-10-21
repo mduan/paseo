@@ -2200,7 +2200,6 @@ export const zhCN: TranslationResources = {
       hideKey: "隐藏 API 密钥",
       notConnected: "未连接",
       connected: "已连接 · {{organization}}",
-      replaceKey: "更换密钥",
       addKey: "添加 API 密钥",
       disconnect: "断开连接",
       offline: "连接到此主机以更改其 Linear 连接。",

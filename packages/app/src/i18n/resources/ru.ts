@@ -2257,7 +2257,6 @@ export const ru: TranslationResources = {
       hideKey: "Скрыть ключ API",
       notConnected: "Не подключено",
       connected: "Подключено · {{organization}}",
-      replaceKey: "Заменить ключ",
       addKey: "Добавить ключ API",
       disconnect: "Отключить",
       offline: "Подключитесь к этому хосту, чтобы изменить подключение к Linear.",

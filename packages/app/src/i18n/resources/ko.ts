@@ -2232,7 +2232,6 @@ export const ko: TranslationResources = {
       hideKey: "API 키 숨기기",
       notConnected: "연결되지 않음",
       connected: "연결됨 · {{organization}}",
-      replaceKey: "키 교체",
       addKey: "API 키 추가",
       disconnect: "연결 해제",
       offline: "Linear 연결을 변경하려면 이 호스트에 연결하세요.",

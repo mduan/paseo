@@ -2257,7 +2257,6 @@ export const ptBR: TranslationResources = {
       hideKey: "Ocultar chave de API",
       notConnected: "Não conectado",
       connected: "Conectado · {{organization}}",
-      replaceKey: "Substituir chave",
       addKey: "Adicionar chave de API",
       disconnect: "Desconectar",
       offline: "Conecte-se a este host para alterar a conexão com o Linear.",

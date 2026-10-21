@@ -2328,7 +2328,6 @@ export const en = {
       hideKey: "Hide API key",
       notConnected: "Not connected",
       connected: "Connected · {{organization}}",
-      replaceKey: "Replace key",
       addKey: "Add API key",
       disconnect: "Disconnect",
       offline: "Connect to this host to change its Linear connection.",

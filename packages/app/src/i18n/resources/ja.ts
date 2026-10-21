@@ -2243,7 +2243,6 @@ export const ja: TranslationResources = {
       hideKey: "API キーを隠す",
       notConnected: "未接続",
       connected: "接続済み · {{organization}}",
-      replaceKey: "キーを変更",
       addKey: "API キーを追加",
       disconnect: "接続を解除",
       offline: "Linear 接続を変更するには、このホストに接続してください。",

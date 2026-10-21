@@ -2272,7 +2272,6 @@ export const es: TranslationResources = {
       hideKey: "Ocultar clave de API",
       notConnected: "Sin conectar",
       connected: "Conectado · {{organization}}",
-      replaceKey: "Reemplazar clave",
       addKey: "Añadir clave de API",
       disconnect: "Desconectar",
       offline: "Conéctate a este host para cambiar su conexión con Linear.",

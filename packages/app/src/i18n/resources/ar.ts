@@ -2222,7 +2222,6 @@ export const ar: TranslationResources = {
       hideKey: "إخفاء مفتاح API",
       notConnected: "غير متصل",
       connected: "متصل · {{organization}}",
-      replaceKey: "استبدال المفتاح",
       addKey: "إضافة مفتاح API",
       disconnect: "قطع الاتصال",
       offline: "اتصل بهذا المضيف لتغيير اتصاله بخدمة Linear.",
