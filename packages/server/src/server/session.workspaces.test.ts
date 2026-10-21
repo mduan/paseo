@@ -10057,7 +10057,8 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   ).toHaveLength(removals + 1);
   const snapshot = await session.workspaceGitService.getSnapshot(REPO_CWD);
   snapshot.forge.pullRequest = {
-    url: "https://github.com/acme/repo/pull/1",
+    url: "https://github.com/acme/repo/pull/482",
+    number: 482,
     title: "Change",
     state: "open",
     baseRefName: "main",
@@ -10077,4 +10078,35 @@ test("workspace Linear links use exact IDs and history searches workspace contex
     { identifier: "ENG-123", url, title: "Retry uploads" },
   ]);
   expect(records.get(workspace.workspaceId)?.linearTickets).toEqual([]);
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-search",
+    search: "#482",
+    page: { limit: 1 },
+  });
+  const prPage = filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload;
+  expect(prPage.entries.map((entry) => entry.agent.id)).toEqual(["unrelated"]);
+  expect(prPage.entries[0].workspacePullRequest).toMatchObject({
+    number: 482,
+    url: "https://github.com/acme/repo/pull/482",
+  });
+  expect(prPage.pageInfo.hasMore).toBe(true);
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-next",
+    search: "#482",
+    page: { limit: 1, cursor: prPage.pageInfo.nextCursor! },
+  });
+  expect(
+    filterByType(emitted, "fetch_agent_history_response")
+      .at(-1)!
+      .payload.entries.map((entry) => entry.agent.id),
+  ).toEqual(["first"]);
+  snapshot.forge.pullRequest = null;
+  await session.handleMessage({
+    type: "fetch_agent_history_request",
+    requestId: "pr-gone",
+    search: "#482",
+  });
+  expect(filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload.entries).toEqual([]);
 });

@@ -162,6 +162,34 @@ describe("fetchAgentHistoryPage", () => {
     expect(entries[0].agent).not.toHaveProperty("linearTickets");
   });
 
+  it("projects current workspace PR state into history without storing it on agent snapshots", async () => {
+    const workspacePullRequest = {
+      url: "https://github.com/acme/repo/pull/482",
+      number: 482,
+      title: "Retry uploads",
+      state: "open",
+      isMerged: false,
+      isDraft: true,
+      forge: "github",
+    };
+    const entry = {
+      ...historyEntry({ id: "pr-chat", cwd: "/repo", updatedAt: "2026-10-21T00:00:00.000Z" }),
+      workspacePullRequest,
+    };
+    const result = await fetchAgentHistoryPage({
+      client: createClient([historyPayload({ entries: [entry] })]),
+      serverId: "server",
+      cursor: null,
+    });
+    expect(result.agents[0].workspacePullRequest).toMatchObject({
+      number: 482,
+      state: "draft",
+      forge: "github",
+      url: workspacePullRequest.url,
+    });
+    expect(entry.agent).not.toHaveProperty("workspacePullRequest");
+  });
+
   it("builds the all-host query key independent of host order", () => {
     expect(allAgentHistoryQueryKey(["server-b", "server-a"])).toEqual(
       allAgentHistoryQueryKey(["server-a", "server-b"]),

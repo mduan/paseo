@@ -28,7 +28,6 @@ import {
   type AgentSnapshotPayload,
   type AgentAttachment,
   type FirstAgentContext,
-  type LinearTicket,
   type SessionInboundMessage,
   type SessionOutboundMessage,
   type GitSetupOptions,
@@ -5545,25 +5544,41 @@ export class Session {
     const matchesSearch = search
       ? createAgentHistorySearch({ query: search, options: searchOptions })
       : undefined;
-    const ticketsByWorkspaceId = new Map<string, Promise<LinearTicket[]>>();
-    const getTickets = (workspaceId: string | undefined) => {
-      if (!workspaceId) return Promise.resolve([]);
-      let tickets = ticketsByWorkspaceId.get(workspaceId);
-      if (!tickets) {
-        tickets = this.workspaceRegistry
-          .get(workspaceId)
-          .then((workspace) =>
-            mergeLinearTickets(
+    type WorkspaceContext = Pick<
+      FetchAgentsResponseEntry,
+      "workspaceLinearTickets" | "workspacePullRequest"
+    >;
+    const contextByWorkspaceId = new Map<string, Promise<WorkspaceContext>>();
+    const getWorkspaceContext = (workspaceId: string | undefined): Promise<WorkspaceContext> => {
+      if (!workspaceId) return Promise.resolve({});
+      let context = contextByWorkspaceId.get(workspaceId);
+      if (!context) {
+        context = this.workspaceRegistry.get(workspaceId).then((workspace) => {
+          const snapshot = workspace
+            ? this.workspaceGitService.peekSnapshot(workspace.cwd)
+            : undefined;
+          const pullRequest = snapshot?.forge.pullRequest;
+          return {
+            workspaceLinearTickets: mergeLinearTickets(
               workspace?.linearTickets,
-              workspace
-                ? this.workspaceGitService.peekSnapshot(workspace.cwd)?.forge.pullRequest
-                    ?.linearTickets
-                : undefined,
+              pullRequest?.linearTickets,
             ),
-          );
-        ticketsByWorkspaceId.set(workspaceId, tickets);
+            workspacePullRequest: pullRequest
+              ? {
+                  url: pullRequest.url,
+                  number: pullRequest.number,
+                  title: pullRequest.title,
+                  state: pullRequest.state,
+                  isMerged: pullRequest.isMerged,
+                  isDraft: pullRequest.isDraft,
+                  forge: snapshot?.forge.forge,
+                }
+              : null,
+          };
+        });
+        contextByWorkspaceId.set(workspaceId, context);
       }
-      return tickets;
+      return context;
     };
     const matchedEntries: FetchAgentsResponseEntry[] = [];
     const batchSize = 25;
@@ -5576,8 +5591,8 @@ export class Session {
       const batchEntries = await Promise.all(
         batch.map(async (agent) => {
           const project = await getPlacement(agent.workspaceId);
-          const workspaceLinearTickets = await getTickets(agent.workspaceId);
-          return project ? { agent, project, workspaceLinearTickets } : null;
+          const context = await getWorkspaceContext(agent.workspaceId);
+          return project ? Object.assign({ agent, project }, context) : null;
         }),
       );
       for (const entry of batchEntries) {

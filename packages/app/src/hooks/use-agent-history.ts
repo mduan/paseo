@@ -1,3 +1,4 @@
+import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { mergeLinearTickets } from "@getpaseo/protocol/linear-tickets";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { AgentHistoryFilterOptions } from "@getpaseo/protocol/messages";
@@ -40,6 +41,7 @@ export interface AgentHistoryResult {
   isLoadingMore: boolean;
   /** False when any target host predates search; the screen hides the field. */
   isSearchSupported: boolean;
+  isPullRequestSupported: boolean;
   isSearchOptionsSupported: boolean;
   isSearchPaused: boolean;
   isFilterSupported: boolean;
@@ -114,9 +116,7 @@ export async function fetchAgentHistoryPage(input: {
     serverId: input.serverId,
     entries: payload.entries,
   });
-  const workspaceTickets = new Map(
-    payload.entries.map((entry) => [entry.agent.id, entry.workspaceLinearTickets]),
-  );
+  const workspaceContexts = new Map(payload.entries.map((entry) => [entry.agent.id, entry]));
   const thinkingOptions = new Map(
     payload.entries.map(({ agent }) => [
       agent.id,
@@ -139,7 +139,11 @@ export async function fetchAgentHistoryPage(input: {
       lastActivityAt: agent.lastActivityAt,
       cwd: agent.cwd,
       workspaceId: agent.workspaceId,
-      workspaceLinearTickets: workspaceTickets.get(agent.id),
+      workspaceLinearTickets: workspaceContexts.get(agent.id)?.workspaceLinearTickets,
+      workspacePullRequest: selectPrHintFromStatus(
+        workspaceContexts.get(agent.id)?.workspacePullRequest,
+        workspaceContexts.get(agent.id)?.workspacePullRequest?.forge,
+      ),
       provider: agent.provider,
       model: agent.runtimeInfo?.model ?? agent.model,
       thinkingOptionId: thinkingOptions.get(agent.id),
@@ -305,21 +309,26 @@ export function useAgentHistory(options: {
     }),
   );
   const queryClient = useQueryClient();
-  const ticketContext = useMemo(
+  const workspaceContext = useMemo(
     () =>
       JSON.stringify(
         Object.entries(liveWorkspacesByServer).flatMap(([serverId, workspaces]) =>
           Array.from(workspaces?.values() ?? [])
             .filter(
               (workspace) =>
-                workspace.linearTickets?.length ||
-                workspace.githubRuntime?.pullRequest?.linearTickets?.length,
+                workspace.linearTickets?.length || workspace.githubRuntime?.pullRequest,
             )
             .map((workspace) => [
               serverId,
               workspace.id,
               workspace.linearTickets,
               workspace.githubRuntime?.pullRequest?.linearTickets,
+              workspace.githubRuntime?.pullRequest?.url,
+              workspace.githubRuntime?.pullRequest?.title,
+              workspace.githubRuntime?.pullRequest?.state,
+              workspace.githubRuntime?.pullRequest?.isMerged,
+              workspace.githubRuntime?.pullRequest?.isDraft,
+              workspace.forge,
             ]),
         ),
       ),
@@ -330,13 +339,13 @@ export function useAgentHistory(options: {
       void queryClient.invalidateQueries({ queryKey: agentHistoryQueryKey(serverId) });
     void queryClient.invalidateQueries({ queryKey: allAgentHistoryQueryRootKey() });
   }, [requestedServerIds, queryClient]);
-  const previousTicketContext = useRef(ticketContext);
+  const previousWorkspaceContext = useRef(workspaceContext);
   useEffect(() => {
-    if (previousTicketContext.current === ticketContext) return;
-    previousTicketContext.current = ticketContext;
+    if (previousWorkspaceContext.current === workspaceContext) return;
+    previousWorkspaceContext.current = workspaceContext;
     // Server search membership can change even when no currently displayed row matched.
     invalidateHistory();
-  }, [ticketContext, invalidateHistory]);
+  }, [workspaceContext, invalidateHistory]);
   useEffect(() => {
     if (!enabled) return;
     const releases = requestedServerIds.map((serverId) =>
@@ -377,6 +386,17 @@ export function useAgentHistory(options: {
         targetServerIds.length > 0 &&
         targetServerIds.every(
           (id) => state.sessions[id]?.serverInfo?.features?.agentHistorySearch === true,
+        ),
+      [targetServerIds],
+    ),
+  );
+  // COMPAT(agentHistoryPullRequests): added in v0.11.0-fork.27, remove gate after 2027-04-21.
+  const isPullRequestSupported = useSessionStore(
+    useCallback(
+      (state) =>
+        targetServerIds.length > 0 &&
+        targetServerIds.every(
+          (id) => state.sessions[id]?.serverInfo?.features?.agentHistoryPullRequests === true,
         ),
       [targetServerIds],
     ),
@@ -511,6 +531,10 @@ export function useAgentHistory(options: {
       const workspace = agent.workspaceId
         ? liveWorkspacesByServer[agent.serverId]?.get(agent.workspaceId)
         : undefined;
+      const pullRequest = workspace
+        ? selectPrHintFromStatus(workspace.githubRuntime?.pullRequest, workspace.forge)
+        : agent.workspacePullRequest;
+      current.workspacePullRequest = isPullRequestSupported ? pullRequest : undefined;
       if (workspace) {
         current.workspaceLinearTickets = mergeLinearTickets(
           workspace.linearTickets,
@@ -530,7 +554,13 @@ export function useAgentHistory(options: {
       return current;
     });
     return sortByLatestActivity(labelledAgents);
-  }, [data?.pages, serverLabelById, liveAgentsByServer, liveWorkspacesByServer]);
+  }, [
+    data?.pages,
+    serverLabelById,
+    liveAgentsByServer,
+    liveWorkspacesByServer,
+    isPullRequestSupported,
+  ]);
   const filterOptions = useMemo<AgentHistoryFilterOptions>(
     () => ({
       projects: data?.pages.flatMap((page) => page.filterOptions?.projects ?? []) ?? [],
@@ -555,6 +585,7 @@ export function useAgentHistory(options: {
     hasMore: hasNextPage,
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
+    isPullRequestSupported,
     isSearchOptionsSupported,
     isSearchPaused: !enabled || !canSearch,
     isFilterSupported,

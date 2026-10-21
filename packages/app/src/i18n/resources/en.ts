@@ -291,6 +291,7 @@ export const en = {
         workspaceName: "Workspace",
         workspace: "Folder",
         branch: "Branch",
+        pullRequest: "Pull request",
         linearTickets: "Linear issues",
         host: "Host",
         provider: "Provider",

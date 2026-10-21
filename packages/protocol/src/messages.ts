@@ -3836,6 +3836,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentTimelinePromptIndex: z.boolean().optional(),
         // COMPAT(agentHistorySearch): added in v0.3.0, remove gate after 2027-02-07.
         agentHistorySearch: z.boolean().optional(),
+        // COMPAT(agentHistoryPullRequests): added in v0.11.0-fork.27, remove gate after 2027-04-21.
+        agentHistoryPullRequests: z.boolean().optional(),
         agentHistorySearchOptions: z.boolean().optional(),
         chatFindOptions: z.boolean().optional(),
         agentHistoryFilters: z.boolean().optional(),
@@ -4162,42 +4164,51 @@ const WorkspaceGitRuntimePayloadSchema = z
   .optional()
   .nullable();
 
+export const WorkspacePullRequestPayloadSchema = z.object({
+  number: z.number().optional(),
+  linearTickets: z.array(LinearTicketSchema).optional(),
+  url: z.string(),
+  title: z.string(),
+  state: z.string(),
+  baseRefName: z.string(),
+  headRefName: z.string(),
+  isMerged: z.boolean(),
+  isDraft: z.boolean().optional(),
+  mergeable: z.enum(["MERGEABLE", "CONFLICTING", "UNKNOWN"]).catch("UNKNOWN").optional(),
+  checks: z
+    .array(
+      z.object({
+        name: z.string(),
+        status: z.enum(["success", "failure", "pending", "skipped", "cancelled"]),
+        url: z.string().nullable(),
+        workflow: z.string().optional(),
+        duration: z.string().optional(),
+        // Open so future forge-neutral refinements remain parse-compatible.
+        traits: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
+  checksStatus: z.enum(["none", "pending", "success", "failure"]).optional(),
+  reviewDecision: z.enum(["approved", "changes_requested", "pending"]).nullable().optional(),
+  repoOwner: z.string().optional(),
+  repoName: z.string().optional(),
+  github: z.unknown().optional(),
+});
+
+export const WorkspacePullRequestSummarySchema = WorkspacePullRequestPayloadSchema.pick({
+  url: true,
+  number: true,
+  title: true,
+  state: true,
+  isMerged: true,
+  isDraft: true,
+}).extend({ forge: z.string().optional() });
+export type WorkspacePullRequestSummary = z.infer<typeof WorkspacePullRequestSummarySchema>;
+
 export const WorkspaceGitHubRuntimePayloadSchema = z
   .object({
     featuresEnabled: z.boolean().optional(),
-    pullRequest: z
-      .object({
-        number: z.number().optional(),
-        linearTickets: z.array(LinearTicketSchema).optional(),
-        url: z.string(),
-        title: z.string(),
-        state: z.string(),
-        baseRefName: z.string(),
-        headRefName: z.string(),
-        isMerged: z.boolean(),
-        isDraft: z.boolean().optional(),
-        mergeable: z.enum(["MERGEABLE", "CONFLICTING", "UNKNOWN"]).catch("UNKNOWN").optional(),
-        checks: z
-          .array(
-            z.object({
-              name: z.string(),
-              status: z.enum(["success", "failure", "pending", "skipped", "cancelled"]),
-              url: z.string().nullable(),
-              workflow: z.string().optional(),
-              duration: z.string().optional(),
-              // Open so future forge-neutral refinements remain parse-compatible.
-              traits: z.array(z.string()).optional(),
-            }),
-          )
-          .optional(),
-        checksStatus: z.enum(["none", "pending", "success", "failure"]).optional(),
-        reviewDecision: z.enum(["approved", "changes_requested", "pending"]).nullable().optional(),
-        repoOwner: z.string().optional(),
-        repoName: z.string().optional(),
-        github: z.unknown().optional(),
-      })
-      .nullable()
-      .optional(),
+    pullRequest: WorkspacePullRequestPayloadSchema.nullable().optional(),
     error: z
       .object({
         message: z.string(),
@@ -4358,6 +4369,7 @@ const AgentDirectoryResponseEntrySchema = z.object({
   agent: AgentSnapshotPayloadSchema,
   project: ProjectPlacementPayloadSchema,
   workspaceLinearTickets: z.array(LinearTicketSchema).optional(),
+  workspacePullRequest: WorkspacePullRequestSummarySchema.nullable().optional(),
   // Legacy relevance metadata remains accepted from older daemons.
   // Current history responses use the requested chronological sort.
   searchScore: z.number().optional(),

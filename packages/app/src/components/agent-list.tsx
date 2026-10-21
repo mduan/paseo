@@ -1,3 +1,6 @@
+import { pullRequestNumberRanges } from "@getpaseo/protocol/pull-request";
+import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
 import { LinearTicketLinks } from "@/components/linear-ticket-links";
 import { LinearIcon } from "@/components/icons/linear-icon";
 import {
@@ -393,6 +396,24 @@ function SessionRowContext({
             numberOfLines={1}
             testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
           />
+        </View>
+      ) : null}
+      {fields.pullRequest && agent.workspacePullRequest ? (
+        <View
+          style={styles.metaItem}
+          testID={`agent-row-pull-request-${agent.serverId}-${agent.id}`}
+        >
+          <PullRequestStateIcon state={agent.workspacePullRequest.state} size={14} />
+          <MarkdownLinkText href={agent.workspacePullRequest.url} style={styles.sessionMetaText}>
+            <HighlightedText
+              text={String(agent.workspacePullRequest.number)}
+              ranges={pullRequestNumberRanges({
+                number: agent.workspacePullRequest.number,
+                forge: agent.workspacePullRequest.forge,
+                search,
+              })}
+            />
+          </MarkdownLinkText>
         </View>
       ) : null}
       {fields.linearTickets && agent.workspaceLinearTickets?.length ? (

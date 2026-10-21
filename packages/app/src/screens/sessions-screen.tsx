@@ -180,6 +180,7 @@ function SessionsScreenContent() {
     isLoadingMore,
     isError,
     isSearchSupported,
+    isPullRequestSupported,
     isSearchOptionsSupported,
     isSearchPaused,
     isFilterSupported,
@@ -260,7 +261,13 @@ function SessionsScreenContent() {
       onChange={setFilters}
     />
   );
-  const displayMenu = <HistoryDisplayMenu fields={fields} onToggle={toggleField} />;
+  const displayMenu = (
+    <HistoryDisplayMenu
+      fields={fields}
+      onToggle={toggleField}
+      supportsPullRequests={isPullRequestSupported}
+    />
+  );
   const searchMenu = useMemo(
     () => <HistorySearchMenu searches={recentSearches} onSelect={selectRecentSearch} />,
     [recentSearches, selectRecentSearch],

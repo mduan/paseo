@@ -10,6 +10,7 @@ export interface AggregatedAgent extends AgentDirectoryEntry {
   serverId: string;
   serverLabel: string;
   workspaceLinearTickets?: import("@getpaseo/protocol/messages").LinearTicket[];
+  workspacePullRequest?: import("@/git/pr-hint").PrHint | null;
 }
 
 export interface AggregatedAgentsResult {

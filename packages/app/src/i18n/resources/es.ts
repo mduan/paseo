@@ -300,6 +300,7 @@ export const es: TranslationResources = {
         workspaceName: "Espacio de trabajo",
         workspace: "Carpeta",
         branch: "Rama",
+        pullRequest: "Solicitud de incorporación",
         linearTickets: "Incidencias de Linear",
         host: "Host",
         provider: "Proveedor",

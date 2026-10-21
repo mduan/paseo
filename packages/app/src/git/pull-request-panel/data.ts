@@ -1,3 +1,4 @@
+import { parsePullRequestNumber } from "@getpaseo/protocol/pull-request";
 import type {
   CheckoutPrStatusResponse,
   PullRequestTimelineResponse,
@@ -302,20 +303,6 @@ function mapReviewDecision(
     return reviewDecision;
   }
   return "pending";
-}
-
-function parsePullRequestNumber(url: string): number | null {
-  try {
-    const match = new URL(url).pathname.match(/\/pull\/(\d+)(?:\/|$)/);
-    if (!match) {
-      return null;
-    }
-
-    const number = Number.parseInt(match[1], 10);
-    return Number.isFinite(number) ? number : null;
-  } catch {
-    return null;
-  }
 }
 
 export function getStateLabel(state: PrState): string {

@@ -299,6 +299,7 @@ export const ptBR: TranslationResources = {
         workspaceName: "Espaço de trabalho",
         workspace: "Pasta",
         branch: "Branch",
+        pullRequest: "Pull request",
         linearTickets: "Issues do Linear",
         host: "Host",
         provider: "Provedor",

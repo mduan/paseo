@@ -294,6 +294,7 @@ export const zhCN: TranslationResources = {
         workspaceName: "工作区",
         workspace: "文件夹",
         branch: "分支",
+        pullRequest: "拉取请求",
         linearTickets: "Linear 议题",
         host: "主机",
         provider: "提供商",
