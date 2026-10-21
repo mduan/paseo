@@ -50,6 +50,7 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   prHint: PrHint | null;
   archiveHasUncommittedChanges: boolean | null;
   archiveUnpushedCommitCount: number | null;
+  ports?: WorkspaceDescriptor["ports"];
   scripts: WorkspaceDescriptor["scripts"];
   hasRunningScripts: boolean;
 }
@@ -149,6 +150,7 @@ export function createSidebarWorkspaceEntry(input: {
   projectViewKey?: string;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
+  supportsPorts?: boolean;
 }): SidebarWorkspaceEntry {
   const projectViewKey = input.projectViewKey ?? input.workspace.projectId;
   const effectiveStatus = deriveEffectiveWorkspaceStatus(input);
@@ -179,6 +181,7 @@ export function createSidebarWorkspaceEntry(input: {
     ),
     archiveHasUncommittedChanges: input.workspace.gitRuntime?.isDirty ?? null,
     archiveUnpushedCommitCount: input.workspace.gitRuntime?.aheadOfOrigin ?? null,
+    ports: input.supportsPorts ? input.workspace.ports : undefined,
     scripts: input.workspace.scripts,
     hasRunningScripts: input.workspace.scripts.some((script) => script.lifecycle === "running"),
   };
@@ -367,6 +370,7 @@ export function buildSidebarWorkspaceEntries(input: {
   sessions: SidebarWorkspaceSession[];
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   previousEntries?: ReadonlyMap<string, SidebarWorkspaceEntry>;
+  portsFeatures?: ReadonlyMap<string, boolean>;
 }): Map<string, SidebarWorkspaceEntry> {
   if (input.placements.length === 0 || input.sessions.length === 0) {
     return new Map();
@@ -391,6 +395,7 @@ export function buildSidebarWorkspaceEntries(input: {
       projectViewKey: placement.projectViewKey,
       pendingCreateAttempts: input.pendingCreateAttempts,
       workspaceAgentActivity: session.workspaceAgentActivity,
+      supportsPorts: input.portsFeatures?.get(placement.serverId),
     });
     const previousEntry = input.previousEntries?.get(placement.workspaceKey);
     entries.set(

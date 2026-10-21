@@ -544,6 +544,9 @@ export const ptBR: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "Portas ativas ({{count}})",
+      portsAccessibility: "Portas ativas: {{ports}}",
+      openInBrowser: "Abrir no navegador",
       scriptsAccessibility: "Scripts do workspace",
       copyPath: "Copiar caminho",
       copyBranchName: "Copiar nome da branch",
@@ -1240,6 +1243,7 @@ export const ptBR: TranslationResources = {
         branch: "Nome da branch",
       },
       show: {
+        ports: "Portas ativas",
         label: "Mostrar",
         branch: "Branch",
         project: "Projeto",

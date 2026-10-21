@@ -2,7 +2,7 @@ import React, { useMemo, type ReactNode } from "react";
 import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-export type StatusBadgeVariant = "success" | "warning" | "error" | "muted";
+export type StatusBadgeVariant = "success" | "warning" | "error" | "muted" | "merged";
 
 interface StatusBadgeProps {
   label: string;
@@ -37,6 +37,7 @@ export function StatusBadge({
       variant === "success" && styles.pillTextSuccess,
       variant === "warning" && styles.pillTextWarning,
       variant === "error" && styles.pillTextError,
+      variant === "merged" && styles.pillTextMerged,
     ],
     [variant],
   );
@@ -87,6 +88,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   pillTextWarning: {
     color: theme.colors.statusWarning,
+  },
+  pillTextMerged: {
+    color: theme.colors.statusMerged,
   },
   pillTextError: {
     color: theme.colors.statusDanger,

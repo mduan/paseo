@@ -544,6 +544,9 @@ export const ru: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "Активные порты ({{count}})",
+      portsAccessibility: "Активные порты: {{ports}}",
+      openInBrowser: "Открыть в браузере",
       scriptsAccessibility: "Скрипты рабочего пространства",
       copyPath: "Копировать путь",
       copyBranchName: "Копировать имя ветки",
@@ -1231,6 +1234,7 @@ export const ru: TranslationResources = {
         branch: "Имя ветки",
       },
       show: {
+        ports: "Активные порты",
         label: "Показывать",
         branch: "Ветка",
         project: "Проект",

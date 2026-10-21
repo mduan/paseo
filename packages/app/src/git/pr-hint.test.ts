@@ -15,6 +15,16 @@ const gitlabStatus = {
 };
 
 describe("selectPrHintFromStatus", () => {
+  it("keeps draft separate from open without overriding merged or closed", () => {
+    expect(selectPrHintFromStatus({ ...githubStatus, isDraft: true })?.state).toBe("draft");
+    expect(selectPrHintFromStatus({ ...githubStatus, isDraft: false })?.state).toBe("open");
+    expect(selectPrHintFromStatus({ ...githubStatus, isDraft: true, isMerged: true })?.state).toBe(
+      "merged",
+    );
+    expect(selectPrHintFromStatus({ ...githubStatus, isDraft: true, state: "closed" })?.state).toBe(
+      "closed",
+    );
+  });
   it("defaults the forge to github when none is supplied (old daemon)", () => {
     const hint = selectPrHintFromStatus(githubStatus);
     expect(hint).toMatchObject({ number: 42, forge: "github" });

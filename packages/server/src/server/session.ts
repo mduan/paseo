@@ -1,3 +1,4 @@
+import type { WorkspacePortsService } from "./workspace-ports/service.js";
 import type { ConnectionHistoryStore } from "./connection-history/store.js";
 import { createConversationTitleGenerator } from "./agent/conversation-title.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
@@ -501,6 +502,7 @@ export interface SessionOptions {
   // defaults to the real checkout-git implementation.
   renameCurrentBranch?: typeof renameCurrentBranchDefault;
   workspaceGitService: WorkspaceGitService;
+  workspacePorts?: WorkspacePortsService;
   workspaceAutoName: WorkspaceAutoName;
   daemonConfigStore: DaemonConfigStore;
   pluginRuntime?: {
@@ -758,6 +760,7 @@ export class Session {
   private readonly github: ForgeService;
   private readonly renameCurrentBranch: typeof renameCurrentBranchDefault;
   private readonly workspaceGitService: WorkspaceGitService;
+  private readonly workspacePorts?: WorkspacePortsService;
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly gitMutation: GitMutationService;
   private readonly workspaceProvisioning: WorkspaceProvisioningService;
@@ -859,6 +862,7 @@ export class Session {
       github,
       renameCurrentBranch,
       workspaceGitService,
+      workspacePorts,
       workspaceAutoName,
       daemonConfigStore,
       pluginRuntime,
@@ -931,6 +935,7 @@ export class Session {
     this.github = github ?? createGitHubService();
     this.renameCurrentBranch = renameCurrentBranch ?? renameCurrentBranchDefault;
     this.workspaceGitService = workspaceGitService;
+    this.workspacePorts = workspacePorts;
     this.gitMutation = createGitMutationService({
       workspaceGitService: this.workspaceGitService,
       logger: this.sessionLogger,
@@ -5724,6 +5729,7 @@ export class Session {
       statusEnteredAt: null,
       activityAt: null,
       diffStat,
+      ports: this.workspacePorts?.getPorts(workspace.workspaceId),
       scripts: this.buildWorkspaceScriptPayloadSnapshot(workspace, resolvedProjectRecord),
       ...(resolvedProjectRecord
         ? {

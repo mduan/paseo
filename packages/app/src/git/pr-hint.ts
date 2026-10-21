@@ -1,16 +1,17 @@
+/* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import { normalizeForge, type Forge } from "@/git/forge";
 import type { PresentableCheck } from "@/git/check-presentation";
 
-export interface PrHint {
+export type PrHint = {
   url: string;
   number: number;
-  state: "open" | "merged" | "closed";
+  state: "open" | "merged" | "closed" | "draft";
   /** Forge backing this change request, so badges render the right brand mark. */
   forge: Forge;
   checks?: PrHintCheck[];
   checksStatus?: "none" | "pending" | "success" | "failure";
   reviewDecision?: "approved" | "changes_requested" | "pending" | null;
-}
+};
 
 export interface PrHintCheck extends PresentableCheck {
   name: string;
@@ -21,6 +22,7 @@ interface PrStatusLike {
   url: string;
   state: string;
   isMerged: boolean;
+  isDraft?: boolean;
   checks?: PrHintCheck[];
   checksStatus?: string;
   reviewDecision?: string | null;
@@ -57,8 +59,9 @@ export function selectPrHintFromStatus(
     return null;
   }
 
-  let state: "merged" | "open" | "closed";
+  let state: PrHint["state"];
   if (status.isMerged || status.state === "merged") state = "merged";
+  else if (status.state === "open" && status.isDraft) state = "draft";
   else if (status.state === "open") state = "open";
   else state = "closed";
 

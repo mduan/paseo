@@ -538,6 +538,9 @@ export const ar: TranslationResources = {
       },
     },
     hoverCard: {
+      livePorts: "المنافذ النشطة ({{count}})",
+      portsAccessibility: "المنافذ النشطة: {{ports}}",
+      openInBrowser: "فتح في المتصفح",
       scriptsAccessibility: "البرامج النصية Workspace",
       copyPath: "نسخ المسار",
       copyBranchName: "نسخ اسم الفرع",
@@ -1213,6 +1216,7 @@ export const ar: TranslationResources = {
         branch: "اسم الفرع",
       },
       show: {
+        ports: "المنافذ النشطة",
         label: "إظهار",
         branch: "الفرع",
         project: "المشروع",

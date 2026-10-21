@@ -51,6 +51,21 @@ function workspaceWithForge(forge: string | undefined, prUrl: string): Workspace
 }
 
 describe("createSidebarWorkspaceEntry forge threading", () => {
+  it("exposes pushed ports only when the host supports workspace ports", () => {
+    const descriptor = workspaceWithForge("github", "https://github.com/acme/repo/pull/42");
+    descriptor.ports = [{ workspaceId: descriptor.id, host: "127.0.0.1", port: 3000 }];
+    expect(
+      createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor }).ports,
+    ).toBeUndefined();
+    expect(
+      createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor, supportsPorts: false })
+        .ports,
+    ).toBeUndefined();
+    expect(
+      createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor, supportsPorts: true })
+        .ports,
+    ).toBe(descriptor.ports);
+  });
   it("threads a gitlab summary forge onto the prHint", () => {
     const entry = createSidebarWorkspaceEntry({
       serverId: "srv",
