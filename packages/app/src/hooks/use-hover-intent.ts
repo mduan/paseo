@@ -18,7 +18,7 @@ export function useHoverIntent() {
     closeTimer.current = setTimeout(() => {
       closeTimer.current = undefined;
       setOpen(false);
-    }, 500);
+    }, 300);
   }, []);
   return { open, openNow, scheduleClose, cancelClose };
 }

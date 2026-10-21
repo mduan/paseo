@@ -100,10 +100,10 @@ async function expectHoverPanelCloseDelay({
   const bounds = await otherRow.boundingBox();
   if (!bounds) throw new Error("Host row has no bounds");
 
-  for (let step = 0; step < 5; step++) {
+  for (let step = 0; step < 3; step++) {
     await page.mouse.move(bounds.x + step + 1, bounds.y + bounds.height / 2);
     await page.clock.runFor(100);
-    await expect(panel).toHaveCount(step < 4 ? 1 : 0);
+    await expect(panel).toHaveCount(step < 2 ? 1 : 0);
   }
 
   await source.hover();
@@ -120,7 +120,7 @@ async function expectHoverPanelCloseDelay({
   await expect(panel).toBeVisible();
 
   await otherRow.hover();
-  await page.clock.runFor(500);
+  await page.clock.runFor(300);
   await expect(panel).toHaveCount(0);
   await page.clock.resume();
 }
