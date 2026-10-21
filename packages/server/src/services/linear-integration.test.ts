@@ -172,3 +172,186 @@ test.each([401, 429, 503])(
     });
   },
 );
+
+const pullRequestUrl = "https://github.com/acme/repo/pull/482";
+
+test("PR issues require a Linear connection", async () => {
+  let calls = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async () => {
+      calls += 1;
+      return connectionResponse();
+    },
+  });
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestTickets()).toEqual([]);
+  expect(calls).toBe(0);
+});
+
+test("loads all PR-linked issues with titles and caches concurrent lookups", async () => {
+  let now = 0;
+  const lookups: unknown[] = [];
+  const second = {
+    identifier: "ENG-124",
+    url: "https://linear.app/acme/issue/ENG-124",
+    title: "Cancel uploads",
+  };
+  const titled = { ...ticket, title: "Retry uploads" };
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    now: () => now,
+    request: async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (!body.variables) return connectionResponse();
+      expect(body.query).toContain("includeArchived: true");
+      expect(new Headers(init?.headers).get("Authorization")).toBe("key");
+      lookups.push(body.variables);
+      const nextPage = body.variables.after === "next";
+      return Response.json({
+        data: {
+          attachmentsForURL: {
+            nodes: nextPage
+              ? [{ issue: titled }, { issue: second }]
+              : [{ issue: { ...titled, url: `${url}/retry-uploads` } }],
+            pageInfo: { hasNextPage: !nextPage, endCursor: nextPage ? null : "next" },
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("key");
+  expect(
+    await Promise.all([
+      service.getPullRequestTickets(pullRequestUrl),
+      service.getPullRequestTickets(pullRequestUrl),
+    ]),
+  ).toEqual([
+    [titled, second],
+    [titled, second],
+  ]);
+  expect(lookups).toEqual([{ url: pullRequestUrl }, { url: pullRequestUrl, after: "next" }]);
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([titled, second]);
+  expect(lookups).toHaveLength(2);
+  now = 300_001;
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([titled, second]);
+  expect(lookups).toHaveLength(4);
+});
+
+test("PR lookup failures hide issues and retry after the failure cache expires", async () => {
+  let now = 0;
+  let lookups = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    now: () => now,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      lookups += 1;
+      if (lookups === 1) return Response.json({ errors: [{ message: "unavailable" }] });
+      return Response.json({
+        data: {
+          attachmentsForURL: {
+            nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("key");
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(lookups).toBe(1);
+  now = 60_001;
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
+    { ...ticket, title: "Retry uploads" },
+  ]);
+  expect(lookups).toBe(2);
+});
+
+test("PR issues follow key replacement and disappear on disconnect", async () => {
+  let lookups = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      lookups += 1;
+      const title = new Headers(init?.headers).get("Authorization");
+      return Response.json({
+        data: {
+          attachmentsForURL: {
+            nodes: [{ issue: { ...ticket, title } }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("first");
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
+    { ...ticket, title: "first" },
+  ]);
+  await service.setKey("second");
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([
+    { ...ticket, title: "second" },
+  ]);
+  await service.disconnect();
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(lookups).toBe(2);
+});
+
+test("disconnect discards PR issues from an in-flight lookup", async () => {
+  const response = Promise.withResolvers<Response>();
+  const started = Promise.withResolvers<void>();
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      started.resolve();
+      return response.promise;
+    },
+  });
+  await service.setKey("key");
+  const lookup = service.getPullRequestTickets(pullRequestUrl);
+  await started.promise;
+  await service.disconnect();
+  response.resolve(
+    Response.json({
+      data: {
+        attachmentsForURL: {
+          nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    }),
+  );
+  expect(await lookup).toEqual([]);
+});
+
+test("incomplete PR attachment pagination never returns partial issues", async () => {
+  let lookups = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async (_url, init) => {
+      if (!JSON.parse(String(init?.body)).variables) return connectionResponse();
+      lookups += 1;
+      return Response.json({
+        data: {
+          attachmentsForURL: {
+            nodes: [{ issue: { ...ticket, title: "Retry uploads" } }],
+            pageInfo: { hasNextPage: true, endCursor: "stuck" },
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("key");
+  expect(await service.getPullRequestTickets(pullRequestUrl)).toEqual([]);
+  expect(lookups).toBe(2);
+});

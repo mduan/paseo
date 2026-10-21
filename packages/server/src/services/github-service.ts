@@ -1,7 +1,5 @@
 /* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import { z } from "zod";
-import type { LinearTicket } from "@getpaseo/protocol/messages";
-import { extractLinearTickets } from "./linear-linkback.js";
 import {
   isGitHubHost,
   parseGitHubRemoteUrl,
@@ -306,30 +304,6 @@ const GitHubAutoMergeRequestSchema = z
   .optional()
   .catch(null);
 
-const LinearLinkbackCommentsSchema = z.object({
-  nodes: z.array(
-    z.object({
-      body: z.string(),
-      author: z.object({ login: z.string().optional() }).nullable().optional(),
-    }),
-  ),
-  pageInfo: z.object({
-    hasNextPage: z.boolean(),
-    endCursor: z.string().nullable(),
-  }),
-});
-
-type LinearLinkbackComments = z.infer<typeof LinearLinkbackCommentsSchema>;
-type GitHubStatusDetails = {
-  facts: GitHubPullRequestStatusFacts;
-  linearTickets: LinearTicket[];
-};
-
-const LINEAR_LINKBACK_COMMENTS_FIELDS = `
-  nodes { body author { login } }
-  pageInfo { hasNextPage endCursor }
-`;
-
 const GitHubPullRequestFactsGraphqlSchema = z.object({
   data: z.object({
     repository: z
@@ -341,7 +315,6 @@ const GitHubPullRequestFactsGraphqlSchema = z.object({
         viewerDefaultMergeMethod: z.string().nullable().optional().catch(null),
         pullRequest: z
           .object({
-            comments: LinearLinkbackCommentsSchema.optional(),
             mergeStateStatus: z.string().nullable().optional().catch(null),
             autoMergeRequest: GitHubAutoMergeRequestSchema,
             viewerCanEnableAutoMerge: z.boolean().optional().catch(false),
@@ -560,7 +533,6 @@ query PullRequestStatusFacts($owner: String!, $name: String!, $number: Int!) {
     rebaseMergeAllowed
     viewerDefaultMergeMethod
     pullRequest(number: $number) {
-      comments(first: 10) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
       mergeStateStatus
       autoMergeRequest {
         enabledAt
@@ -657,7 +629,6 @@ query PullRequestTimeline($owner: String!, $name: String!, $number: Int!) {
 }`;
 
 const BatchPollPrNodeSchema = z.object({
-  comments: LinearLinkbackCommentsSchema.optional(),
   number: z.number(),
   url: z.string().catch(""),
   title: z.string().catch(""),
@@ -762,7 +733,6 @@ type BatchPollRepository = z.infer<typeof BatchPollRepositorySchema>;
 
 const BATCH_PR_STATUS_FRAGMENT = `
 fragment PaseoPollPullRequest on PullRequest {
-  comments(first: 10) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
   number
   url
   title
@@ -1976,24 +1946,9 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         toBatchCurrentPullRequestItem(node, input.rollup ?? undefined),
         entry.target.headRef,
       );
-      let linearTickets: LinearTicket[];
-      try {
-        linearTickets = await loadLinearLinkbackTickets({
-          cwd: entry.target.cwd,
-          owner: entry.owner,
-          name: entry.name,
-          number: node.number,
-          comments: node.comments,
-          run,
-        });
-      } catch (error) {
-        updatePollTargetAfterError(entry.target, error);
-        return;
-      }
       status = built
         ? {
             ...built,
-            ...(linearTickets.length ? { linearTickets } : {}),
             forgeSpecific: { forge: "github", ...facts },
           }
         : null;
@@ -3145,20 +3100,19 @@ async function addCurrentPullRequestGithubFacts(options: {
     return status;
   }
 
-  const details = await loadPullRequestGithubFacts({
+  const facts = await loadPullRequestGithubFacts({
     cwd: options.cwd,
     owner: status.repoOwner,
     name: status.repoName,
     number: status.number,
     run: options.run,
   });
-  if (!details) {
+  if (!facts) {
     return status;
   }
   return {
     ...status,
-    ...(details.linearTickets.length ? { linearTickets: details.linearTickets } : {}),
-    forgeSpecific: { forge: "github", ...details.facts },
+    forgeSpecific: { forge: "github", ...facts },
   };
 }
 
@@ -3168,7 +3122,7 @@ async function loadPullRequestGithubFacts(options: {
   name: string;
   number: number;
   run: (args: string[], options: GitHubCommandRunnerOptions) => Promise<string>;
-}): Promise<GitHubStatusDetails | null> {
+}): Promise<GitHubPullRequestStatusFacts | null> {
   const args = [
     "api",
     "graphql",
@@ -3188,69 +3142,13 @@ async function loadPullRequestGithubFacts(options: {
       cwd: options.cwd,
       emptyFallback: "{}",
     });
-    const facts = parsePullRequestGithubFacts(response);
-    if (!facts) return null;
-    const linearTickets = await loadLinearLinkbackTickets({
-      ...options,
-      comments: response.data.repository?.pullRequest?.comments,
-    });
-    return { facts, linearTickets };
+    return parsePullRequestGithubFacts(response);
   } catch (error) {
     if (error instanceof GitHubCommandError) {
       return null;
     }
     throw error;
   }
-}
-
-async function loadLinearLinkbackTickets(options: {
-  cwd: string;
-  owner: string;
-  name: string;
-  number: number;
-  comments?: LinearLinkbackComments;
-  run: (args: string[], options: GitHubCommandRunnerOptions) => Promise<string>;
-}): Promise<LinearTicket[]> {
-  let page = options.comments;
-  const comments = [...(page?.nodes ?? [])];
-  while (page?.pageInfo.hasNextPage) {
-    const cursor = page.pageInfo.endCursor;
-    if (!cursor) throw new Error("GitHub comment pagination is missing its cursor");
-    const query = `query LinearLinkbackComments($owner: String!, $name: String!, $number: Int!, $cursor: String!) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) {
-          comments(first: 100, after: $cursor) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
-        }
-      }
-    }`;
-    const args = [
-      "api",
-      "graphql",
-      "-f",
-      `query=${query}`,
-      "-F",
-      `owner=${options.owner}`,
-      "-F",
-      `name=${options.name}`,
-      "-F",
-      `number=${options.number}`,
-      "-f",
-      `cursor=${cursor}`,
-    ];
-    const stdout = await options.run(args, { cwd: options.cwd });
-    const response = parseGitHubJsonOutput(stdout, GitHubPullRequestFactsGraphqlSchema, {
-      args,
-      cwd: options.cwd,
-      emptyFallback: "{}",
-    });
-    const nextPage = response.data.repository?.pullRequest?.comments;
-    if (!nextPage || nextPage.pageInfo.endCursor === cursor) {
-      throw new Error("GitHub comment pagination did not advance");
-    }
-    page = nextPage;
-    comments.push(...page.nodes);
-  }
-  return extractLinearTickets(comments);
 }
 
 async function tryCurrentPullRequestView(options: {
