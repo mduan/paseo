@@ -10,15 +10,13 @@ import {
   expectMobileAgentSidebarVisible,
   openMobileAgentSidebar,
   pinWorkspaceFromSidebar,
+  collapseWorkspaceSessions,
 } from "../support/helpers/sidebar";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { expectWorkspaceHeader } from "../support/helpers/workspace-ui";
 import { getServerId } from "../support/helpers/server-id";
 import { getE2EDaemonPort } from "../support/helpers/daemon-port";
-import {
-  projectEquivalenceViewKey,
-  projectPlacementViewKey,
-} from "../support/helpers/project-view-key";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 import { escapeRegex } from "../support/helpers/regex";
 import { openFilesPanel } from "../support/helpers/workspace-tabs";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
@@ -672,6 +670,7 @@ test.describe("Sidebar workspace list", () => {
       await gotoAppShell(page);
 
       const row = await waitForSidebarWorkspace(page, workspace.workspaceId);
+      await collapseWorkspaceSessions(page, workspace.workspaceId);
       await expect(row.getByTestId("workspace-status-indicator-done")).toBeVisible();
       await (await openWorkspaceReadAction(page, workspace.workspaceId, "unread")).click();
       await openWorkspaceReadAction(page, workspace.workspaceId, "read");
@@ -756,9 +755,7 @@ test.describe("Half-screen desktop layout", () => {
       }
 
       await gotoAppShell(page);
-      await page
-        .getByTestId(`sidebar-project-show-more-${projectEquivalenceViewKey(workspace.projectKey)}`)
-        .click();
+      await page.getByTestId(`sidebar-project-show-more-${workspace.projectViewKey}`).click();
       await waitForSidebarWorkspace(page, lastWorkspaceId);
 
       const sidebarScroll = page.getByTestId("sidebar-project-workspace-list-scroll");
@@ -768,10 +765,15 @@ test.describe("Half-screen desktop layout", () => {
       });
       expect(scrollTop).toBe(160);
 
-      await page.getByTestId("menu-button").click();
+      const sidebarToggle = page.getByTestId("composer-dock-header").getByTestId("menu-button");
+      await sidebarToggle.click();
       await expect(page.getByTestId("sidebar-global-new-workspace")).not.toBeVisible();
 
-      await page.getByTestId("menu-button").click();
+      await page.mouse.move(600, 300);
+      await page.mouse.move(2, 300);
+      const sidebar = page.getByTestId("left-sidebar");
+      await expect(sidebar).toBeVisible();
+      await sidebar.getByTestId("menu-button").click();
       await expect(page.getByTestId("sidebar-global-new-workspace")).toBeVisible();
       await expect(sidebarScroll).toHaveJSProperty("scrollTop", scrollTop);
     } finally {

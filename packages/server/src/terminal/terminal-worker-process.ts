@@ -254,6 +254,12 @@ async function handleRequest(message: TerminalWorkerRequest): Promise<void> {
       return;
     }
 
+    case "setTitle": {
+      manager.setTerminalTitle(message.terminalId, message.title);
+      sendToParent({ type: "response", requestId: message.requestId, ok: true });
+      return;
+    }
+
     case "setActivity": {
       await manager.setTerminalActivity(message.terminalId, message.state);
       sendToParent({ type: "response", requestId: message.requestId, ok: true });

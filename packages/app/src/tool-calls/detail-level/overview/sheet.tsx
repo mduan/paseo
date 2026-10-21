@@ -6,6 +6,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { useIsolatedBottomSheetVisibility } from "@/components/ui/isolated-bottom-sheet-modal";
 import { ToolCallSheetModal, useToolCallSheetContextBridge } from "@/components/tool-call-sheet";
+import { BottomSheetVisibleContent } from "@/components/adaptive-modal-sheet";
 import type { Theme } from "@/styles/theme";
 
 interface OverviewToolCallGroupSheetProps {
@@ -16,6 +17,7 @@ interface OverviewToolCallGroupSheetProps {
 }
 
 const SNAP_POINTS = ["60%", "95%"];
+const SCROLL_STYLE = { flex: 1, minHeight: 0 };
 const ThemedWrench = withUnistyles(Wrench);
 const ThemedX = withUnistyles(X);
 const foregroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
@@ -58,32 +60,38 @@ export function OverviewToolCallGroupSheet({
       backdropOpacity={0.5}
       enablePanDownToClose
     >
-      <View style={styles.container} testID="tool-call-group-sheet">
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <ThemedWrench size={20} uniProps={foregroundMapping} />
-            <Text
-              style={styles.headerTitle}
-              numberOfLines={2}
-              testID="tool-call-group-sheet-summary"
+      <BottomSheetVisibleContent>
+        <View style={styles.container} testID="tool-call-group-sheet">
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <ThemedWrench size={20} uniProps={foregroundMapping} />
+              <Text
+                style={styles.headerTitle}
+                numberOfLines={2}
+                testID="tool-call-group-sheet-summary"
+              >
+                {summary}
+              </Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.actions.close")}
+              testID="tool-call-group-sheet-close"
             >
-              {summary}
-            </Text>
+              <ThemedX size={20} uniProps={foregroundMutedMapping} />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={onClose}
-            style={styles.closeButton}
-            accessibilityRole="button"
-            accessibilityLabel={t("common.actions.close")}
-            testID="tool-call-group-sheet-close"
+          <BottomSheetScrollView
+            ref={scrollRef}
+            style={SCROLL_STYLE}
+            onContentSizeChange={scrollToLatest}
           >
-            <ThemedX size={20} uniProps={foregroundMutedMapping} />
-          </Pressable>
+            <View style={styles.contentContainer}>{children}</View>
+          </BottomSheetScrollView>
         </View>
-        <BottomSheetScrollView ref={scrollRef} style={styles.content}>
-          <View style={styles.contentContainer}>{children}</View>
-        </BottomSheetScrollView>
-      </View>
+      </BottomSheetVisibleContent>
     </ToolCallSheetModal>
   );
 }
@@ -116,11 +124,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   closeButton: {
     padding: theme.spacing[2],
-  },
-  content: {
-    flex: 1,
-    minHeight: 0,
-    backgroundColor: theme.colors.surface2,
   },
   contentContainer: {
     paddingHorizontal: 13,

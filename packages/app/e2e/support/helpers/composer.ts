@@ -68,6 +68,7 @@ export async function typeIntoFocusedComposer(page: Page, text: string): Promise
 }
 
 export async function sendDraftToQueue(page: Page): Promise<void> {
+  await expect(page.getByTestId("message-input-send-behavior-menu-trigger")).toBeEnabled();
   await composerInput(page).press("Control+Enter");
 }
 

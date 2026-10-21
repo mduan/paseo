@@ -2341,6 +2341,8 @@ async function readSelectionPaintSamples(
     const scaleX = canvas.width / canvasBounds.width;
     const scaleY = canvas.height / canvasBounds.height;
     const context = canvas.getContext("2d")!;
+    const fontSize = Number.parseFloat(getComputedStyle(canvas).fontSize);
+    const sampleTop = bodyBounds.top + Math.round(fontSize * 1.5) / 2;
     const sample = (left: number, top: number, width: number, height: number) =>
       Array.from(
         context.getImageData(
@@ -2353,9 +2355,9 @@ async function readSelectionPaintSamples(
     const columnLeft =
       selectedSide === "right" ? bodyBounds.left + bodyBounds.width / 2 : bodyBounds.left;
     return {
-      gutter: sample(columnLeft + 2, bodyBounds.top + 24, 8, 8),
-      code: sample(columnLeft + 80, bodyBounds.top + 24, 80, 10),
-      opposite: sample(bodyBounds.left + 80, bodyBounds.top + 24, 80, 10),
+      gutter: sample(columnLeft + 2, sampleTop, 8, 8),
+      code: sample(columnLeft + 80, sampleTop, 80, 10),
+      opposite: sample(bodyBounds.left + 80, sampleTop, 80, 10),
     };
   }, side);
 }

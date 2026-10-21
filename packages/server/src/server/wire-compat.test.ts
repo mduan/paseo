@@ -356,6 +356,7 @@ describe("wire compatibility", () => {
             projectCustomName: "Favorite project",
             projectCustomIconRevision: null,
             projectIconRevision: "automatic:none:v1",
+            projectIconColor: null,
             projectRootPath: "/tmp/project",
             projectKind: "git",
           },

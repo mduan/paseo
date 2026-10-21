@@ -369,6 +369,11 @@ export function createWorkerTerminalManager(
           return;
         }
         record.info = { ...record.info, title: manualTitle };
+        sendBestEffortRequest({
+          type: "setTitle",
+          terminalId: record.info.id,
+          title: manualTitle,
+        });
         for (const listener of Array.from(record.titleChangeListeners)) {
           listener(manualTitle);
         }

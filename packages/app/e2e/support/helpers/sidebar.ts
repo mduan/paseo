@@ -6,6 +6,15 @@ interface ContextMenuAnchor {
   y: number;
 }
 
+export async function collapseWorkspaceSessions(page: Page, workspaceId: string): Promise<void> {
+  const row = page.getByTestId(`sidebar-workspace-row-${getServerId()}:${workspaceId}`);
+  const toggle = row.getByTestId("sidebar-workspace-expand-chevron");
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-label")) === "Hide sessions") await toggle.click();
+  await expect(toggle).toHaveAccessibleName("Show sessions");
+  await page.mouse.move(1, 1);
+}
+
 async function openContextMenuAtRowPoint(
   page: Page,
   rowTestID: string,
@@ -78,7 +87,7 @@ export async function expectWorkspaceContextMenuActions(
   const workspaceKey = `${getServerId()}:${workspaceId}`;
   const menu = page.getByTestId(`sidebar-workspace-context-menu-${workspaceKey}`);
   await expect(menu.getByRole("menuitem", { name: "Copy path" })).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Rename workspace" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Rename workspace", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Archive" })).toBeVisible();
 }
 

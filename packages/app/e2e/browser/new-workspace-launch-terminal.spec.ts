@@ -65,7 +65,7 @@ test.describe("New workspace: launching a terminal", () => {
 
     await test.step("pick a profile that takes a prompt, type one, and submit", async () => {
       await openNewWorkspaceComposer(page, {
-        projectKey: workspace.projectKey,
+        projectViewKey: workspace.projectViewKey,
         projectDisplayName: workspace.projectDisplayName,
       });
       await selectLaunchOption(page, PROMPT_PROFILE.id);
@@ -82,7 +82,7 @@ test.describe("New workspace: launching a terminal", () => {
 
     await test.step("a profile without the sentinel is read-only and shows the resolved command", async () => {
       await openNewWorkspaceComposer(page, {
-        projectKey: workspace.projectKey,
+        projectViewKey: workspace.projectViewKey,
         projectDisplayName: workspace.projectDisplayName,
       });
       await selectLaunchOption(page, BARE_PROFILE.id);

@@ -101,7 +101,7 @@ test("reloading a timeline anchors near-tail assistant image growth", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  const image = await createSmallAssistantPng(workspace, {
+  const image = await createNearTenMegabyteAssistantPng(workspace, {
     alt: "Reload geometry image",
     fileName: "reload-geometry-image.png",
   });

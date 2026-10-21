@@ -59,7 +59,7 @@ test.describe("New workspace isolation memory", () => {
 
       // First visit: the screen opens on Local, switch it to New worktree and create.
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await expectWorkspaceIsolationSelected(page, "local");
@@ -89,7 +89,7 @@ test.describe("New workspace isolation memory", () => {
 
       // Second visit (fresh mount of /new): the worktree choice must stick.
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await expectWorkspaceIsolationSelected(page, "worktree");

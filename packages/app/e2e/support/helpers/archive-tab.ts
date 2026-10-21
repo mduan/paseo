@@ -31,7 +31,7 @@ function buildSeededStoragePayload() {
 }
 
 /**
- * The slice of a daemon client `createIdleAgent` needs: spawn an agent and await
+ * The slice of a daemon client `createMockIdleAgent` needs: spawn an agent and await
  * its idle upsert. The shared seed client satisfies it, so a spec can seed an
  * idle agent from the same client it uses for everything else.
  */
@@ -82,21 +82,6 @@ async function seedIdleAgent(
     cwd: input.cwd,
     workspaceId: input.workspaceId,
   };
-}
-
-export async function createIdleAgent(
-  client: IdleAgentSeedClient,
-  input: { cwd: string; workspaceId: string; title: string },
-): Promise<ArchiveTabAgent> {
-  return seedIdleAgent(client, input, {
-    provider: "opencode",
-    model: "opencode/gpt-5-nano",
-    // OpenCode has no "bypassPermissions" mode (that's Claude's). Use build with
-    // auto_accept for unattended full access — mode validation now rejects modes
-    // the provider doesn't define.
-    modeId: "build",
-    featureValues: { auto_accept: true },
-  });
 }
 
 export async function createMockIdleAgent(

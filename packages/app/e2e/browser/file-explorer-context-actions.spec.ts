@@ -171,8 +171,7 @@ test("creates, renames, copies, and deletes entries through the file explorer", 
   await nameInput.press("Enter");
   await expect(entry("deep")).toBeVisible();
 
-  await entry("folder").click({ button: "right" });
-  await page.getByText("Collapse folder", { exact: true }).click();
+  await entry("folder").click();
   await expect(entry("child.txt")).toBeHidden();
   await expect(entry("nested")).toBeHidden();
   await expect(entry("deep")).toBeHidden();
@@ -180,9 +179,9 @@ test("creates, renames, copies, and deletes entries through the file explorer", 
   await entry("folder").click();
   await expect(entry("child.txt")).toBeVisible();
   await expect(entry("nested")).toBeVisible();
-  await expect(entry("deep")).toBeHidden();
-  await entry("nested").click();
   await expect(entry("deep")).toBeVisible();
+  await entry("nested").click();
+  await expect(entry("deep")).toBeHidden();
 
   await page.getByTestId("files-new-file").click();
   await nameInput.fill("created.txt");

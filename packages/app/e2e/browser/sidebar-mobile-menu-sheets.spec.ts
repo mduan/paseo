@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
@@ -21,9 +20,7 @@ test("project and workspace kebabs open action sheets on compact layouts", async
     await page.getByRole("button", { name: "Open menu", exact: true }).click();
     await waitForSidebarHydration(page);
 
-    await page
-      .getByTestId(`sidebar-project-kebab-${projectEquivalenceViewKey(seeded.projectKey)}`)
-      .click();
+    await page.getByTestId(`sidebar-project-kebab-${seeded.projectViewKey}`).click();
 
     await expect(page.getByRole("button", { name: "Bottom sheet backdrop" }).first()).toBeVisible({
       timeout: 10_000,

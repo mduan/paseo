@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 import { resolveFeatureValues } from "./feature-preferences";
 
 describe("feature-preferences", () => {
+  it("retains selected profile values while feature definitions load", () => {
+    expect(
+      resolveFeatureValues({
+        features: undefined,
+        persistedFeatureValues: { fast_mode: true, plan_mode: true },
+        localFeatureValues: { plan_mode: false },
+      }),
+    ).toEqual({ fast_mode: true, plan_mode: false });
+  });
+
   const features = [
     {
       type: "toggle" as const,

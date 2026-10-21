@@ -8,6 +8,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
 import { seedCorruptedWorkspaceLayout } from "../support/helpers/workspace-layout";
+import { runWorkspaceActionFromCommandCenter } from "../support/helpers/command-center-workspace-actions";
 import {
   openChangesTreePanel,
   waitForWorkspaceTabsVisible,
@@ -233,8 +234,7 @@ async function closeOnlyDraft(page: Page): Promise<void> {
 }
 
 async function moveOnlyDraftIntoRightSplit(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "More actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Split pane right", exact: true }).click();
+  await runWorkspaceActionFromCommandCenter(page, "Split pane right");
   const target = await emptyPaneBox(page);
   await dragChipTo(page, draftTabChip(page), {
     x: target.x + target.width / 2,

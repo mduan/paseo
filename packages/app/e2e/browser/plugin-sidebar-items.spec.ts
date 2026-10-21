@@ -26,6 +26,7 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { installUsageReportsFixture } from "../support/helpers/usage-reports";
 import { claudeAndCodexReports } from "../support/helpers/usage-sidebar-item";
+import { emulateWindowsKeyboard } from "../support/helpers/keyboard-platform";
 
 const APP_SETTINGS_KEY = "@paseo:app-settings";
 
@@ -240,6 +241,7 @@ test.describe("Plugin sidebar items", () => {
   });
 
   test("a header row's shortcut hint presses the row", async ({ page }) => {
+    await emulateWindowsKeyboard(page);
     await page.setViewportSize(WIDE);
     await gotoWorkspace(page, workspaceId);
     const newWorkspace = visibleTestId(page, "sidebar-global-new-workspace");

@@ -191,7 +191,6 @@ test.describe("New workspace host project preservation", () => {
   }) => {
     await openNewWorkspaceFromContextProject(page, crossHostProject);
     await selectNewWorkspaceProject(page, {
-      projectKey: crossHostProject.sharedProjectKey,
       projectViewKey: crossHostProject.selectedProjectViewKey,
       projectDisplayName: SHARED_PROJECT_NAME,
     });

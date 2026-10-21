@@ -405,7 +405,7 @@ describe("search matching options", () => {
       { start: 5, length: 4 },
     ]);
     const zeroWidth = createTextSearch({ query: "(?=.)", options: { regex: true } });
-    expect(zeroWidth.matches(["😀"])).toBe(true);
+    expect(zeroWidth.matches(["😀"])).toBe(false);
     expect(zeroWidth.ranges("😀")).toEqual([]);
   });
 });

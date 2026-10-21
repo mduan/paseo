@@ -213,11 +213,15 @@ export async function sendFollowUpAndExpectVisibleResponse(
 ): Promise<void> {
   await submitMessage(page, input.prompt);
   await expect(page.getByText(input.prompt, { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(input.response, { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page
+      .locator('[data-testid="agent-chat-scroll"]:visible')
+      .getByText(input.response, { exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 async function selectSettledAgentTab(page: Page, agent: ArchiveTabAgent): Promise<void> {
-  const tab = page.getByRole("button", { name: agent.title, exact: true });
+  const tab = page.getByTestId(`workspace-tab-agent_${agent.id}`);
   await tab.click();
   await expect(page).toHaveTitle(agent.title);
   await expect(tab).toHaveAttribute("aria-selected", "true");

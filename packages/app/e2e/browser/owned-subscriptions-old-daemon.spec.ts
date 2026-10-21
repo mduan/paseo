@@ -10,12 +10,14 @@ import { metroTest as test, expect } from "../support/fixtures";
 import { buildCreateAgentPreferences, buildSeededHost } from "../support/helpers/daemon-registry";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import type { MockAgentWorkspace } from "../support/helpers/mock-agent";
+import { readReplicaCache } from "../support/helpers/replica-cache-storage";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import {
   expectTimelinePromptVisible,
   holdOlderHistoryPages,
   openAgentTimeline,
-  scrollThroughOlderHistoryPages,
+  userScrollsTimelineToHistoryStart,
+  waitForTimelineGeometryToSettle,
 } from "../support/helpers/timeline-pagination";
 
 test("does not repeat an assistant block when the current app paginates a published 0.2.5 daemon", async ({
@@ -95,10 +97,29 @@ test("does not repeat an assistant block when the current app paginates a publis
       page,
       "timeline-pagination-turn-19: emit 1 coalesced agent stream updates",
     );
-    await scrollThroughOlderHistoryPages(page, 3, history);
+    for (let pageNumber = 1; pageNumber <= 3; pageNumber += 1) {
+      if (history.requestCount() < pageNumber) await userScrollsTimelineToHistoryStart(page);
+      await history.expectRequestedPages(pageNumber);
+      history.releasePage(pageNumber);
+      // Overlapping legacy pages can compact enough to request the next page automatically.
+      await waitForTimelineGeometryToSettle(page);
+    }
 
     history.expectRepeatedEntries();
-    await history.expectOwnedTextRendered("Now I have a clearer picture.");
+    // Virtualized rows may be off screen; the replica must retain one canonical assistant block.
+    await expect
+      .poll(async () => {
+        const cache = await readReplicaCache(page);
+        const timeline = cache?.hosts
+          ?.flatMap((cachedHost) => cachedHost.timelines)
+          .find((entry) => entry.agentId === agent.agentId);
+        return timeline?.items?.reduce(
+          (count, item) =>
+            count + JSON.stringify(item).split("Now I have a clearer picture.").length - 1,
+          0,
+        );
+      })
+      .toBe(1);
     expect(observationSockets.size).toBe(1);
 
     await test.step("send a live turn after reconnecting the old daemon", async () => {

@@ -40,21 +40,29 @@ export function DesktopSidebarSurface({
   useLayoutEffect(() => {
     const parent = overlay ? getOverlayRoot() : inlineRef.current;
     if (!parent) return;
+    const scrollPositions = Array.from(host.querySelectorAll("*")).map((element) => ({
+      element,
+      top: element.scrollTop,
+      left: element.scrollLeft,
+    }));
+    const surfaceWidth = active ? visibleSidebarWidth : SIDEBAR_EDGE_WIDTH;
     host.style.display = "flex";
     host.style.position = overlay ? "absolute" : "relative";
     host.style.inset = overlay ? "0 auto 0 0" : "";
     host.style.zIndex = "0";
-    parent.appendChild(host);
-    return () => host.remove();
-  }, [host, overlay]);
-
-  useLayoutEffect(() => {
-    const surfaceWidth = active ? visibleSidebarWidth : SIDEBAR_EDGE_WIDTH;
     host.style.width = overlay ? `${surfaceWidth}px` : "";
     host.style.pointerEvents = overlay && active ? "auto" : "none";
     // Native drag regions swallow mouse events even beneath a web overlay.
     host.style.setProperty("-webkit-app-region", overlay ? "no-drag" : "");
+    if (host.parentElement !== parent) parent.appendChild(host);
+    // Changing portal parents resets descendant scroll offsets in browsers.
+    for (const { element, top, left } of scrollPositions) {
+      element.scrollTop = top;
+      element.scrollLeft = left;
+    }
   }, [active, host, overlay, visibleSidebarWidth]);
+
+  useLayoutEffect(() => () => host.remove(), [host]);
 
   useLayoutEffect(() => {
     if (!overlay) return;

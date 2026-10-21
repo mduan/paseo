@@ -82,10 +82,10 @@ test.describe("Sidebar context menus", () => {
 
       await closeWorkspaceContextMenu(page, workspace.workspaceId);
       await expectWorkspaceRowHoverCleared(page, workspace.workspaceId);
-      await openProjectContextMenu(page, workspace.projectKey);
-      await expectProjectContextMenuActions(page, workspace.projectKey);
+      await openProjectContextMenu(page, workspace.projectViewKey);
+      await expectProjectContextMenuActions(page, workspace.projectViewKey);
 
-      await closeProjectContextMenu(page, workspace.projectKey);
+      await closeProjectContextMenu(page, workspace.projectViewKey);
     } finally {
       await workspace.cleanup();
     }

@@ -456,6 +456,7 @@ test.describe("macOS", () => {
     await source(page).press("Control+f");
     await expect(query(page)).toHaveCount(0);
 
+    await source(page).press("Home");
     await source(page).press("Meta+f");
     await expect(query(page)).toBeFocused();
     await query(page).fill("needle");

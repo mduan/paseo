@@ -345,6 +345,26 @@ it("refreshes cached terminal title after worker title changes", async () => {
   expect(session.getState().title).toBe("Build Output");
 });
 
+it("keeps a renamed terminal title in restored worker snapshots", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "worker-terminal-manager-rename-"));
+  temporaryDirs.push(cwd);
+  manager = createWorkerTerminalManager();
+  const session = trackTerminal(
+    await manager.createTerminal({
+      workspaceId: "ws-test",
+      cwd,
+      title: "Original terminal",
+      ...nodeTerminalCommand("setInterval(() => {}, 1000)"),
+    }),
+  );
+
+  expect(manager.setTerminalTitle(session.id, "Renamed terminal")).toBe(true);
+
+  const snapshot = await manager.getTerminalState(session.id);
+  expect(snapshot?.state.title).toBe("Renamed terminal");
+  expect(session.getTitle()).toBe("Renamed terminal");
+});
+
 it("refreshes cached terminal size after worker resize", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "worker-terminal-manager-resize-"));
   temporaryDirs.push(cwd);

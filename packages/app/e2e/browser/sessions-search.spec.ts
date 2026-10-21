@@ -104,10 +104,12 @@ async function verifyAllSearchFieldHighlights(page: Page, repoPath: string): Pro
     await search(page, `${NONCE} main`);
     await expectVisibleTitles(page, [TITLES.unbilled, TITLES.billing, TITLES.terminal]);
     const row = rowTitles(page).filter({ hasText: NONCE }).first();
-    await expect(row.getByTestId(/^agent-row-workspace-/)).toHaveText(path.basename(repoPath));
+    await expect(row.getByTestId(/^agent-row-workspace-(?!name-)/)).toHaveText(
+      path.basename(repoPath),
+    );
     for (const field of ["workspace", "title", "project", "branch"]) {
       await expect(
-        row.getByTestId(new RegExp(`^agent-row-${field}-`)).getByText(/^main$/i),
+        row.getByTestId(new RegExp(`^agent-row-${field}-(?!name-)`)).getByText(/^main$/i),
       ).toBeVisible();
     }
     await expect(page.getByText("Yesterday", { exact: true })).toHaveCount(0);
@@ -416,7 +418,7 @@ test.describe("History search", () => {
 
     await resetSeededPageState(page);
     await openSessions(page);
-    const row = page.getByTestId(new RegExp(`^agent-row-workspace-.*-${agent.id}$`));
+    const row = page.getByTestId(new RegExp(`^agent-row-workspace-(?!name-).*-${agent.id}$`));
     await expect(row).toHaveText(worktreeSlug);
   });
 });

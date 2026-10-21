@@ -5,6 +5,7 @@ import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { withProjectOwnership } from "./project-ownership";
 import { createTempDirectory, createTempGitRepo } from "./workspace";
+import { projectPlacementViewKey } from "./project-view-key";
 
 export interface SeedWorkspaceDescriptor {
   id: string;
@@ -157,13 +158,7 @@ export interface SeedDaemonClient {
   archiveAgent(agentId: string): Promise<{ archivedAt: string }>;
   refreshAgent(agentId: string): Promise<unknown>;
   fetchAgent: DaemonClient["fetchAgent"];
-  getLastServerInfoMessage(): {
-    features?: {
-      projectAdd?: boolean;
-      workspaceRecovery?: boolean;
-      workspaceMarkUnread?: boolean;
-    } | null;
-  } | null;
+  getLastServerInfoMessage: DaemonClient["getLastServerInfoMessage"];
   fetchAgentHistory(options?: {
     page?: { limit: number };
   }): Promise<{ entries: Array<{ agent: { id: string } }> }>;
@@ -214,8 +209,9 @@ export interface SeededWorkspace {
   workspaceDirectory: string;
   /** Host-local identity used by daemon project operations. */
   projectId: string;
-  /** Opaque cross-host key used by grouped project UI. */
+  /** Repository equivalence key reported by the daemon. */
   projectKey: string;
+  projectViewKey: string;
   /** Project label the UI shows (owner/repo for known remotes, else basename). */
   projectDisplayName: string;
   cleanup(): Promise<void>;
@@ -257,6 +253,10 @@ export async function seedWorkspace(options: {
       workspaceDirectory: workspace.workspaceDirectory,
       projectId: workspace.projectId,
       projectKey: descriptor.projectKey,
+      projectViewKey: projectPlacementViewKey(
+        client.getLastServerInfoMessage()!.serverId,
+        workspace.projectId,
+      ),
       projectDisplayName: workspace.projectDisplayName,
       cleanup: async () => {
         await client.removeProject(workspace.projectId).catch(() => undefined);

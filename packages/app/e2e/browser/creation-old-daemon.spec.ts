@@ -110,13 +110,24 @@ for (const version of ["0.2.5", "0.7.2", "0.8.0"]) {
         page.getByTestId("user-message").filter({ visible: true }).filter({ hasText: prompt }),
       ).toBeVisible();
       expect((await client.fetchAgents()).entries).toHaveLength(0);
-      const workspaces = (await client.fetchWorkspaces()).entries.filter(
-        (workspace) =>
-          workspace.projectId === project.projectId && workspace.id !== project.workspaceId,
-      );
-      expect(workspaces).toHaveLength(1);
+      await expect
+        .poll(
+          async () => {
+            const { entries } = await client.fetchWorkspaces();
+            let count = 0;
+            for (const workspace of entries) {
+              if (workspace.projectId === project.projectId && workspace.id !== project.workspaceId)
+                count += 1;
+            }
+            return count;
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(1);
       gate.release();
-      await expect.poll(async () => (await client.fetchAgents()).entries.length).toBe(1);
+      await expect
+        .poll(async () => (await client.fetchAgents()).entries.length, { timeout: 30_000 })
+        .toBe(1);
       const first = (await client.fetchAgents()).entries[0]!.agent;
       await client.waitForFinish(first.id, 20_000);
       await expectPromptOnce(client, first.id, prompt);

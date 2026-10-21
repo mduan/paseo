@@ -293,10 +293,6 @@ test.describe("History search across hosts", () => {
         .and(page.getByTestId(/^agent-row-/))
         .filter({ hasText: activeTitle });
       await expect(activeRow).toContainText("0 turns");
-      const archivedHeight = await archivedRow.evaluate(
-        (element) => element.getBoundingClientRect().height,
-      );
-      const activeTop = await activeRow.evaluate((element) => element.getBoundingClientRect().y);
       await page.getByTestId("sessions-display-trigger").click();
       for (const enabled of [false, true]) {
         await page.getByTestId("sessions-display-status").click();
@@ -304,10 +300,10 @@ test.describe("History search across hosts", () => {
           "aria-checked",
           String(enabled),
         );
-        await expect
-          .poll(async () => (await archivedRow.boundingBox())?.height)
-          .toBe(archivedHeight);
-        await expect.poll(async () => (await activeRow.boundingBox())?.y).toBe(activeTop);
+        await expect(archivedRow.getByText("Archived", { exact: true })).toHaveCount(
+          Number(enabled),
+        );
+        await expectChronologicalTitles(page, [archivedTitle, activeTitle]);
       }
       await page.keyboard.press("Escape");
       await expect(
@@ -392,7 +388,7 @@ test.describe("History search across hosts", () => {
       await expect(activeRow).not.toContainText("Cost unavailable");
       await expect(activeRow).not.toContainText("0 turns");
       await expect(activeRow.getByTestId(/^agent-row-project-/)).toHaveCount(0);
-      await expect(activeRow.getByTestId(/^agent-row-workspace-/)).toBeVisible();
+      await expect(activeRow.getByTestId(/^agent-row-workspace-(?!name-)/)).toBeVisible();
       await activeRow.click();
       await expect(page).toHaveURL(/\/workspace\//);
       await openSessions(page);

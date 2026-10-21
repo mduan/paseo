@@ -53,6 +53,12 @@ export type TerminalWorkerRequest =
       env: Record<string, string>;
     }
   | {
+      type: "setTitle";
+      requestId: string;
+      terminalId: string;
+      title: string;
+    }
+  | {
       type: "setActivity";
       requestId: string;
       terminalId: string;

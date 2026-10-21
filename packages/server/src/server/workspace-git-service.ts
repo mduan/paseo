@@ -319,17 +319,10 @@ export type WorkspaceGitBranchValidationResult = BranchCheckoutResolution;
 export type WorkspaceGitBranchSuggestion = BranchSuggestion;
 export type WorkspaceGitWorktreeInfo = PaseoWorktreeInfo;
 
-export type WorkspaceGitSnapshotOptions =
-  | {
-      force?: false;
-      includeForge?: boolean;
-      reason?: string;
-    }
-  | {
-      force: true;
-      includeForge?: boolean;
-      reason: string;
-    };
+export type WorkspaceGitSnapshotOptions = WorkspaceGitReadOptions & {
+  includeForge?: boolean;
+  queueIfBusy?: boolean;
+};
 
 interface WorkspaceGitRefreshRequest {
   force: boolean;
@@ -3083,7 +3076,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       includeForge: options?.includeForge ?? true,
       reason: options?.reason ?? defaultReason,
       notify,
-      queueIfBusy: false,
+      queueIfBusy: options?.queueIfBusy ?? false,
       movedRemoteRefs: new Set(),
     };
   }

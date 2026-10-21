@@ -17,13 +17,16 @@ async function completeSubmittedTurn(
   agent: Awaited<ReturnType<typeof seedMockAgentWorkspace>>,
   prompt: string,
 ): Promise<Locator> {
+  const completedResponses = page.getByText("(end of synthetic stream)", { exact: true });
+  const previousResponseCount = await completedResponses.count();
   await submitMessage(page, prompt);
   const userMessage = page.getByTestId("user-message").filter({ hasText: prompt });
   await expect(userMessage).toBeVisible();
 
   const finish = await agent.client.waitForFinish(agent.agentId, 30_000);
   expect(finish.status).toBe("idle");
-  await expect(page.getByText("(end of synthetic stream)", { exact: true }).last()).toBeVisible();
+  await expect(completedResponses).toHaveCount(previousResponseCount + 1);
+  await expect(completedResponses.last()).toBeVisible();
   await expect(userMessage).toHaveAttribute("aria-busy", "false");
   return userMessage;
 }
@@ -66,7 +69,7 @@ test.describe("Agent message rewind", () => {
       const userMessage = await completeSubmittedTurn(page, agent, rewoundPrompt);
       await scrollChatAwayFromBottom(page, {
         deltaY: -900,
-        minDistanceFromBottom: 300,
+        minDistanceFromBottom: 200,
       });
       await fillComposerDraft(page, preservedDraft);
       rewindCompletion.clearTimelineStreamCount();

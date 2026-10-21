@@ -461,11 +461,12 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
     }
     const bottomAnchorSettled =
       !followOutputRef.current || isScrollContainerNearBottom(scrollContainer);
+    const canLoadHistory = historyStartReadyRef.current && bottomAnchorSettled && !isJumpSettling();
     return {
       distanceFromHistoryStart: scrollContainer.scrollTop,
       hasOlderHistory,
       isLoadingOlderHistory,
-      isReady: historyStartReadyRef.current && bottomAnchorSettled,
+      isReady: canLoadHistory,
       progressKey: olderHistoryProgressKey,
     };
   });
