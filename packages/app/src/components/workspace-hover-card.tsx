@@ -837,7 +837,11 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 1000,
   },
   cardColumns: { flexDirection: "row" },
-  cardMain: { width: HOVER_CARD_WIDTH, alignSelf: "flex-start" },
+  cardMain: {
+    width: HOVER_CARD_WIDTH,
+    alignSelf: "flex-start",
+    paddingBottom: theme.spacing[2],
+  },
   portsPanel: {
     maxWidth: 290,
     minWidth: 0,
