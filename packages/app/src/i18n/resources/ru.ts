@@ -549,6 +549,7 @@ export const ru: TranslationResources = {
       linearTickets: "Задачи Linear",
       ticketsAccessibility: "Задачи Linear: {{tickets}}",
       openInLinear: "Открыть в Linear",
+      unassigned: "Не назначен",
       ticketTitleUnavailable: "Название недоступно",
       livePorts: "Активные порты",
       portsAccessibility: "Активные порты: {{ports}}",

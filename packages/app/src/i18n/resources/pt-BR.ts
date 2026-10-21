@@ -549,6 +549,7 @@ export const ptBR: TranslationResources = {
       linearTickets: "Tickets do Linear",
       ticketsAccessibility: "Tickets do Linear: {{tickets}}",
       openInLinear: "Abrir no Linear",
+      unassigned: "Sem responsável",
       ticketTitleUnavailable: "Título indisponível",
       livePorts: "Portas ativas",
       portsAccessibility: "Portas ativas: {{ports}}",

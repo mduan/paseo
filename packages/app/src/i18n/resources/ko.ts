@@ -544,6 +544,7 @@ export const ko: TranslationResources = {
       linearTickets: "Linear 티켓",
       ticketsAccessibility: "Linear 티켓: {{tickets}}",
       openInLinear: "Linear에서 열기",
+      unassigned: "담당자 없음",
       ticketTitleUnavailable: "제목 없음",
       livePorts: "활성 포트",
       portsAccessibility: "활성 포트: {{ports}}",

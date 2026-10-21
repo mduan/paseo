@@ -549,6 +549,7 @@ export const ja: TranslationResources = {
       linearTickets: "Linear チケット",
       ticketsAccessibility: "Linear チケット: {{tickets}}",
       openInLinear: "Linear で開く",
+      unassigned: "未割り当て",
       ticketTitleUnavailable: "タイトルなし",
       livePorts: "使用中のポート",
       portsAccessibility: "使用中のポート: {{ports}}",

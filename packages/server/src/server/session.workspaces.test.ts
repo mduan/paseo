@@ -9961,13 +9961,14 @@ test("workspace Linear titles are resolved for saved links and association respo
 test("workspace Linear links use exact IDs and history searches workspace context before pagination", async () => {
   const emitted: SessionOutboundMessage[] = [];
   let pullRequestTickets: LinearTicket[] = [];
+  let issueDetails: Pick<LinearTicket, "state" | "assignee" | "project"> = {};
   const session = createSessionForWorkspaceTests({
     onMessage: (message) => emitted.push(message),
     linearIntegration: {
       getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
       setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
       disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
-      resolve: async (tickets) => (tickets ? [...tickets] : undefined),
+      resolve: async (tickets) => tickets?.map((ticket) => ({ ...ticket, ...issueDetails })),
       getPullRequestTickets: async (prUrl) => {
         if (!prUrl) return [];
         expect(prUrl).toBe("https://github.com/acme/repo/pull/482");
@@ -10148,12 +10149,17 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   expect(
     disconnectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearTickets,
   ).toBeUndefined();
+  issueDetails = {
+    state: { name: "In Progress", type: "started", color: "#e2b53e" },
+    assignee: { name: "Alex", avatarUrl: "https://example.com/alex.png" },
+    project: { name: "External Queries", color: "#ee6666" },
+  };
   pullRequestTickets = [{ identifier: "ENG-123", url, title: "Retry uploads" }];
   await session.handleMessage({ type: "fetch_workspaces_request", requestId: "pr-connected" });
   const connectedWorkspaces = filterByType(emitted, "fetch_workspaces_response").at(-1)!.payload;
-  expect(connectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearTickets).toEqual(
-    pullRequestTickets,
-  );
+  expect(connectedWorkspaces.entries[0].githubRuntime?.pullRequest?.linearTickets).toEqual([
+    { ...pullRequestTickets[0], ...issueDetails },
+  ]);
   await session.handleMessage({
     type: "fetch_agent_history_request",
     requestId: "pr-context",
@@ -10162,7 +10168,7 @@ test("workspace Linear links use exact IDs and history searches workspace contex
   const prHistory = filterByType(emitted, "fetch_agent_history_response").at(-1)!.payload.entries;
   expect(prHistory.map((entry) => entry.agent.id)).toEqual(["unrelated", "first", "archived"]);
   expect(prHistory[1].workspaceLinearTickets).toEqual([
-    { identifier: "ENG-123", url, title: "Retry uploads" },
+    { identifier: "ENG-123", url, title: "Retry uploads", ...issueDetails },
   ]);
   expect(records.get(workspace.workspaceId)?.linearTickets).toEqual([]);
   await session.handleMessage({

@@ -540,6 +540,7 @@ export const en = {
       linearTickets: "Linear tickets",
       ticketsAccessibility: "Linear tickets: {{tickets}}",
       openInLinear: "Open in Linear",
+      unassigned: "Unassigned",
       ticketTitleUnavailable: "Title unavailable",
       livePorts: "Live ports",
       portsAccessibility: "Live ports: {{ports}}",

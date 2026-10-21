@@ -5923,11 +5923,12 @@ export class Session {
     snapshot: WorkspaceGitRuntimeSnapshot,
   ): Promise<NonNullable<WorkspaceDescriptorPayload["githubRuntime"]>> {
     const pullRequest = snapshot.forge.pullRequest;
-    const linearTickets = await this.linearIntegration.getPullRequestTickets(pullRequest?.url);
+    const pullRequestTickets = await this.linearIntegration.getPullRequestTickets(pullRequest?.url);
+    const linearTickets = await this.linearIntegration.resolve(pullRequestTickets);
     const resolvedPullRequest = pullRequest
       ? {
           ...pullRequest,
-          linearTickets: linearTickets.length ? linearTickets : undefined,
+          linearTickets: linearTickets?.length ? linearTickets : undefined,
         }
       : pullRequest;
     return {

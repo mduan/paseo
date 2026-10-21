@@ -543,6 +543,7 @@ export const zhCN: TranslationResources = {
       linearTickets: "Linear 工单",
       ticketsAccessibility: "Linear 工单：{{tickets}}",
       openInLinear: "在 Linear 中打开",
+      unassigned: "未分配",
       ticketTitleUnavailable: "标题不可用",
       livePorts: "活动端口",
       portsAccessibility: "活动端口：{{ports}}",

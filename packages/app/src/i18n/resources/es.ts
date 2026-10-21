@@ -550,6 +550,7 @@ export const es: TranslationResources = {
       linearTickets: "Tickets de Linear",
       ticketsAccessibility: "Tickets de Linear: {{tickets}}",
       openInLinear: "Abrir en Linear",
+      unassigned: "Sin asignar",
       ticketTitleUnavailable: "Título no disponible",
       livePorts: "Puertos activos",
       portsAccessibility: "Puertos activos: {{ports}}",

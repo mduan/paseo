@@ -1,4 +1,5 @@
 import { LinearTicketLinks } from "@/components/linear-ticket-links";
+import { LinearTicketMetadata } from "@/components/linear-ticket-metadata";
 import {
   useCallback,
   useEffect,
@@ -774,9 +775,12 @@ function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
         testID={`hover-card-linear-ticket-${ticket.identifier}`}
       >
         <View style={styles.ticketHeader}>
-          <Text style={styles.ticketIdentifier} selectable={false} pointerEvents="none">
-            {ticket.identifier}
-          </Text>
+          <View style={styles.ticketIdentity}>
+            <Text style={styles.ticketIdentifier} selectable={false} pointerEvents="none">
+              {ticket.identifier}
+            </Text>
+            <LinearTicketMetadata ticket={ticket} />
+          </View>
           <View
             style={[styles.ticketActions, !hovered && styles.hidden]}
             pointerEvents={hovered ? "auto" : "none"}
@@ -878,13 +882,31 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     gap: theme.spacing[1],
   },
-  ticketHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  ticketHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[1],
+  },
+  ticketIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    flexShrink: 1,
+    minWidth: 0,
+  },
   ticketIdentifier: {
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
+    flexShrink: 0,
   },
-  ticketActions: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+  ticketActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+    flexShrink: 0,
+  },
   ticketTitle: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   portHoverTarget: { position: "relative" },
   portRow: {

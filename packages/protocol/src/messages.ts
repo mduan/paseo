@@ -1005,10 +1005,22 @@ export const ProjectRemoveRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export enum LinearIssueStateType {
+  Triage = "triage",
+  Backlog = "backlog",
+  Unstarted = "unstarted",
+  Started = "started",
+  Completed = "completed",
+  Canceled = "canceled",
+}
+
 export const LinearTicketSchema = z.object({
   identifier: z.string(),
   url: z.string(),
   title: z.string().optional(),
+  state: z.object({ name: z.string(), type: z.string(), color: z.string() }).optional(),
+  assignee: z.object({ name: z.string(), avatarUrl: z.string().optional() }).optional(),
+  project: z.object({ name: z.string(), color: z.string() }).optional(),
 });
 
 export type LinearTicket = z.infer<typeof LinearTicketSchema>;
