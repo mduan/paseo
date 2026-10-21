@@ -607,9 +607,9 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
               tabIndex={hovered ? 0 : -1}
             >
               {copied ? (
-                <ThemedCheck size={14} uniProps={foregroundColorMapping} />
+                <ThemedCheck size={12} uniProps={foregroundColorMapping} />
               ) : (
-                <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />
+                <ThemedCopy size={12} uniProps={foregroundMutedColorMapping} />
               )}
             </Pressable>
             {isLocal ? (
@@ -620,7 +620,7 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
                 style={styles.portAction}
                 tabIndex={hovered ? 0 : -1}
               >
-                <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
+                <ThemedExternalLink size={12} uniProps={foregroundMutedColorMapping} />
               </Pressable>
             ) : null}
           </View>
