@@ -390,9 +390,7 @@ test("keeps the shared Find controls usable in a compact dark browser", async ({
   await expect(input(page)).toBeFocused();
 });
 
-test("matches quoted phrases and exposes the same search toggles as chat", async ({
-  page,
-}, testInfo) => {
+test("exposes the same search toggles as chat", async ({ page }, testInfo) => {
   const terminal = await harness.createTerminal({
     name: "Search options",
     command: "bash",
@@ -403,7 +401,7 @@ test("matches quoted phrases and exposes the same search toggles as chat", async
   });
   await harness.openTerminal(page, { terminalId: terminal.id });
   await expect.poll(() => getTerminalBufferText(page)).toContain("READY");
-  await openFind(page, '"a.b  word"');
+  await openFind(page, "a.b  word");
   await expect(status(page)).toHaveText("2 of 2");
   expect((await page.getByLabel("Find", { exact: true }).boundingBox())!.width).toBeGreaterThan(
     400,
@@ -412,7 +410,7 @@ test("matches quoted phrases and exposes the same search toggles as chat", async
   await page.getByTestId("terminal-find-caseSensitive").click();
   await expect(status(page)).toHaveText("1 of 1");
   await page.getByTestId("terminal-find-caseSensitive").click();
-  await query(page).fill('"bill"');
+  await query(page).fill("bill");
   await page.getByTestId("terminal-find-wholeWord").click();
   await expect(status(page)).toHaveText(/of 3/);
   await page.getByTestId("terminal-find-caseSensitive").click();
@@ -435,5 +433,4 @@ test("matches quoted phrases and exposes the same search toggles as chat", async
     "aria-pressed",
     "false",
   );
-  await expect(status(page)).toHaveText(/of 3/);
 });

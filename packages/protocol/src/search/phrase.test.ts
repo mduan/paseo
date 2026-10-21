@@ -51,29 +51,15 @@ it("ignores zero-length regex matches in search results", () => {
   expect(search.ranges("baa")).toEqual([{ start: 1, length: 2 }]);
 });
 
-it("preserves quoted substrings while keeping unquoted phrase whitespace flexible", () => {
-  const pattern = createPhrasePattern({ query: 'before "a.b  word" after' });
-  const text = "before\ta.b  word\nafter before a.b word after before axb  word after";
-  expect([...text.matchAll(pattern)].map((match) => match[0])).toEqual([
-    "before\ta.b  word\nafter",
-  ]);
-  expect(
-    [..." a.b  word ".matchAll(createPhrasePattern({ query: '" a.b  word "' }))].map(
-      (match) => match[0],
-    ),
-  ).toEqual([" a.b  word "]);
-});
-
-it("applies case and Unicode word boundaries to quoted phrases and leaves regex quotes literal", () => {
-  const pattern = createPhrasePattern({
+it("applies case and Unicode word boundaries to quoted history phrases and leaves regex quotes literal", () => {
+  const search = createTextSearch({
     query: '"Word phrase"',
     options: { caseSensitive: true, wholeWord: true },
   });
-  expect(
-    [..."word phrase éWord phrase Word phrase_ Word phrase!".matchAll(pattern)].map(
-      (match) => match[0],
-    ),
-  ).toEqual(["Word phrase"]);
+  expect(search.matches(["Word phrase!"])).toBe(true);
+  for (const text of ["word phrase", "éWord phrase", "Word phrase_"]) {
+    expect(search.matches([text])).toBe(false);
+  }
   const regex = createPhrasePattern({ query: '"a.b"', options: { regex: true } });
   expect([...'axb "axb" "a.b"'.matchAll(regex)].map((match) => match[0])).toEqual([
     '"axb"',

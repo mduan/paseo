@@ -78,20 +78,20 @@ test("reports the addon's highlight limit without disabling navigation beyond th
   expect(results.at(-1)).toMatchObject({ resultCount: 20000, limited: true, resultIndex: 0 });
 });
 
-test("shares quoted phrases, case, Unicode word boundaries, and raw regex with chat Find", async () => {
+test("supports literal phrases, case, Unicode word boundaries, and raw regex", async () => {
   const results = mount();
   await write(
     'bill billé ébill bill_name Bill BILL\r\nfirst a.b  word\r\nlast A.B  word\r\na.b word "axb"\r\n😀',
   );
-  runtime.find.search({ query: '"a.b  word"' });
+  runtime.find.search({ query: "a.b  word" });
   expect(results.at(-1)).toMatchObject({ resultCount: 2, invalid: false });
   expect(window.__paseoTerminal!.getSelection()).toBe("A.B  word");
-  runtime.find.search({ query: '"a.b  word"', options: { caseSensitive: true } });
+  runtime.find.search({ query: "a.b  word", options: { caseSensitive: true } });
   expect(results.at(-1)).toMatchObject({ resultCount: 1 });
   expect(window.__paseoTerminal!.getSelection()).toBe("a.b  word");
-  runtime.find.search({ query: '"bill"', options: { wholeWord: true } });
+  runtime.find.search({ query: "bill", options: { wholeWord: true } });
   expect(results.at(-1)).toMatchObject({ resultCount: 3 });
-  runtime.find.search({ query: '"bill"', options: { wholeWord: true, caseSensitive: true } });
+  runtime.find.search({ query: "bill", options: { wholeWord: true, caseSensitive: true } });
   expect(results.at(-1)).toMatchObject({ resultCount: 1 });
   runtime.find.search({ query: '"a.b"', options: { regex: true } });
   expect(results.at(-1)).toMatchObject({ resultCount: 1 });

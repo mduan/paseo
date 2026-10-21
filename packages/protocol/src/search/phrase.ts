@@ -1,23 +1,21 @@
 import type { SearchOptions } from "./options.js";
-import { splitQuotedQuery } from "./quoted-query.js";
 
 export class SearchQueryError extends Error {}
 
 export function createPhrasePattern({
   query,
   options = {},
+  literal = false,
 }: {
   query: string;
   options?: SearchOptions;
+  literal?: boolean;
 }): RegExp {
   let source = query;
   if (!options.regex) {
-    source = splitQuotedQuery(query.trim())
-      .map(({ text, quoted }) => {
-        const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        return quoted ? escaped : escaped.replace(/\s+/g, "\\s+");
-      })
-      .join("");
+    source = literal ? query : query.trim();
+    source = source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (!literal) source = source.replace(/\s+/g, "\\s+");
   }
   try {
     const flags = options.caseSensitive ? "gu" : "giu";

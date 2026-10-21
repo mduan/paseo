@@ -2,7 +2,6 @@
 import { createPhrasePattern } from "./phrase.js";
 export { SearchQueryError } from "./phrase.js";
 import type { SearchOptions } from "./options.js";
-import { splitQuotedQuery } from "./quoted-query.js";
 import {
   fuzzyPolicyForToken,
   matchRanges,
@@ -39,13 +38,16 @@ export function createTextSearch({
   options?: SearchOptions;
 }): TextSearch {
   if (!options.regex) {
-    const parts = splitQuotedQuery(query);
+    const parts = query.split(/("[^"]*")/g).map((text, index) => ({
+      text: index % 2 ? text.slice(1, -1) : text,
+      quoted: index % 2 === 1,
+    }));
     if (parts.some((part) => part.quoted)) {
       const searches = parts
         .filter((part) => part.text.length > 0)
         .map(({ text, quoted }) =>
           quoted
-            ? createPatternSearch([createPhrasePattern({ query: `"${text}"`, options })])
+            ? createPatternSearch([createPhrasePattern({ query: text, options, literal: true })])
             : createTextSearch({ query: text, options }),
         );
       return {

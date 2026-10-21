@@ -213,13 +213,13 @@ export class TerminalEmulatorRuntime {
       this.emitFindResult();
     },
     search: ({ query, direction, options: searchOptions }) => {
-      if (!query.trim()) {
+      if (!query) {
         this.find.clear();
         return;
       }
       let pattern: RegExp;
       try {
-        pattern = createPhrasePattern({ query, options: searchOptions });
+        pattern = createPhrasePattern({ query, options: searchOptions, literal: true });
       } catch (error) {
         if (!(error instanceof SearchQueryError)) throw error;
         this.find.clear();
