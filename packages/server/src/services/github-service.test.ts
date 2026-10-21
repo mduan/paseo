@@ -3,7 +3,6 @@ import {
   mergeLinearTickets,
   updateLinearTickets,
 } from "@getpaseo/protocol/linear-tickets";
-import { extractLinearTickets } from "./linear-linkback.js";
 import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1153,15 +1152,14 @@ describe("ForgeService", () => {
     expect(statusesA).toEqual([
       expect.objectContaining({
         number: 41,
-        linearTickets: [
-          { identifier: "COR-1", title: "Fix", url: "https://linear.app/acme/issue/COR-1" },
-        ],
         state: "merged",
         isMerged: true,
         checksStatus: "success",
         forgeSpecific: expect.objectContaining({ forge: "github", mergeStateStatus: "CLEAN" }),
       }),
     ]);
+    expect(statusesA[0]?.linearTickets).toBeUndefined();
+    expect(runner.calls[0]?.args[3]).not.toContain("comments(");
     expect(statusesB).toEqual([
       expect.objectContaining({ number: 52, state: "merged", checksStatus: "success" }),
     ]);
@@ -4798,125 +4796,6 @@ describe("ForgeService", () => {
         base: "main",
       }),
     ).rejects.toThrow("Unable to resolve GitHub repository for pull request creation");
-  });
-});
-
-describe("Linear PR linkbacks", () => {
-  const body = `<!-- linear-linkback -->
-<details><summary><a href="https://linear.app/mixpanel/issue/COR-1401/query">COR-1401 Make &quot;Execute Query&quot; &amp; hotkeys discoverable</a></summary></details>
-[COR-1404 Display no results](https://linear.app/mixpanel/issue/COR-1404/no-results)
-[COR-1401 Duplicate](https://linear.app/mixpanel/issue/COR-1401/another-slug)
-<a href="https://linear.app/mixpanel/review/PR-12">Review in Linear</a>`;
-  const tickets = [
-    {
-      identifier: "COR-1401",
-      url: "https://linear.app/mixpanel/issue/COR-1401/query",
-      title: 'Make "Execute Query" & hotkeys discoverable',
-    },
-    {
-      identifier: "COR-1404",
-      url: "https://linear.app/mixpanel/issue/COR-1404/no-results",
-      title: "Display no results",
-    },
-  ];
-
-  it("reads linkback issue headings without collecting related links from issue bodies", () => {
-    const expandedBody = `<!-- linear-linkback -->
-<details><summary><a href="https://linear.app/acme/issue/ENG-1">ENG-1 Fix permissions</a></summary>
-<p>Related existing issue: [ENG-2](https://linear.app/acme/issue/ENG-2).</p>
-<details><summary>[ENG-3 Nested reference](https://linear.app/acme/issue/ENG-3)</summary>
-An unrelated reference inside the issue description.</details>
-</details>
-[ENG-4 Another linked issue](https://linear.app/acme/issue/ENG-4)
-<!-- [ENG-5 Hidden metadata](https://linear.app/acme/issue/ENG-5) -->`;
-    expect(
-      extractLinearTickets([{ author: { login: "linear-code" }, body: expandedBody }]),
-    ).toEqual([
-      { identifier: "ENG-1", url: "https://linear.app/acme/issue/ENG-1", title: "Fix permissions" },
-      {
-        identifier: "ENG-4",
-        url: "https://linear.app/acme/issue/ENG-4",
-        title: "Another linked issue",
-      },
-    ]);
-  });
-
-  it("extracts HTML and Markdown issue links, decodes titles and deduplicates slugs", () => {
-    expect(extractLinearTickets([{ author: { login: "linear-code" }, body }])).toEqual(tickets);
-  });
-
-  it("ignores ordinary discussion, copied linkbacks, review links and lookalike hosts", () => {
-    expect(
-      extractLinearTickets([
-        { author: { login: "person" }, body },
-        { author: { login: "linear-code" }, body: body.replace("<!-- linear-linkback -->", "") },
-        {
-          author: { login: "linear[bot]" },
-          body: `<!-- linear-linkback -->
-<a href="https://linear.app.evil.test/mixpanel/issue/COR-1">COR-1 Nope</a>
-<a href="https://user@linear.app/mixpanel/issue/COR-2">COR-2 Nope</a>
-<a href="https://linear.app:444/mixpanel/issue/COR-3">COR-3 Nope</a>
-<a href="https://linear.app/mixpanel/review/COR-4">Review</a>`,
-        },
-      ]),
-    ).toEqual([]);
-  });
-
-  it("keeps bare identifiers and distinguishes issues in different Linear workspaces", () => {
-    expect(
-      extractLinearTickets([
-        {
-          author: { login: "linear" },
-          body: `<!-- linear-linkback -->
-[COR-1](https://linear.app/one/issue/cor-1)
-[COR-1 Another workspace](https://linear.app/two/issue/COR-1)`,
-        },
-      ]),
-    ).toEqual([
-      { identifier: "COR-1", url: "https://linear.app/one/issue/cor-1" },
-      {
-        identifier: "COR-1",
-        url: "https://linear.app/two/issue/COR-1",
-        title: "Another workspace",
-      },
-    ]);
-  });
-
-  it("paginates comments and caches tickets with current PR metadata", async () => {
-    const runner = createRunner([
-      currentPullRequestJson(),
-      currentPullRequestGithubFactsJson({
-        pullRequest: {
-          comments: {
-            nodes: [{ body: "Earlier discussion", author: { login: "person" } }],
-            pageInfo: { hasNextPage: true, endCursor: "next-comments" },
-          },
-        },
-      }),
-      currentPullRequestGithubFactsJson({
-        pullRequest: {
-          comments: {
-            nodes: [{ body, author: { login: "linear-code" } }],
-            pageInfo: { hasNextPage: false, endCursor: "last-comment" },
-          },
-        },
-      }),
-    ]);
-    const service = createGitHubService({
-      runner: runner.runner,
-      resolveGhPath: async () => "/usr/bin/gh",
-      resolveRepoHost: async () => null,
-      now: () => 0,
-    });
-    try {
-      const input = { cwd: "/repo", headRef: "feature/fork" };
-      expect((await service.getCurrentPullRequestStatus(input))?.linearTickets).toEqual(tickets);
-      expect((await service.getCurrentPullRequestStatus(input))?.linearTickets).toEqual(tickets);
-      expect(runner.calls).toHaveLength(3);
-      expect(runner.calls[2].args).toContain("cursor=next-comments");
-    } finally {
-      service.dispose?.();
-    }
   });
 });
 

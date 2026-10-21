@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Logger } from "pino";
 import {
   LinearConnectionStatus,
+  LinearTicketSchema,
   type LinearConnection,
   type LinearTicket,
 } from "@getpaseo/protocol/messages";
@@ -26,13 +27,23 @@ const ConnectionResponseSchema = z.object({
 const IssueResponseSchema = z.object({
   data: z.object({ issue: z.object({ title: z.string().min(1), url: z.string() }).nullable() }),
 });
+const AttachmentsResponseSchema = z.object({
+  data: z.object({
+    attachmentsForURL: z.object({
+      nodes: z.array(z.object({ issue: LinearTicketSchema.required() })),
+      pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+    }),
+  }),
+});
 type StoredConnection = z.infer<typeof StoredConnectionSchema>;
 type CachedTitle = { pending: Promise<string | undefined>; expiresAt: number };
+type CachedPullRequestTickets = { pending: Promise<LinearTicket[]>; expiresAt: number };
 
 export type LinearIntegrationService = {
   getConnection(): Promise<LinearConnection>;
   setKey(apiKey: string): Promise<LinearConnection>;
   disconnect(): Promise<LinearConnection>;
+  getPullRequestTickets(url?: string): Promise<LinearTicket[]>;
   resolve(tickets?: readonly LinearTicket[]): Promise<LinearTicket[] | undefined>;
 };
 type Options = {
@@ -47,6 +58,7 @@ type GraphqlRequest = {
   variables?: Record<string, string>;
 };
 type TitleLookup = { ticket: LinearTicket; apiKey: string };
+type PullRequestLookup = { url: string; apiKey: string };
 
 class LinearIntegrationError extends Error {
   constructor(message: string) {
@@ -63,6 +75,7 @@ export function createLinearIntegrationService({
 }: Options): LinearIntegrationService {
   const file = join(paseoHome, "integrations", "linear.json");
   const cache = new LRUCache<string, CachedTitle>({ max: 256 });
+  const pullRequestCache = new LRUCache<string, CachedPullRequestTickets>({ max: 256 });
   const limitRequests = pLimit(4);
   const mutate = pLimit(1);
   let stored: Promise<StoredConnection | undefined> | undefined;
@@ -144,6 +157,40 @@ export function createLinearIntegrationService({
     }
   }
 
+  async function loadPullRequestTickets({
+    url,
+    apiKey,
+  }: PullRequestLookup): Promise<LinearTicket[]> {
+    const tickets = new Map<string, LinearTicket>();
+    let after: string | undefined;
+    do {
+      const response = AttachmentsResponseSchema.parse(
+        await graphql({
+          apiKey,
+          query: `query PaseoPullRequestIssues($url: String!, $after: String) {
+            attachmentsForURL(url: $url, after: $after, first: 100, includeArchived: true) {
+              nodes { issue { identifier title url } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }`,
+          variables: { url, ...(after ? { after } : {}) },
+        }),
+      );
+      const page = response.data.attachmentsForURL;
+      for (const { issue } of page.nodes) {
+        const normalized = parseLinearTicketUrl(issue.url);
+        if (normalized) tickets.set(normalized.url, { ...normalized, title: issue.title });
+      }
+      if (!page.pageInfo.hasNextPage) break;
+      const cursor = page.pageInfo.endCursor;
+      if (!cursor || cursor === after) {
+        throw new LinearIntegrationError("Linear attachment pagination did not advance.");
+      }
+      after = cursor;
+    } while (after);
+    return [...tickets.values()];
+  }
+
   return {
     async getConnection() {
       return describe(await load());
@@ -170,6 +217,7 @@ export function createLinearIntegrationService({
         await writeFileAtomic(file, JSON.stringify(next), { mode: 0o600 });
         stored = Promise.resolve(next);
         cache.clear();
+        pullRequestCache.clear();
         return describe(next);
       });
     },
@@ -178,8 +226,41 @@ export function createLinearIntegrationService({
         await rm(file, { force: true });
         stored = Promise.resolve(undefined);
         cache.clear();
+        pullRequestCache.clear();
         return describe(undefined);
       });
+    },
+    async getPullRequestTickets(url) {
+      if (!url) return [];
+      try {
+        const connection = await load();
+        if (!connection) return [];
+        let entry = pullRequestCache.get(url);
+        if (!entry || entry.expiresAt <= now()) {
+          const pending = limitRequests(() =>
+            loadPullRequestTickets({ url, apiKey: connection.apiKey }),
+          );
+          entry = { pending, expiresAt: Number.POSITIVE_INFINITY };
+          const current = entry;
+          current.pending = pending.then(
+            (tickets) => {
+              current.expiresAt = now() + 300_000;
+              return tickets;
+            },
+            () => {
+              current.expiresAt = now() + 60_000;
+              logger.warn({ url }, "Unable to load Linear issues for pull request");
+              return [];
+            },
+          );
+          pullRequestCache.set(url, current);
+        }
+        const tickets = await entry.pending;
+        return (await load()) === connection ? tickets : [];
+      } catch {
+        logger.warn("Unable to read Linear connection for pull request issues");
+        return [];
+      }
     },
     async resolve(tickets) {
       if (!tickets?.length) return tickets ? [...tickets] : undefined;
