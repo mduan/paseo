@@ -24,7 +24,7 @@ import {
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
-import { Archive, Folder, GitBranch, Network, Server } from "lucide-react-native";
+import { Archive, Folder, GitBranch, LayoutPanelLeft, Network, Server } from "lucide-react-native";
 import { useProviderIcon } from "@/components/provider-icons";
 import { WorkspaceTabIcon } from "@/screens/workspace/workspace-tab-presentation";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -54,6 +54,7 @@ const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedBranch = withUnistyles(GitBranch);
 const ThemedServer = withUnistyles(Server);
+const ThemedLayoutPanelLeft = withUnistyles(LayoutPanelLeft);
 const ThemedRefreshControl = withUnistyles(RefreshControl);
 
 interface AgentListProps {
@@ -171,6 +172,7 @@ function SessionRow({
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
+  const titleRanges = useMemo(() => search?.ranges(agent.title ?? "") ?? [], [search, agent.title]);
 
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -207,7 +209,13 @@ function SessionRow({
                 backdrop={getSessionRowBackdrop({ hovered, pressed, isSelected })}
               />
             ) : null}
-            <SessionRowTitle agent={agent} search={search} fields={fields} isMobile={isMobile} />
+            <HighlightedText
+              text={agent.title || t("agentList.fallbackTitle")}
+              ranges={titleRanges}
+              style={styles.sessionTitle}
+              numberOfLines={isMobile ? 2 : 1}
+              testID={`agent-row-title-${agent.serverId}-${agent.id}`}
+            />
             <View style={styles.rowEnd}>
               <SessionRowBadges
                 pendingPermissionCount={pendingPermissionCount}
@@ -216,6 +224,7 @@ function SessionRow({
               {fields.lastActivity ? <AgentActivityTime date={agent.lastActivityAt} /> : null}
             </View>
           </View>
+          {fields.workspaceName ? <SessionRowWorkspaceName agent={agent} search={search} /> : null}
           <View style={styles.rowMetaRow}>
             <SessionRowContext agent={agent} fields={fields} search={search} />
             <SessionRowModel agent={agent} fields={fields} />
@@ -242,51 +251,30 @@ function SessionRow({
   );
 }
 
-function SessionRowTitle({
+function SessionRowWorkspaceName({
   agent,
   search,
-  fields,
-  isMobile,
 }: {
   agent: AggregatedAgent;
   search?: TextSearch;
-  fields: HistoryFields;
-  isMobile: boolean;
 }) {
-  const { t } = useTranslation();
-  const title = agent.title || t("agentList.fallbackTitle");
-  const workspaceName = fields.workspaceName ? agent.projectPlacement?.workspaceName : undefined;
-  const ranges = useMemo(
-    () => ({
-      title: search?.ranges(agent.title ?? "") ?? [],
-      workspaceName: search?.ranges(workspaceName ?? "") ?? [],
-    }),
-    [search, agent.title, workspaceName],
-  );
-  if (!workspaceName) {
-    return (
-      <HighlightedText
-        text={title}
-        ranges={ranges.title}
-        style={styles.sessionTitle}
-        numberOfLines={isMobile ? 2 : 1}
-        testID={`agent-row-title-${agent.serverId}-${agent.id}`}
-      />
-    );
-  }
-  // The workspace name flows inline after the title and wraps with it, untruncated.
+  const workspaceName = agent.projectPlacement?.workspaceName ?? "";
+  const ranges = useMemo(() => search?.ranges(workspaceName) ?? [], [search, workspaceName]);
+  if (!workspaceName) return null;
   return (
-    <Text style={styles.sessionTitle} testID={`agent-row-title-${agent.serverId}-${agent.id}`}>
-      <HighlightedText text={title} ranges={ranges.title} />
-      <Text style={styles.sessionWorkspaceName}>
-        {" · "}
-        <HighlightedText
-          text={workspaceName}
-          ranges={ranges.workspaceName}
-          testID={`agent-row-workspace-name-${agent.serverId}-${agent.id}`}
-        />
-      </Text>
-    </Text>
+    <View style={styles.workspaceNameRow}>
+      <ThemedLayoutPanelLeft
+        size={14}
+        uniProps={mutedIconMapping}
+        style={styles.workspaceNameIcon}
+      />
+      <HighlightedText
+        text={workspaceName}
+        ranges={ranges}
+        style={styles.workspaceNameText}
+        testID={`agent-row-workspace-name-${agent.serverId}-${agent.id}`}
+      />
+    </View>
   );
 }
 
@@ -761,6 +749,7 @@ const styles = StyleSheet.create((theme) => ({
   rowContent: {
     flex: 1,
     minWidth: 0,
+    gap: theme.spacing[2],
   },
   rowTitleRow: {
     flexDirection: "row",
@@ -774,7 +763,6 @@ const styles = StyleSheet.create((theme) => ({
     flexWrap: "wrap",
     columnGap: theme.spacing[3],
     rowGap: theme.spacing[1],
-    marginTop: theme.spacing[1.5],
   },
   archivedBadge: {
     // Keep the pill's padding and border outside the metadata line's height.
@@ -796,7 +784,17 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foreground,
   },
-  sessionWorkspaceName: {
+  workspaceNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing[1.5],
+  },
+  // Centers the icon on the first line when the name wraps.
+  workspaceNameIcon: { marginTop: 2 },
+  workspaceNameText: {
+    flexShrink: 1,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
     color: theme.colors.foregroundMuted,
   },
   sessionMetaText: {
