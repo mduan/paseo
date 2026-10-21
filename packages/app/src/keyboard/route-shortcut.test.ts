@@ -321,6 +321,17 @@ describe("routeKeyboardShortcut — message-input.action", () => {
   });
 });
 
+describe("routeKeyboardShortcut — history.open", () => {
+  it.each(["/h/srv/workspace/ws-2", "/settings/general", "/sessions"])(
+    "opens all-host History from %s",
+    (pathname) => {
+      expect(
+        routeKeyboardShortcut({ action: "history.open", payload: null }, makeCtx({ pathname })),
+      ).toEqual<ShortcutAction>({ kind: "router-push", route: "/sessions" });
+    },
+  );
+});
+
 describe("routeKeyboardShortcut — settings.toggle", () => {
   it("pushes to the settings root when not currently in settings", () => {
     expect(

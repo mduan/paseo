@@ -59,7 +59,7 @@ export function builtinSidebarNavLabelKey(id: BuiltinSidebarItemId): string {
  */
 const BUILTIN_SHORTCUT_ACTIONS: Record<BuiltinSidebarItemId, string | null> = {
   "new-workspace": "new-workspace",
-  history: null,
+  history: "open-history",
   search: "toggle-command-center",
   schedules: null,
   usage: null,

@@ -114,6 +114,7 @@ const SidebarNewWorkspaceRow = memo(function SidebarNewWorkspaceRow({
 
 function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
   const { t } = useTranslation();
+  const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("history"));
   const pathname = usePathname();
   const handlePress = useCallback(() => {
     onBeforeNavigate?.();
@@ -128,6 +129,7 @@ function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
       isActive={pathname.includes("/sessions")}
       testID="sidebar-sessions"
       variant="compact"
+      shortcutKeys={shortcutKeys}
     />
   );
 }
