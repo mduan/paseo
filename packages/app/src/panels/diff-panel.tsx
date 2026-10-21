@@ -18,6 +18,7 @@ import { useInlineReviewController } from "@/review";
 import { buildDiffReviewContext } from "@/review/context";
 import type { ReviewLineRange } from "@/review/range";
 import { DiffDocument } from "@/git/diff-document";
+import { shouldCollapseDiffFile } from "@/utils/diff-layout";
 import {
   ChangesDiffToolbar,
   ChangesSurface,
@@ -293,7 +294,7 @@ function TurnDiffPanel() {
   const { reviewDraftKey } = useReviewDraftScope({ serverId, workspaceId, cwd: cwd ?? "" });
   const panelPreferences = useDiffPanelPreferences();
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
-  const [collapsedFilePaths, setCollapsedFilePaths] = useState<string[]>([]);
+  const [collapsedFilePathsOverride, setCollapsedFilePaths] = useState<string[]>();
   invariant(target.kind === "turn_diff", "TurnDiffPanel requires turn_diff target");
   const turnTarget = useMemo(() => ({ kind: "turn" as const, turnId: target.turnId }), [target]);
   const query = useAgentTurnDiff({
@@ -307,10 +308,6 @@ function TurnDiffPanel() {
     (path: string) => openPreferredTarget({ kind: "file", path }, "diffs"),
     [openPreferredTarget],
   );
-  const collapseState = useMemo(
-    () => ({ paths: collapsedFilePaths, onChange: setCollapsedFilePaths }),
-    [collapsedFilePaths],
-  );
 
   const payload = query.data;
   const handleCopyPath = useCallback(
@@ -322,6 +319,16 @@ function TurnDiffPanel() {
     [copyFilePath, cwd, payload?.cwd],
   );
   const files = payload?.files ?? EMPTY_FILES;
+  const collapsedFilePaths = useMemo(
+    () =>
+      collapsedFilePathsOverride ?? files.filter(shouldCollapseDiffFile).map((file) => file.path),
+    [collapsedFilePathsOverride, files],
+  );
+  const collapseState = useMemo(
+    () => ({ paths: collapsedFilePaths, onChange: setCollapsedFilePaths }),
+    [collapsedFilePaths],
+  );
+
   const diffOptions = useMemo<ChangesToolbarDiffOptions>(
     () => ({
       collapse:

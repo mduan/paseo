@@ -1,6 +1,20 @@
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import type { DiffLine } from "@/git/use-diff-query";
 
+export function shouldCollapseDiffFile(file: ParsedDiffFile): boolean {
+  let lineCount = 0;
+  let characterCount = 0;
+  for (const hunk of file.hunks) {
+    for (const line of hunk.lines) {
+      if (line.type === "header") continue;
+      lineCount++;
+      characterCount += line.content.length;
+      if (lineCount > 1000 || characterCount > 100_000) return true;
+    }
+  }
+  return false;
+}
+
 type ReviewSide = "old" | "new";
 type ReviewableLineType = "add" | "remove" | "context";
 

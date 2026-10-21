@@ -10,7 +10,7 @@ import { compactHighlightTokens } from "@/utils/diff-rendering";
 import { getInlineReviewThreadState, getSplitInlineReviewThreadState } from "@/review/geometry";
 import { canExpandDiffFile, diffGaps, gapDirections, type DiffGap } from "@/git/diff-gaps";
 import { gapSeparatorHeight } from "./gap-separator";
-import { advancesFor, requiresShaping } from "./text-measurement";
+import { advancesFor } from "./text-measurement";
 import type {
   BuildDiffDocumentModelInput,
   DiffCell,
@@ -665,9 +665,9 @@ export function measureFragments(input: {
   const measureWidth =
     input.measureText.measureWidth?.bind(input.measureText) ??
     ((slice: readonly string[]) => advancesFor(input.measureText)(slice).at(-1) ?? 0);
-  // Joining/ligatures can make a longer prefix narrower. Preserve the existing
-  // search order for those runs; changing the probes can change their breaks.
-  const canBoundSearch = !requiresShaping(input.text);
+  // Complex scripts can narrow when characters join. ASCII, including code
+  // ligatures and base64 padding, must not trigger full-tail probes per wrap.
+  const canBoundSearch = !/[^\x20-\x7e\t]/u.test(input.text);
   let graphemeIndex = 0;
   while (graphemeIndex < graphemes.length) {
     let low = graphemeIndex + 1;

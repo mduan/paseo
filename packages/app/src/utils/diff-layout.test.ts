@@ -3,6 +3,7 @@ import {
   buildReviewableDiffTargetKey,
   buildSplitDiffRows,
   buildUnifiedDiffLines,
+  shouldCollapseDiffFile,
 } from "./diff-layout";
 import type { ParsedDiffFile } from "@/git/use-diff-query";
 import type { ReviewableDiffTarget } from "./diff-layout";
@@ -325,5 +326,29 @@ describe("buildUnifiedDiffLines", () => {
       lineType: "add",
       content: "inserted",
     });
+  });
+});
+
+describe("shouldCollapseDiffFile", () => {
+  it("keeps ordinary diffs and binary placeholders expanded", () => {
+    expect(shouldCollapseDiffFile(makeFile([{ type: "add", content: "const x = 1;" }]))).toBe(
+      false,
+    );
+    expect(shouldCollapseDiffFile({ ...makeFile([]), status: "binary" })).toBe(false);
+  });
+
+  it("collapses large text across hunks and single generated lines", () => {
+    const lines = Array.from({ length: 501 }, () => ({ type: "add" as const, content: "x" }));
+    const file = makeFile(lines);
+    expect(shouldCollapseDiffFile(file)).toBe(false);
+    expect(shouldCollapseDiffFile({ ...file, hunks: [...file.hunks, ...file.hunks] })).toBe(true);
+    expect(shouldCollapseDiffFile(makeFile([{ type: "add", content: "a".repeat(296360) }]))).toBe(
+      true,
+    );
+    const wideLines = makeFile([{ type: "add", content: "a".repeat(60000) }]);
+    expect(shouldCollapseDiffFile(wideLines)).toBe(false);
+    expect(
+      shouldCollapseDiffFile({ ...wideLines, hunks: [...wideLines.hunks, ...wideLines.hunks] }),
+    ).toBe(true);
   });
 });

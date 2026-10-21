@@ -92,11 +92,12 @@ function shapedCharactersFor(options: { lineCount: number; lineLength: number })
 }
 
 describe("diff document measurement cost", () => {
-  it("keeps additive wrapped search work proportional to long source lines", () => {
+  it.each(["", "=="])("bounds wrapped search work for long ASCII lines ending in %j", (suffix) => {
     function measuredGraphemes(length: number): number {
       let count = 0;
-      measureFragments({
-        text: "a".repeat(length),
+      const source = "a".repeat(length - suffix.length) + suffix;
+      const fragments = measureFragments({
+        text: source,
         availableWidth: 200,
         wrapLines: true,
         lineHeight: 18,
@@ -112,6 +113,8 @@ describe("diff document measurement cost", () => {
           },
         },
       });
+      expect(fragments.map((fragment) => fragment.text).join("")).toBe(source);
+      expect(fragments.every((fragment) => fragment.width <= 200)).toBe(true);
       return count;
     }
     const short = measuredGraphemes(100);
