@@ -538,7 +538,11 @@ export const ar: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "المنافذ النشطة ({{count}})",
+      linearTickets: "تذاكر Linear",
+      ticketsAccessibility: "تذاكر Linear: {{tickets}}",
+      openInLinear: "فتح في Linear",
+      ticketTitleUnavailable: "العنوان غير متاح",
+      livePorts: "المنافذ النشطة",
       portsAccessibility: "المنافذ النشطة: {{ports}}",
       openInBrowser: "فتح في المتصفح",
       scriptsAccessibility: "البرامج النصية Workspace",
@@ -1216,6 +1220,7 @@ export const ar: TranslationResources = {
         branch: "اسم الفرع",
       },
       show: {
+        linearTickets: "تذاكر Linear",
         ports: "المنافذ النشطة",
         label: "إظهار",
         branch: "الفرع",

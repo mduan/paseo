@@ -444,6 +444,79 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
+  test("Linear tickets show hover actions and two-second copy feedback", async ({
+    page,
+    context,
+  }, testInfo) => {
+    const fixture = {
+      title: "Fix warehouse metrics",
+      comments: [
+        {
+          author: { login: "linear-code" },
+          body: `<!-- linear-linkback -->
+<a href="https://linear.app/acme/issue/COR-1401">COR-1401 Make Execute Query more discoverable</a>
+<a href="https://linear.app/acme/issue/COR-1404">COR-1404 Display no results returned</a>`,
+        },
+      ],
+    };
+    const workspace = await seedWorkspace({
+      repoPrefix: "sidebar-linear-hover-",
+      repo: {
+        originUrl: "https://github.com/paseo-e2e/local-fixture.git",
+        files: [{ path: ".paseo-e2e-pr.json", content: JSON.stringify(fixture) }],
+      },
+    });
+    try {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      await gotoAppShell(page);
+      const sidebarRow = await waitForSidebarWorkspace(page, workspace.workspaceId);
+      await expect(sidebarRow.getByTestId("sidebar-workspace-linear-tickets")).toBeVisible();
+      const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
+      const source = card.getByTestId("hover-card-workspace-linear-tickets");
+      await expect(source).toContainText("COR-1401, COR-1404");
+      await source.hover();
+      const panel = card.getByTestId("hover-card-linear-panel");
+      await expect(panel.getByText("Linear tickets", { exact: true })).toBeVisible();
+      const row = panel.getByTestId("hover-card-linear-ticket-COR-1401");
+      await expect(row.getByText("Make Execute Query more discoverable")).toBeVisible();
+      await expect(row.getByRole("link")).toHaveCount(1);
+      const copy = row.getByRole("button", { name: "Copy: COR-1401", exact: true });
+      const actions = copy.locator("..");
+      await expect(actions).toHaveCSS("opacity", "0");
+      await row.hover();
+      await expect(actions).toHaveCSS("opacity", "1");
+      const title = row.getByText("Make Execute Query more discoverable");
+      await expect(title).toHaveCSS(
+        "color",
+        await row
+          .getByText("COR-1401", { exact: true })
+          .evaluate((element) => getComputedStyle(element).color),
+      );
+      const screenshotPath = testInfo.outputPath("linear-tickets.png");
+      await card.screenshot({ path: screenshotPath });
+      await testInfo.attach("Linear ticket panel", {
+        path: screenshotPath,
+        contentType: "image/png",
+      });
+      await copy.click();
+      await expect(
+        row.getByRole("button", { name: "Copied: COR-1401", exact: true }),
+      ).toBeVisible();
+      await expect(copy).toBeVisible({ timeout: 4_000 });
+      await panel.getByText("Linear tickets", { exact: true }).hover();
+      await expect(actions).toHaveCSS("opacity", "0");
+      await page.getByTestId("sidebar-display-preferences-menu").click();
+      await page.getByTestId("sidebar-display-show").click();
+      await page.getByTestId("sidebar-row-item-linearTickets").click();
+      await expect(sidebarRow.getByTestId("sidebar-workspace-linear-tickets")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await sidebarRow.hover();
+      await expect(source).toContainText("COR-1401, COR-1404");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   test("port hovercard excludes its whole surface from window dragging", async ({ page }) => {
     test.skip(process.platform === "win32", "Port discovery supports macOS and Linux");
     test.setTimeout(90_000);
@@ -488,7 +561,7 @@ test.describe("Sidebar workspace list", () => {
         }
       }
 
-      await panel.getByText("Live ports (2)", { exact: true }).hover();
+      await panel.getByText("Live ports", { exact: true }).hover();
       await expect(actions.nth(0)).toHaveCSS("opacity", "0");
       await expect(actions.nth(1)).toHaveCSS("opacity", "0");
     } finally {

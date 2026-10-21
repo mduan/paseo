@@ -1,4 +1,4 @@
-import type { WorkspacePort } from "@getpaseo/protocol/messages";
+import type { LinearTicket, WorkspacePort } from "@getpaseo/protocol/messages";
 import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
 import type { SidebarChecksDisplay } from "@/components/sidebar/display-preferences/checks-display";
@@ -20,6 +20,7 @@ export type MetaRowItem =
   | { kind: "host" }
   | { kind: "changeRequest"; hint: PrHint }
   | { kind: "checks"; summary: CheckSummary; label: boolean }
+  | { kind: "linearTickets"; tickets: readonly LinearTicket[] }
   | { kind: "ports"; ports: readonly WorkspacePort[] }
   | { kind: "services"; summary: WorkspaceServiceSummary }
   | { kind: "labels"; labels: readonly WorkspaceLabelDefinition[] };
@@ -34,6 +35,7 @@ export type MetaRowItem =
  * The host is filtered upstream, where the badge map is built: a host that should show nothing
  * has no badge to hand down, so by the time a row sees one it is meant to be drawn.
  */
+// oxlint-disable-next-line complexity -- Each independent metadata item keeps its own visibility rule.
 export function selectMetaRowItems(input: {
   currentBranch: string | null;
   projectName: string | null;
@@ -79,6 +81,10 @@ export function selectMetaRowItems(input: {
     if (summary) {
       items.push({ kind: "checks", summary, label: checksDisplay === "iconAndText" });
     }
+  }
+
+  if (prHint?.linearTickets?.length && visible.linearTickets) {
+    items.push({ kind: "linearTickets", tickets: prHint.linearTickets });
   }
 
   if (input.ports?.length && visible.ports) {

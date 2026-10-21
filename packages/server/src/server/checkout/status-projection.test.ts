@@ -11,6 +11,9 @@ describe("checkout status projection", () => {
   test("includes repository identity fields on the PR status wire payload", () => {
     const payload = normalizeCheckoutPrStatusPayload(
       {
+        linearTickets: [
+          { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
+        ],
         number: 123,
         repoOwner: "internal-owner",
         repoName: "internal-repo",
@@ -37,6 +40,7 @@ describe("checkout status projection", () => {
       "github",
     );
 
+    expect(payload?.linearTickets?.[0].identifier).toBe("COR-1");
     expect(payload).toHaveProperty("repoOwner", "internal-owner");
     expect(payload).toHaveProperty("repoName", "internal-repo");
     expect(payload).toHaveProperty("forge", "github");

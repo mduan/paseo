@@ -7,9 +7,36 @@ import {
   WorkspaceCreateRequestSchema,
   WorkspaceDescriptorPayloadSchema,
   WorkspaceScriptPayloadSchema,
+  WorkspaceGitHubRuntimePayloadSchema,
+  CheckoutPrStatusSchema,
 } from "./messages.js";
 
 describe("workspace message schemas", () => {
+  test("keeps Linear ticket metadata optional in workspace and checkout updates", () => {
+    const status = {
+      url: "https://github.com/acme/repo/pull/1",
+      title: "Fix",
+      state: "open",
+      baseRefName: "main",
+      headRefName: "fix",
+      isMerged: false,
+    };
+    const linearTickets = [
+      { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
+    ];
+    expect(CheckoutPrStatusSchema.parse(status).linearTickets).toBeUndefined();
+    expect(
+      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: status })?.pullRequest
+        ?.linearTickets,
+    ).toBeUndefined();
+    expect(
+      WorkspaceGitHubRuntimePayloadSchema.parse({ pullRequest: { ...status, linearTickets } })
+        ?.pullRequest?.linearTickets,
+    ).toEqual(linearTickets);
+    expect(CheckoutPrStatusSchema.parse({ ...status, linearTickets }).linearTickets).toEqual(
+      linearTickets,
+    );
+  });
   test("keeps workspace ports optional and carries full and anonymous listeners on existing updates", () => {
     const workspace = {
       id: "ws-ports",

@@ -538,7 +538,11 @@ export const zhCN: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "活动端口 ({{count}})",
+      linearTickets: "Linear 工单",
+      ticketsAccessibility: "Linear 工单：{{tickets}}",
+      openInLinear: "在 Linear 中打开",
+      ticketTitleUnavailable: "标题不可用",
+      livePorts: "活动端口",
       portsAccessibility: "活动端口：{{ports}}",
       openInBrowser: "在浏览器中打开",
       scriptsAccessibility: "Workspace scripts",
@@ -1208,6 +1212,7 @@ export const zhCN: TranslationResources = {
         branch: "分支名称",
       },
       show: {
+        linearTickets: "Linear 工单",
         ports: "活动端口",
         label: "显示",
         branch: "分支",

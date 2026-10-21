@@ -1,4 +1,7 @@
+/* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import { z } from "zod";
+import type { LinearTicket } from "@getpaseo/protocol/messages";
+import { extractLinearTickets } from "./linear-linkback.js";
 import {
   isGitHubHost,
   parseGitHubRemoteUrl,
@@ -303,6 +306,30 @@ const GitHubAutoMergeRequestSchema = z
   .optional()
   .catch(null);
 
+const LinearLinkbackCommentsSchema = z.object({
+  nodes: z.array(
+    z.object({
+      body: z.string(),
+      author: z.object({ login: z.string().optional() }).nullable().optional(),
+    }),
+  ),
+  pageInfo: z.object({
+    hasNextPage: z.boolean(),
+    endCursor: z.string().nullable(),
+  }),
+});
+
+type LinearLinkbackComments = z.infer<typeof LinearLinkbackCommentsSchema>;
+type GitHubStatusDetails = {
+  facts: GitHubPullRequestStatusFacts;
+  linearTickets: LinearTicket[];
+};
+
+const LINEAR_LINKBACK_COMMENTS_FIELDS = `
+  nodes { body author { login } }
+  pageInfo { hasNextPage endCursor }
+`;
+
 const GitHubPullRequestFactsGraphqlSchema = z.object({
   data: z.object({
     repository: z
@@ -314,6 +341,7 @@ const GitHubPullRequestFactsGraphqlSchema = z.object({
         viewerDefaultMergeMethod: z.string().nullable().optional().catch(null),
         pullRequest: z
           .object({
+            comments: LinearLinkbackCommentsSchema.optional(),
             mergeStateStatus: z.string().nullable().optional().catch(null),
             autoMergeRequest: GitHubAutoMergeRequestSchema,
             viewerCanEnableAutoMerge: z.boolean().optional().catch(false),
@@ -532,6 +560,7 @@ query PullRequestStatusFacts($owner: String!, $name: String!, $number: Int!) {
     rebaseMergeAllowed
     viewerDefaultMergeMethod
     pullRequest(number: $number) {
+      comments(first: 10) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
       mergeStateStatus
       autoMergeRequest {
         enabledAt
@@ -628,6 +657,7 @@ query PullRequestTimeline($owner: String!, $name: String!, $number: Int!) {
 }`;
 
 const BatchPollPrNodeSchema = z.object({
+  comments: LinearLinkbackCommentsSchema.optional(),
   number: z.number(),
   url: z.string().catch(""),
   title: z.string().catch(""),
@@ -732,6 +762,7 @@ type BatchPollRepository = z.infer<typeof BatchPollRepositorySchema>;
 
 const BATCH_PR_STATUS_FRAGMENT = `
 fragment PaseoPollPullRequest on PullRequest {
+  comments(first: 10) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
   number
   url
   title
@@ -1645,7 +1676,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       return;
     }
 
-    const distribution = distributeGitHubPollBatch({
+    const distribution = await distributeGitHubPollBatch({
       entries: addressedEntries,
       aliases: response.aliases,
       args,
@@ -1686,12 +1717,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     }
   }
 
-  function distributeGitHubPollBatch(input: {
+  async function distributeGitHubPollBatch(input: {
     entries: GitHubBatchPollEntry[];
     aliases: Record<string, unknown>;
     args: string[];
     startedAt: number;
-  }): GitHubBatchDistribution {
+  }): Promise<GitHubBatchDistribution> {
     const distribution: GitHubBatchDistribution = {
       pendingChecks: [],
       legacyFallback: [],
@@ -1734,7 +1765,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         ) {
           distribution.legacyFallback.push(entry.target);
         } else {
-          finalizeBatchPollTarget({
+          await finalizeBatchPollTarget({
             entry,
             node: null,
             repository: repository.data,
@@ -1751,7 +1782,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       const cachedRollup = frozenKey ? frozenPullRequestChecksCache.get(frozenKey) : undefined;
       if (frozenKey && cachedRollup) {
         rememberFrozenPullRequestChecks(frozenKey, cachedRollup);
-        finalizeBatchPollTarget({
+        await finalizeBatchPollTarget({
           entry,
           node,
           repository: repository.data,
@@ -1897,7 +1928,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       if (item.cacheKey && !hasPendingChecks) {
         rememberFrozenPullRequestChecks(item.cacheKey, rollup);
       }
-      finalizeBatchPollTarget({
+      await finalizeBatchPollTarget({
         entry: item.entry,
         node: item.node,
         repository: item.repository,
@@ -1919,14 +1950,14 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     }
   }
 
-  function finalizeBatchPollTarget(input: {
+  async function finalizeBatchPollTarget(input: {
     entry: GitHubBatchPollEntry;
     node: BatchPollPrNode | null;
     repository: BatchPollRepository;
     rollup: unknown[] | null;
     /** When this poll cycle became due; cache writes newer than this win. */
     startedAt: number;
-  }): void {
+  }): Promise<void> {
     const { entry, node, repository } = input;
     let status: CurrentPullRequestStatus | null = null;
     if (node) {
@@ -1945,7 +1976,27 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         toBatchCurrentPullRequestItem(node, input.rollup ?? undefined),
         entry.target.headRef,
       );
-      status = built ? { ...built, forgeSpecific: { forge: "github", ...facts } } : null;
+      let linearTickets: LinearTicket[];
+      try {
+        linearTickets = await loadLinearLinkbackTickets({
+          cwd: entry.target.cwd,
+          owner: entry.owner,
+          name: entry.name,
+          number: node.number,
+          comments: node.comments,
+          run,
+        });
+      } catch (error) {
+        updatePollTargetAfterError(entry.target, error);
+        return;
+      }
+      status = built
+        ? {
+            ...built,
+            ...(linearTickets.length ? { linearTickets } : {}),
+            forgeSpecific: { forge: "github", ...facts },
+          }
+        : null;
     }
     const cacheKey = buildCacheKey({
       cwd: entry.target.cwd,
@@ -3094,19 +3145,20 @@ async function addCurrentPullRequestGithubFacts(options: {
     return status;
   }
 
-  const facts = await loadPullRequestGithubFacts({
+  const details = await loadPullRequestGithubFacts({
     cwd: options.cwd,
     owner: status.repoOwner,
     name: status.repoName,
     number: status.number,
     run: options.run,
   });
-  if (!facts) {
+  if (!details) {
     return status;
   }
   return {
     ...status,
-    forgeSpecific: { forge: "github", ...facts },
+    ...(details.linearTickets.length ? { linearTickets: details.linearTickets } : {}),
+    forgeSpecific: { forge: "github", ...details.facts },
   };
 }
 
@@ -3116,7 +3168,7 @@ async function loadPullRequestGithubFacts(options: {
   name: string;
   number: number;
   run: (args: string[], options: GitHubCommandRunnerOptions) => Promise<string>;
-}): Promise<GitHubPullRequestStatusFacts | null> {
+}): Promise<GitHubStatusDetails | null> {
   const args = [
     "api",
     "graphql",
@@ -3131,13 +3183,74 @@ async function loadPullRequestGithubFacts(options: {
   ];
   try {
     const stdout = await options.run(args, { cwd: options.cwd });
-    return parsePullRequestGithubFacts(stdout, { args, cwd: options.cwd });
+    const response = parseGitHubJsonOutput(stdout, GitHubPullRequestFactsGraphqlSchema, {
+      args,
+      cwd: options.cwd,
+      emptyFallback: "{}",
+    });
+    const facts = parsePullRequestGithubFacts(response);
+    if (!facts) return null;
+    const linearTickets = await loadLinearLinkbackTickets({
+      ...options,
+      comments: response.data.repository?.pullRequest?.comments,
+    });
+    return { facts, linearTickets };
   } catch (error) {
     if (error instanceof GitHubCommandError) {
       return null;
     }
     throw error;
   }
+}
+
+async function loadLinearLinkbackTickets(options: {
+  cwd: string;
+  owner: string;
+  name: string;
+  number: number;
+  comments?: LinearLinkbackComments;
+  run: (args: string[], options: GitHubCommandRunnerOptions) => Promise<string>;
+}): Promise<LinearTicket[]> {
+  let page = options.comments;
+  const comments = [...(page?.nodes ?? [])];
+  while (page?.pageInfo.hasNextPage) {
+    const cursor = page.pageInfo.endCursor;
+    if (!cursor) throw new Error("GitHub comment pagination is missing its cursor");
+    const query = `query LinearLinkbackComments($owner: String!, $name: String!, $number: Int!, $cursor: String!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          comments(first: 100, after: $cursor) { ${LINEAR_LINKBACK_COMMENTS_FIELDS} }
+        }
+      }
+    }`;
+    const args = [
+      "api",
+      "graphql",
+      "-f",
+      `query=${query}`,
+      "-F",
+      `owner=${options.owner}`,
+      "-F",
+      `name=${options.name}`,
+      "-F",
+      `number=${options.number}`,
+      "-f",
+      `cursor=${cursor}`,
+    ];
+    const stdout = await options.run(args, { cwd: options.cwd });
+    const response = parseGitHubJsonOutput(stdout, GitHubPullRequestFactsGraphqlSchema, {
+      args,
+      cwd: options.cwd,
+      emptyFallback: "{}",
+    });
+    const nextPage = response.data.repository?.pullRequest?.comments;
+    if (!nextPage || nextPage.pageInfo.endCursor === cursor) {
+      throw new Error("GitHub comment pagination did not advance");
+    }
+    page = nextPage;
+    comments.push(...page.nodes);
+  }
+  return extractLinearTickets(comments);
 }
 
 async function tryCurrentPullRequestView(options: {
@@ -3278,13 +3391,8 @@ function parseCurrentPullRequestCandidateList(
 }
 
 function parsePullRequestGithubFacts(
-  stdout: string,
-  context: { args: string[]; cwd: string },
+  parsed: z.infer<typeof GitHubPullRequestFactsGraphqlSchema>,
 ): GitHubPullRequestStatusFacts | null {
-  const parsed = parseGitHubJsonOutput(stdout, GitHubPullRequestFactsGraphqlSchema, {
-    ...context,
-    emptyFallback: "{}",
-  });
   const repository = parsed.data.repository;
   const pullRequest = repository?.pullRequest;
   if (!repository || !pullRequest) {

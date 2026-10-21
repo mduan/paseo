@@ -83,8 +83,32 @@ if (origin === fixtureRemote) {
     process.stdout.write("[]");
     process.exit(0);
   }
+  const fixturePath = require("path").join(process.cwd(), ".paseo-e2e-pr.json");
+  const fixture = require("fs").existsSync(fixturePath)
+    ? JSON.parse(require("fs").readFileSync(fixturePath, "utf8")) : null;
+  if (fixture && command === "api graphql") {
+    const query = args.find((arg) => arg.startsWith("query=")) || "";
+    const comments = { nodes: fixture.comments, pageInfo: { hasNextPage: false, endCursor: null } };
+    const pr = {
+      number: 1, url: "https://github.com/paseo-e2e/local-fixture/pull/1",
+      title: fixture.title, state: "OPEN", isDraft: false, baseRefName: "main",
+      headRefName: "main", headRefOid: spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim(),
+      mergedAt: null, mergeable: "UNKNOWN", headRepositoryOwner: { login: "paseo-e2e" }, comments
+    };
+    const repo = { owner: { login: "paseo-e2e" }, isFork: false, pullRequest: pr, pullRequests: { nodes: [pr] } };
+    if (query.includes("PaseoBatchPullRequestChecks")) {
+      process.stdout.write(JSON.stringify({ data: { t0: { pullRequest: { commits: { nodes: [] } } } } }));
+    } else if (query.includes("PaseoBatchPullRequestStatus")) {
+      process.stdout.write(JSON.stringify({ data: { t0: repo } }));
+    } else {
+      process.stdout.write(JSON.stringify({ data: { repository: repo } }));
+    }
+    process.exit(0);
+  }
   if (command === "pr list" || command === "pr view") {
     const isFork = args.includes("2");
+    let headRefName = isFork ? "pr-branch-2" : "pr-branch-1";
+    if (fixture) headRefName = "main";
     const pr = {
       number: isFork ? 2 : 1,
       title: "Use pasted PR as start ref",
@@ -93,7 +117,8 @@ if (origin === fixtureRemote) {
       body: null,
       labels: [],
       baseRefName: "main",
-      headRefName: isFork ? "pr-branch-2" : "pr-branch-1",
+      headRefName,
+      headRepositoryOwner: { login: "paseo-e2e" },
       updatedAt: "2026-01-01T00:00:00Z"
     };
     process.stdout.write(JSON.stringify(command === "pr list" ? [pr] : pr));

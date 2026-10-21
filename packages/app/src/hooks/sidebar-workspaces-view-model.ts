@@ -427,6 +427,7 @@ function areSidebarWorkspaceEntriesEqual(
         leftHint.number === rightHint.number &&
         leftHint.state === rightHint.state &&
         leftHint.checks === rightHint.checks &&
+        leftHint.linearTickets === rightHint.linearTickets &&
         leftHint.checksStatus === rightHint.checksStatus &&
         leftHint.reviewDecision === rightHint.reviewDecision)
     );

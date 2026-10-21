@@ -544,7 +544,11 @@ export const ja: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "使用中のポート ({{count}})",
+      linearTickets: "Linear チケット",
+      ticketsAccessibility: "Linear チケット: {{tickets}}",
+      openInLinear: "Linear で開く",
+      ticketTitleUnavailable: "タイトルなし",
+      livePorts: "使用中のポート",
       portsAccessibility: "使用中のポート: {{ports}}",
       openInBrowser: "ブラウザーで開く",
       scriptsAccessibility: "ワークスペーススクリプト",
@@ -1229,6 +1233,7 @@ export const ja: TranslationResources = {
         branch: "ブランチ名",
       },
       show: {
+        linearTickets: "Linear チケット",
         ports: "使用中のポート",
         label: "表示項目",
         branch: "ブランチ",

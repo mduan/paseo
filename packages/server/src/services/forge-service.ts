@@ -1,4 +1,4 @@
-import type { ForgeSearchKind } from "@getpaseo/protocol/messages";
+import type { ForgeSearchKind, LinearTicket } from "@getpaseo/protocol/messages";
 
 export type ForgeSearchRequestKind = ForgeSearchKind | "github-issue" | "github-pr" | "pr";
 
@@ -112,6 +112,7 @@ export type ForgeAuthState =
 export type ForgeSpecificStatusFacts = { forge: string } & Record<string, unknown>;
 
 export interface CurrentPullRequestStatus {
+  linearTickets?: LinearTicket[];
   number?: number;
   repoOwner?: string;
   repoName?: string;

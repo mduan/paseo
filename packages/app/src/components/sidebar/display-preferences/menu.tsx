@@ -1,3 +1,4 @@
+import { LinearIcon } from "@/components/icons/linear-icon";
 import { allFilterOptionsSelected, toggleFilterOption } from "@/utils/filter-selection";
 import {
   useCallback,
@@ -109,6 +110,7 @@ const ROW_ITEM_ICONS: Record<SidebarRowItem, OptionIcon> = {
   project: withUnistyles(Folder),
   host: withUnistyles(Server),
   changeRequest: withUnistyles(GitPullRequest),
+  linearTickets: withUnistyles(LinearIcon),
   ports: withUnistyles(Plug),
   services: withUnistyles(Globe),
   labels: withUnistyles(Tag),
@@ -146,6 +148,7 @@ const ROW_ITEM_LABEL_KEYS: Record<SidebarRowItem, string> = {
   project: "sidebar.display.show.project",
   host: "sidebar.display.show.host",
   changeRequest: "sidebar.display.show.changeRequest",
+  linearTickets: "sidebar.display.show.linearTickets",
   ports: "sidebar.display.show.ports",
   services: "sidebar.display.show.services",
   labels: "sidebar.display.show.labels",
