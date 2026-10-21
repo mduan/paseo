@@ -405,6 +405,7 @@ function SessionRowContext({
             <LinearTicketLinks
               tickets={agent.workspaceLinearTickets}
               style={styles.sessionMetaText}
+              search={search}
             />
           </Text>
         </View>
