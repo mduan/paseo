@@ -473,6 +473,11 @@ test("workspace Linear updates reject unsupported hosts before sending a mutatio
       add: ["https://linear.app/acme/issue/ENG-123"],
     }),
   ).rejects.toThrow("Update the host to use workspace Linear issue associations.");
+  await expect(client.getLinearConnection()).rejects.toThrow(
+    "Update the host to configure Linear.",
+  );
+  await expect(client.setLinearKey("key")).rejects.toThrow("Update the host to configure Linear.");
+  await expect(client.disconnectLinear()).rejects.toThrow("Update the host to configure Linear.");
   expect(mock.sent).toEqual([]);
 });
 

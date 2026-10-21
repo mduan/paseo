@@ -1013,6 +1013,58 @@ export const LinearTicketSchema = z.object({
 
 export type LinearTicket = z.infer<typeof LinearTicketSchema>;
 
+export enum LinearConnectionStatus {
+  Disconnected = "disconnected",
+  Connected = "connected",
+}
+
+export const LinearConnectionSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal(LinearConnectionStatus.Disconnected) }),
+  z.object({
+    status: z.literal(LinearConnectionStatus.Connected),
+    organizationName: z.string(),
+  }),
+]);
+export type LinearConnection = z.infer<typeof LinearConnectionSchema>;
+
+export const LinearGetConnectionRequestSchema = z.object({
+  type: z.literal("integrations.linear.get_connection.request"),
+  requestId: z.string(),
+});
+export const LinearGetConnectionResponseSchema = z.object({
+  type: z.literal("integrations.linear.get_connection.response"),
+  payload: z.object({
+    requestId: z.string(),
+    connection: LinearConnectionSchema.optional(),
+    error: z.string().optional(),
+  }),
+});
+export const LinearSetKeyRequestSchema = z.object({
+  type: z.literal("integrations.linear.set_key.request"),
+  requestId: z.string(),
+  apiKey: z.string().min(1).max(4096),
+});
+export const LinearSetKeyResponseSchema = z.object({
+  type: z.literal("integrations.linear.set_key.response"),
+  payload: z.object({
+    requestId: z.string(),
+    connection: LinearConnectionSchema.optional(),
+    error: z.string().optional(),
+  }),
+});
+export const LinearDisconnectRequestSchema = z.object({
+  type: z.literal("integrations.linear.disconnect.request"),
+  requestId: z.string(),
+});
+export const LinearDisconnectResponseSchema = z.object({
+  type: z.literal("integrations.linear.disconnect.response"),
+  payload: z.object({
+    requestId: z.string(),
+    connection: LinearConnectionSchema.optional(),
+    error: z.string().optional(),
+  }),
+});
+
 export const WorkspaceLinearIssuesUpdateRequestSchema = z.object({
   type: z.literal("workspace.linear_issues.update.request"),
   workspaceId: z.string(),
@@ -3381,6 +3433,9 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconColorSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceLinearIssuesUpdateRequestSchema,
+  LinearGetConnectionRequestSchema,
+  LinearSetKeyRequestSchema,
+  LinearDisconnectRequestSchema,
   WorkspaceTitleSetRequestSchema,
   WorkspacePinSetRequestSchema,
   WorkspaceLabelListRequestSchema,
@@ -3760,6 +3815,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceLabels: z.boolean().optional(),
         // COMPAT(workspaceLinearIssues): added in v0.11.0-fork.27, remove gate after 2027-04-21.
         workspaceLinearIssues: z.boolean().optional(),
+        // COMPAT(linearIntegration): added in v0.11.0-fork.28, remove gate after 2027-04-21.
+        linearIntegration: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
@@ -7290,6 +7347,9 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconColorSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceLinearIssuesUpdateResponseSchema,
+  LinearGetConnectionResponseSchema,
+  LinearSetKeyResponseSchema,
+  LinearDisconnectResponseSchema,
   WorkspaceTitleSetResponseSchema,
   WorkspacePinSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,

@@ -35,6 +35,22 @@ function outboundMessage(type: SessionOutboundMessage["type"]): SessionOutboundM
 }
 
 describe("SessionAuthorization", () => {
+  test("Linear connection metadata is readable but credentials require daemon management", () => {
+    const reader = new SessionAuthorization(["daemon.read"]);
+    expect(reader.allowsInbound(inboundMessage("integrations.linear.get_connection.request"))).toBe(
+      true,
+    );
+    expect(reader.allowsInbound(inboundMessage("integrations.linear.set_key.request"))).toBe(false);
+    expect(reader.allowsInbound(inboundMessage("integrations.linear.disconnect.request"))).toBe(
+      false,
+    );
+    const manager = new SessionAuthorization(["daemon.manage"]);
+    expect(manager.allowsInbound(inboundMessage("integrations.linear.set_key.request"))).toBe(true);
+    expect(manager.allowsInbound(inboundMessage("integrations.linear.disconnect.request"))).toBe(
+      true,
+    );
+  });
+
   test("owner authority covers every session operation", () => {
     const authorization = new SessionAuthorization(OWNER_PERMISSIONS);
 

@@ -246,6 +246,10 @@ import {
 } from "../services/github-service.js";
 import type { ForgeService } from "../services/forge-service.js";
 import {
+  createLinearIntegrationService,
+  type LinearIntegrationService,
+} from "../services/linear-integration.js";
+import {
   resolveWorkspaceRootAgent,
   summarizeFetchWorkspacesEntries,
   workspaceIdsOnCheckout,
@@ -498,6 +502,8 @@ export interface SessionOptions {
   scheduleService: ScheduleService;
   checkoutDiffManager: CheckoutDiffManager;
   github?: ForgeService;
+  linearIntegration?: LinearIntegrationService;
+  onLinearIntegrationChanged?: () => Promise<void>;
   createAgentMcpTransport?: AgentMcpTransportFactory;
   // Injected so tests can substitute the git branch rename without module mocks;
   // defaults to the real checkout-git implementation.
@@ -763,6 +769,14 @@ export class Session {
   private readonly github: ForgeService;
   private readonly renameCurrentBranch: typeof renameCurrentBranchDefault;
   private readonly workspaceGitService: WorkspaceGitService;
+  private linearIntegrationValue?: LinearIntegrationService;
+  private get linearIntegration(): LinearIntegrationService {
+    return (this.linearIntegrationValue ??= createLinearIntegrationService({
+      paseoHome: this.paseoHome,
+      logger: this.sessionLogger,
+    }));
+  }
+  private readonly onLinearIntegrationChanged?: () => Promise<void>;
   private readonly workspacePorts?: WorkspacePortsService;
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly gitMutation: GitMutationService;
@@ -907,6 +921,8 @@ export class Session {
     this.onWorkspaceRecovered = onWorkspaceRecovered ?? null;
     this.pushNotifications = pushNotifications;
     this.paseoHome = paseoHome;
+    this.linearIntegrationValue = options.linearIntegration;
+    this.onLinearIntegrationChanged = options.onLinearIntegrationChanged;
     this.messageReceipts = options.messageReceipts;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
@@ -2864,7 +2880,7 @@ export class Session {
       case "write_project_config_request":
         return this.projectConfigSession.handleWriteProjectConfigRequest(msg);
       default:
-        return undefined;
+        return this.dispatchLinearIntegrationMessage(msg);
     }
   }
 
@@ -3787,6 +3803,59 @@ export class Session {
     }
   }
 
+  private dispatchLinearIntegrationMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
+      case "integrations.linear.get_connection.request":
+      case "integrations.linear.set_key.request":
+      case "integrations.linear.disconnect.request":
+        return this.handleLinearIntegrationRequest(msg);
+      default:
+        return undefined;
+    }
+  }
+
+  private async handleLinearIntegrationRequest(
+    request: Extract<
+      SessionInboundMessage,
+      {
+        type:
+          | "integrations.linear.get_connection.request"
+          | "integrations.linear.set_key.request"
+          | "integrations.linear.disconnect.request";
+      }
+    >,
+  ): Promise<void> {
+    const responseTypes = {
+      "integrations.linear.get_connection.request": "integrations.linear.get_connection.response",
+      "integrations.linear.set_key.request": "integrations.linear.set_key.response",
+      "integrations.linear.disconnect.request": "integrations.linear.disconnect.response",
+    } as const;
+    const type = responseTypes[request.type];
+    try {
+      let connection;
+      switch (request.type) {
+        case "integrations.linear.get_connection.request":
+          connection = await this.linearIntegration.getConnection();
+          break;
+        case "integrations.linear.set_key.request":
+          connection = await this.linearIntegration.setKey(request.apiKey);
+          break;
+        case "integrations.linear.disconnect.request":
+          connection = await this.linearIntegration.disconnect();
+          break;
+      }
+      this.emit({ type, payload: { requestId: request.requestId, connection } });
+    } catch (error) {
+      this.emit({ type, payload: { requestId: request.requestId, error: getErrorMessage(error) } });
+      return;
+    }
+    if (request.type !== "integrations.linear.get_connection.request") {
+      await this.onLinearIntegrationChanged?.().catch(() => {
+        this.sessionLogger.warn("Unable to refresh workspaces after changing Linear connection");
+      });
+    }
+  }
+
   private async handleWorkspaceLinearIssuesUpdate(
     request: Extract<SessionInboundMessage, { type: "workspace.linear_issues.update.request" }>,
   ): Promise<void> {
@@ -3821,7 +3890,7 @@ export class Session {
         workspaceId: updated.workspaceId,
         requestId,
         accepted: true,
-        linearTickets: updated.linearTickets ?? [],
+        linearTickets: (await this.linearIntegration.resolve(updated.linearTickets)) ?? [],
         error: null,
       },
     });
@@ -5553,15 +5622,14 @@ export class Session {
       if (!workspaceId) return Promise.resolve({});
       let context = contextByWorkspaceId.get(workspaceId);
       if (!context) {
-        context = this.workspaceRegistry.get(workspaceId).then((workspace) => {
+        context = this.workspaceRegistry.get(workspaceId).then(async (workspace) => {
           const snapshot = workspace
             ? this.workspaceGitService.peekSnapshot(workspace.cwd)
             : undefined;
           const pullRequest = snapshot?.forge.pullRequest;
           return {
-            workspaceLinearTickets: mergeLinearTickets(
-              workspace?.linearTickets,
-              pullRequest?.linearTickets,
+            workspaceLinearTickets: await this.linearIntegration.resolve(
+              mergeLinearTickets(workspace?.linearTickets, pullRequest?.linearTickets),
             ),
             workspacePullRequest: pullRequest
               ? {
@@ -5813,7 +5881,7 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
-      linearTickets: workspace.linearTickets,
+      linearTickets: await this.linearIntegration.resolve(workspace.linearTickets),
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       archivingAt: null,
       status: "done",
@@ -5848,12 +5916,19 @@ export class Session {
     };
   }
 
-  private buildWorkspaceGitHubRuntimePayload(
+  private async buildWorkspaceGitHubRuntimePayload(
     snapshot: WorkspaceGitRuntimeSnapshot,
-  ): NonNullable<WorkspaceDescriptorPayload["githubRuntime"]> {
+  ): Promise<NonNullable<WorkspaceDescriptorPayload["githubRuntime"]>> {
+    const pullRequest = snapshot.forge.pullRequest;
+    const resolvedPullRequest = pullRequest
+      ? {
+          ...pullRequest,
+          linearTickets: await this.linearIntegration.resolve(pullRequest.linearTickets),
+        }
+      : pullRequest;
     return {
       featuresEnabled: snapshot.forge.featuresEnabled,
-      pullRequest: snapshot.forge.pullRequest,
+      pullRequest: resolvedPullRequest,
       error: snapshot.forge.error,
     };
   }
@@ -5876,7 +5951,7 @@ export class Session {
       name: resolveWorkspaceName({ title: workspace.title, derivedDisplayName: displayName }),
       diffStat: snapshot.git.diffStat ?? null,
       gitRuntime: this.buildWorkspaceGitRuntimePayload(snapshot) ?? undefined,
-      githubRuntime: this.buildWorkspaceGitHubRuntimePayload(snapshot),
+      githubRuntime: await this.buildWorkspaceGitHubRuntimePayload(snapshot),
       // Reuse the forge already resolved on the snapshot (probe-aware; GitHub-only
       // resolves to "github") so the sidebar/hover-card brand mark matches the
       // status projection without a second resolve.

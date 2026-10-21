@@ -79,6 +79,10 @@ import {
   findLatestPermissionRequest,
 } from "@getpaseo/protocol/agent-attention-notification";
 import { createGitHubService } from "../services/github-service.js";
+import {
+  createLinearIntegrationService,
+  type LinearIntegrationService,
+} from "../services/linear-integration.js";
 import type { ForgeService } from "../services/forge-service.js";
 import {
   extractHttpBearerToken,
@@ -554,6 +558,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly projectRegistry: ProjectRegistry;
   private readonly workspaceRegistry: WorkspaceRegistry;
   private readonly workspaceLabelService: WorkspaceLabelService | null;
+  private readonly linearIntegration: LinearIntegrationService;
   private readonly scheduleService: ScheduleService;
   private readonly checkoutDiffManager: CheckoutDiffManager;
   private readonly github: ForgeService;
@@ -726,6 +731,7 @@ export class VoiceAssistantWebSocketServer {
     this.workspaceAutoName = workspaceAutoName;
     this.downloadTokenStore = downloadTokenStore;
     this.paseoHome = paseoHome;
+    this.linearIntegration = createLinearIntegrationService({ paseoHome, logger: this.logger });
     this.passwordHash = auth?.password;
     this.worktreesRoot = daemonRuntimeConfig?.worktreesRoot;
     this.daemonConfigStore = daemonConfigStore;
@@ -1513,6 +1519,16 @@ export class VoiceAssistantWebSocketServer {
       directorySync: this.directorySync,
       scheduleService: this.scheduleService,
       checkoutDiffManager: this.checkoutDiffManager,
+      linearIntegration: this.linearIntegration,
+      onLinearIntegrationChanged: async () => {
+        const workspaces = await this.workspaceRegistry.list();
+        const ids = workspaces.map((workspace) => workspace.workspaceId);
+        await Promise.all(
+          this.listSessions().map((session) =>
+            session.emitWorkspaceUpdatesForExternalWorkspaceIds(ids),
+          ),
+        );
+      },
       github: this.github,
       workspaceGitService: this.workspaceGitService,
       workspacePorts: this.workspacePorts,
@@ -1854,6 +1870,7 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(workspaceSetupRun): added in v0.7.3, remove gate after 2027-09-02.
         workspaceSetupRun: true,
         workspaceLinearIssues: true,
+        linearIntegration: true,
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
         turnDiffs: true,
         // COMPAT(diffExpandContext): added in v0.11.0, remove gate after 2027-10-03.
