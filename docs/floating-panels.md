@@ -81,10 +81,6 @@ of `z-index`. It can hide app toasts and tooltips behind menus.
 The shared overlay scale keeps menus below toasts and
 lets tooltip portals paint above both.
 
-On Electron, a floating surface must set `-webkit-app-region: no-drag` across its full bounds.
-A drag region beneath a portal can swallow native pointer events regardless of `z-index`.
-CDP mouse injection bypasses this native hit test, so it cannot prove that physical hover works.
-
 The shared overlay scale is relative for interactive surfaces: a base floating
 panel is below a base modal, while a floating panel rendered from inside a modal
 inherits that modal's layer and paints above it. Wrap portal content in
@@ -107,6 +103,31 @@ action and has no component context to carry, resolve the host layer with
 `useGlobalWebOverlayLayer` on its closed-to-open transition. It captures the
 current top registered layer before the new host joins the stack; do not give a
 global dialog a fixed root-derived modal layer.
+
+## Electron drag regions
+
+Floating surfaces must exclude their full bounds from native window dragging with
+`-webkit-app-region: no-drag`. The shared `FloatingSurface` owns this exclusion.
+A drag region beneath a portal can swallow native pointer events regardless of `z-index`.
+Individual buttons can exclude their own bounds while the rest of the overlay still loses input.
+
+Symptoms include hover that works only near action buttons, disappears over text or padding,
+or remains on the previous row. A `pointerout` with no destination and coordinates inside the
+overlay can indicate this native boundary. Ignoring that exit can preserve stale hover state
+without restoring the missing input.
+
+Before adding hover handlers or coordinate checks:
+
+1. Record `pointermove`, `pointerover`, and `pointerout` at the document boundary.
+2. Compare the last event coordinates with the row bounds and `document.elementFromPoint()`.
+3. Inspect computed `-webkit-app-region` values on the floating surface and drag regions beneath it.
+4. After changing the surface, reload the app and reopen the overlay before testing with a physical pointer.
+
+CDP mouse injection bypasses native hit testing. An automated sweep can pass while physical
+hover still fails. A style applied through DevTools can disappear when the overlay remounts.
+
+Keep a regression for the surface exclusion. Verify physical movement across row text, padding,
+and actions in both directions after a full reload.
 
 ## Gotcha 2 — Portal breaks lifecycle and coordinate-system inheritance
 
