@@ -840,7 +840,7 @@ const styles = StyleSheet.create((theme) => ({
   cardMain: {
     width: HOVER_CARD_WIDTH,
     alignSelf: "flex-start",
-    paddingBottom: theme.spacing[2],
+    paddingBottom: theme.spacing[1],
   },
   portsPanel: {
     maxWidth: 290,
