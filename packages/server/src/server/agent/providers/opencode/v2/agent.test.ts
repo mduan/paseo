@@ -2,6 +2,7 @@ import type { ModelInfo, SessionMessageInfo } from "@opencode/client";
 import { describe, expect, test } from "vitest";
 
 import { createTestLogger } from "../../../../../test-utils/test-logger.js";
+import { createProviderEnv } from "../../../provider-launch-config.js";
 import type { AgentStreamEvent } from "../../../agent-sdk-types.js";
 import { OpenCodeV2AgentClient } from "./agent.js";
 import { V2Harness } from "../test-utils/v2-harness.js";
@@ -405,7 +406,7 @@ describe("OpenCode v2 session lifecycle", () => {
     }));
     const assertEnvironment = (index: number) => {
       const env = environments.get([first, second][index].info.id);
-      expect(env?.PATH).toBe(process.env.PATH);
+      expect(env?.PATH).toBe(createProviderEnv().PATH);
       expect(env).toMatchObject({ ...launches[index].env, PASEO_ENV_TEST: "configured" });
       expect(env?.USER).toBe(process.env.USER);
       for (const key of [
@@ -497,7 +498,7 @@ describe("OpenCode v2 session lifecycle", () => {
       expect(second.prompts).toEqual(["after exit"]);
       expect(second.mcpAdds).toEqual(["tools"]);
       expect(second.environments).toMatchObject([
-        { sessionID: "session", variables: { TOKEN: "test", PATH: process.env.PATH } },
+        { sessionID: "session", variables: { TOKEN: "test", PATH: createProviderEnv().PATH } },
       ]);
       expect(second.environments).toEqual(first.environments);
       expect(first.releases).toBe(1);

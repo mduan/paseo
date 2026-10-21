@@ -60,9 +60,11 @@ import {
   resolveProviderLaunch,
   checkProviderLaunchAvailable,
   createProviderEnv,
+  createProviderEnvOverlay,
   type ProviderRuntimeSettings,
 } from "./provider-launch-config.js";
 import type { RegisteredProviderDefinition } from "./provider-registry.js";
+import { createExternalProcessEnv } from "../paseo-env.js";
 import { runProviderTurn } from "./providers/provider-runner.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
 
@@ -1619,7 +1621,7 @@ function mapSessionConfig(
 ): ProviderSessionConfig {
   return {
     cwd: config.cwd,
-    env: createProviderEnv({ baseEnv: {}, overlays: [launchContext?.env] }),
+    env: createExternalProcessEnv({}, createProviderEnvOverlay({ overlays: [launchContext?.env] })),
     systemPrompt: combineSystemPrompts(config.systemPrompt, config.daemonAppendSystemPrompt),
     mcpServers: { ...config.mcpServers },
     toolPolicy: config.toolPolicy

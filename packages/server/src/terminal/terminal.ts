@@ -3,13 +3,18 @@ import xterm, { type Terminal as TerminalType } from "@xterm/headless";
 import { randomUUID } from "crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
-import { basename, delimiter, dirname, extname, join, resolve as resolvePath } from "node:path";
+import { basename, dirname, extname, join, resolve as resolvePath } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { createExternalProcessEnv } from "../server/paseo-env.js";
 import { writePrivateFileAtomicSync } from "../server/private-files.js";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
-import { PASEO_CLI_PACKAGE } from "../server/session/daemon/npm-global-cli.js";
+import {
+  prependPaseoCliToPath,
+  resolveExternalProcessPath,
+  resolvePaseoCliBinDir,
+  resolvePaseoCliExecutablePath,
+} from "../executable-resolution/paseo-cli.js";
 import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
 import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
 import { TerminalActivityTracker } from "./activity/terminal-activity-tracker.js";
@@ -17,10 +22,6 @@ import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol
 
 const { Terminal } = xterm;
 const require = createRequire(import.meta.url);
-// The fork publishes the CLI as `@mduan/paseo-cli` with this server bundled
-// inside it; local dev and the desktop app resolve the `@getpaseo/cli` workspace.
-// The fork name goes first so a leftover global `@getpaseo/cli` never wins.
-const PASEO_CLI_BIN_ENTRIES = [`${PASEO_CLI_PACKAGE}/bin/paseo`, "@getpaseo/cli/bin/paseo"];
 let nodePtySpawnHelperChecked = false;
 const TERMINAL_TITLE_DEBOUNCE_MS = 150;
 const TERMINAL_EXIT_OUTPUT_LINE_LIMIT = 12;
@@ -415,83 +416,6 @@ export function resolveZshShellIntegrationDir(): string {
   return fileURLToPath(new URL("./shell-integration/zsh", import.meta.url));
 }
 
-function resolveExternalProcessPath(filePath: string): string {
-  return filePath.replace(/\.asar(?=[/\\]|$)/, ".asar.unpacked");
-}
-
-export function resolvePaseoCliBinDir(): string | null {
-  const cliExecutable = resolvePaseoCliExecutablePath();
-  return cliExecutable ? dirname(cliExecutable) : null;
-}
-
-export function resolvePaseoCliExecutablePath(): string | null {
-  const configuredCli = process.env.PASEO_CLI?.trim();
-  if (configuredCli) {
-    return resolvePath(configuredCli);
-  }
-
-  const cliEntrypoint = resolvePaseoCliBinEntrypoint();
-  if (!cliEntrypoint) {
-    return null;
-  }
-
-  const externalCliEntrypoint = resolveExternalProcessPath(cliEntrypoint);
-  const npmBinDir = findNpmBinDir(dirname(externalCliEntrypoint));
-  if (npmBinDir) {
-    const shim = resolvePaseoCliShim(npmBinDir);
-    if (shim) {
-      return shim;
-    }
-  }
-
-  return externalCliEntrypoint;
-}
-
-function resolvePaseoCliBinEntrypoint(): string | null {
-  for (const entry of PASEO_CLI_BIN_ENTRIES) {
-    try {
-      return require.resolve(entry);
-    } catch {
-      // Try the next package name.
-    }
-  }
-  return null;
-}
-
-function findNpmBinDir(startPath: string): string | null {
-  let current = startPath;
-  while (true) {
-    const candidate = join(current, "node_modules", ".bin");
-    if (hasPaseoCliShim(candidate)) {
-      return candidate;
-    }
-
-    const parent = dirname(current);
-    if (parent === current) {
-      return null;
-    }
-    current = parent;
-  }
-}
-
-function hasPaseoCliShim(binDir: string): boolean {
-  return resolvePaseoCliShim(binDir) !== null;
-}
-
-function resolvePaseoCliShim(binDir: string): string | null {
-  for (const name of paseoCliShimNames()) {
-    const candidate = join(binDir, name);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function paseoCliShimNames(): string[] {
-  return process.platform === "win32" ? ["paseo.cmd", "paseo.exe", "paseo"] : ["paseo"];
-}
-
 function resolveZshShellIntegrationRuntimeDir(): string {
   let username = "unknown";
   try {
@@ -525,10 +449,10 @@ export function buildTerminalEnvironment(
     TERM: "xterm-256color",
     TERM_PROGRAM: "kitty",
   });
-  const envWithAgentHooks = prependPaseoCliToPath(
-    baseEnv,
-    input.paseoCliBinDir === undefined ? resolvePaseoCliBinDir() : input.paseoCliBinDir,
-  );
+  const envWithAgentHooks = prependPaseoCliToPath({
+    env: baseEnv,
+    cliBinDir: input.paseoCliBinDir === undefined ? resolvePaseoCliBinDir() : input.paseoCliBinDir,
+  });
   const envWithHookCli = injectPaseoHookCli(
     envWithAgentHooks,
     input.paseoHookCliPath === undefined ? resolvePaseoCliExecutablePath() : input.paseoHookCliPath,
@@ -558,31 +482,6 @@ function injectPaseoHookCli(
     ...env,
     PASEO_HOOK_CLI: resolvePath(resolveExternalProcessPath(cliPath)),
   };
-}
-
-function prependPaseoCliToPath(
-  env: Record<string, string>,
-  cliBinDir: string | null,
-): Record<string, string> {
-  if (!cliBinDir) {
-    return env;
-  }
-
-  const pathKey = getPathEnvKey(env);
-  const currentPath = env[pathKey] ?? "";
-  return {
-    ...env,
-    [pathKey]: prependPathEntry(currentPath, cliBinDir),
-  };
-}
-
-function getPathEnvKey(env: Record<string, string>): string {
-  return Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
-}
-
-function prependPathEntry(currentPath: string, entry: string): string {
-  const entries = currentPath.split(delimiter).filter((value) => value && value !== entry);
-  return [entry, ...entries].join(delimiter);
 }
 
 function extractCell(terminal: TerminalType, row: number, col: number): TerminalCell {

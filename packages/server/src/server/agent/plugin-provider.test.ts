@@ -1018,6 +1018,8 @@ describe("plugin provider launch and status", () => {
       if (input?.type !== "session.open") throw new Error("Expected session.open");
       expect(input.config.env).not.toHaveProperty("CLAUDECODE");
       expect(input.config.env).not.toHaveProperty("PASEO_NODE_ENV");
+      expect(input.config.env).not.toHaveProperty("PATH");
+      expect(input.config.env).not.toHaveProperty("PASEO_HOME");
     } finally {
       await registry.shutdown();
     }

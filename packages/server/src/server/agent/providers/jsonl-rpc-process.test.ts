@@ -1,5 +1,8 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import pino from "pino";
 import { describe, expect, test } from "vitest";
@@ -22,6 +25,11 @@ function respond(command, success, data, error) {
 
 readline.createInterface({ input: process.stdin, crlfDelay: Infinity }).on("line", (line) => {
   const command = JSON.parse(line);
+  if (command.type === "paseo") {
+    const output = require("node:child_process").execSync("paseo", { encoding: "utf8" });
+    respond(command, true, output.trim());
+    return;
+  }
   if (command.type === "echo") {
     setTimeout(() => respond(command, true, {
       value: command.value,
@@ -114,6 +122,27 @@ function nextExit(transport: JsonlRpcProcess): Promise<JsonlRpcExit> {
 }
 
 describe("JsonlRpcProcess", () => {
+  test("makes plain paseo available to Pi and OMP child processes", async () => {
+    const binDir = mkdtempSync(join(tmpdir(), "paseo-jsonl-cli-"));
+    const cli = join(binDir, process.platform === "win32" ? "paseo.cmd" : "paseo");
+    writeFileSync(
+      cli,
+      process.platform === "win32" ? "@echo bundled-cli\r\n" : "#!/bin/sh\necho bundled-cli\n",
+    );
+    chmodSync(cli, 0o755);
+    const originalCli = process.env.PASEO_CLI;
+    process.env.PASEO_CLI = cli;
+    const transport = startProcess();
+    try {
+      await expect(transport.request({ type: "paseo" })).resolves.toBe("bundled-cli");
+    } finally {
+      await transport.close();
+      if (originalCli === undefined) delete process.env.PASEO_CLI;
+      else process.env.PASEO_CLI = originalCli;
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
   test("spawns a resolved command and correlates concurrent requests", async () => {
     const transport = startProcess();
 

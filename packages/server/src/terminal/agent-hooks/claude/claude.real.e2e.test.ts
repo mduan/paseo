@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import * as pty from "node-pty";
 import { afterEach, describe, expect, it } from "vitest";
-import { createTerminal, resolvePaseoCliBinDir, type TerminalSession } from "../../terminal.js";
+import { createTerminal, type TerminalSession } from "../../terminal.js";
+import { resolvePaseoCliBinDir } from "../../../executable-resolution/paseo-cli.js";
 import { installRegisteredAgentHooks } from "../provider-registry.js";
 
 interface ActivityPost {

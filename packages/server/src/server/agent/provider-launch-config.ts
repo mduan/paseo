@@ -1,5 +1,10 @@
 import { isAbsolute } from "node:path";
 import {
+  getPathEnvKey,
+  prependPaseoCliToPath,
+  resolvePaseoCliBinDir,
+} from "../../executable-resolution/paseo-cli.js";
+import {
   executableExists,
   findExecutable,
 } from "../../executable-resolution/executable-resolution.js";
@@ -235,11 +240,22 @@ function collectProviderEnvOverlays(
   );
 }
 
-export function createProviderEnvSpec(options: ProviderEnvOptions = {}): ProviderEnvSpec {
+export function createProviderEnvOverlay(options: ProviderEnvOptions = {}): ProcessEnvRecord {
   const overlays = collectProviderEnvOverlays(options.runtimeSettings, options.overlays ?? []);
   const envOverlay: ProcessEnvRecord = Object.assign({}, ...overlays);
   for (const key of PARENT_SESSION_ENV_VARS) {
     envOverlay[key] = undefined;
+  }
+  return envOverlay;
+}
+
+export function createProviderEnvSpec(options: ProviderEnvOptions = {}): ProviderEnvSpec {
+  const envOverlay = createProviderEnvOverlay(options);
+  const cliBinDir = resolvePaseoCliBinDir();
+  if (cliBinDir) {
+    const env = createExternalProcessEnv(options.baseEnv ?? process.env, envOverlay);
+    const pathKey = getPathEnvKey(env);
+    envOverlay[pathKey] = prependPaseoCliToPath({ env, cliBinDir })[pathKey];
   }
   return {
     ...(options.baseEnv ? { baseEnv: options.baseEnv } : {}),

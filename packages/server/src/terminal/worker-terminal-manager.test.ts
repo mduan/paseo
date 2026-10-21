@@ -13,8 +13,8 @@ import type {
 import {
   resolvePaseoCliBinDir,
   resolvePaseoCliExecutablePath,
-  type TerminalSession,
-} from "./terminal.js";
+} from "../executable-resolution/paseo-cli.js";
+import type { TerminalSession } from "./terminal.js";
 import type { TerminalState } from "@getpaseo/protocol/messages";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type {

@@ -1,11 +1,13 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { spawnSync } from "node:child_process";
 
 import {
   checkProviderLaunchAvailable,
   createProviderEnv,
+  createProviderEnvSpec,
   migrateProviderSettings,
   ProviderOverrideSchema,
   resolveProviderLaunch,
@@ -14,10 +16,13 @@ import {
 } from "./provider-launch-config.js";
 
 const originalPath = process.env.PATH;
+const originalCli = process.env.PASEO_CLI;
 const tempDirs: string[] = [];
 
 afterEach(() => {
   process.env.PATH = originalPath;
+  if (originalCli === undefined) delete process.env.PASEO_CLI;
+  else process.env.PASEO_CLI = originalCli;
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -217,6 +222,72 @@ describe("checkProviderLaunchAvailable", () => {
 });
 
 describe("createProviderEnv", () => {
+  let cliBinDir: string;
+  beforeEach(() => {
+    cliBinDir = makeTempDir();
+    process.env.PASEO_CLI = createExecutable(cliBinDir, "paseo").path;
+  });
+
+  test("prepends once after PATH overrides and preserves daemon targeting", () => {
+    const env = createProviderEnv({
+      baseEnv: { PATH: "/base", PASEO_HOME: "/isolated/home", PASEO_HOST: "localhost:7777" },
+      runtimeSettings: { env: { PATH: "/provider" } },
+      overlays: [
+        { PATH: ["/launch", cliBinDir, cliBinDir].join(path.delimiter), REMOVE_ME: undefined },
+      ],
+    });
+    expect(env.PATH).toBe([cliBinDir, "/launch"].join(path.delimiter));
+    expect(env.PASEO_HOME).toBe("/isolated/home");
+    expect(env.PASEO_HOST).toBe("localhost:7777");
+    expect(env.REMOVE_ME).toBeUndefined();
+  });
+
+  test("preserves PATH key casing and handles a missing PATH", () => {
+    expect(createProviderEnv({ baseEnv: { Path: "/custom" } })).toEqual({
+      Path: [cliBinDir, "/custom"].join(path.delimiter),
+    });
+    expect(createProviderEnv({ baseEnv: {} })).toEqual({ PATH: cliBinDir });
+  });
+
+  test("runs plain paseo through the provider spawn spec", () => {
+    const spec = createProviderEnvSpec({
+      baseEnv: { PATH: process.platform === "win32" ? process.env.PATH : "/usr/bin:/bin" },
+      overlays: [{ PASEO_CLI: process.env.PASEO_CLI }],
+    });
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+      const { execSync } = require("node:child_process");
+      process.stdout.write(execSync("paseo", { encoding: "utf8" }));
+    `,
+      ],
+      { env: { ...spec.baseEnv, ...spec.envOverlay }, encoding: "utf8" },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("test-version");
+  });
+
+  test
+    .skipIf(process.platform !== "darwin")
+    .each(["/bin/sh", "/bin/bash", "/bin/zsh"].filter(existsSync))(
+    "runs plain paseo in login and non-login %s shells with an isolated home",
+    (shell) => {
+      const home = makeTempDir();
+      const env = createProviderEnv({
+        baseEnv: { HOME: home, ZDOTDIR: home, PATH: "/usr/bin:/bin" },
+      });
+      for (const flag of ["-lc", "-c"]) {
+        const result = spawnSync(shell, [flag, "paseo"], { env, encoding: "utf8" });
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim()).toBe("test-version");
+      }
+    },
+  );
+
   test("merges provider env overrides", () => {
     const base = {
       PATH: "/usr/bin",
@@ -231,7 +302,7 @@ describe("createProviderEnv", () => {
 
     const env = createProviderEnv({ baseEnv: base, runtimeSettings: runtime });
 
-    expect(env.PATH).toBe("/usr/bin");
+    expect(env.PATH).toBe([cliBinDir, "/usr/bin"].join(path.delimiter));
     expect(env.HOME).toBe("/custom/home");
     expect(env.FOO).toBe("bar");
     expect(Object.keys(env).length).toBeGreaterThanOrEqual(3);
@@ -243,7 +314,7 @@ describe("createProviderEnv", () => {
 
     const env = createProviderEnv({ baseEnv: base, runtimeSettings: runtime });
 
-    expect(env.PATH).toBe("/custom/path");
+    expect(env.PATH).toBe([cliBinDir, "/custom/path"].join(path.delimiter));
   });
 
   test("strips parent Claude Code session env vars without removing SDK child flags", () => {
@@ -258,7 +329,7 @@ describe("createProviderEnv", () => {
 
     const env = createProviderEnv({ baseEnv: base });
 
-    expect(env.PATH).toBe("/usr/bin");
+    expect(env.PATH).toBe([cliBinDir, "/usr/bin"].join(path.delimiter));
     expect(env.CLAUDECODE).toBeUndefined();
     expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined();
     expect(env.CLAUDE_CODE_SSE_PORT).toBeUndefined();

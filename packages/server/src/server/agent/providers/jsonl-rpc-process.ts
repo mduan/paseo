@@ -1,6 +1,11 @@
 import { type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { Logger } from "pino";
 
+import {
+  prependPaseoCliToPath,
+  resolvePaseoCliBinDir,
+} from "../../../executable-resolution/paseo-cli.js";
+import { createExternalProcessEnv } from "../../paseo-env.js";
 import { spawnProcess } from "../../../utils/spawn.js";
 import { terminateWithTreeKill } from "../../../utils/tree-kill.js";
 import { JsonlFrameDecoder } from "./jsonl-frame-decoder.js";
@@ -65,7 +70,10 @@ function assertChildWithPipes(
 function spawnJsonlRpcProcess(launch: JsonlRpcLaunch): ChildProcessWithoutNullStreams {
   const child = spawnProcess(launch.command, launch.args, {
     cwd: launch.cwd,
-    envOverlay: launch.env,
+    env: prependPaseoCliToPath({
+      env: createExternalProcessEnv(process.env, launch.env ?? {}),
+      cliBinDir: resolvePaseoCliBinDir(),
+    }),
     stdio: ["pipe", "pipe", "pipe"],
   });
   assertChildWithPipes(child);
