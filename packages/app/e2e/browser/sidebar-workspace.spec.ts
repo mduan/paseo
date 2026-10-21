@@ -444,30 +444,58 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
+  test("GitHub linkbacks do not show Linear tickets without a Linear key", async ({ page }) => {
+    const workspace = await seedWorkspace({
+      repoPrefix: "sidebar-linear-disconnected-",
+      repo: {
+        originUrl: "https://github.com/paseo-e2e/local-fixture.git",
+        files: [
+          {
+            path: ".paseo-e2e-pr.json",
+            content: JSON.stringify({
+              title: "Fix warehouse metrics",
+              comments: [
+                {
+                  author: { login: "linear-code" },
+                  body: "<!-- linear-linkback -->[COR-1401 Fix](https://linear.app/acme/issue/COR-1401)",
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    });
+    try {
+      await gotoAppShell(page);
+      const sidebarRow = await waitForSidebarWorkspace(page, workspace.workspaceId);
+      await expect(
+        sidebarRow.getByRole("link", { name: "Pull request #1, Open", exact: true }),
+      ).toBeVisible();
+      await expect(sidebarRow.getByTestId("sidebar-workspace-linear-tickets")).toHaveCount(0);
+      const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
+      await expect(card.getByTestId("hover-card-workspace-linear-tickets")).toHaveCount(0);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   test("Linear tickets show hover actions and two-second copy feedback", async ({
     page,
     context,
   }, testInfo) => {
-    const fixture = {
-      title: "Fix warehouse metrics",
-      comments: [
-        {
-          author: { login: "linear-code" },
-          body: `<!-- linear-linkback -->
-<a href="https://linear.app/acme/issue/COR-1401">COR-1401 Make Execute Query more discoverable</a>
-<a href="https://linear.app/acme/issue/COR-1404">COR-1404 Display no results returned</a>
-${Array.from({ length: 10 }, (_, index) => `<a href="https://linear.app/acme/issue/COR-${1500 + index}">COR-${1500 + index} Additional ticket with a longer title to exercise the scrolling panel</a>`).join("\n")}`,
-        },
-      ],
-    };
     const workspace = await seedWorkspace({
       repoPrefix: "sidebar-linear-hover-",
-      repo: {
-        originUrl: "https://github.com/paseo-e2e/local-fixture.git",
-        files: [{ path: ".paseo-e2e-pr.json", content: JSON.stringify(fixture) }],
-      },
     });
     try {
+      const identifiers = [
+        "COR-1401",
+        "COR-1404",
+        ...Array.from({ length: 10 }, (_, i) => `COR-${1500 + i}`),
+      ];
+      await workspace.client.updateWorkspaceLinearIssues({
+        workspaceId: workspace.workspaceId,
+        add: identifiers.map((identifier) => `https://linear.app/acme/issue/${identifier}`),
+      });
       await context.grantPermissions(["clipboard-read", "clipboard-write"]);
       await gotoAppShell(page);
       const sidebarRow = await waitForSidebarWorkspace(page, workspace.workspaceId);
@@ -495,20 +523,12 @@ ${Array.from({ length: 10 }, (_, index) => `<a href="https://linear.app/acme/iss
       const expandedHeight = (await card.boundingBox())?.height;
       expect.soft(expandedHeight).toBeLessThanOrEqual(mainHeight + 1);
       const row = panel.getByTestId("hover-card-linear-ticket-COR-1401");
-      await expect(row.getByText("Make Execute Query more discoverable")).toBeVisible();
       await expect(row.getByRole("link")).toHaveCount(1);
       const copy = row.getByRole("button", { name: "Copy: COR-1401", exact: true });
       const actions = copy.locator("..");
       await expect(actions).toHaveCSS("opacity", "0");
       await row.hover();
       await expect(actions).toHaveCSS("opacity", "1");
-      const title = row.getByText("Make Execute Query more discoverable");
-      await expect(title).toHaveCSS(
-        "color",
-        await row
-          .getByText("COR-1401", { exact: true })
-          .evaluate((element) => getComputedStyle(element).color),
-      );
       const screenshotPath = testInfo.outputPath("linear-tickets.png");
       await card.screenshot({ path: screenshotPath });
       await testInfo.attach("Linear ticket panel", {

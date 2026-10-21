@@ -30,6 +30,7 @@ interface SeedProjectDescriptor {
  */
 export interface SeedDaemonClient {
   listAgentTurnDiffs: DaemonClient["listAgentTurnDiffs"];
+  updateWorkspaceLinearIssues: DaemonClient["updateWorkspaceLinearIssues"];
   connect(): Promise<void>;
   close(): Promise<void>;
   addProject(cwd: string): Promise<{
