@@ -29,6 +29,7 @@ import {
   resolveAbsoluteGitDir,
 } from "../utils/checkout-git.js";
 import type {
+  CurrentPullRequestStatus,
   ForgeAuthState,
   ForgeService,
   ForgeSpecificStatusFacts,
@@ -183,6 +184,7 @@ export interface WorkspaceGitRuntimeSnapshot {
      */
     forge?: string;
     pullRequest: {
+      linearTickets?: CurrentPullRequestStatus["linearTickets"];
       number?: number;
       repoOwner?: string;
       repoName?: string;

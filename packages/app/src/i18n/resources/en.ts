@@ -535,7 +535,11 @@ export const en = {
       },
     },
     hoverCard: {
-      livePorts: "Live ports ({{count}})",
+      linearTickets: "Linear tickets",
+      ticketsAccessibility: "Linear tickets: {{tickets}}",
+      openInLinear: "Open in Linear",
+      ticketTitleUnavailable: "Title unavailable",
+      livePorts: "Live ports",
       portsAccessibility: "Live ports: {{ports}}",
       openInBrowser: "Open in browser",
       scriptsAccessibility: "Workspace scripts",
@@ -1224,6 +1228,7 @@ export const en = {
         branch: "Branch name",
       },
       show: {
+        linearTickets: "Linear tickets",
         ports: "Live ports",
         label: "Show",
         branch: "Branch",

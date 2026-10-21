@@ -544,7 +544,11 @@ export const ptBR: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "Portas ativas ({{count}})",
+      linearTickets: "Tickets do Linear",
+      ticketsAccessibility: "Tickets do Linear: {{tickets}}",
+      openInLinear: "Abrir no Linear",
+      ticketTitleUnavailable: "Título indisponível",
+      livePorts: "Portas ativas",
       portsAccessibility: "Portas ativas: {{ports}}",
       openInBrowser: "Abrir no navegador",
       scriptsAccessibility: "Scripts do workspace",
@@ -1243,6 +1247,7 @@ export const ptBR: TranslationResources = {
         branch: "Nome da branch",
       },
       show: {
+        linearTickets: "Tickets do Linear",
         ports: "Portas ativas",
         label: "Mostrar",
         branch: "Branch",

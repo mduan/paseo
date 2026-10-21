@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -9,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Dimensions, Text, View } from "react-native";
+import { Dimensions, ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -26,11 +27,18 @@ import {
   Server,
   Tag,
 } from "lucide-react-native";
+import type { LinearTicket } from "@getpaseo/protocol/messages";
+import { LinearIcon } from "@/components/icons/linear-icon";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
 import { Pressable } from "react-native";
-import type { GestureResponderEvent, PointerEvent as NativePointerEvent } from "react-native";
+import type {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  PointerEvent as NativePointerEvent,
+} from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -102,6 +110,11 @@ function computeHoverCardPosition({
 }
 
 const HOVER_CARD_WIDTH = 260;
+
+enum HoverPanel {
+  Ports,
+  LinearTickets,
+}
 
 interface WorkspaceHoverCardProps {
   workspace: SidebarWorkspaceEntry;
@@ -216,16 +229,33 @@ function WorkspaceHoverCardContent({
     cwd: workspace.workspaceDirectory,
   });
   const ports = workspace.ports;
-  const portsPanel = useHoverIntent();
+  const sidePanel = useHoverIntent();
+  const [activePanel, setActivePanel] = useState<HoverPanel>();
+  const tickets = prHint?.linearTickets;
+  const [mainHeight, setMainHeight] = useState<number>();
+  const handleMainLayout = useCallback((event: LayoutChangeEvent) => {
+    setMainHeight(event.nativeEvent.layout.height);
+  }, []);
+  const openPanelNow = sidePanel.openNow;
+  const openPorts = useCallback(() => {
+    setActivePanel(HoverPanel.Ports);
+    openPanelNow();
+  }, [openPanelNow]);
+  const openTickets = useCallback(() => {
+    setActivePanel(HoverPanel.LinearTickets);
+    openPanelNow();
+  }, [openPanelNow]);
+  const ticketsRowRef = useRef<View>(null);
   const portsRowRef = useRef<View>(null);
-  const schedulePanelClose = portsPanel.scheduleClose;
+  const schedulePanelClose = sidePanel.scheduleClose;
   const handleMainPointerMove = useCallback(
     (event: NativePointerEvent) => {
       const target: unknown = event.target;
-      const portsRow = portsRowRef.current;
+      const sourceRows = [portsRowRef.current, ticketsRowRef.current];
       // Keep document pointer events intact: the hovercard safe zone also reads them.
-      if (isWeb && portsRow instanceof Node && target instanceof Node && portsRow.contains(target))
-        return;
+      if (isWeb && target instanceof Node) {
+        if (sourceRows.some((row) => row instanceof Node && row.contains(target))) return;
+      }
       schedulePanelClose();
     },
     [schedulePanelClose],
@@ -298,15 +328,21 @@ function WorkspaceHoverCardContent({
         <View style={styles.cardColumns}>
           <View
             style={styles.cardMain}
-            onPointerEnter={portsPanel.scheduleClose}
+            onLayout={handleMainLayout}
+            onPointerEnter={sidePanel.scheduleClose}
             onPointerMove={handleMainPointerMove}
-            onPointerLeave={portsPanel.cancelClose}
+            onPointerLeave={sidePanel.cancelClose}
           >
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle} testID="hover-card-workspace-name">
                 {workspace.name}
               </Text>
             </View>
+            {tickets?.length ? (
+              <View ref={ticketsRowRef} onPointerEnter={openTickets}>
+                <LinearTicketsSummary tickets={tickets} onOpen={openTickets} />
+              </View>
+            ) : null}
             {prHint ? <PullRequestRow hint={prHint} /> : null}
             {workspace.diffStat ? (
               <View style={styles.cardInfoRow}>
@@ -346,14 +382,14 @@ function WorkspaceHoverCardContent({
               />
             ) : null}
             {ports?.length ? (
-              <View ref={portsRowRef} onPointerEnter={portsPanel.openNow}>
+              <View ref={portsRowRef} onPointerEnter={openPorts}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("workspace.hoverCard.portsAccessibility", {
                     ports: ports.map((port) => port.port).join(", "),
                   })}
-                  onPress={portsPanel.openNow}
-                  style={styles.cardInfoRow}
+                  onPress={openPorts}
+                  style={[styles.cardInfoRow, styles.defaultCursor]}
                   testID="hover-card-workspace-ports"
                 >
                   <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
@@ -366,17 +402,15 @@ function WorkspaceHoverCardContent({
             ) : null}
             <LabelsRow serverId={workspace.serverId} names={workspace.labels} />
           </View>
-          {portsPanel.open && ports?.length ? (
-            <View
-              style={styles.portsPanel}
-              onPointerEnter={portsPanel.cancelClose}
-              testID="hover-card-ports-panel"
-            >
-              <Text style={styles.portsTitle}>
-                {t("workspace.hoverCard.livePorts", { count: ports.length })}
-              </Text>
-              <PortsList ports={ports} serverId={workspace.serverId} />
-            </View>
+          {sidePanel.open ? (
+            <WorkspaceDetailsPanel
+              activePanel={activePanel}
+              ports={ports}
+              tickets={tickets}
+              serverId={workspace.serverId}
+              cancelClose={sidePanel.cancelClose}
+              maxHeight={mainHeight}
+            />
           ) : null}
         </View>
       </FloatingSurface>
@@ -385,7 +419,95 @@ function WorkspaceHoverCardContent({
   );
 }
 
+function LinearTicketsSummary({
+  tickets,
+  onOpen,
+}: {
+  tickets: readonly LinearTicket[];
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View
+      style={[styles.cardInfoRow, styles.defaultCursor]}
+      testID="hover-card-workspace-linear-tickets"
+    >
+      <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
+      <Text style={styles.cardInfoText} numberOfLines={1}>
+        {tickets.map((ticket, index) => (
+          <Fragment key={ticket.url}>
+            {index > 0 ? ", " : undefined}
+            <MarkdownLinkText href={ticket.url} style={styles.ticketSummaryLink}>
+              {ticket.identifier}
+            </MarkdownLinkText>
+          </Fragment>
+        ))}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={styles.defaultCursor}
+        accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
+          tickets: tickets.map((ticket) => ticket.identifier).join(", "),
+        })}
+      >
+        <ThemedChevronRight size={12} uniProps={foregroundMutedColorMapping} />
+      </Pressable>
+    </View>
+  );
+}
+
+function WorkspaceDetailsPanel({
+  activePanel,
+  ports,
+  tickets,
+  serverId,
+  cancelClose,
+  maxHeight,
+}: {
+  maxHeight?: number;
+  activePanel?: HoverPanel;
+  ports?: readonly WorkspacePort[];
+  tickets?: readonly LinearTicket[];
+  serverId: string;
+  cancelClose: () => void;
+}) {
+  const { t } = useTranslation();
+  if (activePanel === HoverPanel.Ports && ports?.length) {
+    return (
+      <View style={styles.portsPanel} onPointerEnter={cancelClose} testID="hover-card-ports-panel">
+        <View style={styles.panelHeader}>
+          <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
+          <Text style={styles.panelTitle}>{t("workspace.hoverCard.livePorts")}</Text>
+        </View>
+        <PortsList ports={ports} serverId={serverId} />
+      </View>
+    );
+  }
+  if (activePanel === HoverPanel.LinearTickets && tickets?.length && maxHeight) {
+    return (
+      <View
+        style={styles.ticketsPanel(maxHeight)}
+        onPointerEnter={cancelClose}
+        testID="hover-card-linear-panel"
+      >
+        <View style={styles.panelHeader}>
+          <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
+          <Text style={styles.panelTitle}>{t("workspace.hoverCard.linearTickets")}</Text>
+        </View>
+        <ScrollView style={styles.ticketList}>
+          {tickets.map((ticket) => (
+            <LinearTicketRow key={ticket.url} ticket={ticket} />
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+  return null;
+}
+
 const ThemedExternalLink = withUnistyles(ExternalLink);
+const ThemedLinear = withUnistyles(LinearIcon);
 const ThemedPlug = withUnistyles(Plug);
 const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedGitBranch = withUnistyles(GitBranch);
@@ -635,6 +757,70 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   );
 }
 
+function LinearTicketRow({ ticket }: { ticket: LinearTicket }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { copied, markCopied } = useCopyFeedback();
+  const [hovered, setHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => setHovered(false), []);
+  const copyIdentifier = useCallback(() => {
+    void copyToClipboard(ticket.identifier)
+      .then(markCopied)
+      .catch(() => toast.error(t("workspace.tabs.toasts.copyFailed")));
+  }, [ticket.identifier, markCopied, t, toast]);
+  const openTicket = useCallback(() => void openExternalUrl(ticket.url), [ticket.url]);
+
+  return (
+    <View
+      style={styles.portHoverTarget}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+    >
+      <View
+        style={[styles.ticketRow, hovered && styles.listRowHovered]}
+        testID={`hover-card-linear-ticket-${ticket.identifier}`}
+      >
+        <View style={styles.ticketHeader}>
+          <Text style={styles.ticketIdentifier} selectable={false} pointerEvents="none">
+            {ticket.identifier}
+          </Text>
+          <View
+            style={[styles.ticketActions, !hovered && styles.hidden]}
+            pointerEvents={hovered ? "auto" : "none"}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={copyIdentifier}
+              accessibilityLabel={`${copied ? t("common.states.copied") : t("common.actions.copy")}: ${ticket.identifier}`}
+              style={styles.portAction}
+              tabIndex={hovered ? 0 : -1}
+            >
+              {copied ? (
+                <ThemedCheck size={12} uniProps={foregroundColorMapping} />
+              ) : (
+                <ThemedCopy size={12} uniProps={foregroundMutedColorMapping} />
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              onPress={openTicket}
+              accessibilityLabel={`${ticket.identifier}, ${t("workspace.hoverCard.openInLinear")}`}
+              style={styles.portAction}
+              tabIndex={hovered ? 0 : -1}
+            >
+              <ThemedExternalLink size={12} uniProps={foregroundMutedColorMapping} />
+            </Pressable>
+          </View>
+        </View>
+        <Text style={styles.ticketTitle} selectable={false} pointerEvents="none">
+          {ticket.title || t("workspace.hoverCard.ticketTitleUnavailable")}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
   portalOverlay: {
     position: "absolute",
@@ -659,7 +845,7 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 1000,
   },
   cardColumns: { flexDirection: "row" },
-  cardMain: { width: HOVER_CARD_WIDTH },
+  cardMain: { width: HOVER_CARD_WIDTH, alignSelf: "flex-start" },
   portsPanel: {
     maxWidth: 290,
     minWidth: 0,
@@ -668,13 +854,42 @@ const styles = StyleSheet.create((theme) => ({
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
   },
-  portsTitle: {
+  panelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1.5],
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
+  },
+  panelTitle: {
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
   },
+  ticketsPanel: (maxHeight: number) => ({
+    maxHeight,
+    width: 340,
+    minWidth: 0,
+    flexShrink: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: theme.colors.border,
+    paddingBottom: theme.spacing[2],
+  }),
+  ticketList: { flexShrink: 1 },
+  ticketSummaryLink: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+  ticketRow: {
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+    gap: theme.spacing[1],
+  },
+  ticketHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  ticketIdentifier: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foregroundMuted,
+  },
+  ticketActions: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+  ticketTitle: { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
   portHoverTarget: { position: "relative" },
   portRow: {
     flexDirection: "row",
@@ -730,6 +945,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minWidth: 0,
   },
+  defaultCursor: { cursor: "auto" },
   cardInfoRow: {
     flexDirection: "row",
     alignItems: "center",

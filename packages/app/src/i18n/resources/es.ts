@@ -545,7 +545,11 @@ export const es: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "Puertos activos ({{count}})",
+      linearTickets: "Tickets de Linear",
+      ticketsAccessibility: "Tickets de Linear: {{tickets}}",
+      openInLinear: "Abrir en Linear",
+      ticketTitleUnavailable: "Título no disponible",
+      livePorts: "Puertos activos",
       portsAccessibility: "Puertos activos: {{ports}}",
       openInBrowser: "Abrir en el navegador",
       scriptsAccessibility: "GuionesWorkspace",
@@ -1253,6 +1257,7 @@ export const es: TranslationResources = {
         branch: "Nombre de rama",
       },
       show: {
+        linearTickets: "Tickets de Linear",
         ports: "Puertos activos",
         label: "Mostrar",
         branch: "Rama",

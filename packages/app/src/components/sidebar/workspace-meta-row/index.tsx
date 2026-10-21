@@ -1,4 +1,5 @@
-import type { WorkspacePort } from "@getpaseo/protocol/messages";
+import { LinearIcon } from "@/components/icons/linear-icon";
+import type { LinearTicket, WorkspacePort } from "@getpaseo/protocol/messages";
 import { useCallback, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
@@ -39,6 +40,7 @@ const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedPlug = withUnistyles(Plug);
+const ThemedLinear = withUnistyles(LinearIcon);
 const ThemedSplit = withUnistyles(Split);
 
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
@@ -133,6 +135,9 @@ function MetaItemNode({
   if (item.kind === "checks") {
     return <ChecksItem summary={item.summary} label={item.label} />;
   }
+  if (item.kind === "linearTickets") {
+    return <LinearTicketsItem tickets={item.tickets} />;
+  }
   if (item.kind === "ports") {
     return <PortsItem ports={item.ports} />;
   }
@@ -219,6 +224,21 @@ function PullRequestItem({ hint }: { hint: PrHint }) {
     >
       <PullRequestStateIcon state={hint.state} size={META_ICON_SIZE} />
     </Pressable>
+  );
+}
+
+function LinearTicketsItem({ tickets }: { tickets: readonly LinearTicket[] }) {
+  const { t } = useTranslation();
+  return (
+    <View
+      style={styles.item}
+      testID="sidebar-workspace-linear-tickets"
+      accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
+        tickets: tickets.map((ticket) => ticket.identifier).join(", "),
+      })}
+    >
+      <ThemedLinear size={META_ICON_SIZE} uniProps={mutedMapping} />
+    </View>
   );
 }
 

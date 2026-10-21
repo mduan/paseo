@@ -4132,12 +4132,21 @@ const WorkspaceGitRuntimePayloadSchema = z
   .optional()
   .nullable();
 
+export const LinearTicketSchema = z.object({
+  identifier: z.string(),
+  url: z.string(),
+  title: z.string().optional(),
+});
+
+export type LinearTicket = z.infer<typeof LinearTicketSchema>;
+
 export const WorkspaceGitHubRuntimePayloadSchema = z
   .object({
     featuresEnabled: z.boolean().optional(),
     pullRequest: z
       .object({
         number: z.number().optional(),
+        linearTickets: z.array(LinearTicketSchema).optional(),
         url: z.string(),
         title: z.string(),
         state: z.string(),
@@ -5586,6 +5595,7 @@ export const CheckoutPrStatusSchema = z.object({
   repoName: z.string().optional(),
   github: CheckoutPrGithubStatusSchema,
   forgeSpecific: CheckoutPrForgeSpecificSchema,
+  linearTickets: z.array(LinearTicketSchema).optional(),
 });
 
 // Why a forge's PR/MR features are (un)available, so the client can offer the

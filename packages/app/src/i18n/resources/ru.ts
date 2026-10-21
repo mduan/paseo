@@ -544,7 +544,11 @@ export const ru: TranslationResources = {
       },
     },
     hoverCard: {
-      livePorts: "Активные порты ({{count}})",
+      linearTickets: "Задачи Linear",
+      ticketsAccessibility: "Задачи Linear: {{tickets}}",
+      openInLinear: "Открыть в Linear",
+      ticketTitleUnavailable: "Название недоступно",
+      livePorts: "Активные порты",
       portsAccessibility: "Активные порты: {{ports}}",
       openInBrowser: "Открыть в браузере",
       scriptsAccessibility: "Скрипты рабочего пространства",
@@ -1234,6 +1238,7 @@ export const ru: TranslationResources = {
         branch: "Имя ветки",
       },
       show: {
+        linearTickets: "Задачи Linear",
         ports: "Активные порты",
         label: "Показывать",
         branch: "Ветка",

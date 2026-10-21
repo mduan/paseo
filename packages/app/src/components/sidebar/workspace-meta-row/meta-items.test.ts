@@ -35,6 +35,39 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
 const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item) => item.kind);
 
 describe("selectMetaRowItems", () => {
+  it("places Linear after checks and before ports with independent visibility", () => {
+    const linearTickets = [
+      { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
+    ];
+    const input = {
+      prHint: { ...PR_HINT, linearTickets },
+      ports: [{ workspaceId: "app", host: "*", port: 3000 }],
+    };
+    expect(kinds(select(input))).toEqual([
+      "host",
+      "changeRequest",
+      "checks",
+      "linearTickets",
+      "ports",
+      "services",
+      "labels",
+    ]);
+    expect(
+      kinds(select({ ...input, visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, linearTickets: false } })),
+    ).not.toContain("linearTickets");
+    expect(
+      kinds(
+        select({
+          ...input,
+          checksDisplay: "none",
+          visible: { ...DEFAULT_SIDEBAR_ROW_ITEMS, changeRequest: false, ports: false },
+        }),
+      ),
+    ).toEqual(["host", "linearTickets", "services", "labels"]);
+    expect(kinds(select({ prHint: { ...PR_HINT, linearTickets: [] } }))).not.toContain(
+      "linearTickets",
+    );
+  });
   it("places ports after checks, and respects the ports preference and empty results", () => {
     const ports = [{ workspaceId: "app", host: "*", port: 3000 }];
     expect(kinds(select({ ports }))).toEqual([

@@ -51,19 +51,22 @@ function makeDeps(
 }
 
 describe("loadAppSettingsFromStorage", () => {
-  it("enables live ports for old settings and preserves an explicit opt-out", async () => {
-    const deps = makeDeps();
-    await deps.storage.setItem(
-      APP_SETTINGS_KEY,
-      JSON.stringify({ sidebarRowItems: { branch: true } }),
-    );
-    expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems.ports).toBe(true);
-    await deps.storage.setItem(
-      APP_SETTINGS_KEY,
-      JSON.stringify({ sidebarRowItems: { ports: false } }),
-    );
-    expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems.ports).toBe(false);
-  });
+  it.each(["ports", "linearTickets"] as const)(
+    "enables %s for old settings and preserves an explicit opt-out",
+    async (item) => {
+      const deps = makeDeps();
+      await deps.storage.setItem(
+        APP_SETTINGS_KEY,
+        JSON.stringify({ sidebarRowItems: { branch: true } }),
+      );
+      expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems[item]).toBe(true);
+      await deps.storage.setItem(
+        APP_SETTINGS_KEY,
+        JSON.stringify({ sidebarRowItems: { [item]: false } }),
+      );
+      expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems[item]).toBe(false);
+    },
+  );
   it("defaults turn diff opens to Explorer", async () => {
     expect((await loadAppSettingsFromStorage(makeDeps())).turnDiffOpenLocation).toBe(
       TurnDiffOpenLocation.Explorer,

@@ -226,6 +226,7 @@ const SidebarRowItemsSchema = z
     project: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.project),
     host: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.host),
     changeRequest: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.changeRequest),
+    linearTickets: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.linearTickets),
     ports: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.ports),
     services: z.boolean().optional().catch(undefined),
     labels: z.boolean().catch(DEFAULT_SIDEBAR_ROW_ITEMS.labels),

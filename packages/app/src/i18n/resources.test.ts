@@ -106,11 +106,15 @@ function findUntranslatedConnectionErrors(): string[] {
 
 describe("translation resources", () => {
   it.each([en, ar, es, fr, ja, ko, ptBR, ru, zhCN])(
-    "renders port counts and lists without untranslated placeholders",
+    "renders panel headers and metadata lists without untranslated placeholders",
     async (resource) => {
       const instance = createInstance();
       await instance.init({ lng: "test", resources: { test: { translation: resource } } });
-      expect(instance.t("workspace.hoverCard.livePorts", { count: 3 })).toContain("3");
+      expect(instance.t("workspace.hoverCard.livePorts")).not.toMatch(/\(|\{\{/);
+      expect(
+        instance.t("workspace.hoverCard.ticketsAccessibility", { tickets: "COR-1401, COR-1404" }),
+      ).toContain("COR-1401, COR-1404");
+      expect(instance.t("sidebar.display.show.linearTickets")).not.toContain("sidebar.display");
       expect(
         instance.t("workspace.hoverCard.portsAccessibility", { ports: "3000, 8000" }),
       ).toContain("3000, 8000");

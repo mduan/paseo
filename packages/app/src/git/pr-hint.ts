@@ -1,8 +1,10 @@
+import type { LinearTicket } from "@getpaseo/protocol/messages";
 /* oxlint-disable typescript/consistent-type-definitions -- AGENTS.md requires type aliases. */
 import { normalizeForge, type Forge } from "@/git/forge";
 import type { PresentableCheck } from "@/git/check-presentation";
 
 export type PrHint = {
+  linearTickets?: LinearTicket[];
   url: string;
   number: number;
   state: "open" | "merged" | "closed" | "draft";
@@ -19,6 +21,7 @@ export interface PrHintCheck extends PresentableCheck {
 }
 
 interface PrStatusLike {
+  linearTickets?: LinearTicket[];
   url: string;
   state: string;
   isMerged: boolean;
@@ -66,6 +69,7 @@ export function selectPrHintFromStatus(
   else state = "closed";
 
   return {
+    linearTickets: status.linearTickets,
     url: status.url,
     number,
     state,
