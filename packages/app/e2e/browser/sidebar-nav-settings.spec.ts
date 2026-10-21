@@ -7,6 +7,7 @@ import {
   openCompactSidebar,
 } from "../support/helpers/usage-sidebar-item";
 import { gotoAppShell } from "../support/helpers/app";
+import { emulateWindowsKeyboard } from "../support/helpers/keyboard-platform";
 import { SHOWCASE_PLUGIN_ID, installSidebarPlugins } from "../support/helpers/plugin-sidebar-items";
 import {
   expectFooterIconRow,
@@ -30,6 +31,10 @@ import {
   setFooterItemVisible,
   setSidebarNavItemVisible,
 } from "../support/helpers/sidebar-nav-settings";
+
+test.beforeEach(async ({ page }) => {
+  await emulateWindowsKeyboard(page);
+});
 
 test("fixed footer line keeps its five icons, Help and Settings at the end", async ({ page }) => {
   test.setTimeout(120_000);

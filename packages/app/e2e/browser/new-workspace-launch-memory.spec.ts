@@ -57,7 +57,7 @@ test.describe("New workspace: launch target memory", () => {
 
     const openNewWorkspace = () =>
       openNewWorkspaceComposer(page, {
-        projectKey: workspace.projectKey,
+        projectViewKey: workspace.projectViewKey,
         projectDisplayName: workspace.projectDisplayName,
       });
 

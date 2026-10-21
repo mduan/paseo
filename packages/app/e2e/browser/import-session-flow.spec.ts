@@ -12,6 +12,7 @@ import {
   type OpenedProject,
 } from "../support/helpers/new-workspace";
 import { createTempDirectory, createTempGitRepo } from "../support/helpers/workspace";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 
 const SCREENSHOT_DIRECTORY = path.join(
   process.env.HOME ?? tmpdir(),
@@ -89,6 +90,10 @@ test.beforeAll(async () => {
     workspaceId: project.workspace.id,
     projectId: project.workspace.projectId,
     projectKey: projectDescriptor.projectKey,
+    projectViewKey: projectPlacementViewKey(
+      client.getLastServerInfoMessage()!.serverId,
+      project.workspace.projectId,
+    ),
     projectDisplayName: project.workspace.projectDisplayName,
     workspaceName: project.workspace.name,
     workspaceDirectory: project.workspace.workspaceDirectory,

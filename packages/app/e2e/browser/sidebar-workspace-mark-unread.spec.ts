@@ -67,9 +67,12 @@ async function markAsRead(page: Page, workspaceId: string) {
 }
 
 async function expectStatus(page: Page, workspaceId: string, status: "done" | "attention") {
-  await expect(
-    workspaceRow(page, workspaceId).getByTestId(`workspace-status-indicator-${status}`),
-  ).toBeVisible();
+  const row = workspaceRow(page, workspaceId);
+  if (status === "attention") {
+    await expect(row).toHaveAccessibleName(/Ready to review/);
+  } else {
+    await expect(row).not.toHaveAccessibleName(/Ready to review|Working|Failed|Needs input/);
+  }
 }
 
 async function markBackgroundWorkspaceAndReopen(page: Page, workspaceId: string) {

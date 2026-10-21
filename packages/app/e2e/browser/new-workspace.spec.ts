@@ -717,7 +717,7 @@ test.describe("New workspace flow", () => {
       });
 
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");
@@ -765,7 +765,7 @@ test.describe("New workspace flow", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");
@@ -857,7 +857,7 @@ test.describe("New workspace flow", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");
@@ -882,7 +882,7 @@ test.describe("New workspace flow", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");
@@ -912,7 +912,7 @@ test.describe("New workspace flow", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");
@@ -948,7 +948,7 @@ test.describe("New workspace flow", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await openNewWorkspaceComposer(page, {
-      projectKey: openedProject.projectKey,
+      projectViewKey: openedProject.projectViewKey,
       projectDisplayName: openedProject.projectDisplayName,
     });
     await selectWorkspaceIsolation(page, "worktree");
@@ -1006,7 +1006,7 @@ test.describe("New workspace flow", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await openNewWorkspaceComposer(page, {
-      projectKey: openedProject.projectKey,
+      projectViewKey: openedProject.projectViewKey,
       projectDisplayName: openedProject.projectDisplayName,
     });
     await selectWorkspaceIsolation(page, "worktree");
@@ -1054,7 +1054,7 @@ test.describe("New workspace flow", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: openedProject.projectKey,
+        projectViewKey: openedProject.projectViewKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "worktree");

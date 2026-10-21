@@ -263,7 +263,7 @@ function SheetContent({ style, children }: { style: StyleProp<ViewStyle>; childr
   return <View style={[styles.sheetContent, style]}>{children}</View>;
 }
 
-function BottomSheetVisibleContent({ children }: { children: ReactNode }) {
+export function BottomSheetVisibleContent({ children }: { children: ReactNode }) {
   const { animatedDetentsState, animatedKeyboardState, animatedLayoutState, animatedPosition } =
     useBottomSheetInternal();
   const visibleContentStyle = useAnimatedStyle(() => {

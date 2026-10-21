@@ -241,6 +241,7 @@ test.describe("Agent stream UI", () => {
         workspaceId: agent.workspaceId,
         agentId: agent.agentId,
       });
+      await page.getByTestId("work-toggle").click();
       await waitForScrollableChat(page, {
         minScrollableDistance: SCROLL_AWAY_MIN_SCROLLABLE_DISTANCE,
         timeout: 30_000,

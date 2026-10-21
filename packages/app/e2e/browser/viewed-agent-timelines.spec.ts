@@ -396,10 +396,9 @@ test.describe("Viewed agent timelines", () => {
         exact: true,
       });
       await expect(previousMessage).toBeVisible();
-      await expect(page.getByRole("button", { name: "First viewed chat" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      await expect(
+        page.getByTestId(`workspace-tab-agent_${scenario.firstAgentId}`),
+      ).toHaveAttribute("aria-selected", "true");
       await gate.drop();
       await gate.waitForBlockedConnection();
       await expectReconnectingToastVisible(page);

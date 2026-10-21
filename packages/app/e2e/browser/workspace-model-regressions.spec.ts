@@ -16,7 +16,7 @@ import {
   submitNewWorkspacePrompt,
 } from "../support/helpers/new-workspace";
 import { getServerId } from "../support/helpers/server-id";
-import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
+import { selectSidebarStatusGrouping, collapseWorkspaceSessions } from "../support/helpers/sidebar";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import {
   expectSubagentRowVisible,
@@ -115,10 +115,11 @@ async function expectWorkspaceRowNotInStatusBuckets(
 
 async function expectWorkspaceRowHasOnlyIndicator(
   page: import("@playwright/test").Page,
-  input: { rowTestId: string; indicator: WorkspaceIndicator },
+  input: { workspaceId: string; indicator: WorkspaceIndicator },
 ) {
-  const row = page.getByTestId(input.rowTestId);
+  const row = page.getByTestId(`sidebar-workspace-row-${getServerId()}:${input.workspaceId}`);
   await expect(row).toBeVisible({ timeout: 30_000 });
+  await collapseWorkspaceSessions(page, input.workspaceId);
   for (const indicator of [
     "attention",
     "done",
@@ -346,7 +347,7 @@ test.describe("Workspace model regressions", () => {
       const firstRowTestId = `sidebar-workspace-row-${serverId}:${seeded.workspaceId}`;
       const secondRowTestId = `sidebar-workspace-row-${serverId}:${secondWorkspaceId}`;
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: firstRowTestId,
+        workspaceId: seeded.workspaceId,
         indicator: "running",
       });
       await expectWorkspaceRowDoesNotShowIndicator(page, {
@@ -388,7 +389,7 @@ test.describe("Workspace model regressions", () => {
         });
 
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: firstRowTestId,
+        workspaceId: seeded.workspaceId,
         indicator: "running",
       });
       await expectWorkspaceRowDoesNotShowIndicator(page, {
@@ -462,7 +463,7 @@ test.describe("Workspace model regressions", () => {
       const firstRowTestId = `sidebar-workspace-row-${serverId}:${seeded.workspaceId}`;
       const secondRowTestId = `sidebar-workspace-row-${serverId}:${secondWorkspaceId}`;
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: firstRowTestId,
+        workspaceId: seeded.workspaceId,
         indicator: "needs_input",
       });
       await expectWorkspaceRowDoesNotShowIndicator(page, {
@@ -500,7 +501,7 @@ test.describe("Workspace model regressions", () => {
         });
 
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: firstRowTestId,
+        workspaceId: seeded.workspaceId,
         indicator: "needs_input",
       });
       await expectWorkspaceRowDoesNotShowIndicator(page, {
@@ -541,7 +542,6 @@ test.describe("Workspace model regressions", () => {
   test("cross-workspace subagent opens in its workspace and keeps its parent relationship", async ({
     page,
   }) => {
-    const serverId = getServerId();
     const seeded = await seedWorkspace({ repoPrefix: "workspace-cross-subagent-" });
 
     try {
@@ -554,14 +554,12 @@ test.describe("Workspace model regressions", () => {
       await waitForSidebarHydration(page);
       await expectWorkspaceTabVisible(page, agents.child.id);
 
-      const parentRowTestId = `sidebar-workspace-row-${serverId}:${agents.parent.workspaceId}`;
-      const childRowTestId = `sidebar-workspace-row-${serverId}:${agents.child.workspaceId}`;
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: childRowTestId,
+        workspaceId: agents.child.workspaceId,
         indicator: "running",
       });
       await expectWorkspaceRowHasOnlyIndicator(page, {
-        rowTestId: parentRowTestId,
+        workspaceId: agents.parent.workspaceId,
         indicator: "done",
       });
 

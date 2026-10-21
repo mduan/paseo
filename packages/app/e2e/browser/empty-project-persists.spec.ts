@@ -10,7 +10,7 @@ import {
 import { expectOpenedProject } from "../support/helpers/project-picker-ui";
 import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
@@ -153,7 +153,7 @@ test.describe("Project with no workspaces persists", () => {
     const workspace = await seedWorkspace({ repoPrefix: "empty-project-persists-" });
 
     try {
-      const projectViewKey = projectEquivalenceViewKey(workspace.projectKey);
+      const projectViewKey = workspace.projectViewKey;
       const projectRow = page.getByTestId(`sidebar-project-row-${projectViewKey}`);
       const newWorkspaceRow = page.getByTestId(
         `sidebar-project-new-workspace-row-${projectViewKey}`,
@@ -200,7 +200,7 @@ test.describe("Project remove", () => {
     let readdedProjectId: string | null = null;
 
     try {
-      const projectViewKey = projectEquivalenceViewKey(workspace.projectKey);
+      const projectViewKey = workspace.projectViewKey;
       const projectRow = page.getByTestId(`sidebar-project-row-${projectViewKey}`);
 
       await gotoAppShell(page);
@@ -232,13 +232,13 @@ test.describe("Project remove", () => {
 
       await page.reload();
       await waitForSidebarHydration(page);
-      await expect(projectRow).toBeVisible({ timeout: 30_000 });
-      await expect(projectRow).toContainText(workspace.projectDisplayName);
-      await expect(projectRow).not.toContainText(workspace.repoPath);
+      const readdedViewKey = projectPlacementViewKey(getServerId(), readdedProjectId);
+      const readdedRow = page.getByTestId(`sidebar-project-row-${readdedViewKey}`);
+      await expect(readdedRow).toBeVisible({ timeout: 30_000 });
+      await expect(readdedRow).toContainText(workspace.projectDisplayName);
+      await expect(readdedRow).not.toContainText(workspace.repoPath);
       await expect(
-        page.getByTestId(
-          `sidebar-project-new-workspace-row-${projectEquivalenceViewKey(readdedProjectKey)}`,
-        ),
+        page.getByTestId(`sidebar-project-new-workspace-row-${readdedViewKey}`),
       ).toBeVisible({ timeout: 30_000 });
     } finally {
       if (readdedProjectId) {

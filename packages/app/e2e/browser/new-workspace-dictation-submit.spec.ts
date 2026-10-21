@@ -174,7 +174,7 @@ test.describe("New Workspace dictation submit", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: seeded.projectKey,
+        projectViewKey: seeded.projectViewKey,
         projectDisplayName: seeded.projectDisplayName,
       });
       await selectWorkspaceIsolation(page, "local");

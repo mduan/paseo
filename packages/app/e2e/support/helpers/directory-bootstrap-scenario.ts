@@ -4,6 +4,7 @@ import { installDaemonWebSocketGate } from "./daemon-websocket-gate";
 import { seedWorkspace, type SeededWorkspace } from "./seed-client";
 import { getServerId } from "./server-id";
 import { waitForWorkspaceTabsVisible } from "./workspace-tabs";
+import { openCommandCenter } from "./command-center";
 import { expectReconnectingToastGone, expectReconnectingToastVisible } from "./workspace-ui";
 
 interface SeededDirectoryAgent {
@@ -31,10 +32,6 @@ async function createRunningMockAgent(
   );
   expect(running.status).toBe("running");
   return { id: agent.id, title };
-}
-
-async function openCommandCenter(page: Page): Promise<void> {
-  await page.getByTestId("sidebar-search").click();
 }
 
 export class DirectoryBootstrapScenario {
@@ -78,8 +75,8 @@ export class DirectoryBootstrapScenario {
     const workspaceLink = this.page.getByText(workspace.projectDisplayName, { exact: true });
     await expect(workspaceLink).toHaveCount(1);
     await expect(workspaceLink).toBeVisible();
-    await openCommandCenter(this.page);
-    const agentLink = this.page.getByText(agent.title, { exact: true });
+    const panel = await openCommandCenter(this.page);
+    const agentLink = panel.getByText(agent.title, { exact: true });
     await expect(agentLink).toHaveCount(1);
     await expect(agentLink).toBeVisible();
     await this.page.keyboard.press("Escape");
@@ -111,8 +108,8 @@ export class DirectoryBootstrapScenario {
     const workspaceLink = this.page.getByText(workspace.projectDisplayName, { exact: true });
     await expect(workspaceLink).toHaveCount(1);
     await expect(workspaceLink).toBeVisible();
-    await openCommandCenter(this.page);
-    const agentLink = this.page.getByText(agent.title, { exact: true });
+    const panel = await openCommandCenter(this.page);
+    const agentLink = panel.getByText(agent.title, { exact: true });
     await expect(agentLink).toHaveCount(1);
     await expect(agentLink).toBeVisible();
     await agentLink.click();

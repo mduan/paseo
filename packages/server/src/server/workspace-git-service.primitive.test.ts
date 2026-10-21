@@ -807,6 +807,33 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     service.dispose();
   });
 
+  test("a manual refresh queues behind an in-flight forced refresh to read the changed branch", async () => {
+    const activeRefresh = createDeferred<CheckoutStatusGit>();
+    const getCheckoutStatus = vi
+      .fn<() => Promise<CheckoutStatusGit>>()
+      .mockImplementationOnce(async () => createCheckoutStatus(REPO_CWD))
+      .mockImplementationOnce(async () => activeRefresh.promise)
+      .mockImplementationOnce(async () =>
+        createCheckoutStatus(REPO_CWD, { currentBranch: "feature" }),
+      );
+    const service = createService({ getCheckoutStatus });
+    await service.getSnapshot(REPO_CWD);
+
+    const initialRefresh = service.getSnapshot(REPO_CWD, { force: true, reason: "initial" });
+    await flushPromises();
+    const manualRefresh = service.getSnapshot(REPO_CWD, {
+      force: true,
+      reason: "manual-refresh",
+      queueIfBusy: true,
+    });
+    activeRefresh.resolve(createCheckoutStatus(REPO_CWD));
+
+    await initialRefresh;
+    expect((await manualRefresh).git.currentBranch).toBe("feature");
+    expect(getCheckoutStatus).toHaveBeenCalledTimes(3);
+    await service.dispose();
+  });
+
   test("a forced GitHub-inclusive call during an in-flight forced git refresh queues a GitHub refresh", async () => {
     const forcedGitRefresh = createDeferred<CheckoutStatusGit>();
     const getCheckoutStatus = vi

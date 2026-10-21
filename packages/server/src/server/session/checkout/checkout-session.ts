@@ -526,6 +526,8 @@ export class CheckoutSession {
         force: true,
         includeForge: true,
         reason: "manual-refresh",
+        // The active refresh may have started before the user's filesystem change.
+        queueIfBusy: true,
       });
       this.checkoutDiffManager.scheduleRefreshForCwd(resolvedCwd);
       this.host.emit({

@@ -5,6 +5,7 @@ import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
 import { TerminalE2EHarness } from "../support/helpers/terminal-dsl";
 import { getTerminalBufferText, buildTerminalWorkspaceUrl } from "../support/helpers/terminal-perf";
+import { emulateLinuxKeyboard } from "../support/helpers/keyboard-platform";
 
 function query(page: Page) {
   return page.getByRole("textbox", { name: "Find in pane", exact: true }).filter({ visible: true });
@@ -122,7 +123,9 @@ async function expectVimPageDown(page: Page, before: { topLine: number; lastLine
     try {
       // Vim's Ctrl+F keeps two lines of overlap, so the new page starts before the old page ends.
       await expect.poll(() => visibleTopLineNumber(page)).toBeGreaterThan(before.topLine);
-      await expect.poll(() => visibleTopLineNumber(page)).toBeGreaterThanOrEqual(40);
+      await expect
+        .poll(() => visibleTopLineNumber(page))
+        .toBeGreaterThanOrEqual(before.lastLine - 1);
       await expectFindClosed(page);
     } finally {
       await recordTerminalEvidence("vim-after-control-f", await getTerminalBufferText(page));
@@ -233,6 +236,7 @@ test.describe("macOS terminal shortcuts", () => {
 });
 
 test("opens Find with Control+f on Linux without sending ^F to cat", async ({ page }) => {
+  await emulateLinuxKeyboard(page);
   await openControlCharacterTerminal(page);
   await pressTerminalShortcut(page, "Control+f");
   await expect(query(page)).toBeFocused();

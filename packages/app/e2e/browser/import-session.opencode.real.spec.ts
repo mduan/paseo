@@ -6,6 +6,7 @@ import { expect, test, type Page } from "../support/fixtures";
 import { connectSeedClient, type SeededWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { waitForWorkspaceTabsVisible } from "../support/helpers/workspace-tabs";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 
 const OPENCODE_REAL_MODEL = "openrouter/google/gemini-2.5-flash-lite";
 const OPENCODE_SEED_TIMEOUT_MS = 45_000;
@@ -83,6 +84,10 @@ async function seedPaseoWorkspaceWithOpenCodeSession(): Promise<OpenCodeImportSc
         workspaceDirectory: createdWorkspace.workspace.workspaceDirectory,
         projectId: createdWorkspace.workspace.projectId,
         projectKey,
+        projectViewKey: projectPlacementViewKey(
+          getServerId(),
+          createdWorkspace.workspace.projectId,
+        ),
         projectDisplayName: createdWorkspace.workspace.projectDisplayName,
         cleanup: async () => {
           await client.close().catch(() => undefined);

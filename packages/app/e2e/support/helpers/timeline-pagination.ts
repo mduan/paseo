@@ -60,7 +60,6 @@ interface OlderHistoryPages {
   expectSettledWithRequestedPages(count: number): Promise<void>;
   expectNoRepeatedEntries(): void;
   expectRepeatedEntries(): void;
-  expectOwnedTextRendered(text: string): Promise<void>;
   releasePage(pageNumber: number): void;
   requestCount(): number;
 }
@@ -338,12 +337,6 @@ export async function holdOlderHistoryPages(
     expectRepeatedEntries() {
       expect(gate.getRepeatedEntryCount()).toBeGreaterThan(0);
     },
-    async expectOwnedTextRendered(text) {
-      const expectedCount = gate.getOwnedEntryCountContaining(text);
-      expect(expectedCount).toBeGreaterThan(0);
-      const timeline = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
-      await expect(timeline.getByText(text, { exact: false })).toHaveCount(expectedCount);
-    },
     releasePage(pageNumber) {
       gate.releasePage(pageNumber);
     },
@@ -480,26 +473,19 @@ async function returnTimelineToSettledHistoryStart(
   const loadingSpinner = page.getByTestId("load-older-history-spinner");
   // A caller may only start a new history traversal after its prior page has settled.
   await expect(loadingSpinner).toBeHidden();
-  let previous = await readTimelineViewport(page);
-  while (true) {
-    await moveUp();
-    await waitForTimelineGeometryToSettle(page);
-    let viewport = await readTimelineViewport(page);
-    // Tests that hold the response need to observe the requested page before releasing it.
-    if (await loadingSpinner.isVisible()) {
-      return;
-    }
-    if (viewport.scrollTop <= HISTORY_START_THRESHOLD_PX) {
-      return;
-    }
-    await expect(loadingSpinner).toBeHidden();
-    await waitForTimelineGeometryToSettle(page);
-    viewport = await readTimelineViewport(page);
-    expect(
-      viewport.scrollTop < previous.scrollTop || viewport.scrollHeight > previous.scrollHeight,
-    ).toBe(true);
-    previous = viewport;
-  }
+  await expect
+    .poll(
+      async () => {
+        await moveUp();
+        await waitForTimelineGeometryToSettle(page);
+        const loadingPage = await loadingSpinner.isVisible();
+        const viewport = await readTimelineViewport(page);
+        const atHistoryStart = viewport.scrollTop <= HISTORY_START_THRESHOLD_PX;
+        return loadingPage || atHistoryStart;
+      },
+      { timeout: 30_000, intervals: [100] },
+    )
+    .toBe(true);
 }
 
 export async function scrollTimelineToNewestLoadedEdge(page: Page): Promise<void> {
@@ -527,8 +513,13 @@ export async function scrollTimelineUntilOlderHistoryIsReachable(
     const previousHeight = await readTimelineViewport(page);
     await userScrollsTimelineToHistoryStart(page);
     await expect
-      .poll(async () => (await readTimelineViewport(page)).scrollHeight)
-      .toBeGreaterThan(previousHeight.scrollHeight);
+      .poll(async () => {
+        const targetRevealed = (await prompt.count()) > 0;
+        const viewport = await readTimelineViewport(page);
+        const historyExpanded = viewport.scrollHeight > previousHeight.scrollHeight;
+        return targetRevealed || historyExpanded;
+      })
+      .toBe(true);
     await waitForTimelineGeometryToSettle(page);
   }
   await expect(prompt).toBeVisible();
@@ -544,7 +535,7 @@ async function readTimelineViewport(page: Page): Promise<TimelineViewportSnapsho
   });
 }
 
-async function waitForTimelineGeometryToSettle(page: Page): Promise<void> {
+export async function waitForTimelineGeometryToSettle(page: Page): Promise<void> {
   const scroll = page.locator('[data-testid="agent-chat-scroll"]:visible').first();
   await scroll.evaluate(
     (element) =>

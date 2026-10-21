@@ -40,7 +40,6 @@ test.describe("New workspace composer draft", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: firstProject.projectKey,
         projectViewKey: firstProjectViewKey,
         projectDisplayName: firstProject.projectDisplayName,
       });
@@ -55,7 +54,6 @@ test.describe("New workspace composer draft", () => {
       await expect(firstAction).toHaveCSS("opacity", "1");
 
       await selectNewWorkspaceProject(page, {
-        projectKey: secondProject.projectKey,
         projectViewKey: secondProjectViewKey,
         projectDisplayName: secondProject.projectDisplayName,
       });
@@ -138,7 +136,6 @@ test.describe("New workspace composer draft", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
       await openNewWorkspaceComposer(page, {
-        projectKey: project.projectKey,
         projectViewKey: projectPlacementViewKey(getServerId(), project.projectId),
         projectDisplayName: project.projectDisplayName,
       });

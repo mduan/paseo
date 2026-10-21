@@ -3,7 +3,6 @@ import { gotoAppShell } from "../support/helpers/app";
 import { addScheduleHostAndReload, createScheduleHost } from "../support/helpers/schedule-host";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { escapeRegex } from "../support/helpers/regex";
 import { expectNoTruncation } from "../support/helpers/no-truncation";
 import { expectSettled, expectStableHeight } from "../support/helpers/settled";
@@ -202,9 +201,7 @@ test.describe("Schedules project target", () => {
     await expect(formSheet.getByText("Cron", { exact: true })).toHaveCount(0);
 
     await page.getByRole("button", { name: /select project/i }).click();
-    await page
-      .getByTestId(`schedule-project-option-${projectEquivalenceViewKey(workspace.projectKey)}`)
-      .click();
+    await page.getByTestId(`schedule-project-option-${workspace.projectViewKey}`).click();
     const projectTrigger = page.getByTestId("schedule-project-trigger");
     await expect(projectTrigger).toContainText(workspace.projectDisplayName);
     await expectSettled(projectTrigger);
@@ -300,9 +297,7 @@ test.describe("Schedules project target", () => {
     await expectSettled(hostTrigger);
 
     await projectTrigger.click();
-    await page
-      .getByTestId(`schedule-project-option-${projectEquivalenceViewKey(workspace.projectKey)}`)
-      .click();
+    await page.getByTestId(`schedule-project-option-${workspace.projectViewKey}`).click();
     await expect(projectTrigger).toContainText(workspace.projectDisplayName);
     await expectSettled(projectTrigger);
 
@@ -325,9 +320,7 @@ test.describe("Schedules project target", () => {
     await expectSettled(projectTrigger);
 
     await projectTrigger.click();
-    await page
-      .getByTestId(`schedule-project-option-${projectEquivalenceViewKey(secondary.projectKey)}`)
-      .click();
+    await page.getByTestId(`schedule-project-option-${secondary.projectViewKey}`).click();
     await expect(projectTrigger).toContainText(secondary.projectDisplayName);
     await expectSettled(projectTrigger);
     await expect(modelTrigger).toContainText(/select model/i);
@@ -353,9 +346,7 @@ test.describe("Schedules project target", () => {
     await page.getByTestId("schedules-empty-new").click();
 
     await page.getByRole("button", { name: /select project/i }).click();
-    await page
-      .getByTestId(`schedule-project-option-${projectEquivalenceViewKey(workspace.projectKey)}`)
-      .click();
+    await page.getByTestId(`schedule-project-option-${workspace.projectViewKey}`).click();
     await selectModelByLabel(page, "Ten second stream");
     await expect(
       page.getByText("Off keeps each run's workspace in the sidebar for inspection."),

@@ -496,6 +496,11 @@ function getActiveServerDataRoute(
   if (query.getObserversCount() === 0) {
     return null;
   }
+  // Query metadata belongs to the last observer that rendered, including disabled observers.
+  for (const observer of query.observers) {
+    const route = getServerDataRoute({ meta: observer.options.meta });
+    if (route?.enabled && route.serverId === serverId) return route;
+  }
   const route = getServerDataRoute(query);
   if (route) {
     return route.enabled && route.serverId === serverId ? route : null;
@@ -592,7 +597,7 @@ function canEventChangeDesiredSubscriptions(type: QueryCacheNotifyEvent["type"])
   );
 }
 
-function getServerDataRoute(query: Query): ServerDataRoute | null {
+function getServerDataRoute(query: Pick<Query, "meta">): ServerDataRoute | null {
   const meta = query.meta;
   if (!isRecord(meta) || !isRecord(meta.serverData)) {
     return null;

@@ -9,7 +9,7 @@ import {
   archiveAgentFromDaemon,
   archiveAgentFromSessions,
   clickSessionRow,
-  createIdleAgent,
+  createMockIdleAgent,
   expectArchivedAgentFocused,
   expectSessionRowArchived,
   expectSessionRowVisible,
@@ -52,12 +52,12 @@ test.describe("Archive tab reconciliation", () => {
   });
 
   test("non-UI archive prunes the archived tab across open pages and reload", async ({ page }) => {
-    const archived = await createIdleAgent(client, {
+    const archived = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `cli-archive-${randomUUID().slice(0, 8)}`,
     });
-    const surviving = await createIdleAgent(client, {
+    const surviving = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `cli-control-${randomUUID().slice(0, 8)}`,
@@ -93,12 +93,12 @@ test.describe("Archive tab reconciliation", () => {
   });
 
   test("Sessions archive prunes the archived tab across open pages", async ({ page }) => {
-    const archived = await createIdleAgent(client, {
+    const archived = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `ui-archive-${randomUUID().slice(0, 8)}`,
     });
-    const surviving = await createIdleAgent(client, {
+    const surviving = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `ui-control-${randomUUID().slice(0, 8)}`,
@@ -125,12 +125,12 @@ test.describe("Archive tab reconciliation", () => {
   });
 
   test("clicking an archived session navigates without unarchiving it", async ({ page }) => {
-    const archived = await createIdleAgent(client, {
+    const archived = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `unarchive-archived-${randomUUID().slice(0, 8)}`,
     });
-    const surviving = await createIdleAgent(client, {
+    const surviving = await createMockIdleAgent(client, {
       cwd: tempRepo.path,
       workspaceId,
       title: `unarchive-control-${randomUUID().slice(0, 8)}`,

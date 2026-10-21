@@ -4,7 +4,6 @@ import { gotoWorkspace, clickNewTerminal } from "../support/helpers/launcher";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { getServerId } from "../support/helpers/server-id";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
@@ -17,12 +16,12 @@ function workspaceRow(page: Page, workspaceId: string) {
   return page.getByTestId(`sidebar-workspace-row-${getServerId()}:${workspaceId}`);
 }
 
-function projectRow(page: Page, projectKey: string) {
-  return page.getByTestId(`sidebar-project-row-${projectEquivalenceViewKey(projectKey)}`);
+function projectRow(page: Page, projectViewKey: string) {
+  return page.getByTestId(`sidebar-project-row-${projectViewKey}`);
 }
 
-function projectNewWorktreeIcon(page: Page, projectKey: string) {
-  return page.getByTestId(`sidebar-project-new-worktree-${projectEquivalenceViewKey(projectKey)}`);
+function projectNewWorktreeIcon(page: Page, projectViewKey: string) {
+  return page.getByTestId(`sidebar-project-new-worktree-${projectViewKey}`);
 }
 
 async function seedSecondWorkspace(seeded: SeededWorkspace, title: string): Promise<string> {
@@ -54,8 +53,8 @@ test.describe("Model B sidebar shape", () => {
 
       // Both projects are expandable parents — the non-git one is NOT flattened
       // into a bare workspace link.
-      await expect(projectRow(page, gitProject.projectKey)).toBeVisible({ timeout: 30_000 });
-      await expect(projectRow(page, nonGitProject.projectKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, gitProject.projectViewKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, nonGitProject.projectViewKey)).toBeVisible({ timeout: 30_000 });
 
       // Each parent shows both of its workspace rows underneath.
       await expect(workspaceRow(page, gitProject.workspaceId)).toBeVisible({ timeout: 30_000 });
@@ -66,12 +65,12 @@ test.describe("Model B sidebar shape", () => {
       // Both projects show a per-row New workspace icon (revealed on hover): the
       // git project can branch off a worktree, and the non-git project can add
       // another workspace because the host supports workspaceMultiplicity.
-      await projectRow(page, gitProject.projectKey).hover();
-      await expect(projectNewWorktreeIcon(page, gitProject.projectKey)).toBeVisible({
+      await projectRow(page, gitProject.projectViewKey).hover();
+      await expect(projectNewWorktreeIcon(page, gitProject.projectViewKey)).toBeVisible({
         timeout: 30_000,
       });
-      await projectRow(page, nonGitProject.projectKey).hover();
-      await expect(projectNewWorktreeIcon(page, nonGitProject.projectKey)).toBeVisible({
+      await projectRow(page, nonGitProject.projectViewKey).hover();
+      await expect(projectNewWorktreeIcon(page, nonGitProject.projectViewKey)).toBeVisible({
         timeout: 30_000,
       });
 

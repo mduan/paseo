@@ -49,7 +49,7 @@ test.describe("New workspace: the composer is one control in two modes", () => {
     await waitForSidebarHydration(page);
 
     await openNewWorkspaceComposer(page, {
-      projectKey: workspace.projectKey,
+      projectViewKey: workspace.projectViewKey,
       projectDisplayName: workspace.projectDisplayName,
     });
 

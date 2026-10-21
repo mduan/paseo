@@ -40,10 +40,13 @@ export function applyFeatureValues(
 }
 
 export function resolveFeatureValues(args: {
-  features: AgentFeature[];
+  features: AgentFeature[] | undefined;
   persistedFeatureValues: Record<string, unknown>;
   localFeatureValues: Record<string, unknown>;
 }): Record<string, unknown> {
+  if (!args.features) {
+    return { ...args.persistedFeatureValues, ...args.localFeatureValues };
+  }
   const next: Record<string, unknown> = {};
 
   for (const feature of args.features) {

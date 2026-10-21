@@ -103,7 +103,7 @@ test.describe("Agent profiles repair modeless provider preferences", () => {
       await waitForSidebarHydration(page);
       await openGlobalNewWorkspaceComposer(page);
       await selectNewWorkspaceProject(page, {
-        projectKey: workspace.projectKey,
+        projectViewKey: workspace.projectViewKey,
         projectDisplayName: workspace.projectDisplayName,
       });
 
@@ -166,7 +166,7 @@ test.describe("Agent profiles repair modeless provider preferences", () => {
       await waitForSidebarHydration(page);
       await openGlobalNewWorkspaceComposer(page);
       await selectNewWorkspaceProject(page, {
-        projectKey: workspace.projectKey,
+        projectViewKey: workspace.projectViewKey,
         projectDisplayName: workspace.projectDisplayName,
       });
 

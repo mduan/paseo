@@ -22,6 +22,7 @@ import {
   submitNewWorkspaceEmpty,
 } from "../support/helpers/new-workspace";
 import { selectSidebarStatusGrouping } from "../support/helpers/sidebar";
+import { projectPlacementViewKey } from "../support/helpers/project-view-key";
 import { killProcessTree, spawnTsx } from "../support/helpers/spawn-node";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 import { getVisibleWorkspaceAgentTabIds } from "../support/helpers/workspace-tabs";
@@ -446,7 +447,7 @@ test.describe("Workspace model restart regressions", () => {
 
       await openGlobalNewWorkspaceComposer(page);
       await selectNewWorkspaceProject(page, {
-        projectKey: reconciledProjectKey.projectKey,
+        projectViewKey: projectPlacementViewKey(serverId, reconciledProjectKey.projectId),
         projectDisplayName: seeded.projectDisplayName,
       });
       await expectNewWorkspaceProjectSelected(page, seeded.projectDisplayName);

@@ -58,7 +58,7 @@ test.describe("New workspace metadata row layout", () => {
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
     await openNewWorkspaceComposer(page, {
-      projectKey: workspace.projectKey,
+      projectViewKey: workspace.projectViewKey,
       projectDisplayName: workspace.projectDisplayName,
     });
     await selectWorkspaceIsolation(page, "worktree");

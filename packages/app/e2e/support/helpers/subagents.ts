@@ -1,4 +1,3 @@
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { expect, type Page } from "@playwright/test";
 import { daemonWsRoutePattern } from "./daemon-port";
 import type { SeededWorkspace } from "./seed-client";
@@ -41,6 +40,8 @@ export async function seedParentWithSubagent(
   workspace: Pick<SeededWorkspace, "client" | "repoPath" | "workspaceId">,
   input: { parentTitle: string; childTitle: string },
 ): Promise<SeededSubagentPair> {
+  // Playwright's CommonJS collection must not preload modules used by the ESM client.
+  const { PARENT_AGENT_ID_LABEL } = await import("@getpaseo/protocol/agent-labels");
   const parent = await workspace.client.createAgent({
     provider: "mock",
     cwd: workspace.repoPath,
@@ -78,6 +79,7 @@ export async function seedParentWithCrossWorkspaceSubagent(
   workspace: Pick<SeededWorkspace, "client" | "repoPath" | "workspaceId" | "projectId">,
   input: { parentTitle: string; childTitle: string },
 ): Promise<SeededCrossWorkspaceSubagentPair> {
+  const { PARENT_AGENT_ID_LABEL } = await import("@getpaseo/protocol/agent-labels");
   const parent = await workspace.client.createAgent({
     provider: "mock",
     cwd: workspace.repoPath,

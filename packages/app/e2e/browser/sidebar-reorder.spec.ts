@@ -1,7 +1,6 @@
 import type { Locator } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
 import { getServerId } from "../support/helpers/server-id";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
@@ -79,10 +78,13 @@ test("projects, workspaces, and pinned chats reorder with an immediate mouse dra
     await gotoAppShell(page);
     await waitForSidebarHydration(page);
 
-    const firstProjectTestId = `sidebar-project-row-${projectEquivalenceViewKey(firstProject.projectKey)}`;
-    const secondProjectTestId = `sidebar-project-row-${projectEquivalenceViewKey(secondProject.projectKey)}`;
+    const firstProjectTestId = `sidebar-project-row-${firstProject.projectViewKey}`;
+    const secondProjectTestId = `sidebar-project-row-${secondProject.projectViewKey}`;
     await quickDragFirstRowAfterSecond(
-      page.locator(`[data-testid="${firstProjectTestId}"], [data-testid="${secondProjectTestId}"]`),
+      page
+        .getByTestId(firstProjectTestId)
+        .or(page.getByTestId(secondProjectTestId))
+        .filter({ visible: true }),
       pressProjectRow,
     );
     const firstWorkspaceTestId = `sidebar-workspace-row-${getServerId()}:${firstProject.workspaceId}`;

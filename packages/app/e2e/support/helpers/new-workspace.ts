@@ -4,7 +4,7 @@ import type { DaemonClient as InternalDaemonClient } from "@getpaseo/client/inte
 import { decodeWorkspaceIdFromPathSegment } from "@/utils/host-routes";
 import { connectDaemonClient, loadProtocolSchemas } from "./daemon-client-loader";
 import { daemonWsRoutePattern } from "./daemon-port";
-import { projectEquivalenceViewKey } from "./project-view-key";
+import { projectPlacementViewKey } from "./project-view-key";
 import { expectWorkspaceHeader } from "./workspace-ui";
 import { withProjectOwnership } from "./project-ownership";
 
@@ -21,6 +21,7 @@ type NewWorkspaceDaemonClient = Pick<
   | "fetchWorkspaces"
   | "getPaseoWorktreeList"
   | "getDaemonConfig"
+  | "getLastServerInfoMessage"
   | "installDirectoryPlugin"
   | "installPluginSource"
   | "disablePlugin"
@@ -44,6 +45,7 @@ export interface OpenedProject {
   workspaceId: string;
   projectId: string;
   projectKey: string;
+  projectViewKey: string;
   projectDisplayName: string;
   workspaceName: string;
   workspaceDirectory: string;
@@ -72,6 +74,10 @@ async function openedProjectFromWorkspace(
     workspaceId: workspace.id,
     projectId: workspace.projectId,
     projectKey: project.projectKey,
+    projectViewKey: projectPlacementViewKey(
+      client.getLastServerInfoMessage()!.serverId,
+      workspace.projectId,
+    ),
     projectDisplayName: workspace.projectDisplayName,
     workspaceName: workspace.name,
     workspaceDirectory: workspace.workspaceDirectory,
@@ -181,9 +187,9 @@ export async function createWorktreeViaDaemon(
 
 export async function openNewWorkspaceComposer(
   page: Page,
-  input: { projectKey: string; projectDisplayName: string; projectViewKey?: string },
+  input: { projectDisplayName: string; projectViewKey: string },
 ): Promise<void> {
-  const projectViewKey = input.projectViewKey ?? projectEquivalenceViewKey(input.projectKey);
+  const { projectViewKey } = input;
   const projectRow = page.getByTestId(`sidebar-project-row-${projectViewKey}`).first();
   await expect(projectRow).toBeVisible({ timeout: 30_000 });
   await projectRow.hover();
@@ -306,7 +312,7 @@ export async function submitNewWorkspacePrompt(
 
 export async function clickNewWorkspaceButton(
   page: Page,
-  input: { projectKey: string; projectDisplayName: string; prompt?: string },
+  input: { projectViewKey: string; projectDisplayName: string; prompt?: string },
 ): Promise<void> {
   await openNewWorkspaceComposer(page, input);
   await submitNewWorkspacePrompt(page, input.prompt);
@@ -314,7 +320,7 @@ export async function clickNewWorkspaceButton(
 
 export async function selectNewWorkspaceProject(
   page: Page,
-  input: { projectKey: string; projectDisplayName: string; projectViewKey?: string },
+  input: { projectDisplayName: string; projectViewKey: string },
 ): Promise<void> {
   const trigger = page
     .getByTestId("new-workspace-project-picker-trigger")
@@ -323,7 +329,7 @@ export async function selectNewWorkspaceProject(
   await expect(trigger).toBeVisible({ timeout: 30_000 });
   await trigger.click();
 
-  const projectViewKey = input.projectViewKey ?? projectEquivalenceViewKey(input.projectKey);
+  const { projectViewKey } = input;
   const option = page.getByTestId(`new-workspace-project-picker-option-${projectViewKey}`);
   await expect(option).toBeVisible({ timeout: 30_000 });
   await option.click();
@@ -476,7 +482,7 @@ export async function pasteGithubPrUrl(
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.evaluate((value) => navigator.clipboard.writeText(value), url);
   await composer.focus();
-  await page.keyboard.press("Control+V");
+  await page.keyboard.press("ControlOrMeta+V");
 }
 
 export async function assertNewWorkspaceSidebarAndHeader(

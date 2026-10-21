@@ -14,7 +14,7 @@ import { getE2EDaemonPort } from "../support/helpers/daemon-port";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 import { seedSavedSettingsHosts } from "../support/helpers/settings";
 import { getServerId } from "../support/helpers/server-id";
-import { projectEquivalenceViewKey } from "../support/helpers/project-view-key";
+import { emulateWindowsKeyboard } from "../support/helpers/keyboard-platform";
 import {
   clickArchiveWorkspaceMenuItem,
   expectWorkspaceAbsentFromSidebar,
@@ -31,8 +31,8 @@ import {
 // screen, the project icon preselects the right project across the reused 'new'
 // screen, and non-git projects never offer the worktree Isolation control.
 
-function projectRow(page: import("@playwright/test").Page, projectKey: string) {
-  return page.getByTestId(`sidebar-project-row-${projectEquivalenceViewKey(projectKey)}`);
+function projectRow(page: import("@playwright/test").Page, projectViewKey: string) {
+  return page.getByTestId(`sidebar-project-row-${projectViewKey}`);
 }
 
 test.describe("New workspace entry points", () => {
@@ -138,6 +138,7 @@ test.describe("New workspace entry points", () => {
   });
 
   test("Ctrl+P opens the project picker with search focused", async ({ page }) => {
+    await emulateWindowsKeyboard(page);
     const seeded: SeededWorkspace = await seedWorkspace({ repoPrefix: "entry-shortcut-" });
 
     try {
@@ -209,13 +210,13 @@ test.describe("New workspace entry points", () => {
     try {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
-      await expect(projectRow(page, projectA.projectKey)).toBeVisible({ timeout: 30_000 });
-      await expect(projectRow(page, projectB.projectKey)).toBeVisible({ timeout: 30_000 });
-      await expect(projectRow(page, projectC.projectKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, projectA.projectViewKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, projectB.projectViewKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, projectC.projectViewKey)).toBeVisible({ timeout: 30_000 });
 
       // Project A's row icon opens New Workspace with A preselected.
       await openNewWorkspaceComposer(page, {
-        projectKey: projectA.projectKey,
+        projectViewKey: projectA.projectViewKey,
         projectDisplayName: projectA.projectDisplayName,
       });
       await expectNewWorkspaceProjectSelected(page, projectA.projectDisplayName);
@@ -225,7 +226,7 @@ test.describe("New workspace entry points", () => {
       // route-driven navigation targets a different project.
       await page.getByTestId("new-workspace-project-picker-trigger").click();
       const optionC = page.getByTestId(
-        `new-workspace-project-picker-option-${projectEquivalenceViewKey(projectC.projectKey)}`,
+        `new-workspace-project-picker-option-${projectC.projectViewKey}`,
       );
       await expect(optionC).toBeVisible({ timeout: 30_000 });
       await optionC.click();
@@ -235,7 +236,7 @@ test.describe("New workspace entry points", () => {
       // because the stale manual choice (C) was reset on the route change. If the
       // reset were missing, the trigger would still read C.
       await openNewWorkspaceComposer(page, {
-        projectKey: projectB.projectKey,
+        projectViewKey: projectB.projectViewKey,
         projectDisplayName: projectB.projectDisplayName,
       });
       await expectNewWorkspaceProjectSelected(page, projectB.projectDisplayName);
@@ -258,8 +259,8 @@ test.describe("New workspace entry points", () => {
     try {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
-      await expect(projectRow(page, gitProject.projectKey)).toBeVisible({ timeout: 30_000 });
-      await expect(projectRow(page, nonGitProject.projectKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, gitProject.projectViewKey)).toBeVisible({ timeout: 30_000 });
+      await expect(projectRow(page, nonGitProject.projectViewKey)).toBeVisible({ timeout: 30_000 });
 
       // Open New Workspace for the non-git project via the global button, then
       // select it in the picker (the per-row icon would preselect it too).
@@ -268,7 +269,7 @@ test.describe("New workspace entry points", () => {
       await expect(trigger).toBeVisible({ timeout: 30_000 });
       await trigger.click();
       const nonGitOption = page.getByTestId(
-        `new-workspace-project-picker-option-${projectEquivalenceViewKey(nonGitProject.projectKey)}`,
+        `new-workspace-project-picker-option-${nonGitProject.projectViewKey}`,
       );
       await expect(nonGitOption).toBeVisible({ timeout: 30_000 });
       await nonGitOption.click();
@@ -281,7 +282,7 @@ test.describe("New workspace entry points", () => {
       // Switching to the git project on the same screen reveals the Isolation row.
       await trigger.click();
       const gitOption = page.getByTestId(
-        `new-workspace-project-picker-option-${projectEquivalenceViewKey(gitProject.projectKey)}`,
+        `new-workspace-project-picker-option-${gitProject.projectViewKey}`,
       );
       await expect(gitOption).toBeVisible({ timeout: 30_000 });
       await gitOption.click();

@@ -4,7 +4,6 @@ import { test as base } from "../support/fixtures";
 import {
   beginWorkspaceFromProject,
   createWorkspaceWithoutAgent,
-  expectProjectContainsWorkspaces,
   expectProjectSettingsName,
   expectProjectWorkspaceCountForHost,
   expectSeparateProjects,
@@ -332,26 +331,26 @@ async function openScenario(
 test.describe("Sidebar project grouping", () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test("groups projects with the same Git remote across hosts", async ({
+  test("keeps projects with the same Git remote separate across hosts", async ({
     page,
     crossHostProject,
   }) => {
     await openScenario(page, crossHostProject);
-    await expectProjectContainsWorkspaces(page, {
-      projectName: GROUPED_PROJECT_NAME,
-      workspaceNames: ["Primary workspace", "Secondary workspace"],
-    });
+    await expectSeparateProjects(page, [
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Primary workspace" },
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Secondary workspace" },
+    ]);
   });
 
-  test("groups persisted projects missing project keys after boot", async ({
+  test("keeps persisted projects missing project keys separate after boot", async ({
     page,
     reconciledCrossHostProject,
   }) => {
     await openScenario(page, reconciledCrossHostProject);
-    await expectProjectContainsWorkspaces(page, {
-      projectName: GROUPED_PROJECT_NAME,
-      workspaceNames: ["Recovered primary workspace", "Recovered secondary workspace"],
-    });
+    await expectSeparateProjects(page, [
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Recovered primary workspace" },
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Recovered secondary workspace" },
+    ]);
   });
 
   test("keeps a repository root and its subdirectory as separate projects", async ({
@@ -365,15 +364,15 @@ test.describe("Sidebar project grouping", () => {
     ]);
   });
 
-  test("groups the same repository subdirectory across hosts", async ({
+  test("keeps the same repository subdirectory separate across hosts", async ({
     page,
     crossHostSubdirectoryProject,
   }) => {
     await openScenario(page, crossHostSubdirectoryProject);
-    await expectProjectContainsWorkspaces(page, {
-      projectName: GROUPED_PROJECT_NAME,
-      workspaceNames: ["Primary app workspace", "Secondary app workspace"],
-    });
+    await expectSeparateProjects(page, [
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Primary app workspace" },
+      { projectName: GROUPED_PROJECT_NAME, workspaceName: "Secondary app workspace" },
+    ]);
   });
 
   test("keeps two clones of the same repository on one host separate", async ({
@@ -409,7 +408,10 @@ test.describe("Sidebar project grouping", () => {
     crossHostProject,
   }) => {
     await openScenario(page, crossHostProject);
-    await beginWorkspaceFromProject(page, GROUPED_PROJECT_NAME);
+    await beginWorkspaceFromProject(page, {
+      projectName: GROUPED_PROJECT_NAME,
+      workspaceName: "Primary workspace",
+    });
     await selectWorkspaceHost(page, SECONDARY_HOST_LABEL);
     await createWorkspaceWithoutAgent(page);
     await expectProjectWorkspaceCountForHost(page, {

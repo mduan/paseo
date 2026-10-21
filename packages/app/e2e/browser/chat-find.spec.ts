@@ -19,6 +19,7 @@ import {
 } from "../support/helpers/composer";
 
 import { openCommandCenter, closeCommandCenter } from "../support/helpers/command-center";
+import { emulateWindowsKeyboard } from "../support/helpers/keyboard-platform";
 
 const MAC_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -457,6 +458,7 @@ async function findFromComposer(page: Page, shortcut: string, testInfo: TestInfo
 }
 
 test("opens and refocuses Find with Control+f from the composer", async ({ page }, testInfo) => {
+  await emulateWindowsKeyboard(page);
   await findFromComposer(page, "Control+f", testInfo);
 });
 

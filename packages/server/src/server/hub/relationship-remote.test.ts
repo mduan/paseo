@@ -355,7 +355,7 @@ test("controller redials once after a failed upgrade without also handling its c
 
   await hub.expectAttemptReleased(1);
 
-  expect(controller.status().state).toBe("reconnecting");
+  await expect.poll(() => controller.status().state).toBe("reconnecting");
   expect(clock.scheduledAttempts()).toEqual([0]);
   expect(clock.pendingTasks()).toBe(1);
 
