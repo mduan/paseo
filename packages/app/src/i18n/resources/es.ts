@@ -1126,7 +1126,6 @@ export const es: TranslationResources = {
           openOn: "Abrir en {{brand}}",
         },
         checksSummary: {
-          passedLabel: "pasó",
           failedLabel: "falló",
           runningLabel: "en curso",
           passedAccessible: "Comprobaciones superadas",

@@ -1105,7 +1105,6 @@ export const ja: TranslationResources = {
           openOn: "{{brand}}で開く",
         },
         checksSummary: {
-          passedLabel: "成功",
           failedLabel: "失敗",
           runningLabel: "実行中",
           passedAccessible: "チェック成功",

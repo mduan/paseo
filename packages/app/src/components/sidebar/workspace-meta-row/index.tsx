@@ -19,7 +19,7 @@ import { useSidebarMetaPreferences } from "@/components/sidebar/display-preferen
 import type { Theme } from "@/styles/theme";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { CheckIndicator } from "./check-indicator";
-import type { CheckSummary, CheckSummaryState } from "./check-summary";
+import type { CheckSummary } from "./check-summary";
 import { selectMetaRowItems, type MetaRowItem } from "./meta-items";
 import { workspaceServiceLabelKey, type WorkspaceServiceSummary } from "./service-summary";
 
@@ -260,19 +260,6 @@ function PortsItem({ ports }: { ports: readonly WorkspacePort[] }) {
   );
 }
 
-/**
- * By default every state says its own name. A tick on its own has no subject — the reader has to
- * already know the glyph is about CI to read it at all, and sitting after a host and a change
- * request it reads as something left over. One short word costs less than that ambiguity, which
- * is why icon-and-text is the default and dropping the word is something you ask for.
- *
- * The words are the outcome, not the noun: "passed" against "failed", both naming how a finished
- * run ended, "running" for one still deciding. Repeating the subject on every healthy row —
- * "checks passed" — is the noise worth avoiding; naming the outcome is not.
- *
- * The accessible name is on the wrapper either way, so turning the word off shrinks the row
- * without taking the state away from a screen reader.
- */
 function ChecksItem({ summary, label }: { summary: CheckSummary; label: boolean }) {
   const { t } = useTranslation();
   return (
@@ -282,8 +269,11 @@ function ChecksItem({ summary, label }: { summary: CheckSummary; label: boolean 
       testID={`sidebar-workspace-checks-${summary.state}`}
     >
       <CheckIndicator summary={summary} size={META_ICON_SIZE} />
-      {label ? (
-        <Text style={checksTextStyle(summary.state)} numberOfLines={1}>
+      {label && summary.state !== "passed" ? (
+        <Text
+          style={summary.state === "failed" ? styles.checksTextFailed : styles.checksTextRunning}
+          numberOfLines={1}
+        >
           {t(CHECK_STATE_LABEL_KEYS[summary.state])}
         </Text>
       ) : null}
@@ -292,7 +282,6 @@ function ChecksItem({ summary, label }: { summary: CheckSummary; label: boolean 
 }
 
 const CHECK_STATE_LABEL_KEYS = {
-  passed: "workspace.git.pr.checksSummary.passedLabel",
   failed: "workspace.git.pr.checksSummary.failedLabel",
   running: "workspace.git.pr.checksSummary.runningLabel",
 } as const;
@@ -402,12 +391,6 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
   },
   // Matches the indicator — see COLOR_MAPPINGS in check-indicator.tsx.
-  checksTextPassed: {
-    color: theme.colors.statusSuccess,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 0,
-  },
   checksTextFailed: {
     color: theme.colors.statusDanger,
     fontSize: theme.fontSize.sm,
@@ -421,12 +404,3 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
   },
 }));
-
-// Read inside render, never into a module-scope table: touching `styles.x` at module load
-// materializes the Unistyles proxy before the persisted theme has resolved, and the style
-// freezes on whatever theme happened to be active first. See docs/unistyles.md.
-function checksTextStyle(state: CheckSummaryState) {
-  if (state === "failed") return styles.checksTextFailed;
-  if (state === "running") return styles.checksTextRunning;
-  return styles.checksTextPassed;
-}
