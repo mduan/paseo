@@ -1,4 +1,4 @@
-import type { TerminalFindResult } from "../runtime/terminal-emulator-runtime";
+import type { TerminalFindInput, TerminalFindResult } from "../runtime/terminal-emulator-runtime";
 import type { ITheme } from "@xterm/xterm";
 import xtermCss from "@xterm/xterm/css/xterm.css";
 import type { TerminalState } from "@getpaseo/protocol/messages";
@@ -33,7 +33,7 @@ type InboundMessage =
   | { type: "renderSnapshot"; streamKey: string; state: TerminalState | null }
   | { type: "paste"; streamKey: string; text: string }
   | { type: "clear"; streamKey: string }
-  | { type: "find"; streamKey: string; query: string; direction?: "next" | "previous" }
+  | ({ type: "find"; streamKey: string } & TerminalFindInput)
   | { type: "clearFind"; streamKey: string }
   | { type: "findWidgetSize"; streamKey: string; size: { width: number; height: number } }
   | { type: "focus"; streamKey: string; forceRefocus?: boolean }
@@ -240,7 +240,7 @@ class TerminalWebViewBridge {
       return;
     }
     if (message.type === "find") {
-      this.runtime?.find.search(message.query, message.direction);
+      this.runtime?.find.search(message);
       return;
     }
     if (message.type === "clearFind") {

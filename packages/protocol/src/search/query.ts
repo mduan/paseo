@@ -2,6 +2,7 @@
 import { createPhrasePattern } from "./phrase.js";
 export { SearchQueryError } from "./phrase.js";
 import type { SearchOptions } from "./options.js";
+import { splitQuotedQuery } from "./quoted-query.js";
 import {
   fuzzyPolicyForToken,
   matchRanges,
@@ -37,6 +38,22 @@ export function createTextSearch({
   query: string;
   options?: SearchOptions;
 }): TextSearch {
+  if (!options.regex) {
+    const parts = splitQuotedQuery(query);
+    if (parts.some((part) => part.quoted)) {
+      const searches = parts
+        .filter((part) => part.text.length > 0)
+        .map(({ text, quoted }) =>
+          quoted
+            ? createPatternSearch([createPhrasePattern({ query: `"${text}"`, options })])
+            : createTextSearch({ query: text, options }),
+        );
+      return {
+        matches: (fields) => searches.every((search) => search.matches(fields)),
+        ranges: (text) => mergeRanges(searches.flatMap((search) => search.ranges(text))),
+      };
+    }
+  }
   if (!options.regex && !options.wholeWord && !options.caseSensitive) {
     return {
       matches: (fields) => scoreTextFields(query, [...fields], { typoTolerant: true }) !== null,
@@ -52,6 +69,10 @@ export function createTextSearch({
   const tokens = options.regex ? [query] : query.trim().split(/\s+/).filter(Boolean);
   // shortcut: native regex can block the main thread; isolate it if runtime limits become required.
   const patterns = tokens.map((token) => createPhrasePattern({ query: token, options }));
+  return createPatternSearch(patterns);
+}
+
+function createPatternSearch(patterns: RegExp[]): TextSearch {
   function rangesForPattern(pattern: RegExp, text: string): MatchRange[] {
     const ranges: MatchRange[] = [];
     // matchAll clones the expression, so repeated fields cannot inherit lastIndex.

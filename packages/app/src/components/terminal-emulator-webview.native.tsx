@@ -22,6 +22,7 @@ import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-m
 import type {
   TerminalOutputData,
   TerminalFindResult,
+  TerminalFindInput,
 } from "../terminal/runtime/terminal-emulator-runtime";
 import type {
   TerminalLocalFileLinkSource,
@@ -52,7 +53,7 @@ type BridgeInboundMessage =
   | { type: "renderSnapshot"; streamKey: string; state: TerminalState | null }
   | { type: "paste"; streamKey: string; text: string }
   | { type: "clear"; streamKey: string }
-  | { type: "find"; streamKey: string; query: string; direction?: "next" | "previous" }
+  | ({ type: "find"; streamKey: string } & TerminalFindInput)
   | { type: "clearFind"; streamKey: string }
   | { type: "findWidgetSize"; streamKey: string; size: { width: number; height: number } }
   | { type: "focus"; streamKey: string; forceRefocus?: boolean }
@@ -331,7 +332,7 @@ export default function WebViewTerminalEmulator({
     (): TerminalEmulatorHandle => ({
       find: {
         setWidgetSize: (size) => sendToWebView({ type: "findWidgetSize", streamKey, size }),
-        search: (query, direction) => sendToWebView({ type: "find", streamKey, query, direction }),
+        search: (input) => sendToWebView({ type: "find", streamKey, ...input }),
         clear: () => sendToWebView({ type: "clearFind", streamKey }),
       },
       writeOutput: (data: TerminalOutputData) => {

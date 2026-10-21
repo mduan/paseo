@@ -389,3 +389,51 @@ test("keeps the shared Find controls usable in a compact dark browser", async ({
   await page.getByRole("button", { name: "Close Find" }).click();
   await expect(input(page)).toBeFocused();
 });
+
+test("matches quoted phrases and exposes the same search toggles as chat", async ({
+  page,
+}, testInfo) => {
+  const terminal = await harness.createTerminal({
+    name: "Search options",
+    command: "bash",
+    args: [
+      "-c",
+      `printf '%s\\n' 'bill billé ébill bill_name Bill BILL' 'a.b  word' 'A.B  word' 'a.b word "axb"' 'READY'; cat`,
+    ],
+  });
+  await harness.openTerminal(page, { terminalId: terminal.id });
+  await expect.poll(() => getTerminalBufferText(page)).toContain("READY");
+  await openFind(page, '"a.b  word"');
+  await expect(status(page)).toHaveText("2 of 2");
+  expect((await page.getByLabel("Find", { exact: true }).boundingBox())!.width).toBeGreaterThan(
+    400,
+  );
+  expect((await query(page).boundingBox())!.width).toBeGreaterThan(220);
+  await page.getByTestId("terminal-find-caseSensitive").click();
+  await expect(status(page)).toHaveText("1 of 1");
+  await page.getByTestId("terminal-find-caseSensitive").click();
+  await query(page).fill('"bill"');
+  await page.getByTestId("terminal-find-wholeWord").click();
+  await expect(status(page)).toHaveText(/of 3/);
+  await page.getByTestId("terminal-find-caseSensitive").click();
+  await expect(status(page)).toHaveText("1 of 1");
+  await page.getByTestId("terminal-find-wholeWord").click();
+  await page.getByTestId("terminal-find-regex").click();
+  await query(page).fill('"a.b"');
+  await expect(status(page)).toHaveText("1 of 1");
+  await page.screenshot({ path: testInfo.outputPath("terminal-find-options.png") });
+  await query(page).fill("[");
+  await expect(status(page)).toHaveText("Invalid regular expression");
+  await expect(query(page)).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("button", { name: "Next match" })).toBeDisabled();
+  await query(page).fill('"a.b"');
+  await expect(status(page)).toHaveText("1 of 1");
+  await query(page).press("Escape");
+  await openFind(page);
+  await expect(page.getByTestId("terminal-find-regex")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("terminal-find-caseSensitive")).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(status(page)).toHaveText(/of 3/);
+});

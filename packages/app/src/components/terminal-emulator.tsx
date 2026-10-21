@@ -299,7 +299,7 @@ export default function TerminalEmulator({
     (): TerminalEmulatorHandle => ({
       find: {
         setWidgetSize: (size) => runtimeRef.current?.find.setWidgetSize(size),
-        search: (query, direction) => runtimeRef.current?.find.search(query, direction),
+        search: (input) => runtimeRef.current?.find.search(input),
         clear: () => runtimeRef.current?.find.clear(),
       },
       writeOutput: (data: TerminalOutputData) => {
