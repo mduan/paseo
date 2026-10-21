@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceStructureProject } from "@/projects/workspace-structure";
+import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { buildWorkspaceAgentActivityIndex } from "@/utils/workspace-agent-activity";
 import {
   appendMissingOrderKeys,
@@ -325,6 +326,50 @@ describe("buildSidebarProjectsFromStructure", () => {
 });
 
 describe("shared sidebar workspace model", () => {
+  it("clears working after a background-created chat finishes before its timeline is opened", () => {
+    const createFlow = useCreateFlowStore.getState();
+    const draftId = "background-draft";
+    createFlow.setPending({
+      draftId,
+      serverId: "srv",
+      workspaceId: "ws-1",
+      agentId: null,
+      clientMessageId: "initial-message",
+      text: "hello",
+      timestamp: 1_000,
+    });
+    const finishedWorkspace = projectWorkspace("ws-1", "done");
+    const finishedSession = sessionWith({
+      workspaces: [finishedWorkspace],
+      agents: [agent({ id: "a1", workspaceId: "ws-1", status: "idle" })],
+    });
+    function entry() {
+      return createSidebarWorkspaceEntry({
+        serverId: "srv",
+        workspace: finishedWorkspace,
+        pendingCreateAttempts: useCreateFlowStore.getState().pendingByDraftId,
+        workspaceAgentActivity: finishedSession.workspaceAgentActivity,
+      });
+    }
+
+    try {
+      expect(entry().statusBucket).toBe("running");
+      createFlow.updateAgentId({ draftId, agentId: "a1" });
+      createFlow.markLifecycle({ draftId, lifecycle: "sent" });
+
+      expect(entry().statusBucket).toBe("done");
+      expect(
+        deriveProjectStatusBucket({
+          workspaces: [workspacePlacement({ workspaceId: "ws-1" })],
+          sessions: { srv: finishedSession },
+          pendingCreateAttempts: useCreateFlowStore.getState().pendingByDraftId,
+        }),
+      ).toBe("done");
+    } finally {
+      createFlow.clear({ draftId });
+    }
+  });
+
   it("feeds project placement and status grouping from the same cross-host workspace identities", () => {
     const model = buildSidebarWorkspacePlacementModel({
       projects: [

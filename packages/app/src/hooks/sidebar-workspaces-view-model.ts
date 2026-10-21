@@ -232,7 +232,7 @@ function getPendingInitialAgentCreateStartedAt(input: {
   for (const pending of Object.values(input.pendingCreateAttempts ?? {})) {
     if (pending.serverId !== input.serverId) continue;
     if (pending.workspaceId !== input.workspaceId) continue;
-    if (pending.lifecycle === "abandoned") continue;
+    if (pending.lifecycle !== "active") continue;
     const startedAt = new Date(pending.timestamp);
     if (!latestStartedAt || startedAt > latestStartedAt) {
       latestStartedAt = startedAt;
