@@ -1099,7 +1099,6 @@ export const ko: TranslationResources = {
           openOn: "{{brand}}에서 열기",
         },
         checksSummary: {
-          passedLabel: "통과",
           failedLabel: "실패",
           runningLabel: "진행 중",
           passedAccessible: "검사 통과",

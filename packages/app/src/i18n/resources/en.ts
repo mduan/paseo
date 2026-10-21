@@ -1100,7 +1100,6 @@ export const en = {
           openOn: "Open on {{brand}}",
         },
         checksSummary: {
-          passedLabel: "passed",
           failedLabel: "failed",
           runningLabel: "running",
           passedAccessible: "Checks passed",

@@ -1084,7 +1084,6 @@ export const zhCN: TranslationResources = {
           openOn: "在 {{brand}} 上打开",
         },
         checksSummary: {
-          passedLabel: "通过",
           failedLabel: "失败",
           runningLabel: "运行中",
           passedAccessible: "检查通过",

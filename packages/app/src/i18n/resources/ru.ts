@@ -1110,7 +1110,6 @@ export const ru: TranslationResources = {
           openOn: "Открыть на {{brand}}",
         },
         checksSummary: {
-          passedLabel: "успешно",
           failedLabel: "ошибка",
           runningLabel: "выполняется",
           passedAccessible: "Проверки пройдены",

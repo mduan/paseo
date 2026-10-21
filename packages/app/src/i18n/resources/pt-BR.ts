@@ -1116,7 +1116,6 @@ export const ptBR: TranslationResources = {
           openOn: "Abrir no {{brand}}",
         },
         checksSummary: {
-          passedLabel: "passou",
           failedLabel: "falhou",
           runningLabel: "em andamento",
           passedAccessible: "Verificações aprovadas",

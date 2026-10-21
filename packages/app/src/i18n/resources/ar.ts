@@ -1092,7 +1092,6 @@ export const ar: TranslationResources = {
           openOn: "فتح على {{brand}}",
         },
         checksSummary: {
-          passedLabel: "نجح",
           failedLabel: "فشل",
           runningLabel: "قيد التشغيل",
           passedAccessible: "نجحت الفحوصات",
