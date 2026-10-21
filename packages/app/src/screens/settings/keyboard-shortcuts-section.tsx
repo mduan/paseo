@@ -14,6 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { HighlightedText } from "@/components/ui/highlighted-text";
+import { SearchField } from "@/components/ui/search-field";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-overrides";
 import {
@@ -28,6 +30,10 @@ import {
   heldModifiersFromEvent,
   keyboardEventToComboString,
 } from "@/keyboard/shortcut-string";
+import {
+  filterShortcutHelpSectionsByLabel,
+  shortcutLabelMatchRange,
+} from "@/keyboard/shortcut-help-search";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { getShortcutOs } from "@/utils/shortcut-platform";
@@ -74,6 +80,7 @@ function ShortcutSequence({
 
 interface ShortcutRowContainerProps {
   row: KeyboardShortcutHelpRow;
+  query: string;
   bindingId: string | null;
   displayChord: ShortcutKey[][] | null;
   hasOverride: boolean;
@@ -90,6 +97,7 @@ interface ShortcutRowContainerProps {
 
 function ShortcutRowContainer({
   row,
+  query,
   bindingId,
   displayChord,
   hasOverride,
@@ -118,6 +126,7 @@ function ShortcutRowContainer({
   return (
     <ShortcutRow
       row={row}
+      query={query}
       bindingId={bindingId}
       displayChord={displayChord}
       hasOverride={hasOverride}
@@ -236,6 +245,7 @@ function ShortcutActionsMenu({
 
 function ShortcutRow({
   row,
+  query,
   bindingId,
   displayChord,
   hasOverride,
@@ -250,6 +260,7 @@ function ShortcutRow({
   onReset,
 }: {
   row: KeyboardShortcutHelpRow;
+  query: string;
   bindingId: string | null;
   displayChord: ShortcutKey[][] | null;
   hasOverride: boolean;
@@ -275,10 +286,15 @@ function ShortcutRow({
   const showReset = hasOverride && hasDefault;
   // Nothing is bound in the unassigned state, so there is nothing to *re*-bind.
   const bindLabel = displayChord === null ? "bind" : "rebind";
+  const label = t(row.labelKey);
+  const labelRanges = useMemo(() => {
+    const range = shortcutLabelMatchRange(label, query);
+    return range ? [range] : undefined;
+  }, [label, query]);
 
   return (
     <View style={rowStyle}>
-      <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
+      <HighlightedText text={label} ranges={labelRanges} style={styles.rowLabel} />
       <View style={styles.rowActions}>
         <View style={styles.rowKeys}>
           <ShortcutRowKeys
@@ -328,15 +344,20 @@ export function KeyboardShortcutsSection() {
   const [capturingBindingId, setCapturingBindingId] = useState<string | null>(null);
   const [capturedCombos, setCapturedCombos] = useState<string[]>([]);
   const [heldModifiers, setHeldModifiers] = useState<string | null>(null);
-  const { overrides, hasOverrides, setOverride, clearOverride, removeOverride, resetAll } =
-    useKeyboardShortcutOverrides();
+  const { overrides, setOverride, clearOverride, removeOverride } = useKeyboardShortcutOverrides();
+  const query = useKeyboardShortcutsStore((s) => s.settingsShortcutsQuery);
+  const setQuery = useKeyboardShortcutsStore((s) => s.setSettingsShortcutsQuery);
   const setCapturingShortcut = useKeyboardShortcutsStore((s) => s.setCapturingShortcut);
   const capturing = useKeyboardShortcutsStore((s) => s.capturingShortcut);
 
   const isFocused = useIsFocused();
   const isMac = getShortcutOs() === "mac";
   const isDesktopApp = getIsElectronRuntime();
-  const sections = buildKeyboardShortcutHelpSections({ isMac, isDesktop: isDesktopApp });
+  const sections = filterShortcutHelpSectionsByLabel({
+    sections: buildKeyboardShortcutHelpSections({ isMac, isDesktop: isDesktopApp }),
+    query,
+    translate: t,
+  });
 
   const cancelCapture = useCallback(() => {
     setCapturedCombos([]);
@@ -404,6 +425,12 @@ export function KeyboardShortcutsSection() {
     };
   }, [setCapturingShortcut]);
 
+  // The query lives in the store for the page title's Reset all; start each
+  // visit unfiltered.
+  useEffect(() => {
+    return () => setQuery("");
+  }, [setQuery]);
+
   // Suppress desktop zoom accelerators while capturing so combos like Cmd+- are
   // recorded instead of zooming the window. No-op outside Electron.
   useEffect(() => {
@@ -415,7 +442,6 @@ export function KeyboardShortcutsSection() {
     };
   }, [capturing]);
 
-  const handleResetAll = useCallback(() => void resetAll(), [resetAll]);
   const handleClearOverride = useCallback(
     (bindingId: string) => void clearOverride(bindingId),
     [clearOverride],
@@ -435,21 +461,24 @@ export function KeyboardShortcutsSection() {
     );
   }
 
-  const resetAllButton = hasOverrides ? (
-    <Button variant="ghost" size="sm" onPress={handleResetAll}>
-      {t("settings.shortcuts.actions.resetAll")}
-    </Button>
-  ) : undefined;
-
   return (
     <>
-      {sections.map(function (section, sectionIndex) {
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("settings.shortcuts.searchPlaceholder")}
+          clearAccessibilityLabel={t("settings.shortcuts.clearSearch")}
+          fullWidth
+          testID="settings-shortcuts-search"
+        />
+      </View>
+      {sections.length === 0 ? (
+        <Text style={styles.empty}>{t("common.empty.noResults")}</Text>
+      ) : null}
+      {sections.map(function (section) {
         return (
-          <SettingsSection
-            key={section.id}
-            title={t(section.titleKey)}
-            trailing={sectionIndex === 0 ? resetAllButton : undefined}
-          >
+          <SettingsSection key={section.id} title={t(section.titleKey)}>
             <View style={settingsStyles.card}>
               {section.rows.map(function (row, index) {
                 const platform = { isMac, isDesktop: isDesktopApp };
@@ -465,6 +494,7 @@ export function KeyboardShortcutsSection() {
                   <View key={row.id}>
                     <ShortcutRowContainer
                       row={row}
+                      query={query}
                       bindingId={bindingId}
                       displayChord={displayChord}
                       hasOverride={hasOverride}
@@ -492,7 +522,34 @@ export function KeyboardShortcutsSection() {
   );
 }
 
+/**
+ * Reset all, for the page title row. Hidden while the search filters the list,
+ * since it resets every shortcut and not only the visible ones.
+ */
+export function KeyboardShortcutsResetAll() {
+  const { t } = useTranslation();
+  const { hasOverrides, resetAll } = useKeyboardShortcutOverrides();
+  const isFiltered = useKeyboardShortcutsStore((s) => s.settingsShortcutsQuery.trim() !== "");
+  const handleResetAll = useCallback(() => void resetAll(), [resetAll]);
+
+  if (isNative || !hasOverrides || isFiltered) return null;
+  return (
+    <Button variant="link" size="xs" onPress={handleResetAll}>
+      {t("settings.shortcuts.actions.resetAll")}
+    </Button>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
+  search: {
+    marginBottom: theme.spacing[6],
+  },
+  empty: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+    textAlign: "center",
+    paddingVertical: theme.spacing[8],
+  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

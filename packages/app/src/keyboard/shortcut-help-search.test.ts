@@ -5,7 +5,12 @@ import {
   UNASSIGNED_COMBO,
   type ShortcutOverrides,
 } from "./keyboard-shortcuts";
-import { filterShortcutHelpSections, shortcutSearchText } from "./shortcut-help-search";
+import {
+  filterShortcutHelpSections,
+  filterShortcutHelpSectionsByLabel,
+  shortcutLabelMatchRange,
+  shortcutSearchText,
+} from "./shortcut-help-search";
 
 const MAC_DESKTOP = { isMac: true, isDesktop: true };
 const NEW_WORKSPACE_BINDING = "workspace-new-cmd-n-mac";
@@ -109,5 +114,30 @@ describe("filterShortcutHelpSections", () => {
 
   it("drops a section whose rows all miss", () => {
     expect(filter("no shortcut spells this")).toEqual([]);
+  });
+});
+
+describe("filterShortcutHelpSectionsByLabel", () => {
+  function labelMatches(query: string): string[] {
+    return filterShortcutHelpSectionsByLabel({
+      sections: buildKeyboardShortcutHelpSections(MAC_DESKTOP),
+      query,
+      translate,
+    }).flatMap((section) => section.rows.map((row) => row.id));
+  }
+
+  it("matches part of a label, ignoring case", () => {
+    expect(labelMatches("WORK")).toContain("new-workspace");
+    expect(labelMatches("open proj")).toEqual(["new-agent"]);
+  });
+
+  it("ignores section titles and keys", () => {
+    expect(labelMatches("projects")).toEqual([]);
+    expect(labelMatches("cmd+n")).toEqual([]);
+  });
+
+  it("reports where the query sits in the label", () => {
+    expect(shortcutLabelMatchRange("New workspace", " WORK ")).toEqual({ start: 4, length: 4 });
+    expect(shortcutLabelMatchRange("New workspace", "tab")).toBeUndefined();
   });
 });

@@ -78,7 +78,10 @@ import { AddHostMethodModal } from "@/components/add-host-method-modal";
 import { AddHostModal } from "@/components/add-host-modal";
 import { AddRemoteSshHostModal } from "@/components/add-remote-ssh-host-modal";
 import { PairLinkModal } from "@/components/pair-link-modal";
-import { KeyboardShortcutsSection } from "@/screens/settings/keyboard-shortcuts-section";
+import {
+  KeyboardShortcutsResetAll,
+  KeyboardShortcutsSection,
+} from "@/screens/settings/keyboard-shortcuts-section";
 import { EditorSection } from "@/screens/settings/editor-section";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -149,6 +152,8 @@ interface SidebarSectionItem {
   webOnly?: boolean;
   /** The page body, for pages that need nothing from the settings screen. */
   Content?: ComponentType;
+  /** Page-wide text links beside the page title, on its baseline. */
+  Actions?: ComponentType;
 }
 
 const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
@@ -192,6 +197,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     icon: Keyboard,
     desktopOnly: true,
     Content: KeyboardShortcutsSection,
+    Actions: KeyboardShortcutsResetAll,
   },
   {
     id: "integrations",
@@ -1352,6 +1358,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     return undefined;
   })();
 
+  const PageActions =
+    view.kind === "section"
+      ? ALL_SECTION_ITEMS.find((s) => s.id === view.section)?.Actions
+      : undefined;
+  const pageActions = useMemo(() => (PageActions ? <PageActions /> : undefined), [PageActions]);
+
   const content: ReactNode = (() => {
     if (view.kind === "plugin")
       return (
@@ -1478,7 +1490,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   if (isCompactLayout) {
     return (
       <View style={styles.container}>
-        <PageLayout title={detailTitle} onBack={handleBackFromDetail}>
+        <PageLayout
+          title={detailTitle}
+          onBack={handleBackFromDetail}
+          actions={pageActions}
+          baselineActions
+        >
           {content}
         </PageLayout>
         {addHostModals}
@@ -1506,7 +1523,12 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         </WindowChromeRegion>
         <WindowChromeRegion corners="top-right">
           <View style={desktopStyles.contentPane} testID="settings-detail-pane">
-            <PageLayout title={detailTitle} titleTestID="settings-detail-header-title">
+            <PageLayout
+              title={detailTitle}
+              titleTestID="settings-detail-header-title"
+              actions={pageActions}
+              baselineActions
+            >
               {content}
             </PageLayout>
           </View>

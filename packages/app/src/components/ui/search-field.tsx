@@ -115,16 +115,20 @@ export function SearchField({
         style={styles.input}
       />
       {value.length > 0 ? (
-        <ToolbarButton
-          testID={clearTestID}
-          onPress={handleClear}
-          label={clearAccessibilityLabel}
-          compact={isNative}
-          style={iconButtonChromeFrameStyle(isNative ? "small" : "large", isNative)}
-          hitSlop={8}
-        >
-          <ThemedX size={14} uniProps={mutedColorMapping} />
-        </ToolbarButton>
+        // The clear frame is taller than the text row. Its slot keeps the row's
+        // height so the field doesn't grow when the button appears.
+        <View style={styles.clearSlot}>
+          <ToolbarButton
+            testID={clearTestID}
+            onPress={handleClear}
+            label={clearAccessibilityLabel}
+            compact={isNative}
+            style={iconButtonChromeFrameStyle(isNative ? "small" : "large", isNative)}
+            hitSlop={8}
+          >
+            <ThemedX size={14} uniProps={mutedColorMapping} />
+          </ToolbarButton>
+        </View>
       ) : null}
       {trailing}
     </View>
@@ -132,6 +136,7 @@ export function SearchField({
 }
 
 const SEARCH_FIELD_MAX_WIDTH = 420;
+const INPUT_HEIGHT = 20;
 
 const styles = StyleSheet.create((theme) => ({
   field: {
@@ -154,11 +159,15 @@ const styles = StyleSheet.create((theme) => ({
   },
   fieldInvalid: { borderColor: theme.colors.statusDanger },
   fieldFullWidth: { maxWidth: "100%" },
+  clearSlot: {
+    height: INPUT_HEIGHT,
+    justifyContent: "center",
+  },
   input: {
     flex: 1,
     minWidth: 0,
     padding: 0,
-    height: 20,
+    height: INPUT_HEIGHT,
     // The browser's focus ring would sit inside the field's own focus border.
     // `outlineWidth` is typed on ViewStyle since RN 0.81 and is a no-op on
     // native, so this needs neither a cast nor a platform branch.

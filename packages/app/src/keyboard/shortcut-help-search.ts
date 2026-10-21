@@ -1,4 +1,5 @@
 import type { KeyboardShortcutHelpSection } from "@/keyboard/keyboard-shortcuts";
+import type { MatchRange } from "@getpaseo/protocol/search/text-match";
 import { formatShortcut, type ShortcutKey, type ShortcutOs } from "@/utils/format-shortcut";
 
 /** Resolves an i18n key to display text. The caller's `t`, injected. */
@@ -85,6 +86,40 @@ export function filterShortcutHelpSections({
       return searchText.includes(normalizedQuery);
     });
 
+    return rows.length > 0 ? [{ ...section, rows }] : [];
+  });
+}
+
+/**
+ * Where `query` appears in `label`, ignoring case, or undefined when it does
+ * not. Feeds both the settings page filter and its match highlight.
+ */
+export function shortcutLabelMatchRange(label: string, query: string): MatchRange | undefined {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return undefined;
+  // Assumes lowercasing keeps the length, which holds outside rare locale casings.
+  const start = label.toLocaleLowerCase().indexOf(normalizedQuery);
+  return start === -1 ? undefined : { start, length: normalizedQuery.length };
+}
+
+/**
+ * The settings page's sections narrowed to rows whose label contains the
+ * query. Unlike the cheat sheet filter, it matches the label only.
+ */
+export function filterShortcutHelpSectionsByLabel({
+  sections,
+  query,
+  translate,
+}: {
+  sections: readonly KeyboardShortcutHelpSection[];
+  query: string;
+  translate: TranslateHelpKey;
+}): KeyboardShortcutHelpSection[] {
+  if (!query.trim()) return [...sections];
+  return sections.flatMap((section) => {
+    const rows = section.rows.filter((row) =>
+      shortcutLabelMatchRange(translate(row.labelKey), query),
+    );
     return rows.length > 0 ? [{ ...section, rows }] : [];
   });
 }
