@@ -25,6 +25,7 @@ const FIELD_GROUPS = [
     HistoryField.WorkspaceName,
     HistoryField.Workspace,
     HistoryField.Branch,
+    HistoryField.LinearTickets,
     HistoryField.Host,
   ],
   [

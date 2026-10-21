@@ -299,6 +299,7 @@ export const ja: TranslationResources = {
         workspaceName: "ワークスペース",
         workspace: "フォルダー",
         branch: "ブランチ",
+        linearTickets: "Linear の課題",
         host: "ホスト",
         provider: "プロバイダー",
         model: "モデル",

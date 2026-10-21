@@ -299,6 +299,7 @@ export const ru: TranslationResources = {
         workspaceName: "Рабочее пространство",
         workspace: "Папка",
         branch: "Ветка",
+        linearTickets: "Задачи Linear",
         host: "Хост",
         provider: "Провайдер",
         model: "Модель",

@@ -294,6 +294,7 @@ export const ar: TranslationResources = {
         workspaceName: "مساحة العمل",
         workspace: "مجلد",
         branch: "الفرع",
+        linearTickets: "مشكلات Linear",
         host: "المضيف",
         provider: "المزوّد",
         model: "النموذج",

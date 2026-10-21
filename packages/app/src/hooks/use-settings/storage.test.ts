@@ -67,6 +67,18 @@ describe("loadAppSettingsFromStorage", () => {
       expect((await loadAppSettingsFromStorage(deps)).sidebarRowItems[item]).toBe(false);
     },
   );
+  it("enables Linear in legacy History preferences without resetting other display choices", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ history: { fields: { branch: false, host: false } } }),
+      }),
+    });
+    const fields = (await loadAppSettingsFromStorage(deps)).history.fields;
+    expect(fields.linearTickets).toBe(true);
+    expect(fields.branch).toBe(false);
+    expect(fields.host).toBe(false);
+  });
+
   it("defaults turn diff opens to Explorer", async () => {
     expect((await loadAppSettingsFromStorage(makeDeps())).turnDiffOpenLocation).toBe(
       TurnDiffOpenLocation.Explorer,

@@ -248,20 +248,6 @@ function SessionRow({
               />
             ) : null}
           </View>
-          {agent.workspaceLinearTickets?.length ? (
-            <View
-              style={styles.rowMetaRow}
-              testID={`agent-row-linear-tickets-${agent.serverId}-${agent.id}`}
-            >
-              <ThemedLinear size={14} uniProps={mutedIconMapping} />
-              <Text style={styles.sessionMetaText}>
-                <LinearTicketLinks
-                  tickets={agent.workspaceLinearTickets}
-                  style={styles.sessionMetaText}
-                />
-              </Text>
-            </View>
-          ) : null}
         </View>
       )}
     </Pressable>
@@ -407,6 +393,20 @@ function SessionRowContext({
             numberOfLines={1}
             testID={`agent-row-branch-${agent.serverId}-${agent.id}`}
           />
+        </View>
+      ) : null}
+      {fields.linearTickets && agent.workspaceLinearTickets?.length ? (
+        <View
+          style={styles.metaItem}
+          testID={`agent-row-linear-tickets-${agent.serverId}-${agent.id}`}
+        >
+          <ThemedLinear size={14} uniProps={mutedIconMapping} />
+          <Text style={styles.sessionMetaText} numberOfLines={1}>
+            <LinearTicketLinks
+              tickets={agent.workspaceLinearTickets}
+              style={styles.sessionMetaText}
+            />
+          </Text>
         </View>
       ) : null}
       {fields.host ? (
