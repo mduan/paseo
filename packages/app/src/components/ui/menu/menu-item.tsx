@@ -428,8 +428,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.spacing[2],
   },
   selectionTitle: {
-    textTransform: "uppercase",
     fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
     flexShrink: 1,
   },
   labelContainer: {
