@@ -64,7 +64,10 @@ function LinearKeyForm({ client, enabled, onCancel, onSaved }: KeyFormProps) {
   }, [state.canSubmit, disabled, saveKey]);
   const createKeyLink = useMemo(
     () => (
-      <ExternalLink href="https://linear.app/settings/api" label={t("settings.linear.createKey")} />
+      <ExternalLink
+        href="https://linear.app/settings/account/security"
+        label={t("settings.linear.createKey")}
+      />
     ),
     [t],
   );
