@@ -4820,6 +4820,27 @@ describe("Linear PR linkbacks", () => {
     },
   ];
 
+  it("reads linkback issue headings without collecting related links from issue bodies", () => {
+    const expandedBody = `<!-- linear-linkback -->
+<details><summary><a href="https://linear.app/acme/issue/ENG-1">ENG-1 Fix permissions</a></summary>
+<p>Related existing issue: [ENG-2](https://linear.app/acme/issue/ENG-2).</p>
+<details><summary>[ENG-3 Nested reference](https://linear.app/acme/issue/ENG-3)</summary>
+An unrelated reference inside the issue description.</details>
+</details>
+[ENG-4 Another linked issue](https://linear.app/acme/issue/ENG-4)
+<!-- [ENG-5 Hidden metadata](https://linear.app/acme/issue/ENG-5) -->`;
+    expect(
+      extractLinearTickets([{ author: { login: "linear-code" }, body: expandedBody }]),
+    ).toEqual([
+      { identifier: "ENG-1", url: "https://linear.app/acme/issue/ENG-1", title: "Fix permissions" },
+      {
+        identifier: "ENG-4",
+        url: "https://linear.app/acme/issue/ENG-4",
+        title: "Another linked issue",
+      },
+    ]);
+  });
+
   it("extracts HTML and Markdown issue links, decodes titles and deduplicates slugs", () => {
     expect(extractLinearTickets([{ author: { login: "linear-code" }, body }])).toEqual(tickets);
   });
