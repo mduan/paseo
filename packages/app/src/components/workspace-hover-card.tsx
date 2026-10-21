@@ -636,7 +636,7 @@ const styles = StyleSheet.create((theme) => ({
   portsTitle: {
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
-    fontSize: theme.fontSize.base,
+    fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
   },
