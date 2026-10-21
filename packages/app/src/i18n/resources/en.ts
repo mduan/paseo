@@ -288,6 +288,7 @@ export const en = {
       fields: {
         subagent: "Subagent badge",
         project: "Project",
+        workspaceName: "Workspace",
         workspace: "Folder",
         branch: "Branch",
         host: "Host",

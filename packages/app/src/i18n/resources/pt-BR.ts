@@ -296,6 +296,7 @@ export const ptBR: TranslationResources = {
       fields: {
         subagent: "Selo de subagente",
         project: "Projeto",
+        workspaceName: "Espaço de trabalho",
         workspace: "Pasta",
         branch: "Branch",
         host: "Host",

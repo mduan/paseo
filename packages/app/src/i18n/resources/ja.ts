@@ -296,6 +296,7 @@ export const ja: TranslationResources = {
       fields: {
         subagent: "サブエージェントバッジ",
         project: "プロジェクト",
+        workspaceName: "ワークスペース",
         workspace: "フォルダー",
         branch: "ブランチ",
         host: "ホスト",

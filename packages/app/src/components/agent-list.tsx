@@ -171,7 +171,6 @@ function SessionRow({
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
-  const titleRanges = useMemo(() => search?.ranges(agent.title ?? "") ?? [], [search, agent.title]);
 
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
@@ -208,13 +207,7 @@ function SessionRow({
                 backdrop={getSessionRowBackdrop({ hovered, pressed, isSelected })}
               />
             ) : null}
-            <HighlightedText
-              text={agent.title || t("agentList.fallbackTitle")}
-              ranges={titleRanges}
-              style={styles.sessionTitle}
-              numberOfLines={isMobile ? 2 : 1}
-              testID={`agent-row-title-${agent.serverId}-${agent.id}`}
-            />
+            <SessionRowTitle agent={agent} search={search} fields={fields} isMobile={isMobile} />
             <View style={styles.rowEnd}>
               <SessionRowBadges
                 pendingPermissionCount={pendingPermissionCount}
@@ -246,6 +239,54 @@ function SessionRow({
         </View>
       )}
     </Pressable>
+  );
+}
+
+function SessionRowTitle({
+  agent,
+  search,
+  fields,
+  isMobile,
+}: {
+  agent: AggregatedAgent;
+  search?: TextSearch;
+  fields: HistoryFields;
+  isMobile: boolean;
+}) {
+  const { t } = useTranslation();
+  const title = agent.title || t("agentList.fallbackTitle");
+  const workspaceName = fields.workspaceName ? agent.projectPlacement?.workspaceName : undefined;
+  const ranges = useMemo(
+    () => ({
+      title: search?.ranges(agent.title ?? "") ?? [],
+      workspaceName: search?.ranges(workspaceName ?? "") ?? [],
+    }),
+    [search, agent.title, workspaceName],
+  );
+  if (!workspaceName) {
+    return (
+      <HighlightedText
+        text={title}
+        ranges={ranges.title}
+        style={styles.sessionTitle}
+        numberOfLines={isMobile ? 2 : 1}
+        testID={`agent-row-title-${agent.serverId}-${agent.id}`}
+      />
+    );
+  }
+  // The workspace name flows inline after the title and wraps with it, untruncated.
+  return (
+    <Text style={styles.sessionTitle} testID={`agent-row-title-${agent.serverId}-${agent.id}`}>
+      <HighlightedText text={title} ranges={ranges.title} />
+      <Text style={styles.sessionWorkspaceName}>
+        {" · "}
+        <HighlightedText
+          text={workspaceName}
+          ranges={ranges.workspaceName}
+          testID={`agent-row-workspace-name-${agent.serverId}-${agent.id}`}
+        />
+      </Text>
+    </Text>
   );
 }
 
@@ -754,6 +795,9 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foreground,
+  },
+  sessionWorkspaceName: {
+    color: theme.colors.foregroundMuted,
   },
   sessionMetaText: {
     flexShrink: 1,

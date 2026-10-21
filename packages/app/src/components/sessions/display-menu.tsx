@@ -20,7 +20,13 @@ import { HistoryField, type HistoryFields } from "./preferences";
 const ThemedSettings = withUnistyles(Settings2);
 const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const FIELD_GROUPS = [
-  [HistoryField.Project, HistoryField.Workspace, HistoryField.Branch, HistoryField.Host],
+  [
+    HistoryField.Project,
+    HistoryField.WorkspaceName,
+    HistoryField.Workspace,
+    HistoryField.Branch,
+    HistoryField.Host,
+  ],
   [
     HistoryField.Provider,
     HistoryField.Model,

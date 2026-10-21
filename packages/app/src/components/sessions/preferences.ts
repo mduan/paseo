@@ -18,6 +18,7 @@ export enum HistoryAgentType {
 export enum HistoryField {
   Subagent = "subagent",
   Project = "project",
+  WorkspaceName = "workspaceName",
   Workspace = "workspace",
   Branch = "branch",
   Host = "host",
@@ -33,6 +34,7 @@ export enum HistoryField {
 const HistoryFieldsSchema = z.object({
   subagent: z.boolean().catch(true),
   project: z.boolean().catch(true),
+  workspaceName: z.boolean().catch(true),
   workspace: z.boolean().catch(true),
   branch: z.boolean().catch(true),
   host: z.boolean().catch(true),
