@@ -9,7 +9,7 @@ import { LinearIssueStateType, type LinearTicket } from "@getpaseo/protocol/mess
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
-const METADATA_SIZE = ICON_SIZE.sm;
+const METADATA_SIZE = ICON_SIZE.xs;
 const ThemedUser = withUnistyles(UserRound);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -87,7 +87,9 @@ export function LinearTicketMetadata({ ticket }: { ticket: LinearTicket }) {
         <View style={styles.project}>
           <Tooltip enabledOnMobile>
             <TooltipTrigger style={styles.projectTrigger} accessibilityLabel={project.name}>
-              <Box size={12} color={project.color} style={styles.projectIcon} />
+              <View style={styles.projectIcon}>
+                <Box size={METADATA_SIZE} color={project.color} />
+              </View>
               <Text style={styles.projectName} numberOfLines={1}>
                 {project.name}
               </Text>
@@ -140,7 +142,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   project: { flexShrink: 1, minWidth: 0 },
-  projectIcon: { flexShrink: 0 },
+  projectIcon: { width: METADATA_SIZE, height: METADATA_SIZE, flexShrink: 0 },
   projectTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -154,7 +156,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
   },
   projectName: {
-    fontSize: theme.fontSize.sm,
+    fontSize: METADATA_SIZE - 2,
     lineHeight: METADATA_SIZE - 2,
     color: theme.colors.foregroundMuted,
     flexShrink: 1,
