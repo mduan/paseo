@@ -9,7 +9,7 @@ import { LinearIssueStateType, type LinearTicket } from "@getpaseo/protocol/mess
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
-const METADATA_SIZE = ICON_SIZE.md;
+const METADATA_SIZE = ICON_SIZE.sm;
 const ThemedUser = withUnistyles(UserRound);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
