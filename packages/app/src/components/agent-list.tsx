@@ -29,7 +29,15 @@ import {
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
-import { Archive, Folder, GitBranch, LayoutPanelLeft, Network, Server } from "lucide-react-native";
+import {
+  Archive,
+  Folder,
+  GitBranch,
+  LayoutPanelLeft,
+  Network,
+  Server,
+  Split,
+} from "lucide-react-native";
 import { useProviderIcon } from "@/components/provider-icons";
 import { WorkspaceTabIcon } from "@/screens/workspace/workspace-tab-presentation";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
@@ -59,6 +67,7 @@ const ThemedArchive = withUnistyles(Archive);
 const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedBranch = withUnistyles(GitBranch);
+const ThemedSplit = withUnistyles(Split);
 const ThemedServer = withUnistyles(Server);
 const ThemedLayoutPanelLeft = withUnistyles(LayoutPanelLeft);
 const ThemedRefreshControl = withUnistyles(RefreshControl);
@@ -327,6 +336,18 @@ function SessionRowIcon({
   );
 }
 
+function SessionRowBranchIcon({ isWorktree }: { isWorktree: boolean }) {
+  const { t } = useTranslation();
+  const Icon = isWorktree ? ThemedSplit : ThemedBranch;
+  return (
+    <Icon
+      size={14}
+      uniProps={mutedIconMapping}
+      accessibilityLabel={isWorktree ? t("settings.customizations.gitWorktree") : undefined}
+    />
+  );
+}
+
 function SessionRowContext({
   agent,
   fields,
@@ -388,7 +409,7 @@ function SessionRowContext({
       ) : null}
       {showBranch ? (
         <View style={styles.metaItem}>
-          <ThemedBranch size={14} uniProps={mutedIconMapping} />
+          <SessionRowBranchIcon isWorktree={Boolean(placement.checkout.mainRepoRoot)} />
           <HighlightedText
             text={branch}
             ranges={ranges.branch}
