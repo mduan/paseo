@@ -22,6 +22,7 @@ import {
   GitBranch,
   Plug,
   ChevronRight,
+  ExternalLink,
   Server,
   Tag,
 } from "lucide-react-native";
@@ -382,6 +383,7 @@ function WorkspaceHoverCardContent({
   );
 }
 
+const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedPlug = withUnistyles(Plug);
 const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedGitBranch = withUnistyles(GitBranch);
@@ -563,41 +565,36 @@ function PortsList({ ports, serverId }: { ports: readonly WorkspacePort[]; serve
 function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
+  const showAction = hovered && isLocal;
   const handleEnter = useCallback(() => setHovered(true), []);
   const handleLeave = useCallback(() => setHovered(false), []);
   const host = port.host.includes(":") ? `[${port.host}]` : port.host;
-  const url = `http://localhost:${port.port}`;
   const address = `${host}:${port.port}`;
   const openPort = useCallback(
-    (event: GestureResponderEvent) => {
-      event.preventDefault();
-      void openExternalUrl(url);
-    },
-    [url],
+    () => void openExternalUrl(`http://localhost:${port.port}`),
+    [port.port],
   );
   return (
     <View onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
       <View style={[styles.portRow, hovered && styles.listRowHovered]}>
         <Text style={styles.portNumber}>{port.port}</Text>
-        <Text style={styles.portProcess} numberOfLines={1}>
-          {port.processName}
-        </Text>
+        <Text style={styles.portProcess}>{port.processName}</Text>
         <View style={styles.portAddressSlot}>
-          <Text
-            style={[styles.portAddress, isLocal && hovered && styles.portAddressHovered]}
-            numberOfLines={1}
-            {...(isWeb && isLocal
-              ? {
-                  href: url,
-                  hrefAttrs: { target: "_blank", rel: "noopener noreferrer" },
-                  accessibilityRole: "link" as const,
-                  accessibilityLabel: `${address}, ${t("workspace.hoverCard.openInBrowser")}`,
-                  onPress: openPort,
-                }
-              : {})}
-          >
+          <Text style={[styles.portAddress, showAction && styles.hidden]} numberOfLines={1}>
             {address}
           </Text>
+          {isLocal ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`${address}, ${t("workspace.hoverCard.openInBrowser")}`}
+              onPress={openPort}
+              style={[styles.portAction, !showAction && styles.hidden]}
+              pointerEvents={showAction ? "auto" : "none"}
+              tabIndex={showAction ? 0 : -1}
+            >
+              <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>
@@ -630,7 +627,9 @@ const styles = StyleSheet.create((theme) => ({
   cardColumns: { flexDirection: "row" },
   cardMain: { width: HOVER_CARD_WIDTH },
   portsPanel: {
-    width: 290,
+    maxWidth: 290,
+    minWidth: 0,
+    flexShrink: 1,
     borderLeftWidth: 1,
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
@@ -650,20 +649,29 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[3],
   },
   portNumber: {
+    flexShrink: 0,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.semibold,
     fontVariant: ["tabular-nums"],
     color: theme.colors.foreground,
   },
   portProcess: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    overflowWrap: "anywhere",
     minWidth: 0,
     fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
   },
-  portAddressSlot: { minHeight: 24, justifyContent: "center", alignItems: "flex-end" },
+  portAddressSlot: {
+    flexShrink: 0,
+    minHeight: 24,
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
   portAddress: { maxWidth: 130, fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
-  portAddressHovered: { color: theme.colors.foreground, textDecorationLine: "underline" },
+  portAction: { position: "absolute", right: 0, padding: theme.spacing[1] },
+  hidden: { opacity: 0 },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
