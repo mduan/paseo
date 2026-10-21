@@ -576,6 +576,10 @@ test("find options expand collapsed work before highlighting and reset when clos
     await expect(page.getByText("Running the foreground command.", { exact: true })).toHaveCount(0);
     await searchChat(page, "foreground");
     await expect(status(page)).toHaveText("1 of 2");
+    expect((await page.getByLabel("Find", { exact: true }).boundingBox())!.width).toBeGreaterThan(
+      400,
+    );
+    expect((await query(page).boundingBox())!.width).toBeGreaterThan(220);
     const folded = page.getByTestId("chat-find-includeFolded");
     await expect(folded).toHaveAttribute("aria-pressed", "false");
     await folded.click();

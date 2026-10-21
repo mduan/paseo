@@ -15,6 +15,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
   type TextInputProps,
+  type LayoutChangeEvent,
 } from "react-native";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -168,6 +169,14 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
 ) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
+  const [optionsWidth, setOptionsWidth] = useState(0);
+  const measureOptions = useCallback((event: LayoutChangeEvent) => {
+    setOptionsWidth(event.nativeEvent.layout.width);
+  }, []);
+  const widgetStyle = useMemo(
+    () => [styles.widget, { width: FIND_WIDGET_WIDTH + (options ? optionsWidth : 0) }],
+    [options, optionsWidth],
+  );
   const controlSize = smallIconButtonChromeFrameSize(isCompact);
   const glyphSize = paneContentToolbarIconSize(isCompact);
   const rowHeight = Math.max(COLLAPSED_FIELD_HEIGHT, controlSize);
@@ -244,7 +253,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
 
   return (
     <View
-      style={styles.widget}
+      style={widgetStyle}
       accessibilityLabel={t("paneFind.title")}
       {...(isWeb
         ? {
@@ -287,7 +296,7 @@ export const PaneFind = forwardRef<PaneFindHandle, PaneFindProps>(function PaneF
             trailing={
               <>
                 {invalid ? null : matchCount}
-                {options}
+                {options ? <View onLayout={measureOptions}>{options}</View> : null}
               </>
             }
             onChangeText={onQueryChange}

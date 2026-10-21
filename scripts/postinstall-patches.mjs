@@ -43,6 +43,12 @@ const patchedPackages = [
     patchPrefix: "@opencode-ai+sdk+",
     cwd: "packages/server",
   },
+  // Keep regex boundaries Unicode-aware and refresh highlights when search options change.
+  {
+    nodeModulesPath: "packages/app/node_modules/@xterm/addon-search",
+    patchPrefix: "@xterm+addon-search+",
+    cwd: "packages/app",
+  },
 ];
 
 const installedPackages = patchedPackages.filter(({ nodeModulesPath }) =>

@@ -1,3 +1,4 @@
+import { TerminalFindDirection } from "../find/direction";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
@@ -8,6 +9,8 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { LigaturesAddon } from "@xterm/addon-ligatures/lib/addon-ligatures.mjs";
 import { Terminal, type ITheme, type IMarker } from "@xterm/xterm";
 import type { TerminalState } from "@getpaseo/protocol/messages";
+import type { SearchOptions } from "@getpaseo/protocol/search/options";
+import { createPhrasePattern, SearchQueryError } from "@getpaseo/protocol/search/phrase";
 import {
   type TerminalInputModeState,
   TerminalInputModeTracker,
@@ -34,9 +37,16 @@ import { resolveTerminalFontFamily, resolveTerminalFontSize } from "./terminal-f
 
 export type TerminalOutputData = Uint8Array;
 
+// eslint-disable-next-line typescript/consistent-type-definitions -- Workspace instructions require type aliases.
+export type TerminalFindInput = {
+  query: string;
+  direction?: TerminalFindDirection;
+  options?: SearchOptions;
+};
+
 export interface TerminalFindHandle {
   setWidgetSize(size: { width: number; height: number }): void;
-  search(query: string, direction?: "next" | "previous"): void;
+  search(input: TerminalFindInput): void;
   clear(): void;
 }
 
@@ -44,6 +54,7 @@ export interface TerminalFindResult {
   resultIndex: number;
   resultCount: number;
   limited: boolean;
+  invalid: boolean;
   placement: "top" | "bottom";
 }
 
@@ -192,6 +203,7 @@ export class TerminalEmulatorRuntime {
   private searchAddon: SearchAddon | null = null;
   private findResult = { resultIndex: -1, resultCount: 0 };
   private findQuery = "";
+  private findInvalid = false;
   private findOutputAnchor: IMarker | undefined;
   private findWidgetSize = { width: 0, height: 0 };
 
@@ -200,14 +212,29 @@ export class TerminalEmulatorRuntime {
       this.findWidgetSize = size;
       this.emitFindResult();
     },
-    search: (query, direction) => {
+    search: ({ query, direction, options: searchOptions }) => {
+      if (!query) {
+        this.find.clear();
+        return;
+      }
+      let pattern: RegExp;
+      try {
+        pattern = createPhrasePattern({ query, options: searchOptions, literal: true });
+      } catch (error) {
+        if (!(error instanceof SearchQueryError)) throw error;
+        this.find.clear();
+        this.findInvalid = true;
+        this.emitFindResult();
+        return;
+      }
+      this.findInvalid = false;
       this.releaseFindOutputAnchor();
       this.findQuery = query;
       if (this.terminal && !this.searchAddon) this.loadSearchAddon(this.terminal);
       const theme = this.terminal?.options.theme;
       const options = {
-        regex: false,
-        caseSensitive: false,
+        regex: true,
+        caseSensitive: searchOptions?.caseSensitive,
         incremental: direction === undefined,
         decorations: {
           matchBorder: theme?.yellow ?? "#b58900",
@@ -216,12 +243,14 @@ export class TerminalEmulatorRuntime {
           activeMatchColorOverviewRuler: theme?.blue ?? "#268bd2",
         },
       };
-      if (direction === "next") this.searchAddon?.findNext(query, options);
-      else this.searchAddon?.findPrevious(query, options);
+      if (direction === TerminalFindDirection.Next)
+        this.searchAddon?.findNext(pattern.source, options);
+      else this.searchAddon?.findPrevious(pattern.source, options);
     },
     clear: () => {
       this.releaseFindOutputAnchor();
       this.findQuery = "";
+      this.findInvalid = false;
       // clearDecorations leaves the addon's pending refresh alive. Disposal
       // cancels its timers and listeners without touching terminal selection.
       this.searchAddon?.dispose();
@@ -418,6 +447,7 @@ export class TerminalEmulatorRuntime {
     this.callbacks.onFindResult?.({
       ...this.findResult,
       limited: this.findResult.resultCount >= FIND_HIGHLIGHT_LIMIT,
+      invalid: this.findInvalid,
       placement,
     });
   }
@@ -951,6 +981,7 @@ export class TerminalEmulatorRuntime {
     this.terminal = null;
     this.searchAddon = null;
     this.findQuery = "";
+    this.findInvalid = false;
     this.findResult = { resultIndex: -1, resultCount: 0 };
     this.fitAddon = null;
     this.fitAndEmitResize = null;

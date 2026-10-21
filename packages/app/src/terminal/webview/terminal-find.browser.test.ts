@@ -64,6 +64,19 @@ test("the generated WebView searches its mounted stream and keeps Find commands 
     .toMatchObject({ resultCount: 2, resultIndex: 0 });
   send({ type: "find", streamKey: "stale", query: "absent" });
   expect(win.__paseoTerminal!.getSelection()).toBe("a.b");
+  send({ type: "find", query: "a.b", options: { caseSensitive: true } });
+  await expect
+    .poll(() => messages.findLast((m) => m.type === "findResult")?.result)
+    .toMatchObject({ resultCount: 1, invalid: false });
+  expect(win.__paseoTerminal!.getSelection()).toBe("a.b");
+  send({ type: "find", query: '"a.b"', options: { regex: true } });
+  await expect
+    .poll(() => messages.findLast((m) => m.type === "findResult")?.result)
+    .toMatchObject({ resultCount: 0, invalid: false });
+  send({ type: "find", query: "[", options: { regex: true } });
+  await expect
+    .poll(() => messages.findLast((m) => m.type === "findResult")?.result)
+    .toMatchObject({ resultCount: 0, invalid: true });
   send({ type: "clearFind" });
   await expect
     .poll(() => messages.findLast((m) => m.type === "findResult")?.result)

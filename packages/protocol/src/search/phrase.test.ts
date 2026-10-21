@@ -36,13 +36,90 @@ it("supports raw regex and reports invalid expressions", () => {
       ),
     ].map((m) => m[0]),
   ).toEqual(["retry1", "Retry22"]);
-  expect(() => createPhrasePattern({ query: "(", options: { regex: true } })).toThrow(
-    SearchQueryError,
-  );
+  for (const query of ["(", "["]) {
+    for (const wholeWord of [false, true]) {
+      expect(() => createPhrasePattern({ query, options: { regex: true, wholeWord } })).toThrow(
+        SearchQueryError,
+      );
+    }
+  }
 });
 
 it("ignores zero-length regex matches in search results", () => {
   const search = createTextSearch({ query: "a*", options: { regex: true } });
   expect(search.matches(["bbb"])).toBe(false);
   expect(search.ranges("baa")).toEqual([{ start: 1, length: 2 }]);
+});
+
+it("applies case and Unicode word boundaries to quoted history phrases and leaves regex quotes literal", () => {
+  const search = createTextSearch({
+    query: '"Word phrase"',
+    options: { caseSensitive: true, wholeWord: true },
+  });
+  expect(search.matches(["Word phrase!"])).toBe(true);
+  for (const text of ["word phrase", "éWord phrase", "Word phrase_"]) {
+    expect(search.matches([text])).toBe(false);
+  }
+  const regex = createPhrasePattern({ query: '"a.b"', options: { regex: true } });
+  expect([...'axb "axb" "a.b"'.matchAll(regex)].map((match) => match[0])).toEqual([
+    '"axb"',
+    '"a.b"',
+  ]);
+});
+
+it("combines exact quoted history phrases with existing fuzzy tokens across fields", () => {
+  const search = createTextSearch({ query: '"stripe billing" mian' });
+  expect(search.matches(["Stripe billing export", "main"])).toBe(true);
+  for (const title of ["Stripe usage billing", "Stripe  billing", "Stripe bulling"]) {
+    expect(search.matches([title, "main"])).toBe(false);
+  }
+  expect(search.matches(["stripe", "billing", "main"])).toBe(false);
+  expect(search.matches(["Stripe billing", "other"])).toBe(false);
+  expect(search.ranges("Stripe billing on main")).toEqual([
+    { start: 0, length: 14 },
+    { start: 18, length: 4 },
+  ]);
+});
+
+it("starts exact history matching at an opening quote", () => {
+  for (const query of ['"mai', '"mai"']) {
+    const search = createTextSearch({ query });
+    expect(search.matches(["main"])).toBe(true);
+    expect(search.matches(["maki"])).toBe(false);
+    expect(search.ranges("main")).toEqual([{ start: 0, length: 3 }]);
+  }
+  const mixed = createTextSearch({ query: 'mian "stripe bill' });
+  expect(mixed.matches(["main", "Stripe billing"])).toBe(true);
+  expect(mixed.matches(["main", "Stripe extra billing"])).toBe(false);
+  expect(mixed.matches(["main", "Stripe  billing"])).toBe(false);
+  const options = createTextSearch({
+    query: '"Bill',
+    options: { caseSensitive: true, wholeWord: true },
+  });
+  expect(options.matches(["Bill!"])).toBe(true);
+  expect(options.matches(["bill"])).toBe(false);
+  expect(options.matches(["Billing"])).toBe(false);
+  const regex = createTextSearch({ query: '"mai', options: { regex: true } });
+  expect(regex.matches(["main"])).toBe(false);
+  expect(regex.matches(['"main'])).toBe(true);
+});
+
+it("supports multiple quoted phrases, partial substrings, options, and unfinished quotes", () => {
+  const search = createTextSearch({ query: '"bill" "export usage"' });
+  expect(search.matches(["billing export usage"])).toBe(true);
+  expect(search.matches(["bull export usage"])).toBe(false);
+  const wholeWord = createTextSearch({ query: '"bill"', options: { wholeWord: true } });
+  expect(wholeWord.matches(["billing"])).toBe(false);
+  expect(wholeWord.matches(["Bill"])).toBe(true);
+  const caseSensitive = createTextSearch({
+    query: '"Bill" Paseo',
+    options: { caseSensitive: true },
+  });
+  expect(caseSensitive.matches(["Bill", "Paseo"])).toBe(true);
+  expect(caseSensitive.matches(["bill", "Paseo"])).toBe(false);
+  expect(
+    [...'say "hello'.matchAll(createPhrasePattern({ query: 'say "hello' }))].map(
+      (match) => match[0],
+    ),
+  ).toEqual(['say "hello']);
 });

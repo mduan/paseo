@@ -1,4 +1,5 @@
 import "@xterm/xterm/css/xterm.css";
+import { TerminalFindDirection } from "../find/direction";
 import { afterEach, expect, test } from "vitest";
 import {
   TerminalEmulatorRuntime,
@@ -49,38 +50,79 @@ test("uses xterm's literal matching across wrapped cells and keeps selection whe
   // before choosing an exact column boundary for the wrapped text fixture.
   await new Promise((resolve) => setTimeout(resolve, 2600));
   await write("first [a.b] 界\r\n" + "padding\r\n".repeat(30) + "last [A.B] 界");
-  runtime.find.search("[a.b] 界");
+  runtime.find.search({ query: "[a.b] 界" });
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 1, limited: false });
-  runtime.find.search("[a.b] 界", "previous");
+  runtime.find.search({ query: "[a.b] 界", direction: TerminalFindDirection.Previous });
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 0, placement: "top" });
-  runtime.find.search("[a.b] 界", "previous");
+  runtime.find.search({ query: "[a.b] 界", direction: TerminalFindDirection.Previous });
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 1 });
   const selection = window.__paseoTerminal!.getSelection();
   runtime.find.clear();
   expect(window.__paseoTerminal!.getSelection()).toBe(selection);
   expect(results.at(-1)).toMatchObject({ resultCount: 0, resultIndex: -1 });
-  runtime.find.search("[aXb]");
+  runtime.find.search({ query: "[aXb]" });
   expect(results.at(-1)).toMatchObject({ resultCount: 0 });
   const cols = window.__paseoTerminal!.cols;
   await write("\r\n" + "x".repeat(cols - 2) + "wrapped-needle");
-  runtime.find.search("wrapped-needle");
+  runtime.find.search({ query: "wrapped-needle" });
   await expect.poll(() => results.at(-1)).toMatchObject({ resultCount: 1, resultIndex: 0 });
 });
 
 test("reports the addon's highlight limit without disabling navigation beyond the counted matches", async () => {
   const results = mount();
   await write(("a ".repeat(25) + "\r\n").repeat(801));
-  runtime.find.search("a");
+  runtime.find.search({ query: "a" });
   expect(results.at(-1)).toMatchObject({ resultCount: 20000, limited: true, resultIndex: -1 });
   expect(window.__paseoTerminal!.getSelection()).toBe("a");
-  runtime.find.search("a", "next");
+  runtime.find.search({ query: "a", direction: TerminalFindDirection.Next });
   expect(results.at(-1)).toMatchObject({ resultCount: 20000, limited: true, resultIndex: 0 });
+});
+
+test("supports literal phrases, case, Unicode word boundaries, and raw regex", async () => {
+  const results = mount();
+  await write(
+    'bill billé ébill bill_name Bill BILL\r\nfirst a.b  word\r\nlast A.B  word\r\na.b word "axb"\r\n😀',
+  );
+  runtime.find.search({ query: "a.b  word" });
+  expect(results.at(-1)).toMatchObject({ resultCount: 2, invalid: false });
+  expect(window.__paseoTerminal!.getSelection()).toBe("A.B  word");
+  runtime.find.search({ query: "a.b  word", options: { caseSensitive: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1 });
+  expect(window.__paseoTerminal!.getSelection()).toBe("a.b  word");
+  runtime.find.search({ query: "bill", options: { wholeWord: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 3 });
+  runtime.find.search({ query: "bill", options: { wholeWord: true, caseSensitive: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1 });
+  runtime.find.search({ query: '"a.b"', options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1 });
+  expect(window.__paseoTerminal!.getSelection()).toBe('"axb"');
+  runtime.find.search({ query: "😀", options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1 });
+  runtime.find.search({ query: "(?=.)", options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 0 });
+  runtime.find.search({ query: "a*", options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 6 });
+});
+
+test("clears invalid regex results and recovers when the pattern is fixed", async () => {
+  const results = mount();
+  await write("needle");
+  runtime.find.search({ query: "needle" });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1, invalid: false });
+  runtime.find.search({ query: "[", options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 0, invalid: true });
+  runtime.find.setWidgetSize({ width: 400, height: 58 });
+  expect(results.at(-1)).toMatchObject({ resultCount: 0, invalid: true });
+  runtime.find.search({ query: "needle", options: { regex: true } });
+  expect(results.at(-1)).toMatchObject({ resultCount: 1, invalid: false });
+  runtime.find.search({ query: "" });
+  expect(results.at(-1)).toMatchObject({ resultCount: 0, invalid: false });
 });
 
 test("keeps the inspected bottom viewport fixed when output arrives", async () => {
   mount();
   await write("padding\r\n".repeat(30) + "inspected needle");
-  runtime.find.search("needle");
+  runtime.find.search({ query: "needle" });
   const term = window.__paseoTerminal!;
   const inspected = term.buffer.active.viewportY;
   await write("\r\nnew output".repeat(30));
@@ -93,14 +135,14 @@ test("searches the active alternate buffer without moving the restored normal vi
   await write("normal needle\r\n" + "padding\r\n".repeat(30));
   const normalViewport = window.__paseoTerminal!.buffer.active.viewportY;
   await write("\x1b[?1049hAlt needle\r\nAlt NEEDLE");
-  runtime.find.search("needle");
+  runtime.find.search({ query: "needle" });
   expect(results.at(-1)).toMatchObject({ resultCount: 2, resultIndex: 1, limited: false });
   expect(window.__paseoTerminal!.getSelection()).toBe("NEEDLE");
-  runtime.find.search("needle", "previous");
+  runtime.find.search({ query: "needle", direction: TerminalFindDirection.Previous });
   expect(window.__paseoTerminal!.getSelection()).toBe("needle");
   await write("\x1b[?1049l");
   await expect.poll(() => window.__paseoTerminal!.buffer.active.viewportY).toBe(normalViewport);
-  runtime.find.search("needle");
+  runtime.find.search({ query: "needle" });
   await expect.poll(() => results.at(-1)).toMatchObject({ resultCount: 1, resultIndex: 0 });
 });
 
@@ -110,9 +152,9 @@ test("keeps Find at the top unless its measured frame covers the active match", 
   runtime.find.setWidgetSize({ width: 356, height: 58 });
   const cols = window.__paseoTerminal!.cols;
   await write("left-needle\r\n" + " ".repeat(cols - 12) + "right-needle");
-  runtime.find.search("left-needle");
+  runtime.find.search({ query: "left-needle" });
   expect(results.at(-1)).toMatchObject({ resultCount: 1, placement: "top" });
-  runtime.find.search("right-needle");
+  runtime.find.search({ query: "right-needle" });
   expect(results.at(-1)).toMatchObject({ resultCount: 1, placement: "bottom" });
 });
 
@@ -121,7 +163,7 @@ test("closing Find cancels pending refreshes without clearing old or new selecti
   await write("first needle\r\n" + "padding\r\n".repeat(30) + "last needle");
   const term = window.__paseoTerminal!;
   for (const freshSelection of [false, true]) {
-    runtime.find.search("needle");
+    runtime.find.search({ query: "needle" });
     await write("\r\nnew output");
     // onWriteParsed schedules the addon's refresh after the write callback.
     await new Promise<void>((resolve) => {
@@ -144,7 +186,7 @@ test("preserves inspection through multiple real parser turns of queued output",
   mount();
   await new Promise((resolve) => setTimeout(resolve, 2600));
   await write("padding\r\n".repeat(30) + "needle\r\nprogress");
-  runtime.find.search("needle");
+  runtime.find.search({ query: "needle" });
   const term = window.__paseoTerminal!;
   const inspected = term.buffer.active.viewportY;
   const samples: { viewport: number; base: number }[] = [];
