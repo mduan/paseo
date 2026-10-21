@@ -36,6 +36,7 @@ import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
+import { useToast } from "@/contexts/toast-context";
 import { PrBadge } from "@/components/sidebar-workspace-list";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
@@ -564,37 +565,59 @@ function PortsList({ ports, serverId }: { ports: readonly WorkspacePort[]; serve
 
 function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [hovered, setHovered] = useState(false);
-  const showAction = hovered && isLocal;
   const handleEnter = useCallback(() => setHovered(true), []);
   const handleLeave = useCallback(() => setHovered(false), []);
   const host = port.host.includes(":") ? `[${port.host}]` : port.host;
   const address = `${host}:${port.port}`;
+  const copyAddress = useCallback(() => {
+    void copyToClipboard(address)
+      .then(() => toast.copied(address))
+      .catch(() => toast.error(t("workspace.tabs.toasts.copyFailed")));
+  }, [address, t, toast]);
   const openPort = useCallback(
     () => void openExternalUrl(`http://localhost:${port.port}`),
     [port.port],
   );
   return (
-    <View onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
+    <View style={styles.portHoverTarget} onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
       <View style={[styles.portRow, hovered && styles.listRowHovered]}>
         <Text style={styles.portNumber}>{port.port}</Text>
         <Text style={styles.portProcess}>{port.processName}</Text>
         <View style={styles.portAddressSlot}>
-          <Text style={[styles.portAddress, showAction && styles.hidden]} numberOfLines={1}>
+          <Text
+            style={[styles.portAddress, hovered && styles.hidden]}
+            numberOfLines={1}
+            pointerEvents="none"
+          >
             {address}
           </Text>
-          {isLocal ? (
+          <View
+            style={[styles.portActions, !hovered && styles.hidden]}
+            pointerEvents={hovered ? "auto" : "none"}
+          >
             <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={`${address}, ${t("workspace.hoverCard.openInBrowser")}`}
-              onPress={openPort}
-              style={[styles.portAction, !showAction && styles.hidden]}
-              pointerEvents={showAction ? "auto" : "none"}
-              tabIndex={showAction ? 0 : -1}
+              accessibilityRole="button"
+              accessibilityLabel={`${t("common.actions.copy")}: ${address}`}
+              onPress={copyAddress}
+              style={styles.portAction}
+              tabIndex={hovered ? 0 : -1}
             >
-              <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
+              <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />
             </Pressable>
-          ) : null}
+            {isLocal ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`${address}, ${t("workspace.hoverCard.openInBrowser")}`}
+                onPress={openPort}
+                style={styles.portAction}
+                tabIndex={hovered ? 0 : -1}
+              >
+                <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </View>
     </View>
@@ -641,6 +664,7 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
   },
+  portHoverTarget: { position: "relative" },
   portRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -660,17 +684,26 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     overflowWrap: "anywhere",
     minWidth: 0,
+    paddingVertical: theme.spacing[1],
     fontSize: theme.fontSize.sm,
     color: theme.colors.foregroundMuted,
   },
   portAddressSlot: {
     flexShrink: 0,
+    minWidth: 48,
     minHeight: 24,
     justifyContent: "center",
     alignItems: "flex-end",
   },
   portAddress: { maxWidth: 130, fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted },
-  portAction: { position: "absolute", right: 0, padding: theme.spacing[1] },
+  portActions: {
+    position: "absolute",
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
+  portAction: { padding: theme.spacing[1] },
   hidden: { opacity: 0 },
   cardHeader: {
     flexDirection: "row",
