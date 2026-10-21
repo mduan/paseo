@@ -455,7 +455,8 @@ test.describe("Sidebar workspace list", () => {
           author: { login: "linear-code" },
           body: `<!-- linear-linkback -->
 <a href="https://linear.app/acme/issue/COR-1401">COR-1401 Make Execute Query more discoverable</a>
-<a href="https://linear.app/acme/issue/COR-1404">COR-1404 Display no results returned</a>`,
+<a href="https://linear.app/acme/issue/COR-1404">COR-1404 Display no results returned</a>
+${Array.from({ length: 10 }, (_, index) => `<a href="https://linear.app/acme/issue/COR-${1500 + index}">COR-${1500 + index} Additional ticket with a longer title to exercise the scrolling panel</a>`).join("\n")}`,
         },
       ],
     };
@@ -474,9 +475,19 @@ test.describe("Sidebar workspace list", () => {
       const card = await openWorkspaceHoverCard(page, workspace.workspaceId);
       const source = card.getByTestId("hover-card-workspace-linear-tickets");
       await expect(source).toContainText("COR-1401, COR-1404");
+      await expect
+        .soft(source.getByRole("link", { name: "COR-1401", exact: true }))
+        .toHaveAttribute("href", "https://linear.app/acme/issue/COR-1401");
+      await expect
+        .soft(source.getByRole("link", { name: "COR-1404", exact: true }))
+        .toHaveAttribute("href", "https://linear.app/acme/issue/COR-1404");
+      const mainHeight = (await card.boundingBox())?.height;
+      if (!mainHeight) throw new Error("Workspace tooltip has no height");
       await source.hover();
       const panel = card.getByTestId("hover-card-linear-panel");
       await expect(panel.getByText("Linear tickets", { exact: true })).toBeVisible();
+      const expandedHeight = (await card.boundingBox())?.height;
+      expect.soft(expandedHeight).toBeLessThanOrEqual(mainHeight + 1);
       const row = panel.getByTestId("hover-card-linear-ticket-COR-1401");
       await expect(row.getByText("Make Execute Query more discoverable")).toBeVisible();
       await expect(row.getByRole("link")).toHaveCount(1);
@@ -505,6 +516,9 @@ test.describe("Sidebar workspace list", () => {
       await expect(copy).toBeVisible({ timeout: 4_000 });
       await panel.getByText("Linear tickets", { exact: true }).hover();
       await expect(actions).toHaveCSS("opacity", "0");
+      const lastTicket = panel.getByTestId("hover-card-linear-ticket-COR-1509");
+      await lastTicket.scrollIntoViewIfNeeded();
+      await expect(lastTicket).toBeVisible();
       await page.getByTestId("sidebar-display-preferences-menu").click();
       await page.getByTestId("sidebar-display-show").click();
       await page.getByTestId("sidebar-row-item-linearTickets").click();

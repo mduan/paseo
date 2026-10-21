@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -28,11 +29,16 @@ import {
 } from "lucide-react-native";
 import type { LinearTicket } from "@getpaseo/protocol/messages";
 import { LinearIcon } from "@/components/icons/linear-icon";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
 import { Pressable } from "react-native";
-import type { GestureResponderEvent, PointerEvent as NativePointerEvent } from "react-native";
+import type {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  PointerEvent as NativePointerEvent,
+} from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -226,6 +232,10 @@ function WorkspaceHoverCardContent({
   const sidePanel = useHoverIntent();
   const [activePanel, setActivePanel] = useState<HoverPanel>();
   const tickets = prHint?.linearTickets;
+  const [mainHeight, setMainHeight] = useState<number>();
+  const handleMainLayout = useCallback((event: LayoutChangeEvent) => {
+    setMainHeight(event.nativeEvent.layout.height);
+  }, []);
   const openPanelNow = sidePanel.openNow;
   const openPorts = useCallback(() => {
     setActivePanel(HoverPanel.Ports);
@@ -318,6 +328,7 @@ function WorkspaceHoverCardContent({
         <View style={styles.cardColumns}>
           <View
             style={styles.cardMain}
+            onLayout={handleMainLayout}
             onPointerEnter={sidePanel.scheduleClose}
             onPointerMove={handleMainPointerMove}
             onPointerLeave={sidePanel.cancelClose}
@@ -329,21 +340,7 @@ function WorkspaceHoverCardContent({
             </View>
             {tickets?.length ? (
               <View ref={ticketsRowRef} onPointerEnter={openTickets}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={openTickets}
-                  accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
-                    tickets: tickets.map((ticket) => ticket.identifier).join(", "),
-                  })}
-                  style={styles.cardInfoRow}
-                  testID="hover-card-workspace-linear-tickets"
-                >
-                  <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
-                  <Text style={styles.cardInfoText} numberOfLines={1}>
-                    {tickets.map((ticket) => ticket.identifier).join(", ")}
-                  </Text>
-                  <ThemedChevronRight size={12} uniProps={foregroundMutedColorMapping} />
-                </Pressable>
+                <LinearTicketsSummary tickets={tickets} onOpen={openTickets} />
               </View>
             ) : null}
             {prHint ? <PullRequestRow hint={prHint} /> : null}
@@ -412,6 +409,7 @@ function WorkspaceHoverCardContent({
               tickets={tickets}
               serverId={workspace.serverId}
               cancelClose={sidePanel.cancelClose}
+              maxHeight={mainHeight}
             />
           ) : null}
         </View>
@@ -421,13 +419,49 @@ function WorkspaceHoverCardContent({
   );
 }
 
+function LinearTicketsSummary({
+  tickets,
+  onOpen,
+}: {
+  tickets: readonly LinearTicket[];
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.cardInfoRow} testID="hover-card-workspace-linear-tickets">
+      <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
+      <Text style={styles.cardInfoText} numberOfLines={1}>
+        {tickets.map((ticket, index) => (
+          <Fragment key={ticket.url}>
+            {index > 0 ? ", " : undefined}
+            <MarkdownLinkText href={ticket.url} style={styles.ticketSummaryLink}>
+              {ticket.identifier}
+            </MarkdownLinkText>
+          </Fragment>
+        ))}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        accessibilityLabel={t("workspace.hoverCard.ticketsAccessibility", {
+          tickets: tickets.map((ticket) => ticket.identifier).join(", "),
+        })}
+      >
+        <ThemedChevronRight size={12} uniProps={foregroundMutedColorMapping} />
+      </Pressable>
+    </View>
+  );
+}
+
 function WorkspaceDetailsPanel({
   activePanel,
   ports,
   tickets,
   serverId,
   cancelClose,
+  maxHeight,
 }: {
+  maxHeight?: number;
   activePanel?: HoverPanel;
   ports?: readonly WorkspacePort[];
   tickets?: readonly LinearTicket[];
@@ -446,10 +480,10 @@ function WorkspaceDetailsPanel({
       </View>
     );
   }
-  if (activePanel === HoverPanel.LinearTickets && tickets?.length) {
+  if (activePanel === HoverPanel.LinearTickets && tickets?.length && maxHeight) {
     return (
       <View
-        style={styles.ticketsPanel}
+        style={styles.ticketsPanel(maxHeight)}
         onPointerEnter={cancelClose}
         testID="hover-card-linear-panel"
       >
@@ -807,7 +841,7 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 1000,
   },
   cardColumns: { flexDirection: "row" },
-  cardMain: { width: HOVER_CARD_WIDTH },
+  cardMain: { width: HOVER_CARD_WIDTH, alignSelf: "flex-start" },
   portsPanel: {
     maxWidth: 290,
     minWidth: 0,
@@ -828,15 +862,17 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foregroundMuted,
   },
-  ticketsPanel: {
+  ticketsPanel: (maxHeight: number) => ({
+    maxHeight,
     width: 340,
     minWidth: 0,
     flexShrink: 1,
     borderLeftWidth: 1,
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
-  },
-  ticketList: { maxHeight: 400 },
+  }),
+  ticketList: { flexShrink: 1 },
+  ticketSummaryLink: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   ticketRow: {
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
