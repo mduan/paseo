@@ -140,6 +140,28 @@ function historyEntry(input: {
 }
 
 describe("fetchAgentHistoryPage", () => {
+  it("projects workspace issues for every historical chat without editing agent snapshots", async () => {
+    const tickets = [
+      {
+        identifier: "ENG-123",
+        url: "https://linear.app/acme/issue/ENG-123",
+        title: "Retry uploads",
+      },
+    ];
+    const entries = ["first", "second"].map((id) =>
+      Object.assign(historyEntry({ id, cwd: "/repo", updatedAt: "2026-10-21T00:00:00.000Z" }), {
+        workspaceLinearTickets: tickets,
+      }),
+    );
+    const result = await fetchAgentHistoryPage({
+      client: createClient([historyPayload({ entries })]),
+      serverId: "server",
+      cursor: null,
+    });
+    expect(result.agents.map((agent) => agent.workspaceLinearTickets)).toEqual([tickets, tickets]);
+    expect(entries[0].agent).not.toHaveProperty("linearTickets");
+  });
+
   it("builds the all-host query key independent of host order", () => {
     expect(allAgentHistoryQueryKey(["server-b", "server-a"])).toEqual(
       allAgentHistoryQueryKey(["server-a", "server-b"]),

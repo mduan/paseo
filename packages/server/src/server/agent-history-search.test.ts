@@ -42,6 +42,21 @@ function candidate(input: {
 }
 
 describe("matchesAgentHistoryQuery", () => {
+  it("matches workspace issue identifiers and available titles", () => {
+    const entry = {
+      ...candidate({ title: "Work" }),
+      workspaceLinearTickets: [
+        {
+          identifier: "ENG-123",
+          url: "https://linear.app/acme/issue/ENG-123",
+          title: "Retry uploads",
+        },
+      ],
+    };
+    expect(matchesAgentHistoryQuery("eng-123", entry)).toBe(true);
+    expect(matchesAgentHistoryQuery("uploads", entry)).toBe(true);
+    expect(matchesAgentHistoryQuery("ENG-999", entry)).toBe(false);
+  });
   it("rejects scattered letters across words while keeping within-word subsequences", () => {
     expect(
       matchesAgentHistoryQuery(

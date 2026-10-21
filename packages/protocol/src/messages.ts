@@ -1005,6 +1005,33 @@ export const ProjectRemoveRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const LinearTicketSchema = z.object({
+  identifier: z.string(),
+  url: z.string(),
+  title: z.string().optional(),
+});
+
+export type LinearTicket = z.infer<typeof LinearTicketSchema>;
+
+export const WorkspaceLinearIssuesUpdateRequestSchema = z.object({
+  type: z.literal("workspace.linear_issues.update.request"),
+  workspaceId: z.string(),
+  add: z.array(z.string()).optional(),
+  remove: z.array(z.string()).optional(),
+  requestId: z.string(),
+});
+
+export const WorkspaceLinearIssuesUpdateResponseSchema = z.object({
+  type: z.literal("workspace.linear_issues.update.response"),
+  payload: z.object({
+    requestId: z.string(),
+    workspaceId: z.string(),
+    accepted: z.boolean(),
+    linearTickets: z.array(LinearTicketSchema),
+    error: z.string().nullable(),
+  }),
+});
+
 export const WorkspaceTitleSetRequestSchema = z.object({
   type: z.literal("workspace.title.set.request"),
   workspaceId: z.string(),
@@ -3353,6 +3380,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetRequestSchema,
   ProjectIconColorSetRequestSchema,
   ProjectRemoveRequestSchema,
+  WorkspaceLinearIssuesUpdateRequestSchema,
   WorkspaceTitleSetRequestSchema,
   WorkspacePinSetRequestSchema,
   WorkspaceLabelListRequestSchema,
@@ -3730,6 +3758,8 @@ export const ServerInfoStatusPayloadSchema = z
         directorySync: z.boolean().optional(),
         // COMPAT(workspaceLabels): added in v0.5.0, remove after 2027-08-14.
         workspaceLabels: z.boolean().optional(),
+        // COMPAT(workspaceLinearIssues): added in v0.11.0-fork.27, remove gate after 2027-04-21.
+        workspaceLinearIssues: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
@@ -4132,14 +4162,6 @@ const WorkspaceGitRuntimePayloadSchema = z
   .optional()
   .nullable();
 
-export const LinearTicketSchema = z.object({
-  identifier: z.string(),
-  url: z.string(),
-  title: z.string().optional(),
-});
-
-export type LinearTicket = z.infer<typeof LinearTicketSchema>;
-
 export const WorkspaceGitHubRuntimePayloadSchema = z
   .object({
     featuresEnabled: z.boolean().optional(),
@@ -4228,6 +4250,7 @@ export const WorkspaceDescriptorPayloadSchema = z
     pinnedAt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
+    linearTickets: z.array(LinearTicketSchema).optional(),
     archivingAt: z.string().nullable().optional().default(null),
     status: WorkspaceStateBucketSchema,
     // Best-effort workspace status entry timestamp. Old daemons omit the
@@ -4334,6 +4357,7 @@ export type AgentSearchMatch = z.infer<typeof AgentSearchMatchSchema>;
 const AgentDirectoryResponseEntrySchema = z.object({
   agent: AgentSnapshotPayloadSchema,
   project: ProjectPlacementPayloadSchema,
+  workspaceLinearTickets: z.array(LinearTicketSchema).optional(),
   // Legacy relevance metadata remains accepted from older daemons.
   // Current history responses use the requested chronological sort.
   searchScore: z.number().optional(),
@@ -7253,6 +7277,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconSetResponseSchema,
   ProjectIconColorSetResponseSchema,
   ProjectRemoveResponseSchema,
+  WorkspaceLinearIssuesUpdateResponseSchema,
   WorkspaceTitleSetResponseSchema,
   WorkspacePinSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,

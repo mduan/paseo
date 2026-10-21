@@ -64,6 +64,7 @@ export function WorkspaceMetaRow({
   projectName,
   hostBadge,
   prHint,
+  linearTickets,
   serviceSummary,
   ports,
   labels = EMPTY_LABELS,
@@ -73,6 +74,7 @@ export function WorkspaceMetaRow({
   projectName: string | null;
   hostBadge: HostBadgeModel | null;
   prHint: PrHint | null;
+  linearTickets?: readonly LinearTicket[];
   serviceSummary: WorkspaceServiceSummary | null;
   ports?: readonly WorkspacePort[];
   labels?: readonly WorkspaceLabelDefinition[];
@@ -84,6 +86,7 @@ export function WorkspaceMetaRow({
     projectName,
     hasHostBadge: hostBadge !== null,
     prHint,
+    linearTickets,
     serviceSummary,
     ports,
     labels,

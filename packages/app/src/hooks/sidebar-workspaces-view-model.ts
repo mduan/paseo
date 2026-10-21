@@ -1,3 +1,5 @@
+import equal from "fast-deep-equal";
+import { mergeLinearTickets } from "@getpaseo/protocol/linear-tickets";
 import type { PrHint } from "@/git/pr-hint";
 import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { type HostProjectListItem } from "@/projects/host-project-model";
@@ -48,6 +50,7 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   archivingAt: string | null;
   diffStat: { additions: number; deletions: number } | null;
   prHint: PrHint | null;
+  linearTickets?: WorkspaceDescriptor["linearTickets"];
   archiveHasUncommittedChanges: boolean | null;
   archiveUnpushedCommitCount: number | null;
   ports?: WorkspaceDescriptor["ports"];
@@ -178,6 +181,10 @@ export function createSidebarWorkspaceEntry(input: {
     prHint: selectPrHintFromStatus(
       input.workspace.githubRuntime?.pullRequest,
       input.workspace.forge,
+    ),
+    linearTickets: mergeLinearTickets(
+      input.workspace.linearTickets,
+      input.workspace.githubRuntime?.pullRequest?.linearTickets,
     ),
     archiveHasUncommittedChanges: input.workspace.gitRuntime?.isDirty ?? null,
     archiveUnpushedCommitCount: input.workspace.gitRuntime?.aheadOfOrigin ?? null,
@@ -416,6 +423,7 @@ function areSidebarWorkspaceEntriesEqual(
   const keys = Object.keys(left) as Array<keyof SidebarWorkspaceEntry>;
   if (keys.length !== Object.keys(right).length) return false;
   return keys.every((key) => {
+    if (key === "linearTickets") return equal(left.linearTickets, right.linearTickets);
     if (key !== "prHint") return Object.is(left[key], right[key]);
     const leftHint = left.prHint;
     const rightHint = right.prHint;

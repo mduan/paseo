@@ -562,7 +562,7 @@ install.
 
 Use `npm run cli` to run the in-repo CLI from source (`npx tsx packages/cli/src/index.ts`). The script wraps the CLI with `scripts/dev-home.sh`, so it automatically uses this checkout's `.dev/paseo-home` and dev daemon endpoint unless you pass an explicit override. The globally installed `paseo` binary on macOS is a symlink into the installed Paseo desktop app, not this checkout — use it to drive the desktop's built-in daemon, but use `npm run cli` when you want to talk to the CLI you are editing.
 
-Canonical automation uses `paseo project create/ls/rename/delete`, `paseo workspace create/ls/rename/archive`, `paseo heartbeat create/update/delete`, and the full `paseo schedule` group. MCP heartbeat automation is intentionally smaller: create and delete only. Detach remains an explicit user lifecycle action rather than an agent tool. `paseo run --new-workspace local|worktree` composes workspace creation with agent creation. The old `paseo worktree` and `paseo run --worktree` forms are hidden compatibility aliases.
+Canonical automation uses `paseo project create/ls/rename/delete`, `paseo workspace create/ls/rename/update/archive`, `paseo heartbeat create/update/delete`, and the full `paseo schedule` group. MCP heartbeat automation is intentionally smaller: create and delete only. Detach remains an explicit user lifecycle action rather than an agent tool. `paseo run --new-workspace local|worktree` composes workspace creation with agent creation. The old `paseo worktree` and `paseo run --worktree` forms are hidden compatibility aliases.
 
 ```bash
 npm run cli -- ls -a -g              # List all agents globally
@@ -590,6 +590,29 @@ Desktop integrations can focus an existing agent without creating one or
 sending a message. Use `paseo://h/<server-id>/agent/<agent-id>`, or run
 `paseo agent open <agent-id>`. The CLI reads the local daemon's server ID by
 default; pass `--server <server-id>` when targeting another server.
+
+### Linear issue context for agents
+
+When `PASEO_WORKSPACE_ID` is set and you begin work on a specific Linear issue, attempt to link its full URL:
+
+```bash
+paseo workspace update "$PASEO_WORKSPACE_ID" --add-linear-issue https://linear.app/acme/issue/ENG-123 --json
+```
+
+Link issues you actively work on. Skip issues mentioned only as background. Repeated adds are safe. Keep links after the task or chat ends.
+
+Treat linking as best effort. A missing CLI, unsupported command or flag, old daemon, or rejected or failed link must not block your main task.
+Report the limitation once. If linking is unsupported, skip subsequent attempts in this chat.
+Upgrade the CLI, restart the daemon, or change the daemon target only when the user explicitly requests that action.
+The CLI returns failures with a nonzero exit status. Best effort applies to your workflow, not command errors.
+
+The explicit workspace ID selects the workspace, even when several workspaces share a directory.
+Manual links persist with the workspace. Current PR links remain separate and can supply titles.
+Removing a manual association preserves a current PR association for that issue:
+
+```bash
+paseo workspace update "$PASEO_WORKSPACE_ID" --remove-linear-issue https://linear.app/acme/issue/ENG-123 --json
+```
 
 ## Agent state
 

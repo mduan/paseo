@@ -1,3 +1,5 @@
+import { LinearTicketLinks } from "@/components/linear-ticket-links";
+import { LinearIcon } from "@/components/icons/linear-icon";
 import {
   View,
   Text,
@@ -49,6 +51,7 @@ const refreshColorMapping = (theme: Theme) => ({
   tintColor: theme.colors.foregroundMuted,
   colors: [theme.colors.foregroundMuted],
 });
+const ThemedLinear = withUnistyles(LinearIcon);
 const ThemedArchive = withUnistyles(Archive);
 const ThemedNetwork = withUnistyles(Network);
 const ThemedFolder = withUnistyles(Folder);
@@ -245,6 +248,20 @@ function SessionRow({
               />
             ) : null}
           </View>
+          {agent.workspaceLinearTickets?.length ? (
+            <View
+              style={styles.rowMetaRow}
+              testID={`agent-row-linear-tickets-${agent.serverId}-${agent.id}`}
+            >
+              <ThemedLinear size={14} uniProps={mutedIconMapping} />
+              <Text style={styles.sessionMetaText}>
+                <LinearTicketLinks
+                  tickets={agent.workspaceLinearTickets}
+                  style={styles.sessionMetaText}
+                />
+              </Text>
+            </View>
+          ) : null}
         </View>
       )}
     </Pressable>

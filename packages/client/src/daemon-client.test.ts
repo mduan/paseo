@@ -455,6 +455,27 @@ test.each(["agent", "workspace"] as const)(
   },
 );
 
+test("workspace Linear updates reject unsupported hosts before sending a mutation", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "linear_feature_gate_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+  });
+  clients.push(client);
+  const connecting = client.connect();
+  mock.triggerOpen();
+  await connecting;
+  await expect(
+    client.updateWorkspaceLinearIssues({
+      workspaceId: "ws",
+      add: ["https://linear.app/acme/issue/ENG-123"],
+    }),
+  ).rejects.toThrow("Update the host to use workspace Linear issue associations.");
+  expect(mock.sent).toEqual([]);
+});
+
 test("Hub management requires daemon support before dispatching requests", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

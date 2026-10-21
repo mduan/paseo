@@ -1,5 +1,5 @@
+import { LinearTicketLinks } from "@/components/linear-ticket-links";
 import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -29,7 +29,6 @@ import {
 } from "lucide-react-native";
 import type { LinearTicket } from "@getpaseo/protocol/messages";
 import { LinearIcon } from "@/components/icons/linear-icon";
-import { MarkdownLinkText } from "@/components/markdown/link-text";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
@@ -231,7 +230,7 @@ function WorkspaceHoverCardContent({
   const ports = workspace.ports;
   const sidePanel = useHoverIntent();
   const [activePanel, setActivePanel] = useState<HoverPanel>();
-  const tickets = prHint?.linearTickets;
+  const tickets = workspace.linearTickets;
   const [mainHeight, setMainHeight] = useState<number>();
   const handleMainLayout = useCallback((event: LayoutChangeEvent) => {
     setMainHeight(event.nativeEvent.layout.height);
@@ -434,14 +433,7 @@ function LinearTicketsSummary({
     >
       <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
       <Text style={styles.cardInfoText} numberOfLines={1}>
-        {tickets.map((ticket, index) => (
-          <Fragment key={ticket.url}>
-            {index > 0 ? ", " : undefined}
-            <MarkdownLinkText href={ticket.url} style={styles.ticketSummaryLink}>
-              {ticket.identifier}
-            </MarkdownLinkText>
-          </Fragment>
-        ))}
+        <LinearTicketLinks tickets={tickets} style={styles.ticketSummaryLink} />
       </Text>
       <Pressable
         accessibilityRole="button"

@@ -3097,6 +3097,24 @@ export class DaemonClient {
     return { removedWorkspaceIds: payload.removedWorkspaceIds };
   }
 
+  async updateWorkspaceLinearIssues(input: {
+    workspaceId: string;
+    add?: string[];
+    remove?: string[];
+  }) {
+    // COMPAT(workspaceLinearIssues): added in v0.11.0-fork.27, remove gate after 2027-04-21.
+    if (this.lastServerInfoMessage?.features?.workspaceLinearIssues !== true) {
+      throw new Error("Update the host to use workspace Linear issue associations.");
+    }
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.linear_issues.update.response">({
+        message: { type: "workspace.linear_issues.update.request", ...input },
+      });
+    if (!payload.accepted)
+      throw new Error(payload.error ?? "Workspace Linear issue update rejected");
+    return { workspaceId: payload.workspaceId, linearTickets: payload.linearTickets };
+  }
+
   async setWorkspaceTitle(
     workspaceId: string,
     title: string | null,

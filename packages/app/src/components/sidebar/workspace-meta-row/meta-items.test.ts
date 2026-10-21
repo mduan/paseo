@@ -40,7 +40,8 @@ describe("selectMetaRowItems", () => {
       { identifier: "COR-1", url: "https://linear.app/acme/issue/COR-1", title: "Fix" },
     ];
     const input = {
-      prHint: { ...PR_HINT, linearTickets },
+      prHint: PR_HINT,
+      linearTickets,
       ports: [{ workspaceId: "app", host: "*", port: 3000 }],
     };
     expect(kinds(select(input))).toEqual([
@@ -64,9 +65,8 @@ describe("selectMetaRowItems", () => {
         }),
       ),
     ).toEqual(["host", "linearTickets", "services", "labels"]);
-    expect(kinds(select({ prHint: { ...PR_HINT, linearTickets: [] } }))).not.toContain(
-      "linearTickets",
-    );
+    expect(kinds(select({ prHint: null, linearTickets }))).toContain("linearTickets");
+    expect(kinds(select({ linearTickets: [] }))).not.toContain("linearTickets");
   });
   it("places ports after checks, and respects the ports preference and empty results", () => {
     const ports = [{ workspaceId: "app", host: "*", port: 3000 }];

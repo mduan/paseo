@@ -1,3 +1,4 @@
+import { mergeLinearTickets } from "@getpaseo/protocol/linear-tickets";
 import type { SearchOptions } from "@getpaseo/protocol/search/options";
 import type { AgentHistoryFilterOptions } from "@getpaseo/protocol/messages";
 import type {
@@ -5,8 +6,8 @@ import type {
   FetchAgentHistoryOptions,
   FetchAgentHistoryPageInfo,
 } from "@getpaseo/client/internal/daemon-client";
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo } from "react";
+import { keepPreviousData, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
@@ -15,9 +16,13 @@ import {
   useHostRuntimeConnectionStatuses,
   useHosts,
 } from "@/runtime/host-runtime";
-import { useSessionStore, type Agent } from "@/stores/session-store";
+import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
 import { buildAgentDirectoryState } from "@/utils/agent-directory-sync";
-import { agentHistoryQueryKey, allAgentHistoryQueryKey } from "./agent-history-query-key";
+import {
+  agentHistoryQueryKey,
+  allAgentHistoryQueryKey,
+  allAgentHistoryQueryRootKey,
+} from "./agent-history-query-key";
 
 const AGENT_HISTORY_PAGE_LIMIT = 200;
 const AGENT_HISTORY_SORT: NonNullable<FetchAgentHistoryOptions["sort"]> = [
@@ -109,6 +114,9 @@ export async function fetchAgentHistoryPage(input: {
     serverId: input.serverId,
     entries: payload.entries,
   });
+  const workspaceTickets = new Map(
+    payload.entries.map((entry) => [entry.agent.id, entry.workspaceLinearTickets]),
+  );
   const thinkingOptions = new Map(
     payload.entries.map(({ agent }) => [
       agent.id,
@@ -131,6 +139,7 @@ export async function fetchAgentHistoryPage(input: {
       lastActivityAt: agent.lastActivityAt,
       cwd: agent.cwd,
       workspaceId: agent.workspaceId,
+      workspaceLinearTickets: workspaceTickets.get(agent.id),
       provider: agent.provider,
       model: agent.runtimeInfo?.model ?? agent.model,
       thinkingOptionId: thinkingOptions.get(agent.id),
@@ -287,6 +296,56 @@ export function useAgentHistory(options: {
       return agents;
     }),
   );
+  const liveWorkspacesByServer = useSessionStore(
+    useShallow((state) => {
+      const workspaces: Record<string, Map<string, WorkspaceDescriptor> | undefined> = {};
+      for (const serverId of requestedServerIds)
+        workspaces[serverId] = state.sessions[serverId]?.workspaces;
+      return workspaces;
+    }),
+  );
+  const queryClient = useQueryClient();
+  const ticketContext = useMemo(
+    () =>
+      JSON.stringify(
+        Object.entries(liveWorkspacesByServer).flatMap(([serverId, workspaces]) =>
+          Array.from(workspaces?.values() ?? [])
+            .filter(
+              (workspace) =>
+                workspace.linearTickets?.length ||
+                workspace.githubRuntime?.pullRequest?.linearTickets?.length,
+            )
+            .map((workspace) => [
+              serverId,
+              workspace.id,
+              workspace.linearTickets,
+              workspace.githubRuntime?.pullRequest?.linearTickets,
+            ]),
+        ),
+      ),
+    [liveWorkspacesByServer],
+  );
+  const invalidateHistory = useCallback(() => {
+    for (const serverId of requestedServerIds)
+      void queryClient.invalidateQueries({ queryKey: agentHistoryQueryKey(serverId) });
+    void queryClient.invalidateQueries({ queryKey: allAgentHistoryQueryRootKey() });
+  }, [requestedServerIds, queryClient]);
+  const previousTicketContext = useRef(ticketContext);
+  useEffect(() => {
+    if (previousTicketContext.current === ticketContext) return;
+    previousTicketContext.current = ticketContext;
+    // Server search membership can change even when no currently displayed row matched.
+    invalidateHistory();
+  }, [ticketContext, invalidateHistory]);
+  useEffect(() => {
+    if (!enabled) return;
+    const releases = requestedServerIds.map((serverId) =>
+      runtime.getClient(serverId)?.on("workspace_update", (message) => {
+        if (message.payload.kind === "remove") invalidateHistory();
+      }),
+    );
+    return () => releases.forEach((release) => release?.());
+  }, [enabled, runtime, requestedServerIds, connectionStatuses, invalidateHistory]);
   // A host the user asked about splits two ways: one this fetch can reach, and
   // one whose sessions will be missing from the answer. Both come out of here,
   // because dropping the unreachable ones silently is what lets the list — and
@@ -449,6 +508,15 @@ export function useAgentHistory(options: {
       const current = Object.assign({}, agent, {
         serverLabel: serverLabelById.get(agent.serverId) ?? agent.serverLabel,
       });
+      const workspace = agent.workspaceId
+        ? liveWorkspacesByServer[agent.serverId]?.get(agent.workspaceId)
+        : undefined;
+      if (workspace) {
+        current.workspaceLinearTickets = mergeLinearTickets(
+          workspace.linearTickets,
+          workspace.githubRuntime?.pullRequest?.linearTickets,
+        );
+      }
       if (live) {
         Object.assign(current, {
           status: live.status,
@@ -462,7 +530,7 @@ export function useAgentHistory(options: {
       return current;
     });
     return sortByLatestActivity(labelledAgents);
-  }, [data?.pages, serverLabelById, liveAgentsByServer]);
+  }, [data?.pages, serverLabelById, liveAgentsByServer, liveWorkspacesByServer]);
   const filterOptions = useMemo<AgentHistoryFilterOptions>(
     () => ({
       projects: data?.pages.flatMap((page) => page.filterOptions?.projects ?? []) ?? [],

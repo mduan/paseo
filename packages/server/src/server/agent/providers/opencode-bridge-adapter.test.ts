@@ -45,24 +45,40 @@ describe("OpenCode bridge adapter", () => {
       { provider: "opencode", cwd: "/workspace/one" },
       {
         agentId: "agent-one",
-        env: { PASEO_AGENT_ID: "agent-one", PASEO_AGENT_CWD: "/workspace/one" },
+        env: {
+          PASEO_AGENT_ID: "agent-one",
+          PASEO_AGENT_CWD: "/workspace/one",
+          PASEO_WORKSPACE_ID: "ws-one",
+        },
       },
     );
     const second = await client.createSession(
       { provider: "opencode", cwd: "/workspace/two" },
       {
         agentId: "agent-two",
-        env: { PASEO_AGENT_ID: "agent-two", PASEO_AGENT_CWD: "/workspace/two" },
+        env: {
+          PASEO_AGENT_ID: "agent-two",
+          PASEO_AGENT_CWD: "/workspace/two",
+          PASEO_WORKSPACE_ID: "ws-two",
+        },
       },
     );
 
     expect(client.capabilities.supportsNativePaseoTools).toBe(true);
     expect(runtime.acquisitions.map(({ kind }) => kind)).toEqual(["current", "current"]);
     await expect(readBridgeContext(bridge, "ses_first")).resolves.toEqual({
-      env: { PASEO_AGENT_ID: "agent-one", PASEO_AGENT_CWD: "/workspace/one" },
+      env: {
+        PASEO_AGENT_ID: "agent-one",
+        PASEO_AGENT_CWD: "/workspace/one",
+        PASEO_WORKSPACE_ID: "ws-one",
+      },
     });
     await expect(readBridgeContext(bridge, "ses_second")).resolves.toEqual({
-      env: { PASEO_AGENT_ID: "agent-two", PASEO_AGENT_CWD: "/workspace/two" },
+      env: {
+        PASEO_AGENT_ID: "agent-two",
+        PASEO_AGENT_CWD: "/workspace/two",
+        PASEO_WORKSPACE_ID: "ws-two",
+      },
     });
 
     await first.close();

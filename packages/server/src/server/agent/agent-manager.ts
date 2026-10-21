@@ -1450,7 +1450,7 @@ export class AgentManager {
       {
         reason: "resume",
         purpose,
-        workspaceId: options?.workspaceId ?? null,
+        workspaceId: record?.workspaceId ?? options?.workspaceId ?? null,
       },
     );
     launchContext.priorTotalCostUsd = totalCostOf(record?.lastUsage);
@@ -1465,6 +1465,7 @@ export class AgentManager {
     await this.requireExternalMcpSupport(session, storedConfig);
     return this.registerSession(session, storedConfig, resolvedAgentId, {
       ...options,
+      workspaceId: record?.workspaceId ?? options?.workspaceId,
       persistence: handle,
       lastUsage: record?.lastUsage,
       turnCount: record?.turnCount,
@@ -5652,6 +5653,8 @@ export class AgentManager {
         ...env,
         PASEO_AGENT_ID: agentId,
         PASEO_AGENT_CWD: cwd,
+        // Empty clears inherited identity for internal sessions without a workspace.
+        PASEO_WORKSPACE_ID: opening?.workspaceId ?? "",
       },
     };
     if (

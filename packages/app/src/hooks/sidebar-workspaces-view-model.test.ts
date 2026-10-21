@@ -51,6 +51,23 @@ function workspaceWithForge(forge: string | undefined, prUrl: string): Workspace
 }
 
 describe("createSidebarWorkspaceEntry forge threading", () => {
+  it("combines manual and current PR issues, keeping manual links without a PR", () => {
+    const descriptor = workspaceWithForge("github", "https://github.com/acme/repo/pull/42");
+    const ticket = { identifier: "ENG-123", url: "https://linear.app/acme/issue/ENG-123" };
+    descriptor.linearTickets = [ticket];
+    descriptor.githubRuntime!.pullRequest!.linearTickets = [
+      { ...ticket, url: `${ticket.url}/a-title`, title: "Retry uploads" },
+    ];
+    const entry = () => createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor });
+    expect(entry().linearTickets).toEqual([{ ...ticket, title: "Retry uploads" }]);
+    descriptor.linearTickets = [];
+    expect(entry().linearTickets).toEqual([
+      { ...ticket, url: `${ticket.url}/a-title`, title: "Retry uploads" },
+    ]);
+    descriptor.linearTickets = [ticket];
+    descriptor.githubRuntime = null;
+    expect(entry().linearTickets).toEqual([ticket]);
+  });
   it("exposes pushed ports only when the host supports workspace ports", () => {
     const descriptor = workspaceWithForge("github", "https://github.com/acme/repo/pull/42");
     descriptor.ports = [{ workspaceId: descriptor.id, host: "127.0.0.1", port: 3000 }];
