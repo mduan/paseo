@@ -157,6 +157,7 @@ export const SHORTCUT_HELP_ROW_ORDER: Record<ShortcutSectionId, readonly string[
   general: [
     "toggle-command-center",
     "search-files",
+    "open-history",
     "show-shortcuts",
     "toggle-settings",
     "cycle-theme",
@@ -238,6 +239,7 @@ const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
   "workspace-terminal-new": "settings.shortcuts.help.newTerminal",
   "search-files": "settings.shortcuts.help.searchFiles",
   "toggle-command-center": "settings.shortcuts.help.toggleCommandCenter",
+  "open-history": "sidebar.sections.sessions",
   "show-shortcuts": "settings.shortcuts.help.showKeyboardShortcuts",
   "toggle-left-sidebar": "settings.shortcuts.help.toggleLeftSidebar",
   "toggle-right-sidebar": "settings.shortcuts.help.toggleRightSidebar",
@@ -932,6 +934,29 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
       id: "toggle-command-center",
       section: "general",
       label: "Toggle command center",
+    },
+  },
+
+  {
+    id: "history-open-cmd-shift-h-mac",
+    action: "history.open",
+    combo: "Cmd+Shift+H",
+    when: { mac: true, commandCenter: false },
+    help: {
+      id: "open-history",
+      section: "general",
+      label: "History",
+    },
+  },
+  {
+    id: "history-open-ctrl-shift-h-non-mac",
+    action: "history.open",
+    combo: "Ctrl+Shift+H",
+    when: { mac: false, commandCenter: false, terminal: false },
+    help: {
+      id: "open-history",
+      section: "general",
+      label: "History",
     },
   },
 

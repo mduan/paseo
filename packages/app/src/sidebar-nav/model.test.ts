@@ -295,7 +295,7 @@ describe("builtinSidebarNavShortcutAction", () => {
   it("maps only the builtins that have a keyboard shortcut", () => {
     expect(builtinSidebarNavShortcutAction("new-workspace")).toBe("new-workspace");
     expect(builtinSidebarNavShortcutAction("search")).toBe("toggle-command-center");
-    expect(builtinSidebarNavShortcutAction("history")).toBeNull();
+    expect(builtinSidebarNavShortcutAction("history")).toBe("open-history");
     expect(builtinSidebarNavShortcutAction("schedules")).toBeNull();
   });
 });

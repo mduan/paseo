@@ -132,6 +132,17 @@ interface HelpSectionCase {
 describe("keyboard-shortcuts", () => {
   const matchingCases: MatchingShortcutCase[] = [
     {
+      name: "matches Cmd+Shift+H to open History on mac",
+      event: { key: "H", code: "KeyH", metaKey: true, shiftKey: true },
+      context: { isMac: true, focusScope: "message-input" },
+      action: "history.open",
+    },
+    {
+      name: "matches Ctrl+Shift+H to open History on non-mac",
+      event: { key: "H", code: "KeyH", ctrlKey: true, shiftKey: true },
+      action: "history.open",
+    },
+    {
       name: "matches Cmd+O to open project",
       event: { key: "o", code: "KeyO", metaKey: true },
       context: { isMac: true },
@@ -412,6 +423,16 @@ describe("keyboard-shortcuts", () => {
   });
 
   const nonMatchingCases: NonMatchingShortcutCase[] = [
+    {
+      name: "does not open History while the command center is open",
+      event: { key: "H", code: "KeyH", metaKey: true, shiftKey: true },
+      context: { isMac: true, commandCenterOpen: true },
+    },
+    {
+      name: "leaves Ctrl+Shift+H to the focused terminal on non-mac",
+      event: { key: "H", code: "KeyH", ctrlKey: true, shiftKey: true },
+      context: { focusScope: "terminal" },
+    },
     {
       name: "does not keep old Mod+Alt+N binding",
       event: { key: "n", code: "KeyN", metaKey: true, altKey: true },
@@ -701,6 +722,7 @@ describe("keyboard-shortcut help sections", () => {
       name: "uses web defaults for workspace and tab jump",
       context: { isMac: true, isDesktop: false },
       expectedKeys: {
+        "open-history": ["mod", "shift", "H"],
         "new-agent": ["mod", "O"],
         "workspace-tab-new": ["mod", "T"],
         "workspace-jump-index": ["alt", "1-9"],
@@ -715,6 +737,7 @@ describe("keyboard-shortcut help sections", () => {
       name: "uses desktop defaults for workspace and tab jump",
       context: { isMac: true, isDesktop: true },
       expectedKeys: {
+        "open-history": ["mod", "shift", "H"],
         "new-agent": ["mod", "O"],
         "new-workspace": ["mod", "N"],
         "workspace-tab-new": ["mod", "T"],
@@ -733,6 +756,7 @@ describe("keyboard-shortcut help sections", () => {
       name: "uses non-mac desktop defaults for tab jump and close tab",
       context: { isMac: false, isDesktop: true },
       expectedKeys: {
+        "open-history": ["ctrl", "shift", "H"],
         "workspace-tab-jump-index": ["alt", "1-9"],
         "workspace-tab-close-current": ["ctrl", "W"],
       },
@@ -745,6 +769,7 @@ describe("keyboard-shortcut help sections", () => {
       // only and `formatShortcut` labels either token "Ctrl" there, so the badge
       // is unchanged — see the render assertion below.
       expectedKeys: {
+        "open-history": ["ctrl", "shift", "H"],
         "toggle-left-sidebar": ["ctrl", "B"],
         "toggle-both-sidebars": ["ctrl", "."],
       },

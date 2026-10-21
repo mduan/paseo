@@ -245,6 +245,8 @@ export function CommandCenterRootActions() {
           title: t("sidebar.sections.sessions"),
           sectionTitle: t("shell.commandCenter.actions"),
           icon: HistoryIcon,
+          shortcutKeys:
+            resolveShortcutKeysForAction("open-history", overrides, shortcutPlatform) ?? undefined,
         },
       },
       {
