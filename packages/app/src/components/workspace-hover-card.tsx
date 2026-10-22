@@ -345,6 +345,9 @@ function WorkspaceHoverCardContent({
                 {workspace.name}
               </Text>
             </View>
+            {project ? (
+              <ProjectRow project={project} projectViewKey={workspace.projectViewKey} />
+            ) : null}
             {issues?.length ? (
               <View
                 {...(isWeb && {
@@ -366,9 +369,6 @@ function WorkspaceHoverCardContent({
               </View>
             ) : null}
             <HostRow serverId={workspace.serverId} />
-            {project ? (
-              <ProjectRow project={project} projectViewKey={workspace.projectViewKey} />
-            ) : null}
             {workspace.currentBranch ? (
               <CopyableInfoRow
                 icon={ThemedGitBranch}
