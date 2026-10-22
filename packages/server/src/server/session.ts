@@ -2992,6 +2992,8 @@ export class Session {
         return this.handleProjectIconColorSetRequest(msg);
       case "workspace.linear_issues.update.request":
         return this.handleWorkspaceLinearIssuesUpdate(msg);
+      case "workspace.refresh_metadata.request":
+        return this.handleWorkspaceMetadataRefresh(msg);
       case "workspace.title.set.request":
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
       case "workspace.pin.set.request":
@@ -3852,6 +3854,47 @@ export class Session {
     if (request.type !== "integrations.linear.get_connection.request") {
       await this.onLinearIntegrationChanged?.().catch(() => {
         this.sessionLogger.warn("Unable to refresh workspaces after changing Linear connection");
+      });
+    }
+  }
+
+  private async handleWorkspaceMetadataRefresh(
+    request: Extract<SessionInboundMessage, { type: "workspace.refresh_metadata.request" }>,
+  ): Promise<void> {
+    const { workspaceId, requestId } = request;
+    try {
+      const workspace = await this.workspaceRegistry.get(workspaceId);
+      if (!workspace) throw new Error("Workspace not found");
+      await Promise.all([
+        this.workspacePorts?.refresh(),
+        this.workspaceGitService
+          .getSnapshot(workspace.cwd, {
+            force: true,
+            includeForge: true,
+            refreshGit: false,
+            queueIfBusy: false,
+            reason: "workspace-hover",
+          })
+          .then((snapshot) =>
+            this.linearIntegration.getPullRequestIssues(snapshot.forge.pullRequest?.url, {
+              force: true,
+            }),
+          )
+          .then((prIssues) =>
+            this.linearIntegration.resolve(mergeLinearIssues(workspace.linearIssues, prIssues), {
+              force: true,
+            }),
+          ),
+      ]);
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+      this.emit({
+        type: "workspace.refresh_metadata.response",
+        payload: { workspaceId, requestId, success: true },
+      });
+    } catch (error) {
+      this.emit({
+        type: "workspace.refresh_metadata.response",
+        payload: { workspaceId, requestId, success: false, error: getErrorMessage(error) },
       });
     }
   }

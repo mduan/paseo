@@ -1085,6 +1085,22 @@ export const WorkspaceLinearIssuesUpdateRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const WorkspaceRefreshMetadataRequestSchema = z.object({
+  type: z.literal("workspace.refresh_metadata.request"),
+  workspaceId: z.string(),
+  requestId: z.string(),
+});
+
+export const WorkspaceRefreshMetadataResponseSchema = z.object({
+  type: z.literal("workspace.refresh_metadata.response"),
+  payload: z.object({
+    requestId: z.string(),
+    workspaceId: z.string(),
+    success: z.boolean(),
+    error: z.string().optional(),
+  }),
+});
+
 export const WorkspaceLinearIssuesUpdateResponseSchema = z.object({
   type: z.literal("workspace.linear_issues.update.response"),
   payload: z.object({
@@ -3445,6 +3461,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconColorSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceLinearIssuesUpdateRequestSchema,
+  WorkspaceRefreshMetadataRequestSchema,
   LinearGetConnectionRequestSchema,
   LinearSetKeyRequestSchema,
   LinearDisconnectRequestSchema,
@@ -3827,6 +3844,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceLabels: z.boolean().optional(),
         // COMPAT(workspaceLinearIssues): added in v0.11.0-fork.27, remove gate after 2027-04-21.
         workspaceLinearIssues: z.boolean().optional(),
+        // COMPAT(workspaceMetadataRefresh): added in v0.11.0-fork.30, remove gate after 2027-04-21.
+        workspaceMetadataRefresh: z.boolean().optional(),
         // COMPAT(linearIntegration): added in v0.11.0-fork.28, remove gate after 2027-04-21.
         linearIntegration: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
@@ -7359,6 +7378,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectIconColorSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceLinearIssuesUpdateResponseSchema,
+  WorkspaceRefreshMetadataResponseSchema,
   LinearGetConnectionResponseSchema,
   LinearSetKeyResponseSchema,
   LinearDisconnectResponseSchema,
