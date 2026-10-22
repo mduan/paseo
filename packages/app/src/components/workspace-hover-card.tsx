@@ -33,6 +33,8 @@ import { LinearIcon } from "@/components/icons/linear-icon";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
+import { ProjectIconView } from "@/components/project-icon-view";
+import { projectIconPlaceholderLabelFromDisplayName } from "@/utils/project-display-name";
 import { Pressable } from "react-native";
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -109,15 +111,26 @@ function computeHoverCardPosition({
 }
 
 const HOVER_CARD_WIDTH = 260;
+// Line box of the card's info text. Every single-line row is pinned to it, so the PR badge and
+// diff stat, which are taller than the text, center in the row padding instead of widening the
+// gap around their row.
+const INFO_ROW_LINE_HEIGHT = 14;
 
 enum HoverPanel {
   Ports,
   LinearIssues,
 }
 
+interface HoverCardProject {
+  name: string;
+  iconDataUri: string | null;
+}
+
 interface WorkspaceHoverCardProps {
   workspace: SidebarWorkspaceEntry;
   prHint: PrHint | null;
+  /** Shown when the row itself sits outside a project header, as in status grouping. */
+  project?: HoverCardProject;
   isDragging: boolean;
   disabled?: boolean;
 }
@@ -125,6 +138,7 @@ interface WorkspaceHoverCardProps {
 export function WorkspaceHoverCard({
   workspace,
   prHint,
+  project,
   isDragging,
   disabled = false,
   children,
@@ -139,6 +153,7 @@ export function WorkspaceHoverCard({
     <WorkspaceHoverCardDesktop
       workspace={workspace}
       prHint={prHint}
+      project={project}
       isDragging={isDragging}
       disabled={disabled}
     >
@@ -150,6 +165,7 @@ export function WorkspaceHoverCard({
 function WorkspaceHoverCardDesktop({
   workspace,
   prHint,
+  project,
   isDragging,
   disabled = false,
   children,
@@ -217,6 +233,7 @@ function WorkspaceHoverCardDesktop({
         <WorkspaceHoverCardContent
           workspace={workspace}
           prHint={prHint}
+          project={project}
           triggerRef={triggerRef}
           contentRef={contentRef}
         />
@@ -228,11 +245,13 @@ function WorkspaceHoverCardDesktop({
 function WorkspaceHoverCardContent({
   workspace,
   prHint,
+  project,
   triggerRef,
   contentRef,
 }: {
   workspace: SidebarWorkspaceEntry;
   prHint: PrHint | null;
+  project?: HoverCardProject;
   triggerRef: React.RefObject<View | null>;
   contentRef: React.RefObject<View | null>;
 }): ReactElement | null {
@@ -330,6 +349,9 @@ function WorkspaceHoverCardContent({
                 {workspace.name}
               </Text>
             </View>
+            {project ? (
+              <ProjectRow project={project} projectViewKey={workspace.projectViewKey} />
+            ) : null}
             {issues?.length ? (
               <View
                 {...(isWeb && {
@@ -529,6 +551,29 @@ function HostRow({ serverId }: { serverId: string }): ReactElement | null {
   return <InfoRow icon={ThemedServer} value={label} testID="hover-card-workspace-host" />;
 }
 
+function ProjectRow({
+  project,
+  projectViewKey,
+}: {
+  project: HoverCardProject;
+  projectViewKey: string;
+}): ReactElement {
+  return (
+    <View style={styles.cardInfoRow}>
+      <ProjectIconView
+        iconDataUri={project.iconDataUri}
+        initial={projectIconPlaceholderLabelFromDisplayName(project.name).charAt(0).toUpperCase()}
+        projectViewKey={projectViewKey}
+        size={12}
+        textStyle={styles.projectIconFallbackText}
+      />
+      <Text style={styles.cardInfoText} numberOfLines={1} testID="hover-card-workspace-project">
+        {project.name}
+      </Text>
+    </View>
+  );
+}
+
 function LabelsRow({
   serverId,
   names,
@@ -540,7 +585,7 @@ function LabelsRow({
   if (labels.length === 0) return null;
 
   return (
-    <View style={styles.cardInfoRow} testID="hover-card-workspace-labels">
+    <View style={[styles.cardInfoRow, styles.cardLabelsRow]} testID="hover-card-workspace-labels">
       <ThemedTag size={12} uniProps={foregroundMutedColorMapping} />
       <View style={styles.cardLabels}>
         {labels.map((label) => (
@@ -990,19 +1035,28 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1.5],
+    height: INFO_ROW_LINE_HEIGHT + theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
+  },
+  // Labels wrap onto more lines, so this row grows instead of being pinned.
+  cardLabelsRow: { height: "auto" },
+  projectIconFallbackText: {
+    fontSize: 7,
   },
   cardInfoText: {
     flex: 1,
     minWidth: 0,
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+    lineHeight: INFO_ROW_LINE_HEIGHT,
     fontWeight: theme.fontWeight.normal,
   },
   cardLabels: {
     flex: 1,
     minWidth: 0,
+    // A line of chips is 2pt taller than the text line; split the overflow into the padding.
+    marginVertical: -1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[1],

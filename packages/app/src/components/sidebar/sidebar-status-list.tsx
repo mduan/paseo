@@ -790,6 +790,10 @@ function StatusWorkspaceRowInnerContent({
   const rowSelected = selected && !sessions.showsFocusedRow;
   const groupSelected = selected && sessions.rows.length > 0;
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const hoverCardProject = useMemo(
+    () => ({ name: projectName, iconDataUri: projectIconDataUri }),
+    [projectName, projectIconDataUri],
+  );
   const didLongPressRef = dragInteraction?.didLongPressRef;
   const startDragPress = dragInteraction?.handlePressIn;
   const moveDragPress = dragInteraction?.handleTouchMove;
@@ -869,6 +873,7 @@ function StatusWorkspaceRowInnerContent({
             <WorkspaceHoverCard
               workspace={workspace}
               prHint={workspace.prHint}
+              project={hoverCardProject}
               isDragging={isDragging}
               disabled={contextMenuOpen}
             >
