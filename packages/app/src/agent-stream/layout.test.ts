@@ -414,7 +414,7 @@ describe("layoutStream", () => {
       expect(layout.auxiliaryTurnFooter).toBeNull();
       expect(findLayoutItem(layout, assistant.id).completedFooter).toBeNull();
       expect(findLayoutItem(layout, tool.id).completedFooter?.itemId).toBe(assistant.id);
-      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(4);
+      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(7);
       expect(footerOwners(layout)).toEqual([tool.id]);
       expect(footerAssistantIds(layout)).toEqual([assistant.id]);
     },
@@ -430,7 +430,7 @@ describe("layoutStream", () => {
       });
 
       expect(findLayoutItem(layout, tool.id).completedFooter).toBeNull();
-      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(8);
+      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(11);
     },
   );
 
