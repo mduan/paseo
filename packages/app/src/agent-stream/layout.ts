@@ -1,5 +1,6 @@
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
+import { SPACING } from "@/styles/theme";
 import { getGapBetweenStreamItems } from "./spacing";
 import type { StreamFrameChildOrder, StreamStrategy } from "./strategy";
 import { continuesResponse, continuesTurn, isTurnBoundary } from "./turn-membership";
@@ -308,11 +309,13 @@ function layoutSegmentItem(
     boundaryAboveItems: input.boundaryAboveItems,
     boundaryAboveIndex: input.boundaryAboveIndex,
   });
+  const isToolBeforeUser = item.kind === "tool_call" && belowItem?.kind === "user_message";
+  const toolToUserGap = isToolBeforeUser ? SPACING[1] : 0;
   return shareLayoutItem({
     item,
     aboveItem,
     belowItem,
-    gapBelow: completedFooter ? 0 : getGapBetweenStreamItems(item, belowItem),
+    gapBelow: (completedFooter ? 0 : getGapBetweenStreamItems(item, belowItem)) + toolToUserGap,
     completedFooter,
     toolSequence: getToolSequence({ item, aboveItem, belowItem }),
     isFirstInUserGroup: item.kind === "user_message" && aboveItem?.kind !== "user_message",
