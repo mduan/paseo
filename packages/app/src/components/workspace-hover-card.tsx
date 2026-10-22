@@ -33,6 +33,8 @@ import { LinearIcon } from "@/components/icons/linear-icon";
 import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
 import type { Theme } from "@/styles/theme";
 import { DiffStat } from "@/components/diff-stat";
+import { ProjectIconView } from "@/components/project-icon-view";
+import { projectIconPlaceholderLabelFromDisplayName } from "@/utils/project-display-name";
 import { Pressable } from "react-native";
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -115,9 +117,16 @@ enum HoverPanel {
   LinearIssues,
 }
 
+interface HoverCardProject {
+  name: string;
+  iconDataUri: string | null;
+}
+
 interface WorkspaceHoverCardProps {
   workspace: SidebarWorkspaceEntry;
   prHint: PrHint | null;
+  /** Shown when the row itself sits outside a project header, as in status grouping. */
+  project?: HoverCardProject;
   isDragging: boolean;
   disabled?: boolean;
 }
@@ -125,6 +134,7 @@ interface WorkspaceHoverCardProps {
 export function WorkspaceHoverCard({
   workspace,
   prHint,
+  project,
   isDragging,
   disabled = false,
   children,
@@ -139,6 +149,7 @@ export function WorkspaceHoverCard({
     <WorkspaceHoverCardDesktop
       workspace={workspace}
       prHint={prHint}
+      project={project}
       isDragging={isDragging}
       disabled={disabled}
     >
@@ -150,6 +161,7 @@ export function WorkspaceHoverCard({
 function WorkspaceHoverCardDesktop({
   workspace,
   prHint,
+  project,
   isDragging,
   disabled = false,
   children,
@@ -217,6 +229,7 @@ function WorkspaceHoverCardDesktop({
         <WorkspaceHoverCardContent
           workspace={workspace}
           prHint={prHint}
+          project={project}
           triggerRef={triggerRef}
           contentRef={contentRef}
         />
@@ -228,11 +241,13 @@ function WorkspaceHoverCardDesktop({
 function WorkspaceHoverCardContent({
   workspace,
   prHint,
+  project,
   triggerRef,
   contentRef,
 }: {
   workspace: SidebarWorkspaceEntry;
   prHint: PrHint | null;
+  project?: HoverCardProject;
   triggerRef: React.RefObject<View | null>;
   contentRef: React.RefObject<View | null>;
 }): ReactElement | null {
@@ -351,6 +366,9 @@ function WorkspaceHoverCardContent({
               </View>
             ) : null}
             <HostRow serverId={workspace.serverId} />
+            {project ? (
+              <ProjectRow project={project} projectViewKey={workspace.projectViewKey} />
+            ) : null}
             {workspace.currentBranch ? (
               <CopyableInfoRow
                 icon={ThemedGitBranch}
@@ -527,6 +545,29 @@ function HostRow({ serverId }: { serverId: string }): ReactElement | null {
   const label = host?.label?.trim() || serverId;
 
   return <InfoRow icon={ThemedServer} value={label} testID="hover-card-workspace-host" />;
+}
+
+function ProjectRow({
+  project,
+  projectViewKey,
+}: {
+  project: HoverCardProject;
+  projectViewKey: string;
+}): ReactElement {
+  return (
+    <View style={styles.cardInfoRow}>
+      <ProjectIconView
+        iconDataUri={project.iconDataUri}
+        initial={projectIconPlaceholderLabelFromDisplayName(project.name).charAt(0).toUpperCase()}
+        projectViewKey={projectViewKey}
+        size={12}
+        textStyle={styles.projectIconFallbackText}
+      />
+      <Text style={styles.cardInfoText} numberOfLines={1} testID="hover-card-workspace-project">
+        {project.name}
+      </Text>
+    </View>
+  );
 }
 
 function LabelsRow({
@@ -992,6 +1033,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1.5],
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
+  },
+  projectIconFallbackText: {
+    fontSize: 7,
   },
   cardInfoText: {
     flex: 1,
