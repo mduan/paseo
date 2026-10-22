@@ -111,6 +111,10 @@ function computeHoverCardPosition({
 }
 
 const HOVER_CARD_WIDTH = 260;
+// Line box of the card's info text. Every single-line row is pinned to it, so the PR badge and
+// diff stat, which are taller than the text, center in the row padding instead of widening the
+// gap around their row.
+const INFO_ROW_LINE_HEIGHT = 14;
 
 enum HoverPanel {
   Ports,
@@ -581,7 +585,7 @@ function LabelsRow({
   if (labels.length === 0) return null;
 
   return (
-    <View style={styles.cardInfoRow} testID="hover-card-workspace-labels">
+    <View style={[styles.cardInfoRow, styles.cardLabelsRow]} testID="hover-card-workspace-labels">
       <ThemedTag size={12} uniProps={foregroundMutedColorMapping} />
       <View style={styles.cardLabels}>
         {labels.map((label) => (
@@ -1031,9 +1035,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1.5],
+    height: INFO_ROW_LINE_HEIGHT + theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
   },
+  // Labels wrap onto more lines, so this row grows instead of being pinned.
+  cardLabelsRow: { height: "auto" },
   projectIconFallbackText: {
     fontSize: 7,
   },
@@ -1042,11 +1049,14 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+    lineHeight: INFO_ROW_LINE_HEIGHT,
     fontWeight: theme.fontWeight.normal,
   },
   cardLabels: {
     flex: 1,
     minWidth: 0,
+    // A line of chips is 2pt taller than the text line; split the overflow into the padding.
+    marginVertical: -1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing[1],
