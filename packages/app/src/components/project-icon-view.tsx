@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { type StyleProp, Text, type TextStyle, View } from "react-native";
 import { ProjectIconImage } from "@/components/project-icon-image";
 import { useProjectIconColor } from "@/stores/session-store-hooks";
-import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import { deriveIdentityColorName, projectIconColor } from "@/styles/identity-colors";
 import { readableLetterColor } from "@/utils/hex-color";
 
 const FALLBACK_LAYOUT = { alignItems: "center", justifyContent: "center" } as const;
@@ -48,7 +48,7 @@ export function ProjectIconView({
   color?: string;
 }) {
   const storedColor = useProjectIconColor(projectViewKey);
-  const fill = color ?? storedColor ?? identityColor(deriveIdentityColorName(projectViewKey));
+  const fill = color ?? storedColor ?? projectIconColor(deriveIdentityColorName(projectViewKey));
   // The uploaded image is sized but never clipped — see projectIconRadius.
   const box = useMemo(() => ({ width: size, height: size }), [size]);
   const fallbackStyles = useMemo(

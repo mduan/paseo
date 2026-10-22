@@ -25,7 +25,7 @@ import {
   type ProjectIconIntent,
 } from "@/projects/edit-form";
 import { importProjectIconFromUrl } from "@/projects/import-project-icon";
-import { deriveIdentityColorName, identityColor } from "@/styles/identity-colors";
+import { deriveIdentityColorName, projectIconColor } from "@/styles/identity-colors";
 import type { Theme } from "@/styles/theme";
 import { toErrorMessage } from "@/utils/error-messages";
 
@@ -110,7 +110,7 @@ export function ProjectEditSheet({
   const closeColorPicker = useCallback(() => setIsColorPickerOpen(false), []);
   // The color only shows on the lettered fallback, so an image makes the icon inert.
   const canPickColor = supportsIconColor && !state.previewDataUri && !isSaving;
-  const derivedColor = identityColor(deriveIdentityColorName(projectViewKey));
+  const derivedColor = projectIconColor(deriveIdentityColorName(projectViewKey));
 
   const header = useMemo<SheetHeader>(() => ({ title: t("settings.project.edit.title") }), [t]);
   const colorPickerHeader = useMemo<SheetHeader>(

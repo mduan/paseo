@@ -44,6 +44,40 @@ export function identityColor(name: IdentityColorName): string {
   return IDENTITY_COLORS[name];
 }
 
+// Project icons opt out of the muted band above: they are the one place a project is told apart
+// at a glance, so hue and lightness both vary (true yellow and orange carry the dark letter via
+// readableLetterColor). Same ten names, so a derived project keeps its hue family.
+const PROJECT_ICON_COLORS: Record<IdentityColorName, string> = {
+  violet: "#9957c4",
+  sky: "#43b2e1",
+  emerald: "#7ab22c",
+  orange: "#f68c36",
+  pink: "#e266a7",
+  indigo: "#4841af",
+  teal: "#12a7a7",
+  red: "#db4241",
+  amber: "#f6c835",
+  blue: "#2663c9",
+};
+
+/** Picker display order: around the color wheel. Not the derivation order. */
+export const PROJECT_ICON_COLOR_ORDER: readonly IdentityColorName[] = [
+  "red",
+  "orange",
+  "amber",
+  "emerald",
+  "teal",
+  "sky",
+  "blue",
+  "indigo",
+  "violet",
+  "pink",
+];
+
+export function projectIconColor(name: IdentityColorName): string {
+  return PROJECT_ICON_COLORS[name];
+}
+
 // The same ten identities used as *foreground* — a glyph or a label painted directly on the
 // row — rather than as a fill with a white letter on top. That is a different contrast
 // problem and the fill table cannot solve it: clearing 4.5:1 against a near-white surface

@@ -7,7 +7,7 @@ import Svg, { Defs, Line, LinearGradient, Pattern, Rect, Stop } from "react-nati
 import { Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { FormTextInput } from "@/components/ui/form-field";
-import { IDENTITY_COLOR_NAMES, identityColor } from "@/styles/identity-colors";
+import { PROJECT_ICON_COLOR_ORDER, projectIconColor } from "@/styles/identity-colors";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { type HsvColor, hexToHsv, hsvToHex, parseHexColor } from "@/utils/hex-color";
 
@@ -23,7 +23,7 @@ const HUE_STOPS = ["#ff0000", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00
 const HUE_STOP_ELEMENTS = HUE_STOPS.map((stop) => (
   <Stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
 ));
-const PRESETS = IDENTITY_COLOR_NAMES.map((name) => ({ name, hex: identityColor(name) }));
+const PRESETS = PROJECT_ICON_COLOR_ORDER.map((name) => ({ name, hex: projectIconColor(name) }));
 const PRESET_HEXES = new Set(PRESETS.map((preset) => preset.hex));
 /** Where Custom starts when the project has no color of its own yet. */
 const CUSTOM_SEED = "#3a7bd5";
