@@ -9,6 +9,7 @@ const isToolSequenceItem = (item?: StreamItem | null) =>
 const TOOL_ROW_INSET = SPACING[1] + 1; // padding + border of a tool row
 const PARAGRAPH_TRAILING_MARGIN = SPACING[3];
 const ROW_GAP = SPACING[1];
+export const TOOL_TO_USER_GAP = SPACING[2];
 
 /** Text between tool rows sits at the same spacing as the rows themselves. */
 export function getGapBetweenStreamItems(item: StreamItem, belowItem: StreamItem | null): number {
