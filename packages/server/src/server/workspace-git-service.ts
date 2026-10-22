@@ -321,6 +321,8 @@ export type WorkspaceGitWorktreeInfo = PaseoWorktreeInfo;
 
 export type WorkspaceGitSnapshotOptions = WorkspaceGitReadOptions & {
   includeForge?: boolean;
+  // Hover refreshes must not rescan large working trees.
+  refreshGit?: boolean;
   queueIfBusy?: boolean;
 };
 
@@ -3071,8 +3073,8 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     const force = options?.force === true;
     return {
       force,
-      refreshStructure: true,
-      refreshWorktree: true,
+      refreshStructure: options?.refreshGit !== false,
+      refreshWorktree: options?.refreshGit !== false,
       includeForge: options?.includeForge ?? true,
       reason: options?.reason ?? defaultReason,
       notify,

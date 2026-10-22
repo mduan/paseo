@@ -455,6 +455,50 @@ test.each(["agent", "workspace"] as const)(
   },
 );
 
+test.each([
+  { success: true, error: undefined },
+  { success: false, error: "Workspace not found" },
+])(
+  "workspace metadata refresh correlates the response (success=$success)",
+  async ({ success, error }) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "workspace_metadata_test",
+      transportFactory: () => mock.transport,
+      reconnect: { enabled: false },
+    });
+    clients.push(client);
+    const connecting = client.connect();
+    mock.triggerOpen({ features: { workspaceMetadataRefresh: true } });
+    await connecting;
+    const refreshing = client.refreshWorkspaceMetadata({ workspaceId: "hovered" });
+    const request = parseSentFrame(mock.sent[0]);
+    expect(request).toEqual({
+      type: "workspace.refresh_metadata.request",
+      workspaceId: "hovered",
+      requestId: expect.any(String),
+    });
+    mock.triggerMessage(
+      wrapSessionMessage({
+        type: "workspace.refresh_metadata.response",
+        payload: {
+          workspaceId: "hovered",
+          requestId: request.requestId,
+          success,
+          error,
+        },
+      }),
+    );
+    await expect(
+      refreshing.then(
+        () => undefined,
+        (failure: Error) => failure.message,
+      ),
+    ).resolves.toBe(error);
+  },
+);
+
 test("workspace Linear updates reject unsupported hosts before sending a mutation", async () => {
   const mock = createMockTransport();
   const client = new DaemonClient({

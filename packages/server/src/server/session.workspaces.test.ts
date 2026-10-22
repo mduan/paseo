@@ -22,6 +22,8 @@ import { LinearConnectionStatus, type LinearIssue } from "@getpaseo/protocol/mes
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { Session } from "./session.js";
+import { WorkspacePortsService } from "./workspace-ports/service.js";
+import type { ProcessDetails } from "./workspace-ports/parse.js";
 import type { SessionOptions } from "./session.js";
 import { OWNER_PERMISSIONS } from "./authorization/index.js";
 import type { AgentUpdatesService } from "./session/agent-updates/agent-updates-service.js";
@@ -568,6 +570,7 @@ function createSessionForWorkspaceTests(
     workspaceRegistry?: SessionOptions["workspaceRegistry"];
     github?: ForgeService;
     linearIntegration?: SessionOptions["linearIntegration"];
+    workspacePorts?: SessionOptions["workspacePorts"];
     paseoHome?: string;
     worktreesRoot?: string;
     renameCurrentBranch?: (
@@ -728,6 +731,7 @@ function createSessionForWorkspaceTests(
         dispose: () => {},
       }),
       github: options.github,
+      workspacePorts: options.workspacePorts,
       linearIntegration: options.linearIntegration ?? {
         getConnection: async () => ({ status: LinearConnectionStatus.Disconnected }),
         setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
@@ -9956,6 +9960,130 @@ test("workspace Linear titles are resolved for saved links and association respo
     accepted: true,
     linearIssues: [{ identifier: "ENG-123", url, title }],
   });
+});
+
+test("workspace metadata refresh publishes current GitHub status, Linear details, PR links, and scanned ports for the requested workspace", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const issue = { identifier: "ENG-123", url: "https://linear.app/acme/issue/ENG-123" };
+  let state = { name: "In Progress", type: "started", color: "#e2b53e" };
+  let prIssues: LinearIssue[] = [];
+  const resolveIssues = vi.fn(async (issues?: readonly LinearIssue[]) =>
+    issues?.map((linkedIssue) => ({ ...linkedIssue, state })),
+  );
+  const getPrIssues = vi.fn(async () => prIssues);
+  const snapshot = createWorkspaceRuntimeSnapshot(REPO_CWD);
+  const getSnapshot = vi.fn(async () => snapshot);
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "hovered",
+    projectId: "project",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "workspace",
+    createdAt: "2026-01-01",
+    updatedAt: "2026-01-01",
+    linearIssues: [issue],
+  });
+  const sibling = { ...workspace, workspaceId: "sibling", linearIssues: undefined };
+  const scan = vi.fn(async (details: Map<number, ProcessDetails>) => {
+    details.set(42, { cwd: REPO_CWD });
+    return [{ host: "127.0.0.1", port: 3000, pid: 42, processName: "node" }];
+  });
+  const ports = new WorkspacePortsService({
+    logger: createTestLogger(),
+    scan,
+    listWorkspaces: async () => [workspace],
+    onChange: async () => {},
+  });
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    workspacePorts: ports,
+    workspaceGitService: createNoopWorkspaceGitService({
+      peekSnapshot: () => snapshot,
+      getSnapshot,
+    }),
+    linearIntegration: {
+      getConnection: async () => ({
+        status: LinearConnectionStatus.Connected,
+        organizationName: "Acme",
+      }),
+      setKey: async () => ({ status: LinearConnectionStatus.Disconnected }),
+      disconnect: async () => ({ status: LinearConnectionStatus.Disconnected }),
+      resolve: resolveIssues,
+      getPullRequestIssues: getPrIssues,
+    },
+  });
+  session.workspaceRegistry.list = async () => [workspace, sibling];
+  session.workspaceRegistry.get = async (id) =>
+    [workspace, sibling].find((record) => record.workspaceId === id) ?? null;
+  session.listAgentPayloads = async () => [];
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "observe-hover",
+    subscribe: { subscriptionId: "observe-hover" },
+  });
+  emitted.length = 0;
+  state = { name: "Done", type: "completed", color: "#00ff00" };
+  prIssues = [{ identifier: "ENG-456", url: "https://linear.app/acme/issue/ENG-456" }];
+  snapshot.forge.pullRequest!.reviewDecision = "approved";
+  await session.handleMessage({
+    type: "workspace.refresh_metadata.request",
+    workspaceId: workspace.workspaceId,
+    requestId: "hover",
+  });
+  expect(scan).toHaveBeenCalledTimes(1);
+  expect(getSnapshot).toHaveBeenCalledWith(REPO_CWD, {
+    force: true,
+    includeForge: true,
+    refreshGit: false,
+    queueIfBusy: false,
+    reason: "workspace-hover",
+  });
+  expect(getPrIssues).toHaveBeenCalledWith("https://github.com/acme/repo/pull/123", {
+    force: true,
+  });
+  expect(resolveIssues).toHaveBeenCalledWith([issue, ...prIssues], { force: true });
+  expect(filterByType(emitted, "workspace_update").map((message) => message.payload)).toEqual([
+    expect.objectContaining({
+      kind: "upsert",
+      workspace: expect.objectContaining({
+        id: workspace.workspaceId,
+        linearIssues: [{ ...issue, state }],
+        githubRuntime: expect.objectContaining({
+          pullRequest: expect.objectContaining({
+            reviewDecision: "approved",
+            linearIssues: [{ ...prIssues[0], state }],
+          }),
+        }),
+        ports: [
+          {
+            workspaceId: workspace.workspaceId,
+            host: "127.0.0.1",
+            port: 3000,
+            pid: 42,
+            processName: "node",
+          },
+        ],
+      }),
+    }),
+  ]);
+  expect(findByType(emitted, "workspace.refresh_metadata.response")?.payload).toEqual({
+    workspaceId: workspace.workspaceId,
+    requestId: "hover",
+    success: true,
+  });
+  await session.handleMessage({
+    type: "workspace.refresh_metadata.request",
+    workspaceId: "missing",
+    requestId: "missing",
+  });
+  expect(filterByType(emitted, "workspace.refresh_metadata.response").at(-1)?.payload).toEqual({
+    workspaceId: "missing",
+    requestId: "missing",
+    success: false,
+    error: "Workspace not found",
+  });
+  expect(scan).toHaveBeenCalledTimes(1);
+  ports.dispose();
 });
 
 test("workspace Linear links use exact IDs and history searches workspace context before pagination", async () => {

@@ -52,13 +52,17 @@ const AttachmentsResponseSchema = z.object({
 type StoredConnection = z.infer<typeof StoredConnectionSchema>;
 type CachedIssue = { pending: Promise<LinearIssue | undefined>; expiresAt: number };
 type CachedPullRequestIssues = { pending: Promise<LinearIssue[]>; expiresAt: number };
+type LookupOptions = { force?: boolean };
 
 export type LinearIntegrationService = {
   getConnection(): Promise<LinearConnection>;
   setKey(apiKey: string): Promise<LinearConnection>;
   disconnect(): Promise<LinearConnection>;
-  getPullRequestIssues(url?: string): Promise<LinearIssue[]>;
-  resolve(issues?: readonly LinearIssue[]): Promise<LinearIssue[] | undefined>;
+  getPullRequestIssues(url?: string, options?: LookupOptions): Promise<LinearIssue[]>;
+  resolve(
+    issues?: readonly LinearIssue[],
+    options?: LookupOptions,
+  ): Promise<LinearIssue[] | undefined>;
 };
 type Options = {
   paseoHome: string;
@@ -256,13 +260,17 @@ export function createLinearIntegrationService({
         return describe(undefined);
       });
     },
-    async getPullRequestIssues(url) {
+    async getPullRequestIssues(url, options) {
       if (!url) return [];
       try {
         const connection = await load();
         if (!connection) return [];
         let entry = pullRequestCache.get(url);
-        if (!entry || entry.expiresAt <= now()) {
+        if (
+          !entry ||
+          entry.expiresAt <= now() ||
+          (options?.force && Number.isFinite(entry.expiresAt))
+        ) {
           const pending = limitRequests(() =>
             loadPullRequestIssues({ url, apiKey: connection.apiKey }),
           );
@@ -288,7 +296,7 @@ export function createLinearIntegrationService({
         return [];
       }
     },
-    async resolve(issues) {
+    async resolve(issues, options) {
       if (!issues?.length) return issues ? [...issues] : undefined;
       let connection: StoredConnection | undefined;
       try {
@@ -304,7 +312,11 @@ export function createLinearIntegrationService({
           const normalized = parseLinearIssueUrl(issue.url);
           if (!normalized) return issue;
           let entry = cache.get(normalized.url);
-          if (!entry || entry.expiresAt <= now()) {
+          if (
+            !entry ||
+            entry.expiresAt <= now() ||
+            (options?.force && Number.isFinite(entry.expiresAt))
+          ) {
             const pending = limitRequests(() => loadIssue({ issue: normalized, apiKey }));
             entry = { pending, expiresAt: Number.POSITIVE_INFINITY };
             cache.set(normalized.url, entry);

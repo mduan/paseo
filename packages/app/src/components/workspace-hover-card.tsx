@@ -54,7 +54,9 @@ import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { FloatingSurface } from "@/components/ui/floating";
 import { isWeb } from "@/constants/platform";
-import { useHosts } from "@/runtime/host-runtime";
+import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
+import { selectHostFeature } from "@/runtime/host-features";
+import { useSessionStore } from "@/stores/session-store";
 import { buildForgeChecksUrl } from "@/git/forge-url";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 import { WorkspaceLabelChip } from "@/workspace-labels/chip";
@@ -173,8 +175,22 @@ function WorkspaceHoverCardDesktop({
     cancelClose();
     if (!isDragging && !disabled) {
       setOpen(true);
+      const client = getHostRuntimeStore().getClient(workspace.serverId);
+      // COMPAT(workspaceMetadataRefresh): added in v0.11.0-fork.30, remove gate after 2027-04-21.
+      const supportsMetadataRefresh = selectHostFeature(
+        useSessionStore.getState(),
+        workspace.serverId,
+        "workspaceMetadataRefresh",
+      );
+      if (client?.isConnected && supportsMetadataRefresh) {
+        void client
+          .refreshWorkspaceMetadata({ workspaceId: workspace.workspaceId })
+          .catch((error) => {
+            console.warn("Unable to refresh workspace hover metadata", error);
+          });
+      }
     }
-  }, [cancelClose, disabled, isDragging]);
+  }, [cancelClose, disabled, isDragging, workspace.serverId, workspace.workspaceId]);
 
   const handleTriggerLeave = useCallback(() => {
     triggerHoveredRef.current = false;

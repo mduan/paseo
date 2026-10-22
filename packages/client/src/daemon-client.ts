@@ -3137,6 +3137,14 @@ export class DaemonClient {
     return result.connection;
   }
 
+  async refreshWorkspaceMetadata(input: { workspaceId: string }): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.refresh_metadata.response">({
+        message: { type: "workspace.refresh_metadata.request", ...input },
+      });
+    if (!payload.success) throw new Error(payload.error ?? "Unable to refresh workspace metadata.");
+  }
+
   async updateWorkspaceLinearIssues(input: {
     workspaceId: string;
     add?: string[];

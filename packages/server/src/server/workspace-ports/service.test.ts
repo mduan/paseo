@@ -24,6 +24,51 @@ function setup() {
 afterEach(() => vi.useRealTimers());
 
 describe("WorkspacePortsService", () => {
+  it("shares pending hover scans and limits completed scans to once every five seconds", async () => {
+    vi.useFakeTimers();
+    const { service, scan } = setup();
+    let finish!: (ports: ListeningPort[]) => void;
+    scan.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = service.refresh();
+    const second = service.refresh();
+    expect(second).toBe(first);
+    expect(scan).toHaveBeenCalledTimes(1);
+    finish([]);
+    await first;
+    await vi.advanceTimersByTimeAsync(4_999);
+    await service.refresh();
+    expect(scan).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await service.refresh();
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(service.getPorts("app")).toEqual([{ ...port, workspaceId: "app" }]);
+    service.dispose();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await service.refresh();
+    expect(scan).toHaveBeenCalledTimes(2);
+  });
+
+  it("replaces the background timer after a hover scan", async () => {
+    vi.useFakeTimers();
+    const { service, scan } = setup();
+    service.setConnected(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await service.refresh();
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(scan).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(scan).toHaveBeenCalledTimes(3);
+    service.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("scans immediately on first connection, publishes only changes, clears removed ports, and stops when disconnected", async () => {
     vi.useFakeTimers();
     const { service, scan, onChange } = setup();

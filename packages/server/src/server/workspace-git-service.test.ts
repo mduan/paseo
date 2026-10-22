@@ -254,6 +254,7 @@ function createGitHubServiceStub(): ForgeService {
 }
 
 interface CreateServiceTestOptions {
+  forgeOverrides?: Record<string, ForgeService>;
   subscribe?: ReturnType<typeof vi.fn>;
   getCheckoutStatus?: ReturnType<typeof vi.fn>;
   getCheckoutSnapshotFacts?: ReturnType<typeof vi.fn>;
@@ -1080,6 +1081,55 @@ describe("WorkspaceGitServiceImpl", () => {
 
     subscription.unsubscribe();
     service.dispose();
+  });
+
+  test("forge-only forced refresh updates GitHub status without rescanning cached checkout facts", async () => {
+    const getCheckoutSnapshotFacts = vi.fn(async (cwd: string) => createCheckoutSnapshotFacts(cwd));
+    const getCheckoutShortstat = vi.fn(async () => ({ additions: 1, deletions: 0 }));
+    const getCheckoutWorktreeState = vi.fn();
+    const getPullRequestStatus = vi.fn(async () => createPullRequestStatusResult());
+    const github = createGitHubServiceStub();
+    const service = createService({
+      getCheckoutSnapshotFacts,
+      getCheckoutShortstat,
+      getCheckoutWorktreeState,
+      getPullRequestStatus,
+      forgeOverrides: { github },
+    });
+    await service.getSnapshot(REPO_CWD);
+    getCheckoutSnapshotFacts.mockClear();
+    getCheckoutShortstat.mockClear();
+    getCheckoutWorktreeState.mockClear();
+    getPullRequestStatus.mockClear();
+    getPullRequestStatus.mockResolvedValue(createPullRequestStatusResult({ status: null }));
+    const refreshing = service.getSnapshot(REPO_CWD, {
+      force: true,
+      includeForge: true,
+      refreshGit: false,
+      queueIfBusy: false,
+      reason: "workspace-hover",
+    });
+    const overlapping = service.getSnapshot(REPO_CWD, {
+      force: true,
+      includeForge: true,
+      refreshGit: false,
+      queueIfBusy: false,
+      reason: "workspace-hover",
+    });
+    const [snapshot] = await Promise.all([refreshing, overlapping]);
+    expect(snapshot.forge.pullRequest).toBeNull();
+    expect(getCheckoutSnapshotFacts).not.toHaveBeenCalled();
+    expect(getCheckoutShortstat).not.toHaveBeenCalled();
+    expect(getCheckoutWorktreeState).not.toHaveBeenCalled();
+    expect(getPullRequestStatus).toHaveBeenCalledTimes(1);
+    expect(getPullRequestStatus).toHaveBeenCalledWith(
+      REPO_CWD,
+      github,
+      { force: true, reason: "workspace-hover" },
+      expect.objectContaining({ facts: createCheckoutSnapshotFacts(REPO_CWD) }),
+    );
+    expect(github.invalidate).toHaveBeenCalledWith({ cwd: REPO_CWD });
+    await service.dispose();
   });
 
   test("explicit forced snapshot refresh recomputes github state and notifies listeners", async () => {

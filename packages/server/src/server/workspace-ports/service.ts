@@ -19,7 +19,8 @@ type Options = {
 export class WorkspacePortsService {
   private active = false;
   private disposed = false;
-  private running = false;
+  private pending?: Promise<void>;
+  private lastScanAt?: number;
   private timer?: ReturnType<typeof setTimeout>;
   private readonly details = new Map<number, ProcessDetails>();
   private ports: WorkspacePort[] = [];
@@ -36,7 +37,7 @@ export class WorkspacePortsService {
     this.active = connected;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
-    if (connected && !this.running) void this.refresh();
+    if (connected && !this.pending) void this.startRefresh();
   }
 
   dispose(): void {
@@ -45,8 +46,25 @@ export class WorkspacePortsService {
     this.details.clear();
   }
 
-  private async refresh(): Promise<void> {
-    this.running = true;
+  refresh(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    if (this.pending) return this.pending;
+    // Hovering across rows must not launch a host-wide process scan for every row.
+    if (this.lastScanAt !== undefined && Date.now() - this.lastScanAt < 5_000)
+      return Promise.resolve();
+    return this.startRefresh();
+  }
+
+  private startRefresh(): Promise<void> {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.pending = this.scan().finally(() => {
+      this.pending = undefined;
+    });
+    return this.pending;
+  }
+
+  private async scan(): Promise<void> {
     try {
       const scan =
         this.options.scan ??
@@ -72,9 +90,9 @@ export class WorkspacePortsService {
     } catch (error) {
       this.options.logger.warn({ err: error }, "Failed to publish workspace ports");
     } finally {
-      this.running = false;
+      this.lastScanAt = Date.now();
       if (this.active) {
-        this.timer = setTimeout(() => void this.refresh(), 30_000);
+        this.timer = setTimeout(() => void this.startRefresh(), 30_000);
         this.timer.unref();
       }
     }

@@ -112,6 +112,81 @@ test("enriches linked issues, deduplicates concurrent lookups, and keeps organiz
   expect(calls).toBe(3);
 });
 
+test("forced lookups refresh PR associations and issue details before expiry while sharing concurrent requests", async () => {
+  let version = 1;
+  let prLookups = 0;
+  let issueLookups = 0;
+  const service = createLinearIntegrationService({
+    paseoHome: await home(),
+    logger,
+    request: async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (!body.variables) return connectionResponse();
+      if (body.query.includes("attachmentsForURL")) {
+        prLookups += 1;
+        return Response.json({
+          data: {
+            attachmentsForURL: {
+              nodes: version === 1 ? [] : [{ issue: { ...issue, title: "Retry uploads" } }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        });
+      }
+      issueLookups += 1;
+      return Response.json({
+        data: {
+          issue: {
+            ...issue,
+            title: "Retry uploads",
+            ...metadata,
+            ...(version === 2
+              ? {
+                  state: { name: "Done", type: "completed", color: "#00ff00" },
+                  assignee: null,
+                  project: null,
+                }
+              : {}),
+          },
+        },
+      });
+    },
+  });
+  await service.setKey("key");
+  const prUrl = "https://github.com/acme/repo/pull/1";
+  const initial = [{ ...issue, title: "Retry uploads", ...metadata }];
+  expect(await service.getPullRequestIssues(prUrl)).toEqual([]);
+  expect(await service.resolve([issue])).toEqual(initial);
+  version = 2;
+  expect(await service.getPullRequestIssues(prUrl)).toEqual([]);
+  expect(await service.resolve([issue])).toEqual(initial);
+  const linked = [{ ...issue, title: "Retry uploads" }];
+  expect(
+    await Promise.all([
+      service.getPullRequestIssues(prUrl, { force: true }),
+      service.getPullRequestIssues(prUrl, { force: true }),
+    ]),
+  ).toEqual([linked, linked]);
+  const refreshed = [
+    {
+      ...issue,
+      title: "Retry uploads",
+      state: { name: "Done", type: "completed", color: "#00ff00" },
+      assignee: undefined,
+      project: undefined,
+    },
+  ];
+  expect(
+    await Promise.all([
+      service.resolve([issue], { force: true }),
+      service.resolve([issue], { force: true }),
+    ]),
+  ).toEqual([refreshed, refreshed]);
+  expect(await service.getPullRequestIssues(prUrl)).toEqual(linked);
+  expect(await service.resolve([issue])).toEqual(refreshed);
+  expect({ prLookups, issueLookups }).toEqual({ prLookups: 2, issueLookups: 2 });
+});
+
 test("lookup errors preserve links and retry after the failure cache expires", async () => {
   let now = 0;
   let lookups = 0;
