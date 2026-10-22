@@ -249,7 +249,6 @@ export function ProjectEditSheet({
         header={colorPickerHeader}
         desktopMinWidth={COLOR_PICKER_WIDTH}
         desktopLockWidth
-        desktopChildrenScrollEnabled={false}
         mobileChildrenScrollEnabled={false}
       >
         <ProjectIconColorPicker
