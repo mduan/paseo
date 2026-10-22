@@ -1433,6 +1433,7 @@ export const ptBR: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "As bifurcações com o histórico completo permanecem no host original.",
       isolation: "Choose the isolation level",
       startingRef: "Escolha de onde começar",
       launch: "Choose what to launch",

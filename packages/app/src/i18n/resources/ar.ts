@@ -1406,6 +1406,7 @@ export const ar: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "تبقى المحادثات المتفرعة بالسجل الكامل على المضيف الأصلي.",
       isolation: "Choose the isolation level",
       startingRef: "اختر من أين تبدأ",
       launch: "Choose what to launch",

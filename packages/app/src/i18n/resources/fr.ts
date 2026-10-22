@@ -1443,6 +1443,8 @@ export const fr: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost:
+        "Les conversations dupliquées avec l’historique complet restent sur leur hôte d’origine.",
       isolation: "Choose the isolation level",
       startingRef: "Choisissez par où commencer",
       launch: "Choose what to launch",

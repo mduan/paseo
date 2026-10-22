@@ -1443,6 +1443,7 @@ export const es: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "Las bifurcaciones con el historial completo permanecen en su host original.",
       isolation: "Choose the isolation level",
       startingRef: "Elige por dónde empezar",
       launch: "Choose what to launch",

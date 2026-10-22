@@ -1414,6 +1414,7 @@ export const en = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "Full-history forks stay on their original host.",
       isolation: "Choose the isolation level",
       startingRef: "Choose where to start from",
       launch: "Choose what to launch",

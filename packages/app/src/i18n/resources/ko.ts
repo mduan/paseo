@@ -1413,6 +1413,7 @@ export const ko: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "전체 기록을 포함한 분기는 원래 호스트에서 생성됩니다.",
       isolation: "Choose the isolation level",
       startingRef: "시작 위치를 선택하세요",
       launch: "Choose what to launch",

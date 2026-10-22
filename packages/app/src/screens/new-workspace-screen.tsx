@@ -1331,6 +1331,7 @@ function submitWorkspaceDraft(input: SubmitDraftInput): SubmitOutcome {
 
 function useNewWorkspaceHostSelector(input: {
   initialServerId: string;
+  isHostLocked: boolean;
   allServerIds: string[];
   projects: HostProjectListItem[];
   lastActiveProject: HostProjectListItem | null;
@@ -1428,8 +1429,8 @@ function useNewWorkspaceHostSelector(input: {
   }, []);
 
   return {
-    selectedServerId,
-    hostPickerOpen,
+    selectedServerId: input.isHostLocked ? routeServerId : selectedServerId,
+    hostPickerOpen: !input.isHostLocked && hostPickerOpen,
     handleSelectHost,
     handleHostPickerOpenChange,
     openHostPicker,
@@ -1437,6 +1438,7 @@ function useNewWorkspaceHostSelector(input: {
 }
 
 interface NewWorkspaceInitialContextState {
+  isHostLocked: boolean;
   allHosts: HostProfile[];
   selectedServerId: string;
   hostPickerOpen: boolean;
@@ -1451,10 +1453,14 @@ interface NewWorkspaceInitialContextState {
 
 function useNewWorkspaceInitialContext({
   serverId,
+  forkDraftSetup,
   sourceDirectory: sourceDirectoryProp,
   projectId,
   displayName: displayNameProp,
-}: NewWorkspaceScreenProps): NewWorkspaceInitialContextState {
+}: NewWorkspaceScreenProps & {
+  forkDraftSetup: PendingWorkspaceDraftSetup | null;
+}): NewWorkspaceInitialContextState {
+  const isHostLocked = Boolean(forkDraftSetup?.nativeFork);
   const allHosts = useHosts();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
   const projects = useHostProjects(allServerIds);
@@ -1506,6 +1512,7 @@ function useNewWorkspaceInitialContext({
     openHostPicker,
   } = useNewWorkspaceHostSelector({
     initialServerId: serverId,
+    isHostLocked,
     allServerIds,
     projects,
     lastActiveProject,
@@ -1514,6 +1521,7 @@ function useNewWorkspaceInitialContext({
   });
 
   return {
+    isHostLocked,
     allHosts,
     selectedServerId,
     hostPickerOpen,
@@ -1552,6 +1560,7 @@ interface NewWorkspaceFormStackInput {
   host: FormPickerControl & {
     allHosts: HostProfile[];
     selectedServerId: string;
+    isLocked: boolean;
     onSelect: (id: string) => void;
   };
   isolation: FormPickerControl & {
@@ -1582,14 +1591,68 @@ interface NewWorkspaceFormStackInput {
   };
 }
 
+function NewWorkspaceHostPicker({
+  host,
+  isPending,
+  badgePressableStyle,
+}: {
+  host: NewWorkspaceFormStackInput["host"];
+  isPending: boolean;
+  badgePressableStyle: React.ComponentProps<typeof Pressable>["style"];
+}): ReactElement {
+  const { t } = useTranslation();
+  const selectedHostLabel =
+    host.allHosts.find((h) => h.serverId === host.selectedServerId)?.label ?? "Host";
+  return (
+    <HostPicker
+      hosts={host.allHosts}
+      value={host.selectedServerId}
+      onSelect={host.onSelect}
+      open={host.openState}
+      onOpenChange={host.onOpenChange}
+      anchorRef={host.anchorRef}
+      searchable={false}
+      title="Host"
+      desktopPlacement="bottom-start"
+      desktopMinWidth={200}
+      hostOptionTestID={newWorkspaceHostOptionTestID}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild triggerRefProp="ref">
+          <Pressable
+            ref={host.anchorRef}
+            accessibilityRole="button"
+            accessibilityLabel="Host"
+            onPress={host.open}
+            disabled={isPending || host.isLocked || host.allHosts.length === 0}
+            style={host.isLocked ? [styles.badge, styles.badgeDisabled] : badgePressableStyle}
+            testID="host-picker-trigger"
+          >
+            <View style={styles.badgeIconBox}>
+              <HostStatusDot serverId={host.selectedServerId} />
+            </View>
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {selectedHostLabel}
+            </Text>
+            {metaChevron}
+          </Pressable>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="center" offset={8}>
+          <Text style={styles.tooltipText}>
+            {t(host.isLocked ? "newWorkspace.tooltips.forkHost" : "newWorkspace.tooltips.host")}
+          </Text>
+        </TooltipContent>
+      </Tooltip>
+    </HostPicker>
+  );
+}
+
 function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactElement {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const { isCompact, isPending, project, host, isolation, base, launch } = input;
 
-  const selectedHostLabel =
-    host.allHosts.find((h) => h.serverId === host.selectedServerId)?.label ?? "Host";
-  const showHostControl = host.allHosts.length > 1;
+  const showHostControl = host.isLocked || host.allHosts.length > 1;
   const isolationTriggerLabel = isolationLabel(t, isolation.effectiveIsolation);
   const addProjectAction = useMemo(
     () => <AddProjectPickerAction onPress={project.onAddProject} />,
@@ -1647,44 +1710,11 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
 
   const hostControl = showHostControl ? (
     <View style={desktopControlStyle}>
-      <HostPicker
-        hosts={host.allHosts}
-        value={host.selectedServerId}
-        onSelect={host.onSelect}
-        open={host.openState}
-        onOpenChange={host.onOpenChange}
-        anchorRef={host.anchorRef}
-        searchable={false}
-        title="Host"
-        desktopPlacement="bottom-start"
-        desktopMinWidth={200}
-        hostOptionTestID={newWorkspaceHostOptionTestID}
-      >
-        <Tooltip>
-          <TooltipTrigger asChild triggerRefProp="ref">
-            <Pressable
-              ref={host.anchorRef}
-              accessibilityRole="button"
-              accessibilityLabel="Host"
-              onPress={host.open}
-              disabled={isPending || host.allHosts.length === 0}
-              style={badgePressableStyle}
-              testID="host-picker-trigger"
-            >
-              <View style={styles.badgeIconBox}>
-                <HostStatusDot serverId={host.selectedServerId} />
-              </View>
-              <Text style={styles.badgeText} numberOfLines={1}>
-                {selectedHostLabel}
-              </Text>
-              {metaChevron}
-            </Pressable>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="center" offset={8}>
-            <Text style={styles.tooltipText}>{t("newWorkspace.tooltips.host")}</Text>
-          </TooltipContent>
-        </Tooltip>
-      </HostPicker>
+      <NewWorkspaceHostPicker
+        host={host}
+        isPending={isPending}
+        badgePressableStyle={badgePressableStyle}
+      />
     </View>
   ) : null;
 
@@ -1797,6 +1827,7 @@ export function NewWorkspaceScreen({
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const toast = useToast();
+  const forkDraftSetup = usePendingWorkspaceDraftSetup(draftId);
   const mergeWorkspaces = useCallback(
     (targetServerId: string, workspaces: Iterable<WorkspaceDescriptor>) => {
       getHostRuntimeStore().acceptWorkspaceSnapshots(targetServerId, Array.from(workspaces));
@@ -1804,6 +1835,7 @@ export function NewWorkspaceScreen({
     [],
   );
   const {
+    isHostLocked,
     allHosts,
     selectedServerId,
     hostPickerOpen,
@@ -1816,6 +1848,7 @@ export function NewWorkspaceScreen({
     lastActiveProject,
   } = useNewWorkspaceInitialContext({
     serverId,
+    forkDraftSetup,
     sourceDirectory: sourceDirectoryProp,
     projectId,
     displayName: displayNameProp,
@@ -1922,7 +1955,6 @@ export function NewWorkspaceScreen({
     projects: projectIconTargets,
   });
   const draftKey = buildNewWorkspaceDraftKey(draftId);
-  const forkDraftSetup = usePendingWorkspaceDraftSetup(draftId);
   const draftContextScopeKey = useDraftWorkspaceAttachmentScopeKey(draftId);
   const visibleDraftContextScopeKeys = useMemo(
     () => resolveVisibleDraftContextScopeKeys({ isDraftHandoffActive, draftContextScopeKey }),
@@ -2572,6 +2604,7 @@ export function NewWorkspaceScreen({
     host: {
       allHosts,
       selectedServerId,
+      isLocked: isHostLocked,
       onSelect: handleSelectWorkspaceHost,
       openState: hostPickerOpen,
       onOpenChange: handleHostPickerOpenChange,

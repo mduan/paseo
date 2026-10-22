@@ -1395,6 +1395,7 @@ export const zhCN: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "包含完整历史记录的分叉会保留在原主机上。",
       isolation: "Choose the isolation level",
       startingRef: "选择起始位置",
       launch: "Choose what to launch",

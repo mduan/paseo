@@ -187,6 +187,7 @@ test.describe("Assistant fork menu", () => {
     await expect(page).toHaveURL(/\/new\?.*draftId=/, { timeout: 30_000 });
     await expectChatHistoryAttachment(page);
 
+    await expect(page.getByTestId("host-picker-trigger")).toBeEnabled();
     await page.getByTestId("host-picker-trigger").click();
     await page
       .getByTestId("new-workspace-host-picker-option-secondary-assistant-fork-host")

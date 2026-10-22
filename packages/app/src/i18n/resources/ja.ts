@@ -1420,6 +1420,7 @@ export const ja: TranslationResources = {
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
+      forkHost: "全履歴を引き継ぐフォークは元のホストで作成されます。",
       isolation: "Choose the isolation level",
       startingRef: "開始点を選択",
       launch: "Choose what to launch",

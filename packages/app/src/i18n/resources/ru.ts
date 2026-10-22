@@ -1425,6 +1425,7 @@ export const ru: TranslationResources = {
     tooltips: {
       project: "Выберите проект",
       host: "Выберите хост",
+      forkHost: "Ответвления с полной историей остаются на исходном хосте.",
       isolation: "Выберите уровень изоляции",
       startingRef: "Выберите, с чего начать",
       launch: "Выберите, что запустить",
