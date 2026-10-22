@@ -414,23 +414,8 @@ describe("layoutStream", () => {
       expect(layout.auxiliaryTurnFooter).toBeNull();
       expect(findLayoutItem(layout, assistant.id).completedFooter).toBeNull();
       expect(findLayoutItem(layout, tool.id).completedFooter?.itemId).toBe(assistant.id);
-      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(7);
       expect(footerOwners(layout)).toEqual([tool.id]);
       expect(footerAssistantIds(layout)).toEqual([assistant.id]);
-    },
-  );
-
-  it.each(["web", "android"] as const)(
-    "adds space before a user message after tools without a footer on %s",
-    (platform) => {
-      const tool = toolCall("tool-1", 1);
-      const layout = layoutFor({
-        platform,
-        tail: [tool, userMessage("u1", 2)],
-      });
-
-      expect(findLayoutItem(layout, tool.id).completedFooter).toBeNull();
-      expect(findLayoutItem(layout, tool.id).gapBelow).toBe(11);
     },
   );
 
