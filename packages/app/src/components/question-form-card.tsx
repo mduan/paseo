@@ -14,6 +14,8 @@ import { getAttachmentStore } from "@/attachments/store";
 import { retainAttachmentForGarbageCollection } from "@/attachments/gc-retention";
 import { buildQuestionAttachmentAnswer } from "@/composer/question-answer";
 import { QuestionAnswerInput } from "@/composer/question-answer-input";
+import { MarkdownLinkText } from "@/components/markdown/link-text";
+import { splitPlainTextLinks } from "@/utils/plain-text-links";
 import {
   buildQuestionFormAnswers,
   isQuestionAnswered,
@@ -368,6 +370,10 @@ export function QuestionFormCard({
     attachments,
     activeQuestionIndex,
   });
+  const questionParts = useMemo(
+    () => splitPlainTextLinks(activeQuestion?.question ?? ""),
+    [activeQuestion?.question],
+  );
   const activeAttachments = attachments[resolvedActiveQuestionIndex] ?? EMPTY_ATTACHMENTS;
   const handleChangeAttachments = useCallback(
     (
@@ -582,7 +588,14 @@ export function QuestionFormCard({
       />
       <View style={styles.questionHeader}>
         <Text selectable testID="question-form-current-question" style={questionTextStyle}>
-          {activeQuestion?.question}
+          {questionParts.map((part) => {
+            if (!part.href) return part.text;
+            return (
+              <MarkdownLinkText key={part.start} href={part.href} style={styles.questionLink}>
+                {part.text}
+              </MarkdownLinkText>
+            );
+          })}
         </Text>
       </View>
 
@@ -706,6 +719,10 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.normal,
     lineHeight: 22,
+  },
+  questionLink: {
+    color: theme.colors.accentBright,
+    overflowWrap: "anywhere",
   },
   optionsWrap: {
     gap: theme.spacing[1],
