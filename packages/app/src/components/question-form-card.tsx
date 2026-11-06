@@ -701,6 +701,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   questionText: {
     flex: 1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.normal,
     lineHeight: 22,
