@@ -64,6 +64,7 @@ export type WorkspaceTabMenuEntry =
       key: string;
       label: string;
       icon?:
+        | "circle"
         | "copy"
         | "folder-search"
         | "folder-open"
@@ -451,6 +452,7 @@ export function buildWorkspaceTabMenuEntries(
         kind: "item",
         key: "mark-unread",
         label: i18n.t("workspace.tabs.menu.markAsUnread"),
+        icon: "circle",
         testID: `${menuTestIDBase}-mark-unread`,
         onSelect: () => markUnread(agentId),
       });

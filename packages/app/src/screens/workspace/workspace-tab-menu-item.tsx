@@ -9,6 +9,7 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Copy,
+  Circle,
   CopyX,
   FolderSearch,
   FolderOpen,
@@ -25,6 +26,7 @@ const ThemedArrowRight = withUnistyles(ArrowRight);
 const ThemedArrowUp = withUnistyles(ArrowUp);
 const ThemedArrowDown = withUnistyles(ArrowDown);
 const ThemedCopy = withUnistyles(Copy);
+const ThemedCircle = withUnistyles(Circle);
 const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
 const ThemedArrowRightToLine = withUnistyles(ArrowRightToLine);
@@ -42,6 +44,8 @@ export function useWorkspaceTabMenuItemAdornments(
 ): { leading: ReactElement | undefined; trailing: ReactElement | undefined } {
   const leading = useMemo(() => {
     switch (entry.icon) {
+      case "circle":
+        return <ThemedCircle size={16} uniProps={mutedColorMapping} />;
       case "arrow-left":
         return <ThemedArrowLeft size={16} uniProps={mutedColorMapping} />;
       case "arrow-right":
