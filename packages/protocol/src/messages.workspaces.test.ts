@@ -87,6 +87,13 @@ describe("workspace message schemas", () => {
     ).toBe(false);
   });
   test("parses mark-unread request and response", () => {
+    const request = { type: "agent.mark_unread.request", agentId: "agent-1", requestId: "mark" };
+    expect(SessionInboundMessageSchema.parse(request)).toEqual(request);
+    const response = {
+      type: "agent.mark_unread.response",
+      payload: { agentId: "agent-1", requestId: "mark", success: true, error: null },
+    };
+    expect(SessionOutboundMessageSchema.parse(response)).toEqual(response);
     expect(
       SessionInboundMessageSchema.parse({
         type: "workspace.mark_unread.request",

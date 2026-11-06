@@ -753,6 +753,9 @@ export const ja: TranslationResources = {
         moveTop: "上のペインに移動",
         moveBottom: "下のペインに移動",
         moveToMain: "メインパネルへ移動",
+        markAsUnread: "未読にする",
+        markingUnread: "未読にしています...",
+        markedUnread: "未読にしました",
         reloadAgent: "エージェントを再読み込み",
         reloadAgentTooltip:
           "スキル、MCP、ログイン状態を更新するためにエージェントを再読み込みします。",

@@ -2005,6 +2005,65 @@ test("workspace clear attention responds with an error instead of timing out", a
   });
 });
 
+test.each([undefined, "Agent is no longer finished and read: chosen-agent"])(
+  "agent mark unread targets the requested stored session and reports errors (%s)",
+  async (error) => {
+    const emitted: SessionOutboundMessage[] = [];
+    const markedAgentIds: string[] = [];
+    const record = makeStoredAgent({
+      id: "chosen-agent",
+      cwd: REPO_CWD,
+      updatedAt: "2026-11-05T00:00:00.000Z",
+    });
+    const session = createSessionForWorkspaceTests({
+      onMessage: (message) => emitted.push(message),
+      agentStorage: { get: async (id: string) => (id === record.id ? record : null) },
+      agentManager: {
+        markAgentUnread: async (id: string) => {
+          markedAgentIds.push(id);
+          if (error) throw new Error(error);
+        },
+      },
+    });
+    await session.handleMessage({
+      type: "agent.mark_unread.request",
+      agentId: record.id,
+      requestId: "mark-session",
+    });
+    expect(findByType(emitted, "agent.mark_unread.response").payload).toEqual({
+      agentId: record.id,
+      requestId: "mark-session",
+      success: !error,
+      error: error ?? null,
+    });
+    expect(markedAgentIds).toEqual([record.id]);
+  },
+);
+
+test("agent mark unread rejects a missing session without marking another", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const markedAgentIds: string[] = [];
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    agentStorage: { get: async () => null },
+    agentManager: {
+      markAgentUnread: async (id: string) => {
+        markedAgentIds.push(id);
+      },
+    },
+  });
+  await session.handleMessage({
+    type: "agent.mark_unread.request",
+    agentId: "missing",
+    requestId: "mark",
+  });
+  expect(markedAgentIds).toEqual([]);
+  expect(findByType(emitted, "agent.mark_unread.response").payload).toMatchObject({
+    success: false,
+    error: "Agent not found: missing",
+  });
+});
+
 test("workspace mark unread selects the newest finished workspace root", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const workspace = createPersistedWorkspaceRecord({

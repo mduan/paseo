@@ -220,6 +220,41 @@ test("clicking a multi-agent workspace reveals and clears its marked agent", asy
   await expectSelectedAgent(page, newest.id);
 });
 
+for (const surface of ["tab", "sidebar"] as const) {
+  test(`chat Mark as unread from ${surface} targets that session and survives departure`, async ({
+    page,
+    workspaces,
+  }) => {
+    const { subject, other } = workspaces;
+    await openAgentRoute(page, subject);
+    await expectSelectedAgent(page, subject.agentId);
+    const newest = await addFinishedAgent(subject);
+    await openAgentRoute(page, { workspaceId: subject.workspaceId, agentId: newest.id });
+    await expectSelectedAgent(page, newest.id);
+    const tabId = `agent_${subject.agentId}`;
+    await page.getByTestId(`workspace-tab-${tabId}`).first().click();
+    await expectSelectedAgent(page, subject.agentId);
+    if (surface === "tab") {
+      await page.getByTestId(`workspace-tab-${tabId}`).first().click({ button: "right" });
+    } else {
+      const row = page.getByTestId(`sidebar-workspace-session-agent:${subject.agentId}`);
+      await row.hover();
+      await page.getByTestId(`sidebar-workspace-session-kebab-${tabId}`).click();
+    }
+    await page.getByRole("menuitem", { name: "Mark as unread", exact: true }).click();
+    await expectStatus(page, subject.workspaceId, "attention");
+    await openWorkspace(page, other.workspaceId);
+    await expectStatus(page, subject.workspaceId, "attention");
+    await expect
+      .poll(async () => (await subject.client.fetchAgent(subject.agentId))?.agent.requiresAttention)
+      .toBe(true);
+    expect((await subject.client.fetchAgent(newest.id))?.agent.requiresAttention).toBeFalsy();
+    await openWorkspace(page, subject.workspaceId);
+    await expectSelectedAgent(page, subject.agentId);
+    await expectStatus(page, subject.workspaceId, "done");
+  });
+}
+
 test("manual unread survives leaving the current workspace on compact layout", async ({
   page,
   workspaces,

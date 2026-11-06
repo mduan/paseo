@@ -211,6 +211,53 @@ describe("workspace tab pane moves", () => {
 });
 
 describe("buildWorkspaceTabMenuEntries", () => {
+  it.each(["desktop", "mobile"] as const)("marks only agent sessions unread on %s", (surface) => {
+    const onMarkAgentUnread = vi.fn();
+    const input = {
+      surface,
+      index: 0,
+      tabCount: 1,
+      menuTestIDBase: "session-menu",
+      onCopyResumeCommand: vi.fn(),
+      onCopyAgentId: vi.fn(),
+      onCopyTerminalId: vi.fn(),
+      onCopyFilePath: vi.fn(),
+      onRevealFileInExplorer: vi.fn(),
+      onReloadAgent: vi.fn(),
+      onRenameTab: vi.fn(),
+      onCloseTab: vi.fn(),
+      onCloseTabsBefore: vi.fn(),
+      onCloseTabsAfter: vi.fn(),
+      onCloseOtherTabs: vi.fn(),
+    };
+    const entries = buildWorkspaceTabMenuEntries({
+      ...input,
+      tab: createAgentTab(),
+      onMarkAgentUnread,
+    });
+    const entry = entries.find((item) => item.key === "mark-unread");
+    if (!entry || entry.kind !== "item") throw new Error("Missing mark unread action");
+    expect(entry.label).toBe("Mark as unread");
+    entry.onSelect();
+    expect(onMarkAgentUnread).toHaveBeenCalledWith("agent-123");
+    expect(
+      buildWorkspaceTabMenuEntries({ ...input, tab: createAgentTab() }).some(
+        (item) => item.key === "mark-unread",
+      ),
+    ).toBe(false);
+    const terminal: WorkspaceTabDescriptor = {
+      key: "terminal",
+      tabId: "terminal",
+      kind: "terminal",
+      target: { kind: "terminal", terminalId: "terminal" },
+    };
+    expect(
+      buildWorkspaceTabMenuEntries({ ...input, tab: terminal, onMarkAgentUnread }).some(
+        (item) => item.key === "mark-unread",
+      ),
+    ).toBe(false);
+  });
+
   it("uses desktop tab ordering labels for desktop menus", () => {
     const onCopyResumeCommand = vi.fn();
     const onCopyAgentId = vi.fn();

@@ -113,6 +113,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onRenameTabWithAi?: (agentId: string) => void;
+  onMarkAgentUnread?: (agentId: string) => void;
   renameWithAiPendingIds?: readonly string[];
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsBefore: (tabId: string) => Promise<void> | void;
@@ -135,6 +136,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onRenameTabWithAi?: (agentId: string) => void;
+  onMarkAgentUnread?: (agentId: string) => void;
   renameWithAiPendingIds?: readonly string[];
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
@@ -443,6 +445,16 @@ export function buildWorkspaceTabMenuEntries(
   });
   if (tab.target.kind === "agent") {
     const { agentId } = tab.target;
+    const markUnread = input.onMarkAgentUnread;
+    if (markUnread) {
+      entries.push({
+        kind: "item",
+        key: "mark-unread",
+        label: i18n.t("workspace.tabs.menu.markAsUnread"),
+        testID: `${menuTestIDBase}-mark-unread`,
+        onSelect: () => markUnread(agentId),
+      });
+    }
     entries.push({
       kind: "item",
       key: "reload-agent",
@@ -489,6 +501,7 @@ export function buildWorkspaceDesktopTabActions(
       onReloadAgent: input.onReloadAgent,
       onRenameTab: input.onRenameTab,
       onRenameTabWithAi: input.onRenameTabWithAi,
+      onMarkAgentUnread: input.onMarkAgentUnread,
       renameWithAiPendingIds: input.renameWithAiPendingIds,
       onCloseTab: input.onCloseTab,
       onCloseTabsBefore: input.onCloseTabsToLeft,
