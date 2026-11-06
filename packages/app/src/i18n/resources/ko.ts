@@ -748,6 +748,9 @@ export const ko: TranslationResources = {
         moveTop: "위쪽 창으로 이동",
         moveBottom: "아래쪽 창으로 이동",
         moveToMain: "기본 패널로 이동",
+        markAsUnread: "읽지 않음으로 표시",
+        markingUnread: "읽지 않음으로 표시 중...",
+        markedUnread: "읽지 않음으로 표시됨",
         reloadAgent: "에이전트 다시 로드",
         reloadAgentTooltip:
           "스킬, MCP 또는 로그인 상태를 업데이트하려면 에이전트를 다시 로드하세요.",

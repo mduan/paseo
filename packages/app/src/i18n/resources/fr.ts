@@ -754,6 +754,9 @@ export const fr: TranslationResources = {
         moveTop: "Déplacer vers le volet supérieur",
         moveBottom: "Déplacer vers le volet inférieur",
         moveToMain: "Déplacer vers le panneau principal",
+        markAsUnread: "Marquer comme non lu",
+        markingUnread: "Marquage comme non lu...",
+        markedUnread: "Marqué comme non lu",
         reloadAgent: "Agent de rechargement",
         reloadAgentTooltip:
           "Rechargez l'agent pour mettre à jour les compétences, les MCP ou le statut de connexion.",

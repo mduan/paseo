@@ -3075,6 +3075,8 @@ export class Session {
         return this.handleWorkspaceClearAttentionRequest(msg);
       case "workspace.mark_unread.request":
         return this.handleWorkspaceMarkUnreadRequest(msg);
+      case "agent.mark_unread.request":
+        return this.handleAgentMarkUnreadRequest(msg);
       default:
         return undefined;
     }
@@ -7913,6 +7915,28 @@ export class Session {
                 .join("; "),
       },
     });
+  }
+
+  private async handleAgentMarkUnreadRequest(
+    request: Extract<SessionInboundMessage, { type: "agent.mark_unread.request" }>,
+  ): Promise<void> {
+    const { agentId, requestId } = request;
+    try {
+      const agent = await this.getAgentPayloadById(agentId);
+      if (!agent || agent.archivedAt) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      await this.agentManager.markAgentUnread(agentId);
+      this.emit({
+        type: "agent.mark_unread.response",
+        payload: { agentId, requestId, success: true, error: null },
+      });
+    } catch (error) {
+      this.emit({
+        type: "agent.mark_unread.response",
+        payload: { agentId, requestId, success: false, error: getErrorMessage(error) },
+      });
+    }
   }
 
   private async handleWorkspaceMarkUnreadRequest(

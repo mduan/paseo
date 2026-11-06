@@ -1,3 +1,4 @@
+import { useMarkAgentUnread } from "@/hooks/use-mark-agent-unread";
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -1427,6 +1428,7 @@ function ResolvedDesktopTabChip({
 }) {
   const { t } = useTranslation();
   const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
+  const onMarkAgentUnread = useMarkAgentUnread(serverId);
   const presentation = item.presentation;
   const resolvedTab = useMemo(
     () =>
@@ -1442,6 +1444,7 @@ function ResolvedDesktopTabChip({
         onReloadAgent,
         onRenameTab,
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        onMarkAgentUnread,
         renameWithAiPendingIds: aiRename.pendingIds,
         onCloseTab,
         onCloseTabsToLeft,
@@ -1468,6 +1471,7 @@ function ResolvedDesktopTabChip({
       fileManager,
       onReloadAgent,
       onRenameTab,
+      onMarkAgentUnread,
       aiRename.supported,
       aiRename.rename,
       aiRename.pendingIds,

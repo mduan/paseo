@@ -1,3 +1,4 @@
+import { useMarkAgentUnread } from "@/hooks/use-mark-agent-unread";
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRename, useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
@@ -597,6 +598,7 @@ function MobileWorkspaceTabOption({
     [t],
   );
   const aiRename = useAiRename(normalizedServerId, ConversationTitleTarget.Agent);
+  const onMarkAgentUnread = useMarkAgentUnread(normalizedServerId);
   const menuTestIDBase = `workspace-tab-menu-${tab.tabId}`;
   const menuEntries = buildWorkspaceTabMenuEntries({
     surface: "mobile",
@@ -612,6 +614,7 @@ function MobileWorkspaceTabOption({
     onReloadAgent,
     onRenameTab,
     onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+    onMarkAgentUnread,
     renameWithAiPendingIds: aiRename.pendingIds,
     onCloseTab,
     onCloseTabsBefore: onCloseTabsAbove,
@@ -2356,6 +2359,7 @@ function WorkspaceScreenContent({
   });
 
   const aiRename = useAiRename(normalizedServerId, ConversationTitleTarget.Agent);
+  const onMarkAgentUnread = useMarkAgentUnread(normalizedServerId);
   const [hoveredCloseTabKey, setHoveredCloseTabKey] = useState<string | null>(null);
   const { handleRenameTab, renamingTab, handleRenameModalSubmit, handleRenameModalClose } =
     useWorkspaceTabRename({
@@ -3092,6 +3096,7 @@ function WorkspaceScreenContent({
         },
         onReloadAgent: handleReloadAgent,
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        onMarkAgentUnread,
         renameWithAiPendingIds: aiRename.pendingIds,
         // The rename modal only renders on the focused workspace, so bring this one forward.
         onRenameTab: (renameTab) => {
@@ -3120,6 +3125,7 @@ function WorkspaceScreenContent({
     });
   }, [
     allTabDescriptorsById,
+    onMarkAgentUnread,
     aiRename.supported,
     aiRename.rename,
     aiRename.pendingIds,

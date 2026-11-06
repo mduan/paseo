@@ -1,3 +1,4 @@
+import { useMarkAgentUnread } from "@/hooks/use-mark-agent-unread";
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
 import {
@@ -431,6 +432,7 @@ function WorkspaceSessionKebab({
   const builder = useWorkspaceTabMenuRegistry((state) => state.builders[layoutKey]);
   const layout = useWorkspaceLayoutStore((state) => state.layoutByWorkspace[layoutKey]);
   const aiRename = useAiRename(serverId, ConversationTitleTarget.Agent);
+  const onMarkAgentUnread = useMarkAgentUnread(serverId);
   let entries: WorkspaceTabMenuEntry[] = [];
   if (open) {
     const layoutState = useWorkspaceLayoutStore.getState();
@@ -454,6 +456,7 @@ function WorkspaceSessionKebab({
         onReloadAgent: () => select("reload-agent"),
         onRenameTab: () => select("rename"),
         onRenameTabWithAi: aiRename.supported ? aiRename.rename : undefined,
+        onMarkAgentUnread,
         renameWithAiPendingIds: aiRename.pendingIds,
         onCloseTab: () => select("close"),
         onCloseTabsBefore: () => select("close-before"),

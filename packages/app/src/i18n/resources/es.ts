@@ -754,6 +754,9 @@ export const es: TranslationResources = {
         moveTop: "Mover al panel superior",
         moveBottom: "Mover al panel inferior",
         moveToMain: "Mover al panel principal",
+        markAsUnread: "Marcar como no leído",
+        markingUnread: "Marcando como no leído...",
+        markedUnread: "Marcado como no leído",
         reloadAgent: "Recargar agente",
         reloadAgentTooltip:
           "Vuelva a cargar el agente para actualizar habilidades, MCP o estado de inicio de sesión.",
