@@ -87,7 +87,7 @@ describe("window-manager", () => {
         { role: "copy", enabled: true },
         { role: "paste", enabled: true },
         { type: "separator" },
-        { role: "selectAll" },
+        { label: "Select all", role: "selectAll" },
       ]);
       const menu = vi.mocked(Menu.buildFromTemplate).mock.results[0]!.value;
       expect(menu.popup).toHaveBeenCalledWith({ window: win });

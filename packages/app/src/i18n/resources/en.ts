@@ -1444,10 +1444,10 @@ export const en = {
   },
   desktop: {
     contextMenu: {
-      openLink: "Open Link in Browser",
-      copyLinkAddress: "Copy Link Address",
-      copyImage: "Copy Image",
-      saveImage: "Save Image As…",
+      openLink: "Open link in browser",
+      copyLinkAddress: "Copy link address",
+      copyImage: "Copy image",
+      saveImage: "Save image as…",
       actionFailed: "Unable to complete this action. Try again.",
     },
     windowControls: {

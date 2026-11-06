@@ -197,7 +197,7 @@ function showBrowserWebviewContextMenu(
       { role: "copy", enabled: false },
       { role: "paste" },
       { type: "separator" },
-      { role: "selectAll" },
+      { label: "Select all", role: "selectAll" },
     );
   }
   const items = [
@@ -207,7 +207,7 @@ function showBrowserWebviewContextMenu(
       : [
           { type: "separator" as const },
           {
-            label: "Inspect Element",
+            label: "Inspect element",
             click: () => {
               log.info("[browser-devtools] inspect-element.request", {
                 webContentsId: contents.id,

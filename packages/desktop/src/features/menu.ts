@@ -220,7 +220,7 @@ export function setupApplicationMenu(options: ApplicationMenuOptions): void {
         type: "separator",
       },
       {
-        label: "Select All",
+        label: "Select all",
         role: "selectAll",
       },
     ]);

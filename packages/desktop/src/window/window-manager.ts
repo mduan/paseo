@@ -353,11 +353,11 @@ export function buildStandardContextMenuItems(
   if (params.hasImageContents && params.srcURL) {
     return [
       {
-        label: "Copy Image",
+        label: "Copy image",
         click: () => contents.copyImageAt(params.x, params.y),
       },
       {
-        label: "Save Image As…",
+        label: "Save image as…",
         click: () => contents.downloadURL(params.srcURL),
       },
     ];
@@ -366,13 +366,13 @@ export function buildStandardContextMenuItems(
   if (params.linkURL && /^https?:/i.test(params.linkURL)) {
     const items: MenuItemConstructorOptions[] = [
       {
-        label: "Open Link in Browser",
+        label: "Open link in browser",
         click: () => {
           void shell.openExternal(params.linkURL);
         },
       },
       {
-        label: "Copy Link Address",
+        label: "Copy link address",
         click: () => clipboard.writeText(params.linkURL),
       },
     ];
@@ -401,7 +401,7 @@ export function buildStandardContextMenuItems(
     }
     items.push({ type: "separator" });
     items.push({
-      label: "Add to Dictionary",
+      label: "Add to dictionary",
       click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord),
     });
     items.push({ type: "separator" });
@@ -411,7 +411,7 @@ export function buildStandardContextMenuItems(
   items.push({ role: "copy", enabled: params.editFlags.canCopy });
   items.push({ role: "paste", enabled: params.editFlags.canPaste });
   items.push({ type: "separator" });
-  items.push({ role: "selectAll" });
+  items.push({ label: "Select all", role: "selectAll" });
 
   return items;
 }
