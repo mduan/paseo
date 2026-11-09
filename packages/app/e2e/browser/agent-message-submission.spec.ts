@@ -880,6 +880,30 @@ async function completeDraftCreateSubmission(
 }
 
 test.describe("Agent message submission", () => {
+  test("shows the timestamp and allows rewinding an image-only message", async ({ page }) => {
+    const agent = await seedMockAgentWorkspace({
+      repoPrefix: "image-only-message-footer-",
+      title: "Image-only message footer",
+      model: "ten-second-stream",
+    });
+
+    try {
+      await openAgentRoute(page, agent);
+      await expectComposerVisible(page);
+      const userMessage = await submitImageOnlyMessage(page);
+      await expect(userMessage).toHaveAttribute("aria-busy", "false");
+      await userMessage.getByRole("button", { name: "Open image attachment" }).hover();
+      await expect(userMessage.getByTestId("user-message-timestamp")).toBeVisible();
+      await userMessage
+        .getByRole("button", { name: "Rewind to this message", exact: true })
+        .click();
+      await page.getByRole("menuitem", { name: "Rewind conversation", exact: true }).click();
+      await expect(page.getByTestId("user-message")).toHaveCount(0);
+    } finally {
+      await agent.cleanup();
+    }
+  });
+
   test("settles an immediately interrupted first prompt", async ({ page }, testInfo) => {
     const workspace = await seedWorkspace({
       repoPrefix: `submission-immediate-interrupt-${testInfo.workerIndex}-`,
