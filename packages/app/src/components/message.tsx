@@ -12,6 +12,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useMutation } from "@tanstack/react-query";
 import { MarkdownParagraphView, MarkdownTextSpan } from "@/components/markdown-text";
 import { MarkdownTableCellText } from "@/components/markdown-text-selection";
 import * as React from "react";
@@ -84,6 +85,7 @@ import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-con
 import { ReviewAttachmentPill } from "@/components/review-attachment-pill";
 import { LinkAttachmentPill } from "@/components/link-attachment-pill";
 import { getAttachmentLink } from "@/attachments/link";
+import { copyMessageImage } from "@/attachments/copy-image";
 import { PlanCard } from "./plan-card";
 import { useToolCallSheet } from "./tool-call-sheet";
 import { ToolCallDetailsContent } from "./tool-call-details";
@@ -468,6 +470,7 @@ export const UserMessage = memo(function UserMessage({
   const hasImages = images.length > 0;
   const hasImageSources = !hasImages && imageSources.length > 0;
   const hasAttachments = attachments.length > 0;
+  const canCopy = [hasText, hasImages, hasImageSources].some(Boolean);
   const showTrailingRow = !isPending && (isCompact || isNative || isHovered);
   const formattedTimestamp = useMemo(
     () => formatMessageTimestamp(new Date(timestamp)),
@@ -477,7 +480,11 @@ export const UserMessage = memo(function UserMessage({
 
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
-  const getMessageContent = useCallback(() => message, [message]);
+  const getMessageContent = useCallback(() => (hasText ? message : ""), [hasText, message]);
+  const handleCopyImage = useCallback(
+    () => copyMessageImage({ image: images[0], source: imageSources[0], client }),
+    [images, imageSources, client],
+  );
   const handleRewind = useCallback(
     (input: { mode: RewindMode; rewoundText: string }) => {
       return rewindMutation.rewindAgent(input);
@@ -623,9 +630,10 @@ export const UserMessage = memo(function UserMessage({
               onRewind={handleRewind}
             />
           ) : null}
-          {hasText ? (
+          {canCopy ? (
             <TurnCopyButton
               getContent={getMessageContent}
+              copyImage={handleCopyImage}
               containerStyle={userMessageStylesheet.copyButton}
               accessibilityLabel={t("message.actions.copyMessage")}
             />
@@ -1056,10 +1064,15 @@ const turnCopyButtonStylesheet = StyleSheet.create((theme) => ({
   iconHoveredColor: {
     color: theme.colors.foreground,
   },
+  error: {
+    color: theme.colors.statusDanger,
+    fontSize: STREAM_METADATA_FONT_SIZE,
+  },
 }));
 
 interface TurnCopyButtonProps {
   getContent: () => string;
+  copyImage?: () => Promise<void>;
   containerStyle?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   copiedAccessibilityLabel?: string;
@@ -1067,6 +1080,7 @@ interface TurnCopyButtonProps {
 
 export const TurnCopyButton = memo(function TurnCopyButton({
   getContent,
+  copyImage,
   containerStyle,
   accessibilityLabel,
   copiedAccessibilityLabel,
@@ -1075,24 +1089,30 @@ export const TurnCopyButton = memo(function TurnCopyButton({
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCopy = useCallback(async () => {
-    const content = getContent();
-    if (!content) {
-      return;
-    }
-
-    await writeMarkdownToRichClipboard(content, getDefaultMarkdownClipboardEnvironment());
-    setCopied(true);
-
-    if (copyTimeoutRef.current) {
-      clearTimeout(copyTimeoutRef.current);
-    }
-
-    copyTimeoutRef.current = setTimeout(() => {
-      setCopied(false);
-      copyTimeoutRef.current = null;
-    }, 1500);
-  }, [getContent]);
+  const { mutate, isPending, isError } = useMutation({
+    mutationFn: async () => {
+      const content = getContent();
+      if (content) {
+        await writeMarkdownToRichClipboard(content, getDefaultMarkdownClipboardEnvironment());
+      } else if (copyImage) {
+        await copyImage();
+      } else {
+        return false;
+      }
+      return true;
+    },
+    onMutate: () => setCopied(false),
+    onSuccess: (didCopy) => {
+      if (!didCopy) return;
+      setCopied(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimeoutRef.current = null;
+      }, 1500);
+    },
+  });
+  const handleCopy = useCallback(() => mutate(), [mutate]);
 
   useEffect(() => {
     return () => {
@@ -1112,6 +1132,8 @@ export const TurnCopyButton = memo(function TurnCopyButton({
       onPress={handleCopy}
       style={pressableStyle}
       accessibilityRole="button"
+      disabled={isPending}
+      aria-busy={isPending}
       accessibilityLabel={
         copied
           ? (copiedAccessibilityLabel ?? t("message.actions.copied"))
@@ -1122,6 +1144,14 @@ export const TurnCopyButton = memo(function TurnCopyButton({
         const iconColor = hovered
           ? turnCopyButtonStylesheet.iconHoveredColor.color
           : turnCopyButtonStylesheet.iconColor.color;
+        if (isPending) return <LoadingSpinner color={iconColor} size={ICON_SIZE.sm} />;
+        if (isError) {
+          return (
+            <Text accessibilityRole="alert" style={turnCopyButtonStylesheet.error}>
+              {t("common.errors.unableToCopy")}
+            </Text>
+          );
+        }
         return copied ? (
           <Check size={ICON_SIZE.sm} color={iconColor} />
         ) : (

@@ -200,8 +200,8 @@ async function submitMessageWithImage(page: Page, prompt: string): Promise<Locat
   return page.getByTestId("user-message").filter({ hasText: prompt }).last();
 }
 
-async function submitImageOnlyMessage(page: Page): Promise<Locator> {
-  await attachImageFromMenu(page, IMAGE);
+async function submitImageOnlyMessage(page: Page, image = IMAGE): Promise<Locator> {
+  await attachImageFromMenu(page, image);
   await expectAttachmentPill(page, "composer-image-attachment-pill");
   await page.getByRole("textbox", { name: "Message agent..." }).first().press("Enter");
   const userMessage = page.getByTestId("user-message").last();
@@ -880,29 +880,101 @@ async function completeDraftCreateSubmission(
 }
 
 test.describe("Agent message submission", () => {
-  test("shows the timestamp and allows rewinding an image-only message", async ({ page }) => {
-    const agent = await seedMockAgentWorkspace({
-      repoPrefix: "image-only-message-footer-",
-      title: "Image-only message footer",
-      model: "ten-second-stream",
-    });
+  for (const format of ["png", "jpeg"]) {
+    test(`shows the timestamp and allows copying and rewinding an image-only message (${format})`, async ({
+      page,
+      context,
+    }) => {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      const agent = await seedMockAgentWorkspace({
+        repoPrefix: "image-only-message-footer-",
+        title: "Image-only message footer",
+        model: "ten-second-stream",
+      });
 
-    try {
-      await openAgentRoute(page, agent);
-      await expectComposerVisible(page);
-      const userMessage = await submitImageOnlyMessage(page);
-      await expect(userMessage).toHaveAttribute("aria-busy", "false");
-      await userMessage.getByRole("button", { name: "Open image attachment" }).hover();
-      await expect(userMessage.getByTestId("user-message-timestamp")).toBeVisible();
-      await userMessage
-        .getByRole("button", { name: "Rewind to this message", exact: true })
-        .click();
-      await page.getByRole("menuitem", { name: "Rewind conversation", exact: true }).click();
-      await expect(page.getByTestId("user-message")).toHaveCount(0);
-    } finally {
-      await agent.cleanup();
-    }
-  });
+      try {
+        await openAgentRoute(page, agent);
+        await expectComposerVisible(page);
+        const dataUrl = await page.evaluate((imageFormat) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 2;
+          canvas.height = 2;
+          return canvas.toDataURL(`image/${imageFormat}`);
+        }, format);
+        const userMessage = await submitImageOnlyMessage(page, {
+          name: `clipboard.${format}`,
+          mimeType: `image/${format}`,
+          buffer: Buffer.from(dataUrl.split(",")[1], "base64"),
+        });
+        await expect(userMessage).toHaveAttribute("aria-busy", "false");
+        await userMessage.getByRole("button", { name: "Open image attachment" }).hover();
+        await expect(userMessage.getByTestId("user-message-timestamp")).toBeVisible();
+        await userMessage.getByRole("button", { name: "Copy message", exact: true }).click();
+        await expect(
+          userMessage.getByRole("button", { name: "Copied", exact: true }),
+        ).toBeVisible();
+        expect(
+          await page.evaluate(async () => {
+            const items = await navigator.clipboard.read();
+            const image = await items[0].getType("image/png");
+            return Array.from(new Uint8Array(await image.arrayBuffer()).slice(0, 8));
+          }),
+        ).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+        await agent.client.waitForFinish(agent.agentId, 30_000);
+        await page.reload();
+        await expectComposerVisible(page);
+        await userMessage.locator("img").hover();
+        const copyButton = userMessage.getByRole("button", { name: "Copy message", exact: true });
+        const cdp = await context.newCDPSession(page);
+        const { targetInfo } = await cdp.send("Target.getTargetInfo");
+        const browserContextId = targetInfo.browserContextId;
+        const permission = { name: "clipboard-write" };
+        const origin = new URL(page.url()).origin;
+        await cdp.send("Browser.setPermission", {
+          permission,
+          setting: "denied",
+          origin,
+          browserContextId,
+        });
+        await copyButton.click();
+        await expect(userMessage.getByRole("alert")).toHaveText("Unable to copy");
+        await cdp.send("Browser.setPermission", {
+          permission,
+          setting: "granted",
+          origin,
+          browserContextId,
+        });
+        await copyButton.click();
+        await expect(
+          userMessage.getByRole("button", { name: "Copied", exact: true }),
+        ).toBeVisible();
+        await expect(userMessage.getByRole("alert")).toHaveCount(0);
+        expect(
+          await page.evaluate(async () => {
+            const items = await navigator.clipboard.read();
+            const image = await items[0].getType("image/png");
+            return Array.from(new Uint8Array(await image.arrayBuffer()).slice(0, 8));
+          }),
+        ).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+        await userMessage
+          .getByRole("button", { name: "Rewind to this message", exact: true })
+          .click();
+        await page.getByRole("menuitem", { name: "Rewind conversation", exact: true }).click();
+        await expect(page.getByTestId("user-message")).toHaveCount(0);
+        const prompt = "Copy this text when a message also has an image.";
+        const textMessage = await submitMessageWithImage(page, prompt);
+        await expect(textMessage).toHaveAttribute("aria-busy", "false");
+        await textMessage.getByText(prompt, { exact: true }).hover();
+        await textMessage.getByRole("button", { name: "Copy message", exact: true }).click();
+        await expect(
+          textMessage.getByRole("button", { name: "Copied", exact: true }),
+        ).toBeVisible();
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(prompt);
+      } finally {
+        await agent.cleanup();
+      }
+    });
+  }
 
   test("settles an immediately interrupted first prompt", async ({ page }, testInfo) => {
     const workspace = await seedWorkspace({
