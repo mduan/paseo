@@ -661,6 +661,23 @@ function ProjectMenuItems({
 
   return (
     <>
+      <ProjectMenuItem
+        surface={surface}
+        testID={`sidebar-project-menu-archive-workspaces-${projectViewKey}`}
+        leading={archiveLeadingIcon}
+        disabled={
+          !settingsTarget ||
+          !getProjectWorkspaceArchiveEntries({
+            hosts: [settingsTarget],
+            sessions: useSessionStore.getState().sessions,
+          }).length
+        }
+        status={isArchivingWorkspaces ? "pending" : "idle"}
+        pendingLabel={t("sidebar.project.actions.archivingWorkspaces")}
+        onSelect={onArchiveWorkspaces}
+      >
+        {t("sidebar.project.actions.archiveWorkspaces")}
+      </ProjectMenuItem>
       {settingsTarget ? (
         <ProjectMenuItem
           surface={surface}
@@ -695,23 +712,6 @@ function ProjectMenuItems({
         onSelect={onRemoveProject}
       >
         {t("sidebar.project.actions.remove")}
-      </ProjectMenuItem>
-      <ProjectMenuItem
-        surface={surface}
-        testID={`sidebar-project-menu-archive-workspaces-${projectViewKey}`}
-        leading={archiveLeadingIcon}
-        disabled={
-          !settingsTarget ||
-          !getProjectWorkspaceArchiveEntries({
-            hosts: [settingsTarget],
-            sessions: useSessionStore.getState().sessions,
-          }).length
-        }
-        status={isArchivingWorkspaces ? "pending" : "idle"}
-        pendingLabel={t("sidebar.project.actions.archivingWorkspaces")}
-        onSelect={onArchiveWorkspaces}
-      >
-        {t("sidebar.project.actions.archiveWorkspaces")}
       </ProjectMenuItem>
     </>
   );

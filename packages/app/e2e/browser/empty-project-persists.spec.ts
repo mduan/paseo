@@ -141,7 +141,7 @@ test.describe("Project with no workspaces persists", () => {
       const archiveItem = page.getByTestId(
         `sidebar-project-menu-archive-workspaces-${project.projectViewKey}`,
       );
-      await expect(page.getByRole("menuitem").last()).toHaveText("Archive all workspaces");
+      await expect(page.getByRole("menuitem").first()).toHaveText("Archive all workspaces");
       await archiveItem.click();
 
       await expect(page.getByTestId(workspaceRowTestId(project.workspaceId))).toHaveCount(0);
