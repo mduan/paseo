@@ -8,6 +8,8 @@ import {
   isWorkspaceArchivePending,
 } from "@/contexts/session-workspace-upserts";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
   archiveWorkspaceOptimistically,
   archiveWorkspacesOptimistically,
@@ -88,6 +90,7 @@ function storedWorkspace(id: string): WorkspaceDescriptor | undefined {
 }
 
 beforeEach(() => {
+  useWorkspaceLayoutStore.setState({ layoutByWorkspace: {} });
   seedSessionHosts([SERVER_ID, SECOND_SERVER_ID]);
   useSessionStore.getState().initializeSession(SERVER_ID, {} as DaemonClient);
 });
@@ -198,6 +201,17 @@ describe("archiveWorkspacesOptimistically", () => {
       ),
     );
 
+    const workspaceKeys = [first, second].map(
+      (entry) => buildWorkspaceTabPersistenceKey({ serverId: SERVER_ID, workspaceId: entry.id })!,
+    );
+    for (const workspaceKey of workspaceKeys) {
+      useWorkspaceLayoutStore.getState().openTab({
+        workspaceKey,
+        target: { kind: "agent", agentId: "agent-1" },
+        intent: "reveal",
+      });
+    }
+
     const failures = await archiveWorkspacesOptimistically({
       getClient: () => client,
       workspaces: [target({ workspaceId: first.id }), target({ workspaceId: second.id })],
@@ -207,6 +221,9 @@ describe("archiveWorkspacesOptimistically", () => {
     expect(failures[0]?.workspaceId).toBe(second.id);
     expect(storedWorkspace(first.id)).toBeUndefined();
     expect(storedWorkspace(second.id)).toEqual(second);
+    expect(Object.keys(useWorkspaceLayoutStore.getState().layoutByWorkspace)).toEqual([
+      workspaceKeys[1],
+    ]);
   });
 
   it("archives each workspace through its own server client", async () => {

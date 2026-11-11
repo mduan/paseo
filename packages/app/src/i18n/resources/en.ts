@@ -1314,6 +1314,8 @@ export const en = {
         openNewWindowFailed: "Couldn't open a new window",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "Archive all workspaces",
+        archivingWorkspaces: "Archiving workspaces...",
         remove: "Remove project",
         removing: "Removing...",
       },
@@ -1325,6 +1327,7 @@ export const en = {
         cancel: "Cancel",
       },
       toasts: {
+        archiveFailed: "Failed to archive some workspaces",
         hostDisconnected: "Host is not connected",
         removeFailed: "Failed to remove some workspaces",
         updateHostToRemove: "Update the host to remove projects.",

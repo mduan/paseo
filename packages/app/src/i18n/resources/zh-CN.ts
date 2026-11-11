@@ -1297,6 +1297,8 @@ export const zhCN: TranslationResources = {
         openNewWindowFailed: "无法打开新窗口",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "归档所有工作区",
+        archivingWorkspaces: "正在归档工作区...",
         remove: "移除 project",
         removing: "正在移除...",
       },
@@ -1307,6 +1309,7 @@ export const zhCN: TranslationResources = {
         cancel: "取消",
       },
       toasts: {
+        archiveFailed: "部分工作区归档失败",
         hostDisconnected: "Host 未连接",
         removeFailed: "部分 workspace 移除失败",
         updateHostToRemove: "更新 host 以移除 projects。",

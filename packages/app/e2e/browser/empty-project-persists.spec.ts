@@ -117,6 +117,58 @@ test.describe("Project picker search", () => {
 // Projects are parents in the sidebar. Archiving the last workspace leaves the
 // project row in place with a ghost "+ New workspace" child row.
 test.describe("Project with no workspaces persists", () => {
+  test("archiving all project workspaces includes pinned workspaces and keeps other projects", async ({
+    page,
+  }) => {
+    const project = await seedWorkspace({ repoPrefix: "project-archive-all-" });
+    const otherProject = await seedWorkspace({ repoPrefix: "project-archive-unrelated-" });
+    try {
+      const sibling = await project.client.createWorkspace({
+        source: { kind: "directory", path: project.repoPath, projectId: project.projectId },
+        title: "Pinned workspace",
+      });
+      if (!sibling.workspace) throw new Error(sibling.error ?? "Workspace was not created");
+      await project.client.setWorkspacePinned(sibling.workspace.id, true);
+      await gotoAppShell(page);
+      await waitForSidebarHydration(page);
+
+      const projectRow = page.getByTestId(`sidebar-project-row-${project.projectViewKey}`);
+      await expect(projectRow).toBeVisible();
+      await expect(page.getByTestId(workspaceRowTestId(sibling.workspace.id))).toBeVisible();
+      await page.getByTestId(workspaceRowTestId(project.workspaceId)).click();
+      await projectRow.hover();
+      await page.getByTestId(`sidebar-project-kebab-${project.projectViewKey}`).click();
+      const archiveItem = page.getByTestId(
+        `sidebar-project-menu-archive-workspaces-${project.projectViewKey}`,
+      );
+      await expect(page.getByRole("menuitem").last()).toHaveText("Archive all workspaces");
+      await archiveItem.click();
+
+      await expect(page.getByTestId(workspaceRowTestId(project.workspaceId))).toHaveCount(0);
+      await expect(page.getByTestId(workspaceRowTestId(sibling.workspace.id))).toHaveCount(0);
+      await expect(page.getByTestId(workspaceRowTestId(otherProject.workspaceId))).toBeVisible();
+      await expect(projectRow).toBeVisible();
+      await expect(
+        page.getByTestId(`sidebar-project-new-workspace-row-${project.projectViewKey}`),
+      ).toBeVisible();
+      await expect
+        .poll(
+          async () =>
+            (await project.client.fetchWorkspaces({ filter: { projectId: project.projectId } }))
+              .entries,
+        )
+        .toEqual([]);
+      expect(existsSync(project.repoPath)).toBe(true);
+
+      await projectRow.hover();
+      await page.getByTestId(`sidebar-project-kebab-${project.projectViewKey}`).click();
+      await expect(archiveItem).toBeDisabled();
+    } finally {
+      await project.cleanup();
+      await otherProject.cleanup();
+    }
+  });
+
   test("adding a project starts with only a new-workspace child row", async ({ page }) => {
     const repo = await createTempGitRepo("empty-project-add-");
     const client = await connectSeedClient();

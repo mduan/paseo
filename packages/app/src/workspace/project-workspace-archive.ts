@@ -1,5 +1,10 @@
 import { confirmRiskyWorktreeArchive, toWorktreeArchiveRisk } from "@/git/worktree-archive-warning";
-import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
+import {
+  createSidebarWorkspaceEntry,
+  type SidebarProjectEntry,
+  type SidebarWorkspaceEntry,
+} from "@/hooks/use-sidebar-workspaces-list";
+import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceArchiveTarget } from "@/workspace/workspace-archive";
 
 export interface ProjectWorkspaceArchiveEntry extends Pick<
@@ -12,6 +17,17 @@ export interface ProjectWorkspaceArchiveEntry extends Pick<
   | "archiveUnpushedCommitCount"
   | "diffStat"
 > {}
+
+export function getProjectWorkspaceArchiveEntries(input: {
+  hosts: readonly Pick<SidebarProjectEntry["hosts"][number], "serverId" | "projectId">[];
+  sessions: Record<string, { workspaces: ReadonlyMap<string, WorkspaceDescriptor> } | undefined>;
+}): ProjectWorkspaceArchiveEntry[] {
+  return input.hosts.flatMap(({ serverId, projectId }) =>
+    Array.from(input.sessions[serverId]?.workspaces.values() ?? [])
+      .filter((workspace) => workspace.projectId === projectId && !workspace.archivingAt)
+      .map((workspace) => createSidebarWorkspaceEntry({ serverId, workspace })),
+  );
+}
 
 type ConfirmWorktreeArchive = typeof confirmRiskyWorktreeArchive;
 

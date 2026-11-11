@@ -41,7 +41,15 @@ import {
 import { type GestureType } from "react-native-gesture-handler";
 import { WorkspaceRenameModal } from "@/components/workspace-rename-modal";
 import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-actions";
-import { ExternalLink, Settings, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react-native";
+import {
+  Archive,
+  ExternalLink,
+  Settings,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react-native";
 import { useDraftStore } from "@/stores/draft-store";
 import {
   selectNewWorkspaceDraftProject,
@@ -153,6 +161,12 @@ import {
 } from "@/utils/sidebar-project-row-model";
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { openExternalUrl } from "@/utils/open-external-url";
+import { useSessionStore } from "@/stores/session-store";
+import {
+  getProjectWorkspaceArchiveEntries,
+  selectProjectWorkspacesToArchive,
+} from "@/workspace/project-workspace-archive";
+import { archiveWorkspacesOptimistically } from "@/workspace/workspace-archive";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
 import {
   getCurrentProjectRemoveReadiness,
@@ -181,6 +195,7 @@ const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedPlus = withUnistyles(Plus);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedMoreVertical = withUnistyles(MoreVertical);
+const ThemedArchive = withUnistyles(Archive);
 const ThemedTrash2 = withUnistyles(Trash2);
 const ThemedSettings = withUnistyles(Settings);
 
@@ -278,6 +293,8 @@ interface ProjectHeaderRowProps {
   menuController: ReturnType<typeof useContextMenu> | null;
   onRemoveProject?: () => void;
   removeProjectStatus?: "idle" | "pending";
+  onArchiveWorkspaces: () => void;
+  isArchivingWorkspaces: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
 }
 
@@ -437,6 +454,8 @@ function ProjectRowTrailingActions({
   onBeginWorkspaceSetup,
   onRemoveProject,
   removeProjectStatus,
+  onArchiveWorkspaces,
+  isArchivingWorkspaces,
 }: {
   projectViewKey: string;
   workspaceCount: number;
@@ -452,6 +471,8 @@ function ProjectRowTrailingActions({
   onBeginWorkspaceSetup: () => void;
   onRemoveProject?: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
+  onArchiveWorkspaces: () => void;
+  isArchivingWorkspaces: boolean;
 }) {
   const {
     settings: { sidebarShowWorkspaceCount },
@@ -512,6 +533,8 @@ function ProjectRowTrailingActions({
             projectPath={projectPath}
             onRemoveProject={onRemoveProject}
             removeProjectStatus={removeProjectStatus}
+            onArchiveWorkspaces={onArchiveWorkspaces}
+            isArchivingWorkspaces={isArchivingWorkspaces}
           />
         </View>
       ) : null}
@@ -519,6 +542,7 @@ function ProjectRowTrailingActions({
   );
 }
 
+const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedColorMapping} />;
 const trash2LeadingIcon = <ThemedTrash2 size={14} uniProps={foregroundMutedColorMapping} />;
 const settingsLeadingIcon = <ThemedSettings size={14} uniProps={foregroundMutedColorMapping} />;
 const openInNewWindowLeadingIcon = (
@@ -542,6 +566,8 @@ function ProjectKebabMenu({
   projectPath,
   onRemoveProject,
   removeProjectStatus,
+  onArchiveWorkspaces,
+  isArchivingWorkspaces,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -550,6 +576,8 @@ function ProjectKebabMenu({
   projectPath: string;
   onRemoveProject: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
+  onArchiveWorkspaces: () => void;
+  isArchivingWorkspaces: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -571,6 +599,8 @@ function ProjectKebabMenu({
           projectPath={projectPath}
           onRemoveProject={onRemoveProject}
           removeProjectStatus={removeProjectStatus}
+          onArchiveWorkspaces={onArchiveWorkspaces}
+          isArchivingWorkspaces={isArchivingWorkspaces}
         />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -599,6 +629,8 @@ function ProjectMenuItems({
   projectPath,
   onRemoveProject,
   removeProjectStatus,
+  onArchiveWorkspaces,
+  isArchivingWorkspaces,
 }: {
   surface: ProjectMenuSurface;
   projectViewKey: string;
@@ -606,6 +638,8 @@ function ProjectMenuItems({
   projectPath: string;
   onRemoveProject: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
+  onArchiveWorkspaces: () => void;
+  isArchivingWorkspaces: boolean;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -661,6 +695,23 @@ function ProjectMenuItems({
         onSelect={onRemoveProject}
       >
         {t("sidebar.project.actions.remove")}
+      </ProjectMenuItem>
+      <ProjectMenuItem
+        surface={surface}
+        testID={`sidebar-project-menu-archive-workspaces-${projectViewKey}`}
+        leading={archiveLeadingIcon}
+        disabled={
+          !settingsTarget ||
+          !getProjectWorkspaceArchiveEntries({
+            hosts: [settingsTarget],
+            sessions: useSessionStore.getState().sessions,
+          }).length
+        }
+        status={isArchivingWorkspaces ? "pending" : "idle"}
+        pendingLabel={t("sidebar.project.actions.archivingWorkspaces")}
+        onSelect={onArchiveWorkspaces}
+      >
+        {t("sidebar.project.actions.archiveWorkspaces")}
       </ProjectMenuItem>
     </>
   );
@@ -932,6 +983,8 @@ function ProjectHeaderRow({
   menuController,
   onRemoveProject,
   removeProjectStatus = "idle",
+  onArchiveWorkspaces,
+  isArchivingWorkspaces,
   dragHandleProps,
 }: ProjectHeaderRowProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -1043,6 +1096,8 @@ function ProjectHeaderRow({
         onBeginWorkspaceSetup={handleBeginWorkspaceSetup}
         onRemoveProject={onRemoveProject}
         removeProjectStatus={removeProjectStatus}
+        onArchiveWorkspaces={onArchiveWorkspaces}
+        isArchivingWorkspaces={isArchivingWorkspaces}
       />
       {showShortcutBadge && shortcutNumber !== null ? (
         <View style={styles.projectShortcutBadgeOverlay} pointerEvents="none">
@@ -1112,6 +1167,8 @@ function ProjectHeaderRow({
           projectPath={projectPath}
           onRemoveProject={onRemoveProject}
           removeProjectStatus={removeProjectStatus}
+          onArchiveWorkspaces={onArchiveWorkspaces}
+          isArchivingWorkspaces={isArchivingWorkspaces}
         />
       </ContextMenuContent>
     </ContextMenu>
@@ -1786,6 +1843,37 @@ function ProjectBlock({
   const toast = useToast();
   const { t } = useTranslation();
   const [isRemovingProject, setIsRemovingProject] = useState(false);
+  const [isArchivingWorkspaces, setIsArchivingWorkspaces] = useState(false);
+
+  const handleArchiveWorkspaces = useCallback(() => {
+    if (isArchivingWorkspaces) return;
+    setIsArchivingWorkspaces(true);
+    void (async () => {
+      try {
+        const workspaces = getProjectWorkspaceArchiveEntries({
+          hosts: project.hosts,
+          sessions: useSessionStore.getState().sessions,
+        });
+        const targets = await selectProjectWorkspacesToArchive(workspaces);
+        for (const target of targets) {
+          redirectIfArchivingActiveWorkspace({ ...target, activeWorkspaceSelection });
+        }
+        const failures = await archiveWorkspacesOptimistically({
+          getClient: (serverId) => getHostRuntimeStore().getClient(serverId),
+          workspaces: targets,
+        });
+        if (failures.length) {
+          toast.error(t("sidebar.project.toasts.archiveFailed"));
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : t("sidebar.project.toasts.archiveFailed"),
+        );
+      } finally {
+        setIsArchivingWorkspaces(false);
+      }
+    })();
+  }, [activeWorkspaceSelection, isArchivingWorkspaces, project.hosts, t, toast]);
 
   const handleRemoveProject = useCallback(() => {
     if (isRemovingProject) {
@@ -1933,10 +2021,12 @@ function ProjectBlock({
         onWorkspacePress={onWorkspacePress}
         drag={drag}
         isDragging={isDragging}
-        isArchiving={isRemovingProject}
+        isArchiving={isRemovingProject || isArchivingWorkspaces}
         menuController={null}
         onRemoveProject={handleRemoveProject}
         removeProjectStatus={isRemovingProject ? "pending" : "idle"}
+        onArchiveWorkspaces={handleArchiveWorkspaces}
+        isArchivingWorkspaces={isArchivingWorkspaces}
         dragHandleProps={dragHandleProps}
       />
 

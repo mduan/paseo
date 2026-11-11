@@ -1313,6 +1313,8 @@ export const ko: TranslationResources = {
         openNewWindowFailed: "새 창을 열 수 없습니다",
         openFolder: "파일 관리자에서 열기",
         openFolderFailed: "폴더를 열 수 없습니다.",
+        archiveWorkspaces: "모든 워크스페이스 보관",
+        archivingWorkspaces: "워크스페이스 보관 중...",
         remove: "프로젝트 제거",
         removing: "제거하는 중...",
       },
@@ -1324,6 +1326,7 @@ export const ko: TranslationResources = {
         cancel: "취소",
       },
       toasts: {
+        archiveFailed: "일부 워크스페이스를 보관하지 못했습니다",
         hostDisconnected: "호스트가 연결되어 있지 않습니다",
         removeFailed: "일부 워크스페이스를 제거하지 못했습니다",
         updateHostToRemove: "프로젝트를 제거하려면 호스트를 업데이트하세요.",

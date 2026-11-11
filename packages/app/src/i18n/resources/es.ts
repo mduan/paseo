@@ -1343,6 +1343,8 @@ export const es: TranslationResources = {
         openNewWindowFailed: "Couldn't open a new window",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "Archivar todos los espacios de trabajo",
+        archivingWorkspaces: "Archivando espacios de trabajo...",
         remove: "Eliminar proyecto",
         removing: "Eliminando...",
       },
@@ -1354,6 +1356,7 @@ export const es: TranslationResources = {
         cancel: "Cancelar",
       },
       toasts: {
+        archiveFailed: "No se pudieron archivar algunos espacios de trabajo",
         hostDisconnected: "Hostno está conectado",
         removeFailed: "No se pudieron eliminar algunos espacios de trabajo",
         updateHostToRemove: "Actualiza el host para eliminar proyectos.",

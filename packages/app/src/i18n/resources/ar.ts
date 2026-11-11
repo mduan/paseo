@@ -1306,6 +1306,8 @@ export const ar: TranslationResources = {
         openNewWindowFailed: "Couldn't open a new window",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "أرشفة جميع مساحات العمل",
+        archivingWorkspaces: "جارٍ أرشفة مساحات العمل...",
         remove: "إزالة المشروع",
         removing: "جارٍ الإزالة...",
       },
@@ -1317,6 +1319,7 @@ export const ar: TranslationResources = {
         cancel: "يلغي",
       },
       toasts: {
+        archiveFailed: "تعذرت أرشفة بعض مساحات العمل",
         hostDisconnected: "Host غير متصل",
         removeFailed: "فشل في إزالة بعض مساحات العمل",
         updateHostToRemove: "قم بتحديث Host لإزالة المشاريع.",

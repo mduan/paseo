@@ -1333,6 +1333,8 @@ export const ptBR: TranslationResources = {
         openNewWindowFailed: "Não foi possível abrir uma nova janela",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "Arquivar todos os workspaces",
+        archivingWorkspaces: "Arquivando workspaces...",
         remove: "Remover projeto",
         removing: "Removendo...",
       },
@@ -1344,6 +1346,7 @@ export const ptBR: TranslationResources = {
         cancel: "Cancelar",
       },
       toasts: {
+        archiveFailed: "Falha ao arquivar alguns workspaces",
         hostDisconnected: "Host não está conectado",
         removeFailed: "Falha ao remover alguns workspaces",
         updateHostToRemove: "Atualize o host para remover projetos.",

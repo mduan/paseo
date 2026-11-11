@@ -6,7 +6,16 @@ import {
 } from "@/contexts/session-workspace-upserts";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { i18n } from "@/i18n/i18next";
+
+function purgeArchivedWorkspaceState(input: { serverId: string; workspaceId: string }): void {
+  const workspaceKey = buildWorkspaceTabPersistenceKey(input);
+  if (workspaceKey) {
+    useWorkspaceLayoutStore.getState().purgeWorkspace(workspaceKey);
+  }
+}
 
 export interface WorkspaceArchiveTarget {
   serverId: string;
@@ -93,14 +102,16 @@ export async function archiveWorkspaceOptimistically(input: {
     });
   } catch (error) {
     // The removal event confirms archive before slow worktree cleanup can time out.
-    if (!isWorkspaceArchivePending(input.workspace)) return;
-    restoreOptimisticallyHiddenWorkspace({
-      serverId: input.workspace.serverId,
-      workspaceId: input.workspace.workspaceId,
-      snapshot,
-    });
-    throw error;
+    if (isWorkspaceArchivePending(input.workspace)) {
+      restoreOptimisticallyHiddenWorkspace({
+        serverId: input.workspace.serverId,
+        workspaceId: input.workspace.workspaceId,
+        snapshot,
+      });
+      throw error;
+    }
   }
+  purgeArchivedWorkspaceState(input.workspace);
 }
 
 export async function archiveWorkspacesOptimistically(input: {

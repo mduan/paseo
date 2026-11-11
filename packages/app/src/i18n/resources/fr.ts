@@ -1343,6 +1343,8 @@ export const fr: TranslationResources = {
         openNewWindowFailed: "Couldn't open a new window",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "Archiver tous les espaces de travail",
+        archivingWorkspaces: "Archivage des espaces de travail...",
         remove: "Supprimer le projet",
         removing: "Suppression...",
       },
@@ -1354,6 +1356,7 @@ export const fr: TranslationResources = {
         cancel: "Annuler",
       },
       toasts: {
+        archiveFailed: "Impossible d’archiver certains espaces de travail",
         hostDisconnected: "Hostn'est pas connecté",
         removeFailed: "Échec de la suppression de certains espaces de travail",
         updateHostToRemove: "Mettez à jour le host pour supprimer des projets.",

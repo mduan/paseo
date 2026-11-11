@@ -1325,6 +1325,8 @@ export const ru: TranslationResources = {
         openNewWindowFailed: "Не удалось открыть новое окно",
         openFolder: "Открыть в файловом менеджере",
         openFolderFailed: "Не удалось открыть папку",
+        archiveWorkspaces: "Архивировать все рабочие пространства",
+        archivingWorkspaces: "Архивация рабочих пространств...",
         remove: "Удалить проект",
         removing: "Удаление...",
       },
@@ -1336,6 +1338,7 @@ export const ru: TranslationResources = {
         cancel: "Отмена",
       },
       toasts: {
+        archiveFailed: "Не удалось архивировать некоторые рабочие пространства",
         hostDisconnected: "Хост не подключён",
         removeFailed: "Не удалось удалить некоторые рабочие пространства.",
         updateHostToRemove: "Обновите хост, чтобы удалять проекты.",

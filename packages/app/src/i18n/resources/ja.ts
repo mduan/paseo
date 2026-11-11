@@ -1320,6 +1320,8 @@ export const ja: TranslationResources = {
         openNewWindowFailed: "新しいウィンドウを開けませんでした",
         openFolder: "Open in file manager",
         openFolderFailed: "Couldn't open folder",
+        archiveWorkspaces: "すべてのワークスペースをアーカイブ",
+        archivingWorkspaces: "ワークスペースをアーカイブ中...",
         remove: "プロジェクトを削除",
         removing: "削除中...",
       },
@@ -1331,6 +1333,7 @@ export const ja: TranslationResources = {
         cancel: "キャンセル",
       },
       toasts: {
+        archiveFailed: "一部のワークスペースをアーカイブできませんでした",
         hostDisconnected: "ホストが接続されていません",
         removeFailed: "一部のワークスペースの削除に失敗しました",
         updateHostToRemove: "プロジェクトを削除するにはホストを更新してください。",
