@@ -747,6 +747,7 @@ test("agent handles delegate create, send, timeline refetch, archive, and local 
   const sendPromise = agent.send("hello", {
     messageId: "message-sdk",
     activeTurnBehavior: "steer",
+    sourceAgentId: "caller-sdk",
   });
   const sendRequest = parseSentSessionMessage(ws.sent.at(-1));
   expect(sendRequest).toMatchObject({
@@ -755,6 +756,7 @@ test("agent handles delegate create, send, timeline refetch, archive, and local 
     text: "hello",
     messageId: "message-sdk",
     activeTurnBehavior: "steer",
+    sourceAgentId: "caller-sdk",
   });
 
   ws.message(
