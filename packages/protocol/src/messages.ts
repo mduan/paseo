@@ -1523,6 +1523,8 @@ export const SendAgentMessageRequestSchema = z.object({
   activeTurnBehavior: ActiveTurnBehaviorSchema.optional(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: AgentAttachmentsSchema,
+  /** Set when an agent sends this, such as `paseo send` from an agent's shell; not a human prompt. */
+  sourceAgentId: z.string().optional(),
 });
 
 export const WaitForFinishRequestSchema = z.object({

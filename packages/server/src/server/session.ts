@@ -8739,7 +8739,7 @@ export class Session {
         "agent.session.send_agent_message",
       );
       const send = async () => {
-        await this.recordHumanPrompt({ agentId });
+        if (!msg.sourceAgentId) await this.recordHumanPrompt({ agentId });
         const result = await sendPromptToAgent({
           agentManager: this.agentManager,
           agentStorage: this.agentStorage,

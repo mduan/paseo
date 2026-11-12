@@ -200,10 +200,11 @@ export async function runSendCommand(
       options.image && options.image.length > 0 ? await readImageFiles(options.image) : undefined;
 
     // Send the message
+    const sourceAgentId = process.env.PASEO_AGENT_ID?.trim() || undefined;
     await client.sendAgentMessage(agentIdArg, promptInput, {
       images,
-      activeTurnBehavior:
-        options.behavior ?? (process.env.PASEO_AGENT_ID?.trim() ? "steer" : "interrupt"),
+      sourceAgentId,
+      activeTurnBehavior: options.behavior ?? (sourceAgentId ? "steer" : "interrupt"),
     });
 
     // If --no-wait, return immediately
