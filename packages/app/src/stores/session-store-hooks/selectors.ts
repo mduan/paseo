@@ -1,12 +1,15 @@
 import equal from "fast-deep-equal";
+import { hostSupportsFeature } from "@/runtime/host-features";
 import {
   buildWorkspaceStructureProjects,
+  createProjectViewKey,
   type WorkspaceStructure,
   type WorkspaceStructureProject,
 } from "@/projects/workspace-structure";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
-import type { ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
+import { SidebarSortMode } from "@/stores/sidebar-view-store";
+import type { DaemonServerInfo, ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
 
 export type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 export type { WorkspaceStructure, WorkspaceStructureProject } from "@/projects/workspace-structure";
@@ -19,6 +22,7 @@ export interface SessionsSnapshot {
       hasWorkspaceDirectorySnapshot?: boolean;
       workspaces: Map<string, WorkspaceDescriptor>;
       projects?: Map<string, ProjectDescriptor>;
+      serverInfo?: DaemonServerInfo | null;
     }
   >;
 }
@@ -238,6 +242,76 @@ export function selectProjectIdForServer(
     if (project.projectKey === source.projectKey) return project.projectId;
   }
   return null;
+}
+
+const EMPTY_WORKSPACE_ORDER_BY_SCOPE: Record<string, string[]> = {};
+
+/**
+ * Timestamp-sort workspace order per project, newest first, shaped like the manual
+ * `workspaceOrderByProject` it overrides. Hosts without `workspaceSortTimes` are omitted so they
+ * keep the manual order. Recomputes only when a host's workspaces or server info change.
+ */
+export function createWorkspaceTimeOrderSelector(
+  serverIds: readonly string[],
+  sortMode: SidebarSortMode,
+): (state: SessionsSnapshot) => Record<string, string[]> {
+  let previousInputs: unknown[] | null = null;
+  let previousOrders = EMPTY_WORKSPACE_ORDER_BY_SCOPE;
+
+  return (state) => {
+    if (sortMode === SidebarSortMode.Manual) return EMPTY_WORKSPACE_ORDER_BY_SCOPE;
+    const inputs = serverIds.flatMap((serverId) => [
+      state.sessions[serverId]?.workspaces,
+      state.sessions[serverId]?.serverInfo,
+    ]);
+    if (previousInputs?.every((input, index) => input === inputs[index])) {
+      return previousOrders;
+    }
+    previousInputs = inputs;
+    previousOrders = selectWorkspaceTimeOrderByScope(state, serverIds, sortMode);
+    return previousOrders;
+  };
+}
+
+export function selectWorkspaceTimeOrderByScope(
+  state: SessionsSnapshot,
+  serverIds: readonly string[],
+  sortMode: Exclude<SidebarSortMode, SidebarSortMode.Manual>,
+): Record<string, string[]> {
+  const entriesByScope: Record<string, Array<{ key: string; time: number }>> = {};
+  for (const serverId of serverIds) {
+    const session = state.sessions[serverId];
+    if (!session || !hostSupportsFeature(session.serverInfo, "workspaceSortTimes")) continue;
+    for (const workspace of session.workspaces.values()) {
+      const timestamp = selectWorkspaceSortTime(workspace, sortMode);
+      const scope = createProjectViewKey({ serverId, projectId: workspace.projectId });
+      (entriesByScope[scope] ??= []).push({
+        key: `${serverId}:${workspace.id}`,
+        time: timestamp ? Date.parse(timestamp) : Number.NEGATIVE_INFINITY,
+      });
+    }
+  }
+  const orders: Record<string, string[]> = {};
+  for (const [scope, entries] of Object.entries(entriesByScope)) {
+    entries.sort((left, right) => right.time - left.time || left.key.localeCompare(right.key));
+    orders[scope] = entries.map((entry) => entry.key);
+  }
+  return orders;
+}
+
+/** Never-prompted or never-answered workspaces fall back to their creation time. */
+function selectWorkspaceSortTime(
+  workspace: WorkspaceDescriptor,
+  sortMode: Exclude<SidebarSortMode, SidebarSortMode.Manual>,
+): string | undefined {
+  switch (sortMode) {
+    case SidebarSortMode.Created:
+      return workspace.createdAt;
+    case SidebarSortMode.LastPrompt:
+      return workspace.lastHumanPromptAt ?? workspace.createdAt;
+    case SidebarSortMode.LastResponse:
+      return workspace.lastAgentResponseAt ?? workspace.createdAt;
+  }
 }
 
 export function selectProjectOrder(state: SidebarOrderSnapshot): string[] {

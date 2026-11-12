@@ -1237,6 +1237,13 @@ export const ru: TranslationResources = {
         status: "Статус",
         labels: "Метки",
       },
+      sort: {
+        label: "Сортировка",
+        created: "Дата создания",
+        lastPrompt: "Последний запрос",
+        lastResponse: "Последний ответ",
+        manual: "Вручную",
+      },
       titleSource: {
         label: "Заголовок",
         title: "Заголовок",
@@ -2041,6 +2048,12 @@ export const ru: TranslationResources = {
     backdrop: "Фон меню",
   },
   subagents: {
+    parent: {
+      backTo: "Назад к {{label}}",
+      parent: "Родитель",
+      parentAgent: "Родительский агент",
+      openParent: "Открыть родителя",
+    },
     title: "Субагенты",
     pillLabelOne: "1 субагент",
     pillLabelMany: "Субагентов: {{count}}",

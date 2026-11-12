@@ -1227,6 +1227,13 @@ export const en = {
         status: "Status",
         labels: "Labels",
       },
+      sort: {
+        label: "Sort",
+        created: "Created",
+        lastPrompt: "Last prompt",
+        lastResponse: "Last response",
+        manual: "Manual",
+      },
       titleSource: {
         label: "Title",
         title: "Title",
@@ -2032,6 +2039,12 @@ export const en = {
     backdrop: "Menu backdrop",
   },
   subagents: {
+    parent: {
+      backTo: "Back to {{label}}",
+      parent: "Parent",
+      parentAgent: "Parent agent",
+      openParent: "Open parent",
+    },
     title: "Subagents",
     pillLabelOne: "1 subagent",
     pillLabelMany: "{{count}} subagents",

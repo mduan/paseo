@@ -65,7 +65,7 @@ import {
   type ToggleSidebarWorkspacePin,
 } from "@/hooks/use-sidebar-workspace-pin";
 import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
-import { useHostFeatureMap } from "@/runtime/host-features";
+import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useProjectIcons } from "@/projects/icons";
 import {
@@ -83,6 +83,7 @@ import {
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import {
   hasActiveSidebarLabelFilter,
+  SidebarSortMode,
   useSidebarViewStore,
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
@@ -1819,6 +1820,11 @@ function ProjectBlock({
     ],
   );
 
+  const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const hostSortsByTime = useHostFeature(project.hosts[0]?.serverId, "workspaceSortTimes");
+  // Dragging edits the manual order, so rows a timestamp sort places get no drag handle.
+  const workspaceDragEnabled = sortMode === SidebarSortMode.Manual || !hostSortsByTime;
+
   const renderWorkspace = useCallback(
     ({
       item,
@@ -1826,13 +1832,14 @@ function ProjectBlock({
       isActive,
       dragHandleProps: workspaceDragHandleProps,
     }: DraggableRenderItemInfo<SidebarWorkspacePlacement>) => {
+      if (!workspaceDragEnabled) return renderWorkspaceRow(item);
       return renderWorkspaceRow(item, {
         drag: workspaceDrag,
         isDragging: isActive,
         dragHandleProps: workspaceDragHandleProps,
       });
     },
-    [renderWorkspaceRow],
+    [renderWorkspaceRow, workspaceDragEnabled],
   );
 
   const handleWorkspaceDragEnd = useCallback(

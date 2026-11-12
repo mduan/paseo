@@ -1219,6 +1219,13 @@ export const ar: TranslationResources = {
         status: "الحالة",
         labels: "التسميات",
       },
+      sort: {
+        label: "الترتيب",
+        created: "تاريخ الإنشاء",
+        lastPrompt: "آخر طلب",
+        lastResponse: "آخر رد",
+        manual: "يدوي",
+      },
       titleSource: {
         label: "العنوان",
         title: "العنوان",
@@ -2007,6 +2014,12 @@ export const ar: TranslationResources = {
     backdrop: "خلفية القائمة",
   },
   subagents: {
+    parent: {
+      backTo: "العودة إلى {{label}}",
+      parent: "الأصل",
+      parentAgent: "الوكيل الأصل",
+      openParent: "فتح الأصل",
+    },
     title: "الوكلاء الفرعيون",
     pillLabelOne: "وكيل فرعي واحد",
     pillLabelMany: "{{count}} وكلاء فرعيين",

@@ -136,7 +136,7 @@ test.describe("real provider subagent timelines", () => {
           panel.getByText("Start chatting with this agent...", { exact: true }),
         ).toHaveCount(0);
 
-        await page.getByTestId(`workspace-tab-agent_${handle.agentId}`).first().click();
+        await panel.getByTestId("parent-agent-card-open").click();
         await expect(
           page.getByTestId("assistant-message").filter({ hasText: "ROOT_DONE" }).last(),
         ).toBeVisible({ timeout: 60_000 });

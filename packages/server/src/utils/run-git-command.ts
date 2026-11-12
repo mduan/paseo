@@ -68,8 +68,23 @@ export type RunGitCommand = (
   options: GitCommandOptions,
 ) => Promise<GitCommandResult>;
 
-export function createRunGitCommand(provenance: string): RunGitCommand {
-  return (args, options) => runGitCommandWithProvenance(args, options, provenance);
+export interface GitCommandRunnerOptions {
+  /** Overrides the ambient `runWithGitCommandPriority` lane for every command this runner starts. */
+  priority?: GitProcessPriority;
+}
+
+export function createRunGitCommand(
+  provenance: string,
+  runnerOptions?: GitCommandRunnerOptions,
+): RunGitCommand {
+  const priority = runnerOptions?.priority;
+  if (!priority) {
+    return (args, options) => runGitCommandWithProvenance(args, options, provenance);
+  }
+  return (args, options) =>
+    runWithGitCommandPriority(priority, () =>
+      runGitCommandWithProvenance(args, options, provenance),
+    );
 }
 
 export interface GitCommandMetric {
@@ -98,6 +113,7 @@ export interface GitCommandMetricsSnapshot {
 export interface GitCommandSubmissionMetric {
   args: string[];
   cwd: string;
+  priority: GitProcessPriority;
 }
 
 interface GitCommandMetricsState {
@@ -189,8 +205,8 @@ function snapshotGitCommandMetricsState(state: GitCommandMetricsState): GitComma
   return {
     commands: [...state.commands],
     submissions: state.submissions.map((submission) => ({
+      ...submission,
       args: [...submission.args],
-      cwd: submission.cwd,
     })),
     submitted: state.submitted,
     started: state.started,
@@ -210,12 +226,14 @@ export function snapshotGitCommandRuntimeMetrics(): GitCommandRuntimeMetricsSnap
   });
 }
 
-function submitGitCommandMetric(args: string[], cwd: string): GitCommandMetricsState | null {
+function submitGitCommandMetric(
+  submission: GitCommandSubmissionMetric,
+): GitCommandMetricsState | null {
   const state = gitCommandMetricsState;
   if (!state) {
     return null;
   }
-  state.submissions.push({ args: [...args], cwd });
+  state.submissions.push({ ...submission, args: [...submission.args] });
   state.submitted += 1;
   state.lastSubmittedAtMs = Date.now();
   return state;
@@ -281,7 +299,8 @@ function executeGitCommand<Output>(
   decode: (output: Buffer) => Output,
   provenance?: string,
 ): Promise<GitCommandResult<Output>> {
-  const metricsState = submitGitCommandMetric(args, options.cwd);
+  const priority = gitCommandPriority.getStore() ?? "normal";
+  const metricsState = submitGitCommandMetric({ args, cwd: options.cwd, priority });
   const commandTrace = submitGitCommandTrace(args, options.cwd, {
     active: gitProcessScheduler.activeCount,
     pending: gitProcessScheduler.pendingCount,
@@ -560,9 +579,7 @@ function executeGitCommand<Output>(
     });
     return { result: resultPromise, exited };
   };
-  const promise = gitProcessScheduler.run(startCommand, {
-    priority: gitCommandPriority.getStore() ?? "normal",
-  });
+  const promise = gitProcessScheduler.run(startCommand, { priority });
   gitRuntimeMetrics.observeLimiter(
     gitProcessScheduler.activeCount,
     gitProcessScheduler.pendingCount,

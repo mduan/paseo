@@ -1,5 +1,3 @@
-import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
-import { useAiRenamePending } from "@/workspace/ai-rename/use-ai-rename";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -36,7 +34,6 @@ import {
 } from "@/composer/pill-styles";
 import { getActiveMessageSubmissions } from "@/composer/submission/model";
 import { RewindComposerRestoreProvider } from "@/components/rewind/composer-restore";
-import { useProviderIcon } from "@/components/provider-icons";
 import { useToastHost, type ToastApi, type ToastState } from "@/components/toast-host";
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
 import { useWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
@@ -57,7 +54,7 @@ import { useContainerWidthBelow } from "@/hooks/use-container-width";
 import { reconcileMissingAgentStateWithPresentAgent } from "@/panels/agent-panel-load-state";
 import { TimelineSyncStatus } from "@/timeline/sync-status";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
-import { definePanel, type PanelDescriptor } from "@/panels/panel-registry";
+import { definePanel } from "@/panels/panel-registry";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useHasPluginComposerPills } from "@/plugins";
 import { buildDraftPanelDescriptor } from "@/panels/draft-panel-descriptor";
@@ -74,7 +71,9 @@ import {
   deriveRouteBottomAnchorRequest,
 } from "@/screens/agent/agent-ready-screen-bottom-anchor";
 import { WorkspaceDraftAgentTab } from "@/composer/draft/workspace-tab";
+import { useAgentPanelDescriptor } from "@/panels/agent-panel-descriptor";
 import { AgentTracks, hasAgentTracks } from "@/panels/agent-tracks";
+import { useParentAgentId } from "@/subagents/parent-link";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { buildDraftStoreKey, generateDraftId } from "@/stores/draft-keys";
 import {
@@ -97,7 +96,6 @@ import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { storeFetchedAgentDetail } from "@/utils/store-fetched-agent-detail";
 import { applyLegacyDaemonWorkspaceOwnership } from "@/workspace/legacy-daemon-workspaces";
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
-import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { buildDraftAgentSetup, type ClientSlashCommand } from "@/client-slash-commands";
 
 interface ChatAgentStateShape {
@@ -250,86 +248,6 @@ function renderChatAgentNonReadyView(args: {
     );
   }
   return null;
-}
-
-function formatProviderLabel(provider: Agent["provider"]): string {
-  if (!provider) {
-    return "Agent";
-  }
-  return provider
-    .split(/[-_\s]+/)
-    .filter((part) => part.length > 0)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function resolveWorkspaceAgentTabLabel(title: string | null | undefined): string | null {
-  if (typeof title !== "string") {
-    return null;
-  }
-  const normalized = title.trim();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized.toLowerCase() === "new agent") {
-    return null;
-  }
-  return normalized;
-}
-
-function useAgentPanelDescriptor(
-  target: { kind: "agent"; agentId: string },
-  context: { serverId: string },
-): PanelDescriptor {
-  const { t } = useTranslation();
-  const subagents = useSubagentsForParent({
-    serverId: context.serverId,
-    parentAgentId: target.agentId,
-    includeDescendants: true,
-  });
-  const descriptorState = useSessionStore(
-    useShallow((state) => {
-      const session = state.sessions[context.serverId];
-      const agent =
-        session?.agents?.get(target.agentId) ?? session?.agentDetails?.get(target.agentId) ?? null;
-      return {
-        provider: agent?.provider ?? "codex",
-        title: agent?.title ?? null,
-        status: agent?.status ?? null,
-        pendingPermissionCount: agent?.pendingPermissions.length ?? 0,
-        requiresAttention: agent?.requiresAttention ?? false,
-        attentionReason: agent?.attentionReason ?? null,
-        isTurnActive: selectAgentTurnPresentation(session, target.agentId).isActive,
-      };
-    }),
-  );
-  const aiRenamePending = useAiRenamePending({
-    serverId: context.serverId,
-    target: ConversationTitleTarget.Agent,
-    id: target.agentId,
-  });
-  const provider = descriptorState.provider;
-  const label = aiRenamePending
-    ? t("common.states.renaming")
-    : resolveWorkspaceAgentTabLabel(descriptorState.title);
-  const icon = useProviderIcon(provider, context.serverId);
-
-  return {
-    label: label ?? "",
-    subtitle: `${formatProviderLabel(provider)} agent`,
-    tooltip: label ?? `${formatProviderLabel(provider)} agent`,
-    titleState: label ? "ready" : "loading",
-    icon,
-    statusBucket: descriptorState.status
-      ? deriveSidebarStateBucket({
-          status: descriptorState.isTurnActive ? "running" : descriptorState.status,
-          pendingPermissionCount: descriptorState.pendingPermissionCount,
-          requiresAttention: descriptorState.requiresAttention,
-          attentionReason: descriptorState.attentionReason,
-          hasRunningSubagents: subagents.some((row) => row.status === "running"),
-        })
-      : null,
-  };
 }
 
 function AgentPanel() {
@@ -1135,7 +1053,9 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   });
   const hasPluginComposerPills = useHasPluginComposerPills(serverId, workspaceId, agentId);
   const hasActiveComposer = !agentState.archivedAt && !isArchivingCurrentAgent;
+  const parentAgentId = useParentAgentId(serverId, agentId);
   const hasVisibleAgentTracks = hasAgentTracks({
+    parentAgentId,
     subagentRows,
     tasks,
     archiveFinishedStatus: archiveFinishedSubagents.status,
@@ -1228,6 +1148,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           workspaceId={workspaceId}
           agentId={agentId}
           cwd={cwd}
+          parentAgentId={parentAgentId}
           subagentRows={subagentRows}
           tasks={tasks}
           archiveFinishedStatus={archiveFinishedSubagents.status}

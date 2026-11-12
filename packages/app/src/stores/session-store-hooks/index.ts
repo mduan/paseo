@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
+import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
   composeWorkspaceStructure,
   createWorkspaceStructureProjectsSelector,
+  createWorkspaceTimeOrderSelector,
   selectHasHydratedWorkspaces,
   selectHydratedWorkspaceServerIds,
   selectWorkspaceDirectoryServerIds,
@@ -115,9 +117,19 @@ export function useWorkspaceStructure(serverIds: string[]): WorkspaceStructure {
     (state) => selectProjectOrder(state),
     workspaceEqualityFns.deep,
   );
-  const workspaceOrderByScope = useStoreWithEqualityFn(
+  const manualWorkspaceOrderByScope = useStoreWithEqualityFn(
     useSidebarOrderStore,
     (state) => selectWorkspaceOrderByScope(state),
+    workspaceEqualityFns.deep,
+  );
+  const sortMode = useSidebarViewStore((state) => state.sortMode);
+  const selectTimeOrders = useMemo(
+    () => createWorkspaceTimeOrderSelector(serverIds, sortMode),
+    [serverIds, sortMode],
+  );
+  const timeWorkspaceOrderByScope = useStoreWithEqualityFn(
+    useSessionStore,
+    selectTimeOrders,
     workspaceEqualityFns.deep,
   );
 
@@ -126,9 +138,10 @@ export function useWorkspaceStructure(serverIds: string[]): WorkspaceStructure {
       composeWorkspaceStructure({
         projects,
         projectOrder,
-        workspaceOrderByScope,
+        // Overrides without writing the manual order, so Manual restores the saved arrangement.
+        workspaceOrderByScope: { ...manualWorkspaceOrderByScope, ...timeWorkspaceOrderByScope },
       }),
-    [projectOrder, projects, workspaceOrderByScope],
+    [manualWorkspaceOrderByScope, projectOrder, projects, timeWorkspaceOrderByScope],
   );
 }
 

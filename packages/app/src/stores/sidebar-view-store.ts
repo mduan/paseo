@@ -7,6 +7,14 @@ import { createValidatedPersistStorage } from "@/storage/validated-persist-stora
 
 export type SidebarGroupMode = "project" | "status";
 
+/** How workspaces are ordered inside a project. Manual is the drag order. */
+export enum SidebarSortMode {
+  Created = "created",
+  LastPrompt = "lastPrompt",
+  LastResponse = "lastResponse",
+  Manual = "manual",
+}
+
 const SIDEBAR_VIEW_STORAGE_KEY = "sidebar-view";
 const LEGACY_SIDEBAR_GROUP_MODE_STORAGE_KEY = "sidebar-group-mode";
 const SIDEBAR_VIEW_STORE_VERSION = 6;
@@ -54,7 +62,9 @@ interface SidebarViewStoreState {
    */
   projectFilters: string[] | null;
   labelFilter: SidebarLabelFilter;
+  sortMode: SidebarSortMode;
   setGroupMode: (mode: SidebarGroupMode) => void;
+  setSortMode: (mode: SidebarSortMode) => void;
   toggleHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
   setProjectFilters: (selection: string[] | null) => void;
@@ -70,6 +80,7 @@ interface SidebarViewPersistedState {
   hostFilters: string[];
   projectFilters: string[] | null;
   labelFilter: SidebarLabelFilter;
+  sortMode?: SidebarSortMode;
 }
 
 const PersistedSidebarGroupModeSchema = z.enum(["project", "status", "label"]);
@@ -83,6 +94,7 @@ const SidebarViewPersistedStateSchema = z.strictObject({
   projectFilters: z.array(z.string()).nullable().optional(),
   groupModeByServerId: z.record(z.string(), PersistedSidebarGroupModeSchema).optional(),
   labelFilter: SidebarLabelFilterSchema.optional(),
+  sortMode: z.enum(SidebarSortMode).optional(),
 });
 
 type SidebarViewStorageState = z.infer<typeof SidebarViewPersistedStateSchema>;
@@ -140,6 +152,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
     labelFilter: state.labelFilter
       ? normalizeSidebarLabelFilter(state.labelFilter)
       : emptyLabelFilter(),
+    ...(state.sortMode ? { sortMode: state.sortMode } : {}),
   };
 }
 
@@ -175,7 +188,9 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       hostFilters: [],
       projectFilters: [],
       labelFilter: emptyLabelFilter(),
+      sortMode: SidebarSortMode.Created,
       setGroupMode: (mode) => set({ groupMode: mode }),
+      setSortMode: (sortMode) => set({ sortMode }),
       toggleHostFilter: (serverId) =>
         set((state) => ({ hostFilters: toggleFilterEntry(state.hostFilters, serverId) })),
       clearHostFilters: () => set({ hostFilters: [] }),
@@ -224,6 +239,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
         hostFilters: state.hostFilters,
         projectFilters: state.projectFilters,
         labelFilter: state.labelFilter,
+        sortMode: state.sortMode,
       }),
       migrate: migrateSidebarViewState,
     },

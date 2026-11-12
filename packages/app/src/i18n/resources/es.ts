@@ -1256,6 +1256,13 @@ export const es: TranslationResources = {
         status: "Estado",
         labels: "Etiquetas",
       },
+      sort: {
+        label: "Orden",
+        created: "Creación",
+        lastPrompt: "Último prompt",
+        lastResponse: "Última respuesta",
+        manual: "Manual",
+      },
       titleSource: {
         label: "Título",
         title: "Título",
@@ -2057,6 +2064,12 @@ export const es: TranslationResources = {
     backdrop: "Fondo del menú",
   },
   subagents: {
+    parent: {
+      backTo: "Volver a {{label}}",
+      parent: "Principal",
+      parentAgent: "Agente principal",
+      openParent: "Abrir principal",
+    },
     title: "Subagentes",
     pillLabelOne: "1 subagente",
     pillLabelMany: "{{count}} subagentes",

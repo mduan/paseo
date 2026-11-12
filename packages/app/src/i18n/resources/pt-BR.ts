@@ -1246,6 +1246,13 @@ export const ptBR: TranslationResources = {
         status: "Status",
         labels: "Etiquetas",
       },
+      sort: {
+        label: "Ordenação",
+        created: "Criação",
+        lastPrompt: "Último prompt",
+        lastResponse: "Última resposta",
+        manual: "Manual",
+      },
       titleSource: {
         label: "Título",
         title: "Título",
@@ -2042,6 +2049,12 @@ export const ptBR: TranslationResources = {
     backdrop: "Fundo do menu",
   },
   subagents: {
+    parent: {
+      backTo: "Voltar para {{label}}",
+      parent: "Principal",
+      parentAgent: "Agente principal",
+      openParent: "Abrir principal",
+    },
     title: "Subagentes",
     pillLabelOne: "1 subagente",
     pillLabelMany: "{{count}} subagentes",

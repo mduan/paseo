@@ -16,6 +16,7 @@ import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
 import { usePaneContext } from "@/panels/pane-context";
 import { definePanel, type PanelDescriptor } from "@/panels/panel-registry";
 import { useSessionStore } from "@/stores/session-store";
+import { ParentAgentCard } from "@/subagents/parent-link";
 import { useSubagentsForParent } from "@/subagents/select";
 import { SubagentsTrack } from "@/subagents/track";
 import {
@@ -255,32 +256,36 @@ function ProviderSubagentPanel() {
           </Text>
         </View>
       ) : null}
-      <AgentStreamView
-        agentId={streamId}
-        serverId={serverId}
-        context={streamContext}
-        streamItems={timeline?.tail ?? EMPTY_STREAM_ITEMS}
-        streamHead={timeline?.head ?? EMPTY_STREAM_ITEMS}
-        turnPresentation={turnPresentation}
-        pendingPermissions={EMPTY_PERMISSIONS}
-        isAuthoritativeHistoryReady
-        onOpenWorkspaceFile={openFileInWorkspace}
-        readOnly
-        historyPagination={historyPagination}
-        bottomOverlayTailClearance={childTrackClearance.tail}
-        bottomOverlayControlClearance={childTrackClearance.controls}
-      />
-      <ProviderSubagentChildTrack
-        serverId={serverId}
-        rows={childRows}
-        onOpenProviderSubagent={openProviderChild}
-      />
+      <View style={styles.stream}>
+        <AgentStreamView
+          agentId={streamId}
+          serverId={serverId}
+          context={streamContext}
+          streamItems={timeline?.tail ?? EMPTY_STREAM_ITEMS}
+          streamHead={timeline?.head ?? EMPTY_STREAM_ITEMS}
+          turnPresentation={turnPresentation}
+          pendingPermissions={EMPTY_PERMISSIONS}
+          isAuthoritativeHistoryReady
+          onOpenWorkspaceFile={openFileInWorkspace}
+          readOnly
+          historyPagination={historyPagination}
+          bottomOverlayTailClearance={childTrackClearance.tail}
+          bottomOverlayControlClearance={childTrackClearance.controls}
+        />
+        <ProviderSubagentChildTrack
+          serverId={serverId}
+          rows={childRows}
+          onOpenProviderSubagent={openProviderChild}
+        />
+      </View>
+      <ParentAgentCard serverId={serverId} parentAgentId={target.parentAgentId} />
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, minHeight: 0 },
+  stream: { flex: 1, minHeight: 0 },
   subtitleHeader: {
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[1],

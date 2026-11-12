@@ -5,6 +5,7 @@ import {
   hasActiveSidebarLabelFilter,
   migrateSidebarViewState,
   SIDEBAR_UNLABELLED_LABEL_KEY,
+  SidebarSortMode,
   useSidebarViewStore,
 } from "./sidebar-view-store";
 
@@ -118,12 +119,14 @@ describe("sidebar view store", () => {
       migrateSidebarViewState({
         groupMode: "status",
         hostFilters: ["host-a", "host-b"],
+        sortMode: SidebarSortMode.Manual,
       }),
     ).toEqual({
       groupMode: "status",
       hostFilters: ["host-a", "host-b"],
       projectFilters: [],
       labelFilter: { labels: [] },
+      sortMode: SidebarSortMode.Manual,
     });
   });
 

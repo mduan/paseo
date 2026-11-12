@@ -18,6 +18,10 @@ import {
   CircleDashed,
   Clock,
   Diff,
+  GripVertical,
+  MessageSquare,
+  MessageSquareReply,
+  CalendarPlus,
   EyeOff,
   Folder,
   GitBranch,
@@ -54,6 +58,7 @@ import type { Theme } from "@/styles/theme";
 import {
   hasActiveSidebarLabelFilter,
   SIDEBAR_UNLABELLED_LABEL_KEY,
+  SidebarSortMode,
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
 import { workspaceLabelKey, type WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
@@ -98,6 +103,13 @@ const GROUPING_ICONS: Record<SidebarGroupMode, OptionIcon> = {
   status: withUnistyles(CircleDashed),
 };
 
+const SORT_MODE_ICONS: Record<SidebarSortMode, OptionIcon> = {
+  [SidebarSortMode.Created]: withUnistyles(CalendarPlus),
+  [SidebarSortMode.LastPrompt]: withUnistyles(MessageSquare),
+  [SidebarSortMode.LastResponse]: withUnistyles(MessageSquareReply),
+  [SidebarSortMode.Manual]: withUnistyles(GripVertical),
+};
+
 const TITLE_SOURCE_ICONS: Record<WorkspaceTitleSource, OptionIcon> = {
   title: withUnistyles(Type),
   branch: withUnistyles(GitBranch),
@@ -130,12 +142,25 @@ const TRAILING_ICONS: Record<SidebarTrailingChoice, OptionIcon> = {
 };
 
 const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
+const SORT_MODES: readonly SidebarSortMode[] = [
+  SidebarSortMode.Created,
+  SidebarSortMode.LastPrompt,
+  SidebarSortMode.LastResponse,
+  SidebarSortMode.Manual,
+];
 const TITLE_SOURCES: readonly WorkspaceTitleSource[] = ["title", "branch"];
 const TRAILING_CHOICES: readonly SidebarTrailingChoice[] = ["diff", "timestamp"];
 
 const GROUPING_LABEL_KEYS: Record<SidebarGroupMode, string> = {
   project: "sidebar.display.grouping.project",
   status: "sidebar.display.grouping.status",
+};
+
+const SORT_MODE_LABEL_KEYS: Record<SidebarSortMode, string> = {
+  [SidebarSortMode.Created]: "sidebar.display.sort.created",
+  [SidebarSortMode.LastPrompt]: "sidebar.display.sort.lastPrompt",
+  [SidebarSortMode.LastResponse]: "sidebar.display.sort.lastResponse",
+  [SidebarSortMode.Manual]: "sidebar.display.sort.manual",
 };
 
 const TITLE_SOURCE_LABEL_KEYS: Record<WorkspaceTitleSource, string> = {
@@ -213,6 +238,20 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             selectedValue={preferences.grouping}
             onSelect={preferences.setGrouping}
             testIDPrefix="sidebar-grouping"
+          />
+        ),
+      },
+      {
+        id: "sort",
+        title: t("sidebar.display.sort.label"),
+        content: (
+          <OptionList
+            values={SORT_MODES}
+            icons={SORT_MODE_ICONS}
+            labelKeys={SORT_MODE_LABEL_KEYS}
+            selectedValue={preferences.sortMode}
+            onSelect={preferences.setSortMode}
+            testIDPrefix="sidebar-sort"
           />
         ),
       },
@@ -318,6 +357,13 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             testID="sidebar-display-grouping"
           >
             {t("sidebar.display.grouping.label")}
+          </MenuSubTrigger>
+          <MenuSubTrigger
+            id="sort"
+            value={t(SORT_MODE_LABEL_KEYS[preferences.sortMode])}
+            testID="sidebar-display-sort"
+          >
+            {t("sidebar.display.sort.label")}
           </MenuSubTrigger>
           <MenuSubTrigger
             id="titleSource"

@@ -4,7 +4,19 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 import { afterEach, expect, test, vi } from "vitest";
-import type { CheckoutSnapshotFacts, CheckoutStatusGit } from "../utils/checkout-git.js";
+import {
+  getCheckoutSnapshotFacts as readCheckoutSnapshotFacts,
+  type CheckoutSnapshotFacts,
+  type CheckoutStatusGit,
+} from "../utils/checkout-git.js";
+import {
+  getGitCommandMetrics,
+  runWithGitCommandPriority,
+  startGitCommandMetrics,
+  stopGitCommandMetrics,
+  waitForGitCommandMetricsIdle,
+  type GitCommandSubmissionMetric,
+} from "../utils/run-git-command.js";
 import { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { createFileObserver } from "./file-observer/index.js";
 import { WorkspaceGitServiceImpl } from "./workspace-git-service.js";
@@ -501,3 +513,91 @@ test("a late Git-ignored tree is pruned while tracked changes still notify consu
     rmSync(tempDir, { recursive: true, force: true });
   }
 }, 15_000);
+
+test("observation refreshes run in the background Git lane until a caller joins them", async () => {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-priority-")));
+  const repo = path.join(root, "repo");
+  mkdirSync(repo);
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: repo, stdio: "pipe" });
+  git("init", "-b", "main");
+  git("config", "user.email", "test@example.com");
+  git("config", "user.name", "Test");
+  writeFileSync(path.join(repo, "README.md"), "base\n");
+  git("add", ".");
+  git("commit", "-m", "base");
+  const observer = createFileObserver();
+  let factsGate: { entered: () => void; release: Promise<void> } | null = null;
+  const service = new WorkspaceGitServiceImpl({
+    logger: pino({ enabled: false }),
+    paseoHome: path.join(root, "home"),
+    fileObserver: observer,
+    deps: {
+      getCheckoutSnapshotFacts: async (cwd, context) => {
+        const gate = factsGate;
+        if (gate) {
+          factsGate = null;
+          gate.entered();
+          await gate.release;
+        }
+        return readCheckoutSnapshotFacts(cwd, context);
+      },
+    },
+  });
+  const heads: Array<string | null> = [];
+  const subscription = service.registerWorkspace({ cwd: repo }, (snapshot) => {
+    heads.push(snapshot.git.currentBranch);
+  });
+  cleanup.push(async () => {
+    subscription.unsubscribe();
+    await service.dispose();
+    await observer.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+  const priorities = (submissions: GitCommandSubmissionMetric[]) =>
+    new Set(submissions.map((submission) => submission.priority));
+  const collectWhenIdle = async (quietMs: number) => {
+    await waitForGitCommandMetricsIdle({ quietMs, timeoutMs: 10_000 });
+    return stopGitCommandMetrics().submissions;
+  };
+  // Registration and observation setup settle before the measured changes.
+  startGitCommandMetrics();
+  await service.getSnapshot(repo, { includeForge: false });
+  await collectWhenIdle(500);
+
+  startGitCommandMetrics();
+  git("switch", "-c", "feature");
+  await expect.poll(() => heads, { timeout: 10_000 }).toContain("feature");
+  const observed = await collectWhenIdle(300);
+  expect(observed.length).toBeGreaterThan(0);
+  expect(priorities(observed)).toEqual(new Set(["background"]));
+
+  startGitCommandMetrics();
+  await service.getSnapshot(repo, { force: true, reason: "test-demand", includeForge: false });
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["normal"]));
+
+  startGitCommandMetrics();
+  await runWithGitCommandPriority("high", () =>
+    service.getSnapshot(repo, { force: true, reason: "test-user-action", includeForge: false }),
+  );
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["high"]));
+
+  startGitCommandMetrics();
+  await service.getCheckout(repo, { priority: "background" });
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["background"]));
+
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  factsGate = { entered: entered.resolve, release: release.promise };
+  startGitCommandMetrics();
+  git("switch", "-c", "second");
+  await entered.promise;
+  const submittedBeforeJoin = getGitCommandMetrics().submitted;
+  const joined = service.refresh(repo);
+  release.resolve();
+  await joined;
+  const submittedThroughJoin = getGitCommandMetrics().submitted;
+  const promoted = (await collectWhenIdle(0)).slice(submittedBeforeJoin, submittedThroughJoin);
+  expect(promoted.length).toBeGreaterThan(0);
+  expect(priorities(promoted)).toEqual(new Set(["normal"]));
+}, 30_000);

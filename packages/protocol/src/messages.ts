@@ -3863,6 +3863,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceLinearIssues: z.boolean().optional(),
         // COMPAT(workspaceMetadataRefresh): added in v0.11.0-fork.30, remove gate after 2027-04-21.
         workspaceMetadataRefresh: z.boolean().optional(),
+        // COMPAT(workspaceSortTimes): added in v0.11.0-fork.35, remove gate after 2027-05-11.
+        workspaceSortTimes: z.boolean().optional(),
         // COMPAT(linearIntegration): added in v0.11.0-fork.28, remove gate after 2027-04-21.
         linearIntegration: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.
@@ -4380,6 +4382,13 @@ export const WorkspaceDescriptorPayloadSchema = z
       .nullish()
       .transform((value) => value ?? null),
     activityAt: z.string().nullable(),
+    // COMPAT(workspaceSortTimes): added in v0.11.0-fork.35, remove optional after 2027-05-11.
+    createdAt: z.string().optional(),
+    // When a person last sent this workspace a prompt from a client. Unlike an agent's
+    // `lastUserMessageAt`, schedules, loops, and agent tool calls never set it. Null means never.
+    lastHumanPromptAt: z.string().nullable().optional(),
+    // When an agent here last completed a turn, whoever prompted it.
+    lastAgentResponseAt: z.string().nullable().optional(),
     diffStat: z
       .object({
         additions: z.number(),
