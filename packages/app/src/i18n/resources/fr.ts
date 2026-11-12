@@ -1255,6 +1255,13 @@ export const fr: TranslationResources = {
         status: "Statut",
         labels: "Libellés",
       },
+      sort: {
+        label: "Tri",
+        created: "Création",
+        lastPrompt: "Dernier prompt",
+        lastResponse: "Dernière réponse",
+        manual: "Manuel",
+      },
       titleSource: {
         label: "Titre",
         title: "Titre",

@@ -1246,6 +1246,13 @@ export const ptBR: TranslationResources = {
         status: "Status",
         labels: "Etiquetas",
       },
+      sort: {
+        label: "Ordenação",
+        created: "Criação",
+        lastPrompt: "Último prompt",
+        lastResponse: "Última resposta",
+        manual: "Manual",
+      },
       titleSource: {
         label: "Título",
         title: "Título",

@@ -1226,6 +1226,13 @@ export const ko: TranslationResources = {
         status: "상태",
         labels: "레이블",
       },
+      sort: {
+        label: "정렬",
+        created: "생성일",
+        lastPrompt: "마지막 프롬프트",
+        lastResponse: "마지막 응답",
+        manual: "수동",
+      },
       titleSource: {
         label: "제목",
         title: "제목",

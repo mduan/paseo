@@ -1227,6 +1227,13 @@ export const en = {
         status: "Status",
         labels: "Labels",
       },
+      sort: {
+        label: "Sort",
+        created: "Created",
+        lastPrompt: "Last prompt",
+        lastResponse: "Last response",
+        manual: "Manual",
+      },
       titleSource: {
         label: "Title",
         title: "Title",

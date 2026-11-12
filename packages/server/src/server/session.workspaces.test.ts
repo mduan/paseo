@@ -968,6 +968,86 @@ test.each([
   },
 );
 
+test("a client prompt stamps its workspace's lastHumanPromptAt before dispatch", async () => {
+  const workspaceId = "ws-repo-running";
+  let workspace = createPersistedWorkspaceRecord({
+    workspaceId,
+    projectId: "proj-repo-running",
+    cwd: REPO_CWD,
+    kind: "directory",
+    displayName: "repo",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const chat = makeManagedAgent({
+    id: "chat",
+    cwd: REPO_CWD,
+    workspaceId,
+    lifecycle: "idle",
+    updatedAt: "2026-10-15T00:00:00Z",
+  });
+  const emitted: SessionOutboundMessage[] = [];
+  let stampAtDispatch: string | undefined;
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    workspaceRegistry: {
+      initialize: async () => {},
+      existsOnDisk: async () => true,
+      list: async () => [workspace],
+      get: async (id) => (id === workspaceId ? workspace : null),
+      upsert: async () => {},
+      update: async (id, update) => {
+        if (id !== workspaceId) return null;
+        workspace = update(workspace);
+        return workspace;
+      },
+      archive: async () => {},
+      remove: async () => {},
+    },
+    agentStorage: {
+      get: async () => ({
+        ...makeStoredAgent({ id: chat.id, cwd: chat.cwd, updatedAt: "2026-10-15T00:00:00Z" }),
+        title: "Named",
+      }),
+    },
+    agentManager: {
+      getAgent: () => chat,
+      listAgents: () => [chat],
+      tryRunOutOfBand: () => false,
+      hasInFlightRun: () => false,
+      waitForAgentClose: async () => {},
+      streamAgent: async function* () {
+        stampAtDispatch = workspace.lastHumanPromptAt;
+        yield* [];
+      },
+      waitForAgentRunStart: async () => {},
+    },
+  });
+
+  await session.handleMessage({
+    type: "send_agent_message_request",
+    requestId: "send",
+    agentId: chat.id,
+    text: "Ship it",
+  });
+
+  expect(findByType(emitted, "send_agent_message_response")?.payload).toMatchObject({
+    accepted: true,
+    error: null,
+  });
+  expect(stampAtDispatch).toEqual(expect.any(String));
+  const [descriptor] = (
+    await session.listFetchWorkspacesEntries({
+      type: "fetch_workspaces_request",
+      requestId: "list",
+    })
+  ).entries;
+  expect(descriptor).toMatchObject({
+    createdAt: "2026-03-01T12:00:00.000Z",
+    lastHumanPromptAt: stampAtDispatch,
+  });
+});
+
 test("project.list.request catches up by sequence on the existing RPC", async () => {
   const emitted: SessionOutboundMessage[] = [];
   let project = createPersistedProjectRecord({
