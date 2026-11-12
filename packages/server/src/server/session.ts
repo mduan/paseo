@@ -4140,7 +4140,7 @@ export class Session {
   }
 
   /** A caller agent creating a child is automation, not a person prompting. */
-  private async recordCreationPrompt(
+  private async recordHumanCreationPrompt(
     msg: CreateAgentRequestMessage,
     workspaceId: string,
   ): Promise<void> {
@@ -4584,7 +4584,7 @@ export class Session {
         throw new Error(`Working directory does not exist or is not a directory: ${resolvedCwd}`);
       }
 
-      await this.recordCreationPrompt(msg, resolvedIntent.intent.workspaceId);
+      await this.recordHumanCreationPrompt(msg, resolvedIntent.intent.workspaceId);
       const { snapshot, liveSnapshot } = await createAgentCommand(
         {
           agentManager: this.agentManager,
