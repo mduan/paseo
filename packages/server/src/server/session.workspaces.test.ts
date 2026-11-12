@@ -968,7 +968,7 @@ test.each([
   },
 );
 
-test("a client prompt stamps its workspace's lastHumanPromptAt before dispatch", async () => {
+function createPromptStampHarness() {
   const workspaceId = "ws-repo-running";
   let workspace = createPersistedWorkspaceRecord({
     workspaceId,
@@ -987,7 +987,7 @@ test("a client prompt stamps its workspace's lastHumanPromptAt before dispatch",
     updatedAt: "2026-10-15T00:00:00Z",
   });
   const emitted: SessionOutboundMessage[] = [];
-  let stampAtDispatch: string | undefined;
+  const dispatches: Array<string | null | undefined> = [];
   const session = createSessionForWorkspaceTests({
     onMessage: (message) => emitted.push(message),
     workspaceRegistry: {
@@ -1017,35 +1017,56 @@ test("a client prompt stamps its workspace's lastHumanPromptAt before dispatch",
       hasInFlightRun: () => false,
       waitForAgentClose: async () => {},
       streamAgent: async function* () {
-        stampAtDispatch = workspace.lastHumanPromptAt;
+        dispatches.push(workspace.lastHumanPromptAt);
         yield* [];
       },
       waitForAgentRunStart: async () => {},
     },
   });
+  return {
+    emitted,
+    dispatches,
+    send: (fields: { sourceAgentId?: string } = {}) =>
+      session.handleMessage({
+        type: "send_agent_message_request",
+        requestId: "send",
+        agentId: chat.id,
+        text: "Ship it",
+        ...fields,
+      }),
+    listedWorkspace: async () =>
+      (
+        await session.listFetchWorkspacesEntries({
+          type: "fetch_workspaces_request",
+          requestId: "list",
+        })
+      ).entries[0],
+  };
+}
 
-  await session.handleMessage({
-    type: "send_agent_message_request",
-    requestId: "send",
-    agentId: chat.id,
-    text: "Ship it",
-  });
+test("a client prompt stamps its workspace's lastHumanPromptAt before dispatch", async () => {
+  const harness = createPromptStampHarness();
 
-  expect(findByType(emitted, "send_agent_message_response")?.payload).toMatchObject({
+  await harness.send();
+
+  expect(findByType(harness.emitted, "send_agent_message_response")?.payload).toMatchObject({
     accepted: true,
     error: null,
   });
-  expect(stampAtDispatch).toEqual(expect.any(String));
-  const [descriptor] = (
-    await session.listFetchWorkspacesEntries({
-      type: "fetch_workspaces_request",
-      requestId: "list",
-    })
-  ).entries;
-  expect(descriptor).toMatchObject({
+  expect(harness.dispatches).toEqual([expect.any(String)]);
+  expect(await harness.listedWorkspace()).toMatchObject({
     createdAt: "2026-03-01T12:00:00.000Z",
-    lastHumanPromptAt: stampAtDispatch,
+    lastHumanPromptAt: harness.dispatches[0],
   });
+});
+
+test("an agent's prompt through the client leaves lastHumanPromptAt unset", async () => {
+  const harness = createPromptStampHarness();
+
+  await harness.send({ sourceAgentId: "caller-agent" });
+
+  expect(harness.dispatches).toHaveLength(1);
+  expect((await harness.listedWorkspace())?.lastHumanPromptAt).toBeFalsy();
 });
 
 test("project.list.request catches up by sequence on the existing RPC", async () => {

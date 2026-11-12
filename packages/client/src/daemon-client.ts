@@ -440,6 +440,8 @@ export interface SendMessageOptions {
   activeTurnBehavior?: ActiveTurnBehavior;
   images?: Array<{ data: string; mimeType: string }>;
   attachments?: SendAgentMessageRequest["attachments"];
+  /** The sending agent, when an agent rather than a person sends the message. */
+  sourceAgentId?: string;
 }
 
 export interface AgentAttentionRequiredNotification {
@@ -3672,6 +3674,7 @@ export class DaemonClient {
       ...(options?.activeTurnBehavior ? { activeTurnBehavior: options.activeTurnBehavior } : {}),
       ...(options?.images ? { images: options.images } : {}),
       ...(options?.attachments ? { attachments: options.attachments } : {}),
+      ...(options?.sourceAgentId ? { sourceAgentId: options.sourceAgentId } : {}),
     });
     const payload = await this.sendRequest({
       requestId,
