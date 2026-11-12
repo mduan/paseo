@@ -382,8 +382,16 @@ export interface SetupFinishNotificationParams {
    * admission. Notifications wait for it and are dropped if it fails.
    */
   dispatch?: Promise<unknown>;
+  /** How the armed prompt meets a running turn; a steer can be answered after that turn ends. */
+  activeTurnBehavior?: ActiveTurnBehavior;
   logger: Logger;
 }
+
+/**
+ * Claude answers a steer that arrives after its last tool call in a follow-up turn, started
+ * once the steered turn ends. Keep observing that long so the follow-up's finish is reported.
+ */
+const STEER_FOLLOW_UP_WINDOW_MS = 10_000;
 
 type FinishNotificationReason = "finished" | "errored" | "needs permission" | "was closed";
 
@@ -395,6 +403,7 @@ interface FinishNotificationBodyInput {
   reason: FinishNotificationReason;
   lastAssistantMessage: string | null;
   permissionRequest?: AgentPermissionRequest;
+  followUpPossible?: boolean;
 }
 
 function formatFinishNotificationBody(params: FinishNotificationBodyInput): string {
@@ -422,12 +431,18 @@ function formatFinishNotificationBody(params: FinishNotificationBodyInput): stri
     }
     sections.push(`<agent-response>\n${lastAssistantMessage}\n</agent-response>`);
   }
+  if (params.followUpPossible) {
+    sections.push(
+      "If this response does not answer the message you steered into this agent's turn, the agent may still be answering it. A follow-up report will arrive when it finishes.",
+    );
+  }
   return sections.join("\n\n");
 }
 
 interface NotifySafelyOptions {
   terminal?: boolean;
   permissionRequest?: AgentPermissionRequest;
+  followUpPossible?: boolean;
 }
 
 // One observation per caller/child pair. Re-arming (e.g. a follow-up while the child runs)
@@ -457,11 +472,19 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
   let requireParentOwnership = false;
   // Accepted once any arming is not tied to a dispatch, or any tracked dispatch succeeds.
   let accepted = false;
+  let steeredIntoRunningTurn = false;
+  let followUpWindow: ReturnType<typeof setTimeout> | undefined;
   const dispatches: Promise<unknown>[] = [];
   arm(params);
 
   function arm(next: SetupFinishNotificationParams): void {
     requireParentOwnership = next.requireParentOwnership ?? false;
+    if (
+      next.activeTurnBehavior === "steer" &&
+      agentManager.getAgent(childAgentId)?.lifecycle === "running"
+    ) {
+      steeredIntoRunningTurn = true;
+    }
     const { dispatch } = next;
     if (!dispatch) {
       accepted = true;
@@ -493,13 +516,14 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
   function stop(): void {
     if (stopped) return;
     stopped = true;
+    clearTimeout(followUpWindow);
     unsubscribe?.();
     armedByManager.delete(armedKey);
   }
 
   async function notify(
     reason: FinishNotificationReason,
-    permissionRequest?: AgentPermissionRequest,
+    options: NotifySafelyOptions,
   ): Promise<void> {
     if (!(await dispatchAccepted())) {
       return;
@@ -520,7 +544,8 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
       title,
       reason,
       lastAssistantMessage,
-      permissionRequest,
+      permissionRequest: options.permissionRequest,
+      followUpPossible: options.followUpPossible,
     });
 
     await sendPromptToAgent({
@@ -538,13 +563,25 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     if (stopped) return;
     if (options.terminal ?? true) stop();
     notificationQueue = notificationQueue
-      .then(() => notify(reason, options.permissionRequest))
+      .then(() => notify(reason, options))
       .catch((error) => {
         logger.error(
           { err: error, childAgentId, callerAgentId, reason },
           "Failed to notify caller agent",
         );
       });
+  }
+
+  function notifyFinished(): void {
+    if (!steeredIntoRunningTurn) {
+      notifySafely("finished");
+      return;
+    }
+    steeredIntoRunningTurn = false;
+    hasSeenRunning = false;
+    notifySafely("finished", { terminal: false, followUpPossible: true });
+    followUpWindow = setTimeout(stop, STEER_FOLLOW_UP_WINDOW_MS);
+    followUpWindow.unref?.();
   }
 
   unsubscribe = agentManager.subscribe(
@@ -560,6 +597,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
           }
         }
         if (event.agent.lifecycle === "running") {
+          clearTimeout(followUpWindow);
           if (event.agent.pendingPermissions.size === 0) {
             hasSeenRunning = true;
           }
@@ -570,7 +608,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
           return;
         }
         if (event.agent.lifecycle === "idle" && hasSeenRunning) {
-          notifySafely("finished");
+          notifyFinished();
           return;
         }
         if (event.agent.lifecycle === "closed") {

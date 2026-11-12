@@ -3733,12 +3733,21 @@ class HeldTurnAgentSession implements AgentSession {
     const turnId = randomUUID();
     this.activeTurnId = turnId;
     setTimeout(() => {
+      // A turn finished before its start was announced is never announced.
+      if (this.activeTurnId !== turnId) return;
       this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
-      if (!this.holdTurns && this.activeTurnId === turnId) {
+      if (!this.holdTurns) {
         this.finishTurn();
       }
     }, 0);
     return { turnId };
+  }
+
+  /** Start a turn the provider opens on its own, as Claude does to answer a late steer. */
+  startFollowUpTurn(): void {
+    const turnId = randomUUID();
+    this.activeTurnId = turnId;
+    this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
   }
 
   finishTurn(): void {
@@ -4277,6 +4286,7 @@ describe("send_agent_prompt MCP tool", () => {
           prompt.includes(`Agent ${child.id} (`),
         );
       },
+      lifecycle: () => agentManager.getAgent(child.id)?.lifecycle,
       cleanup: () => removeAgentStateDir(agentManager, storage, workdir),
     };
   }
@@ -4390,6 +4400,49 @@ describe("send_agent_prompt MCP tool", () => {
       await settle();
       expect(child.finishNotifications()).toHaveLength(1);
     } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("reports the follow-up turn that answers a steer after the steered turn ends", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      expect(child.finishNotifications()[0]).toContain("A follow-up report will arrive");
+
+      child.childSession.startFollowUpTurn();
+      await vi.waitFor(() => expect(child.lifecycle()).toBe("running"));
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(2));
+      expect(child.finishNotifications()[1]).not.toContain("A follow-up report will arrive");
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("stops watching a steered child once the follow-up window passes", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(11_000);
+      vi.useRealTimers();
+
+      child.childSession.startFollowUpTurn();
+      await vi.waitFor(() => expect(child.lifecycle()).toBe("running"));
+      child.childSession.finishTurn();
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
       await child.cleanup();
     }
   });

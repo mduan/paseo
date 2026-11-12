@@ -64,6 +64,7 @@ import {
 import {
   sendPromptToAgent,
   setupFinishNotification,
+  type SetupFinishNotificationParams,
   waitForAgentRunStartWithTimeout,
 } from "../agent-prompt.js";
 import { respondToAgentPermission } from "../permission-response.js";
@@ -1892,6 +1893,8 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     }
   }
 
+  const STEERED_BLOCKING_GUIDANCE =
+    "If lastMessage does not answer your message, the agent may still be answering it in a follow-up turn. Check get_agent_activity before acting on this result.";
   const PROMPTED_AGENT_NOTIFICATION_GUIDANCE =
     "You will get notified when the prompted agent finishes, errors, or needs permission. Do not poll for status; continue with other work until the notification arrives.";
 
@@ -1918,7 +1921,9 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
       notifyOnFinish = Boolean(callerAgentId),
       activeTurnBehavior = callerAgentId ? "steer" : "interrupt",
     }) => {
-      function armFinishNotification(dispatch?: Promise<unknown>): boolean {
+      function armFinishNotification(
+        dispatched?: Pick<SetupFinishNotificationParams, "dispatch" | "activeTurnBehavior">,
+      ): boolean {
         if (!callerAgentId || !notifyOnFinish) {
           return false;
         }
@@ -1927,11 +1932,14 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           agentStorage,
           childAgentId: agentId,
           callerAgentId,
-          dispatch,
+          ...dispatched,
           logger: childLogger,
         });
         return true;
       }
+
+      const steersRunningTurn =
+        activeTurnBehavior === "steer" && agentManager.getAgent(agentId)?.lifecycle === "running";
 
       const dispatch = sendPromptToAgent({
         agentManager,
@@ -1943,7 +1951,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         logger: childLogger,
       });
       // Background callers observe before dispatch; blocking callers arm only if the wait runs out.
-      const notifying = background && armFinishNotification(dispatch);
+      const notifying = background && armFinishNotification({ dispatch, activeTurnBehavior });
       const { disposition } = await dispatch;
 
       // If not running in background, wait for completion
@@ -1957,13 +1965,16 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           result.timedOut &&
           agentManager.getAgent(agentId)?.lifecycle === "running" &&
           armFinishNotification();
+        let guidance: string | undefined;
+        if (notifyingAfterWait) guidance = PROMPTED_AGENT_NOTIFICATION_GUIDANCE;
+        else if (steersRunningTurn) guidance = STEERED_BLOCKING_GUIDANCE;
 
         const responseData = {
           success: true,
           status: result.status,
           lastMessage: result.lastMessage,
           permission: sanitizePermissionRequest(result.permission),
-          ...(notifyingAfterWait ? { guidance: PROMPTED_AGENT_NOTIFICATION_GUIDANCE } : {}),
+          ...(guidance ? { guidance } : {}),
         };
         const validJson = ensureValidJson(responseData);
 
