@@ -2115,10 +2115,10 @@ class ClaudeAgentSession implements AgentSession {
    */
   private readonly queuedSteerUuids = new Set<string>();
   /** A foreground completion withheld while a queued steer may still continue the turn. */
-  private heldSteerCompletion?: {
+  private heldSteerCompletion: {
     event: Extract<AgentStreamEvent, { type: "turn_completed" }>;
     timer: ReturnType<typeof setTimeout>;
-  };
+  } | null = null;
   /** Human steers whose text has not reached Claude yet and therefore supersede blocking cards. */
   private readonly permissionClearingSteerUuids = new Set<string>();
   private claudeSessionId: string | null;
@@ -4121,7 +4121,7 @@ class ClaudeAgentSession implements AgentSession {
   private discardHeldSteerCompletion(): void {
     if (!this.heldSteerCompletion) return;
     clearTimeout(this.heldSteerCompletion.timer);
-    this.heldSteerCompletion = undefined;
+    this.heldSteerCompletion = null;
   }
 
   private async buildPumpedMessageEvents(
