@@ -1,5 +1,7 @@
+import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { DefaultNpmGlobalPaseoCli } from "./npm-global-cli.js";
 
 interface CommandCall {
@@ -28,6 +30,57 @@ function npmGlobalPaseoCliJson(version: string, options?: { linked?: boolean }):
 }
 
 describe("DefaultNpmGlobalPaseoCli", () => {
+  test("inspects and updates with the daemon's Node installation when PATH points elsewhere", async () => {
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-npm-runtime-")));
+    const daemonBin = path.join(root, "daemon-bin");
+    const otherBin = path.join(root, "other-bin");
+    const originalExecPath = process.execPath;
+    const nodeName = process.platform === "win32" ? "node.exe" : "node";
+    const daemonNode = path.join(daemonBin, nodeName);
+    try {
+      mkdirSync(daemonBin);
+      mkdirSync(otherBin);
+      copyFileSync(originalExecPath, daemonNode);
+      for (const bin of [daemonBin, otherBin]) {
+        const installed = bin === daemonBin ? npmGlobalPaseoCliJson("0.1.15") : "{}";
+        const script = `
+if (process.argv.includes("install")) {
+  console.log(JSON.stringify({ npmBin: ${JSON.stringify(bin)}, node: process.execPath, args: process.argv.slice(2) }));
+} else {
+  console.log(${JSON.stringify(installed)});
+}
+`;
+        if (process.platform === "win32") {
+          writeFileSync(path.join(bin, "npm-cli.js"), script);
+          writeFileSync(path.join(bin, "npm.cmd"), '@echo off\r\nnode "%~dp0npm-cli.js" %*\r\n');
+        } else {
+          writeFileSync(path.join(bin, "npm"), `#!/usr/bin/env node\n${script}`, { mode: 0o755 });
+        }
+      }
+      vi.stubEnv("PATH", [otherBin, path.dirname(originalExecPath)].join(path.delimiter));
+      Object.defineProperty(process, "execPath", { value: daemonNode });
+      const cli = new DefaultNpmGlobalPaseoCli();
+
+      await expect(cli.inspect()).resolves.toEqual({
+        version: "0.1.15",
+        packagePath: cliPackagePath,
+        globalRootPath: globalRoot,
+        isLinked: false,
+      });
+      const result = await cli.installLatest();
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        npmBin: daemonBin,
+        node: daemonNode,
+        args: ["install", "-g", "@mduan/paseo-cli@latest"],
+      });
+    } finally {
+      Object.defineProperty(process, "execPath", { value: originalExecPath });
+      vi.unstubAllEnvs();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("inspects the npm global cli install with npm -g ls", async () => {
     const calls: CommandCall[] = [];
     const cli = new DefaultNpmGlobalPaseoCli(async (command, args, options) => {
