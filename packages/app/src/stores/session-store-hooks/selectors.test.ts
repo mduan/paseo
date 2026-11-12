@@ -513,14 +513,20 @@ describe("selectWorkspaceTimeOrderByScope", () => {
     id: string,
     createdAt: string,
     lastHumanPromptAt: string | null = null,
+    lastAgentResponseAt: string | null = null,
   ): WorkspaceDescriptor {
-    return { ...createWorkspace({ id }), createdAt, lastHumanPromptAt };
+    return { ...createWorkspace({ id }), createdAt, lastHumanPromptAt, lastAgentResponseAt };
   }
 
   const workspaces = [
     timedWorkspace("oldest", "2026-01-01T00:00:00.000Z", "2026-03-01T00:00:00.000Z"),
     timedWorkspace("newest", "2026-02-01T00:00:00.000Z"),
-    timedWorkspace("middle", "2026-01-15T00:00:00.000Z", "2026-01-20T00:00:00.000Z"),
+    timedWorkspace(
+      "middle",
+      "2026-01-15T00:00:00.000Z",
+      "2026-01-20T00:00:00.000Z",
+      "2026-04-01T00:00:00.000Z",
+    ),
   ];
   function snapshot(features: { workspaceSortTimes?: boolean }) {
     return {
@@ -552,6 +558,16 @@ describe("selectWorkspaceTimeOrderByScope", () => {
         SidebarSortMode.LastPrompt,
       ),
     ).toEqual({ [projectViewKey("project-1")]: keys(["oldest", "newest", "middle"]) });
+  });
+
+  it("orders by latest agent response, falling back to creation for unanswered workspaces", () => {
+    expect(
+      selectWorkspaceTimeOrderByScope(
+        snapshot({ workspaceSortTimes: true }),
+        [SERVER_ID],
+        SidebarSortMode.LastResponse,
+      ),
+    ).toEqual({ [projectViewKey("project-1")]: keys(["middle", "newest", "oldest"]) });
   });
 
   it("leaves hosts without workspaceSortTimes on their manual order", () => {

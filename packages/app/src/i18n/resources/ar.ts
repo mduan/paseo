@@ -1223,6 +1223,7 @@ export const ar: TranslationResources = {
         label: "الترتيب",
         created: "تاريخ الإنشاء",
         lastPrompt: "آخر طلب",
+        lastResponse: "آخر رد",
         manual: "يدوي",
       },
       titleSource: {

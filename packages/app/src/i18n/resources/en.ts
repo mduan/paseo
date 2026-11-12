@@ -1231,6 +1231,7 @@ export const en = {
         label: "Sort",
         created: "Created",
         lastPrompt: "Last prompt",
+        lastResponse: "Last response",
         manual: "Manual",
       },
       titleSource: {

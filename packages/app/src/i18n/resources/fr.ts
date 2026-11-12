@@ -1259,6 +1259,7 @@ export const fr: TranslationResources = {
         label: "Tri",
         created: "Création",
         lastPrompt: "Dernier prompt",
+        lastResponse: "Dernière réponse",
         manual: "Manuel",
       },
       titleSource: {

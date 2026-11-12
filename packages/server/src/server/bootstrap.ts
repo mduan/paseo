@@ -134,6 +134,7 @@ import { AgentManager } from "./agent/agent-manager.js";
 import { AgentStorage } from "./agent/agent-storage.js";
 import { TurnDiffStore } from "./agent/turn-diffs/store.js";
 import { attachAgentStoragePersistence } from "./persistence-hooks.js";
+import { attachWorkspaceResponseRecorder } from "./workspace-response-recorder.js";
 import { createAgentMcpServer } from "./agent/mcp-server.js";
 import {
   createPaseoToolCatalog,
@@ -968,6 +969,11 @@ export async function createPaseoDaemon(
     agentManager,
     agentStorage,
   );
+  const detachWorkspaceResponseRecorder = attachWorkspaceResponseRecorder({
+    logger,
+    agentManager,
+    workspaceRegistry,
+  });
   await agentStorage.initialize();
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
   await bootstrapWorkspaceRegistries({
@@ -1832,6 +1838,7 @@ export async function createPaseoDaemon(
     await closeAllAgents(logger, agentManager);
     await agentManager.flushForShutdown().catch(() => undefined);
     detachAgentStoragePersistence();
+    detachWorkspaceResponseRecorder();
     await agentStorage.flush().catch(() => undefined);
     await agentProviderRuntime.shutdown();
     await pluginRuntime.stopAllPlugins();

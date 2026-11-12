@@ -4387,6 +4387,8 @@ export const WorkspaceDescriptorPayloadSchema = z
     // When a person last sent this workspace a prompt from a client. Unlike an agent's
     // `lastUserMessageAt`, schedules, loops, and agent tool calls never set it. Null means never.
     lastHumanPromptAt: z.string().nullable().optional(),
+    // When an agent here last completed a turn, whoever prompted it.
+    lastAgentResponseAt: z.string().nullable().optional(),
     diffStat: z
       .object({
         additions: z.number(),

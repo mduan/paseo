@@ -5969,6 +5969,7 @@ export class Session {
       pinnedAt: workspace.pinnedAt,
       createdAt: workspace.createdAt,
       lastHumanPromptAt: workspace.lastHumanPromptAt,
+      lastAgentResponseAt: workspace.lastAgentResponseAt,
       linearIssues: await this.linearIntegration.resolve(workspace.linearIssues),
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       archivingAt: null,

@@ -1236,6 +1236,7 @@ export const ja: TranslationResources = {
         label: "並べ替え",
         created: "作成日時",
         lastPrompt: "最後のプロンプト",
+        lastResponse: "最後の応答",
         manual: "手動",
       },
       titleSource: {

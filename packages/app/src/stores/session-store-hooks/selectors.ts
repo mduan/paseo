@@ -276,17 +276,14 @@ export function createWorkspaceTimeOrderSelector(
 export function selectWorkspaceTimeOrderByScope(
   state: SessionsSnapshot,
   serverIds: readonly string[],
-  sortMode: SidebarSortMode.Created | SidebarSortMode.LastPrompt,
+  sortMode: Exclude<SidebarSortMode, SidebarSortMode.Manual>,
 ): Record<string, string[]> {
   const entriesByScope: Record<string, Array<{ key: string; time: number }>> = {};
   for (const serverId of serverIds) {
     const session = state.sessions[serverId];
     if (!session || !hostSupportsFeature(session.serverInfo, "workspaceSortTimes")) continue;
     for (const workspace of session.workspaces.values()) {
-      const timestamp =
-        sortMode === SidebarSortMode.LastPrompt
-          ? (workspace.lastHumanPromptAt ?? workspace.createdAt)
-          : workspace.createdAt;
+      const timestamp = selectWorkspaceSortTime(workspace, sortMode);
       const scope = createProjectViewKey({ serverId, projectId: workspace.projectId });
       (entriesByScope[scope] ??= []).push({
         key: `${serverId}:${workspace.id}`,
@@ -300,6 +297,21 @@ export function selectWorkspaceTimeOrderByScope(
     orders[scope] = entries.map((entry) => entry.key);
   }
   return orders;
+}
+
+/** Never-prompted or never-answered workspaces fall back to their creation time. */
+function selectWorkspaceSortTime(
+  workspace: WorkspaceDescriptor,
+  sortMode: Exclude<SidebarSortMode, SidebarSortMode.Manual>,
+): string | undefined {
+  switch (sortMode) {
+    case SidebarSortMode.Created:
+      return workspace.createdAt;
+    case SidebarSortMode.LastPrompt:
+      return workspace.lastHumanPromptAt ?? workspace.createdAt;
+    case SidebarSortMode.LastResponse:
+      return workspace.lastAgentResponseAt ?? workspace.createdAt;
+  }
 }
 
 export function selectProjectOrder(state: SidebarOrderSnapshot): string[] {

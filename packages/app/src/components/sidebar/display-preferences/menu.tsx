@@ -20,6 +20,7 @@ import {
   Diff,
   GripVertical,
   MessageSquare,
+  MessageSquareReply,
   CalendarPlus,
   EyeOff,
   Folder,
@@ -105,6 +106,7 @@ const GROUPING_ICONS: Record<SidebarGroupMode, OptionIcon> = {
 const SORT_MODE_ICONS: Record<SidebarSortMode, OptionIcon> = {
   [SidebarSortMode.Created]: withUnistyles(CalendarPlus),
   [SidebarSortMode.LastPrompt]: withUnistyles(MessageSquare),
+  [SidebarSortMode.LastResponse]: withUnistyles(MessageSquareReply),
   [SidebarSortMode.Manual]: withUnistyles(GripVertical),
 };
 
@@ -143,6 +145,7 @@ const GROUPING_MODES: readonly SidebarGroupMode[] = ["project", "status"];
 const SORT_MODES: readonly SidebarSortMode[] = [
   SidebarSortMode.Created,
   SidebarSortMode.LastPrompt,
+  SidebarSortMode.LastResponse,
   SidebarSortMode.Manual,
 ];
 const TITLE_SOURCES: readonly WorkspaceTitleSource[] = ["title", "branch"];
@@ -156,6 +159,7 @@ const GROUPING_LABEL_KEYS: Record<SidebarGroupMode, string> = {
 const SORT_MODE_LABEL_KEYS: Record<SidebarSortMode, string> = {
   [SidebarSortMode.Created]: "sidebar.display.sort.created",
   [SidebarSortMode.LastPrompt]: "sidebar.display.sort.lastPrompt",
+  [SidebarSortMode.LastResponse]: "sidebar.display.sort.lastResponse",
   [SidebarSortMode.Manual]: "sidebar.display.sort.manual",
 };
 

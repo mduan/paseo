@@ -1230,6 +1230,7 @@ export const ko: TranslationResources = {
         label: "정렬",
         created: "생성일",
         lastPrompt: "마지막 프롬프트",
+        lastResponse: "마지막 응답",
         manual: "수동",
       },
       titleSource: {

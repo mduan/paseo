@@ -111,6 +111,8 @@ const PersistedWorkspaceRecordSchema = z.object({
   linearIssues: z.array(LinearIssueSchema).optional(),
   // Last client-sent prompt; automated prompts never set it — see `recordHumanPrompt`.
   lastHumanPromptAt: z.string().optional(),
+  // Last completed agent turn, whoever prompted it — see `attachWorkspaceResponseRecorder`.
+  lastAgentResponseAt: z.string().optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
 });
 

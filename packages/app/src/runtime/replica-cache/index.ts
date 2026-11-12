@@ -330,6 +330,7 @@ const StoredWorkspaceSchema = z.strictObject({
   // Persisted like labels below — reconnect sends nothing newer, so a dropped time would stick.
   createdAt: z.string().optional(),
   lastHumanPromptAt: z.string().nullable().optional(),
+  lastAgentResponseAt: z.string().nullable().optional(),
   // Optional because entries written before labels existed have none. A cached workspace that
   // dropped them painted its row without its chips and stayed that way: the directory cursor is
   // current on reconnect, so the daemon has nothing newer to send back.
@@ -745,6 +746,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     pinnedAt: workspace.pinnedAt ?? null,
     createdAt: workspace.createdAt,
     lastHumanPromptAt: workspace.lastHumanPromptAt,
+    lastAgentResponseAt: workspace.lastAgentResponseAt,
     labels: workspace.labels,
     linearIssues: workspace.linearIssues,
     status: workspace.status,

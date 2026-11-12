@@ -1241,6 +1241,7 @@ export const ru: TranslationResources = {
         label: "Сортировка",
         created: "Дата создания",
         lastPrompt: "Последний запрос",
+        lastResponse: "Последний ответ",
         manual: "Вручную",
       },
       titleSource: {

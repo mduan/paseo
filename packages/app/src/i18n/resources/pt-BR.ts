@@ -1250,6 +1250,7 @@ export const ptBR: TranslationResources = {
         label: "Ordenação",
         created: "Criação",
         lastPrompt: "Último prompt",
+        lastResponse: "Última resposta",
         manual: "Manual",
       },
       titleSource: {

@@ -11,6 +11,7 @@ export type SidebarGroupMode = "project" | "status";
 export enum SidebarSortMode {
   Created = "created",
   LastPrompt = "lastPrompt",
+  LastResponse = "lastResponse",
   Manual = "manual",
 }
 

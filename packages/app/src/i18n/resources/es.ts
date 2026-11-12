@@ -1260,6 +1260,7 @@ export const es: TranslationResources = {
         label: "Orden",
         created: "Creación",
         lastPrompt: "Último prompt",
+        lastResponse: "Última respuesta",
         manual: "Manual",
       },
       titleSource: {
