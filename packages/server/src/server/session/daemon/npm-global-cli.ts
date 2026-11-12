@@ -1,3 +1,4 @@
+import path from "node:path";
 import { getErrorMessage } from "@getpaseo/protocol/error-utils";
 import { z } from "zod";
 import { execCommand } from "../../../utils/spawn.js";
@@ -70,6 +71,12 @@ async function runExternalCommand(
     const { stdout, stderr } = await execCommand(command, args, {
       timeout: options?.timeout,
       maxBuffer: options?.maxBuffer,
+      // Version-manager PATH shims can switch Node installations while the daemon is running.
+      envOverlay: {
+        PATH: [path.dirname(process.execPath), process.env.PATH]
+          .filter(Boolean)
+          .join(path.delimiter),
+      },
     });
     return { exitCode: 0, stdout, stderr };
   } catch (error) {
