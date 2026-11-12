@@ -533,12 +533,6 @@ interface ClaudeOptionsLogSummary {
 const MAX_RECENT_STDERR_CHARS = 4000;
 const STDERR_FLUSH_WAIT_MS = 150;
 const STDERR_FLUSH_POLL_INTERVAL_MS = 10;
-/**
- * Claude Code finishes an answer before reading a steer that arrived after its last tool call,
- * then starts the steer as its own command within milliseconds. Bounded so a missing `started`
- * frame only delays the turn's end.
- */
-const QUEUED_STEER_START_WINDOW_MS = 1000;
 
 function summarizeClaudeOptionsForLog(options: ClaudeOptions): ClaudeOptionsLogSummary {
   const systemPromptRaw = options.systemPrompt;
@@ -2114,11 +2108,6 @@ class ClaudeAgentSession implements AgentSession {
    * UUIDs are provider-private; never let them escape the adapter boundary.
    */
   private readonly queuedSteerUuids = new Set<string>();
-  /** A foreground completion withheld while a queued steer may still continue the turn. */
-  private heldSteerCompletion: {
-    event: Extract<AgentStreamEvent, { type: "turn_completed" }>;
-    timer: ReturnType<typeof setTimeout>;
-  } | null = null;
   /** Human steers whose text has not reached Claude yet and therefore supersede blocking cards. */
   private readonly permissionClearingSteerUuids = new Set<string>();
   private claudeSessionId: string | null;
@@ -3725,7 +3714,6 @@ class ClaudeAgentSession implements AgentSession {
   private finishForegroundTurn(
     event: Extract<AgentStreamEvent, { type: "turn_completed" | "turn_failed" | "turn_canceled" }>,
   ): void {
-    this.discardHeldSteerCompletion();
     if (event.type === "turn_failed" || event.type === "turn_canceled") {
       this.flushPendingToolCalls();
     }
@@ -4018,7 +4006,6 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private async routeSdkMessageFromPump(message: SDKMessage): Promise<void> {
-    this.resolveHeldSteerCompletion(message);
     if (this.shouldSuppressStaleResult(message)) {
       if (message.type === "result") this.emitSuppressedResultCost(message);
       return;
@@ -4082,46 +4069,7 @@ class ClaudeAgentSession implements AgentSession {
       this.foregroundHasVisibleActivity = true;
     }
 
-    this.holdCompletionForQueuedSteer(events);
     this.dispatchEvents(events);
-  }
-
-  private holdCompletionForQueuedSteer(events: AgentStreamEvent[]): void {
-    if (!this.activeForegroundTurnId || this.queuedSteerUuids.size === 0) return;
-    const index = events.findIndex((event) => event.type === "turn_completed");
-    if (index < 0) return;
-    const [event] = events.splice(index, 1) as [
-      Extract<AgentStreamEvent, { type: "turn_completed" }>,
-    ];
-    this.heldSteerCompletion = {
-      event,
-      timer: setTimeout(() => this.releaseHeldSteerCompletion(), QUEUED_STEER_START_WINDOW_MS),
-    };
-  }
-
-  /** A started steer continues the held turn; anything else except lifecycle bookkeeping ends it. */
-  private resolveHeldSteerCompletion(message: SDKMessage): void {
-    if (!this.heldSteerCompletion) return;
-    const lifecycle = readClaudeCommandLifecycle(message);
-    if (lifecycle?.state === "completed") return;
-    if (lifecycle?.state === "started" && this.queuedSteerUuids.has(lifecycle.commandUuid)) {
-      this.discardHeldSteerCompletion();
-      return;
-    }
-    this.releaseHeldSteerCompletion();
-  }
-
-  private releaseHeldSteerCompletion(): void {
-    const held = this.heldSteerCompletion;
-    if (!held) return;
-    this.discardHeldSteerCompletion();
-    this.dispatchEvents([held.event]);
-  }
-
-  private discardHeldSteerCompletion(): void {
-    if (!this.heldSteerCompletion) return;
-    clearTimeout(this.heldSteerCompletion.timer);
-    this.heldSteerCompletion = null;
   }
 
   private async buildPumpedMessageEvents(
