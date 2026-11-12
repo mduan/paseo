@@ -5,7 +5,7 @@ import type { Logger } from "pino";
 
 import type { AgentMode, AgentProvider, AgentSessionConfig } from "../agent-sdk-types.js";
 import type { AgentManager } from "../agent-manager.js";
-import { AgentProfileSchema } from "@getpaseo/protocol/messages";
+import { ActiveTurnBehaviorSchema, AgentProfileSchema } from "@getpaseo/protocol/messages";
 import type { DaemonConfigStore } from "../../daemon-config-store.js";
 import {
   AgentFeatureSchema,
@@ -1123,6 +1123,9 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     .object(legacyTopLevelCreateAgentInputSchema)
     .strict();
   const commonSendAgentPromptInputSchema = {
+    activeTurnBehavior: ActiveTurnBehaviorSchema.optional().describe(
+      'How to send into a running turn: "steer" joins it, falling back to interrupt when steering is unavailable; "interrupt" replaces it. Defaults to steer for agent callers and interrupt otherwise.',
+    ),
     agentId: z.string(),
     prompt: z.string(),
     sessionMode: z.string().optional().describe("Optional mode to set before running the prompt."),
@@ -1897,7 +1900,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     {
       title: "Send agent prompt",
       description:
-        "Send a task to a running agent. Agent-scoped callers run in background by default; top-level callers wait by default.",
+        "Send a task to a running agent. Agent-scoped callers run in background and steer a running turn by default; top-level callers wait and interrupt by default.",
       inputSchema: sendAgentPromptInputSchema,
       outputSchema: {
         success: z.boolean(),
@@ -1913,8 +1916,9 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
       sessionMode,
       background = Boolean(callerAgentId),
       notifyOnFinish = Boolean(callerAgentId),
+      activeTurnBehavior = callerAgentId ? "steer" : "interrupt",
     }) => {
-      function armFinishNotification(): boolean {
+      function armFinishNotification(dispatch?: Promise<unknown>): boolean {
         if (!callerAgentId || !notifyOnFinish) {
           return false;
         }
@@ -1923,19 +1927,25 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           agentStorage,
           childAgentId: agentId,
           callerAgentId,
+          dispatch,
           logger: childLogger,
         });
         return true;
       }
 
-      const { disposition } = await sendPromptToAgent({
+      const dispatch = sendPromptToAgent({
         agentManager,
         agentStorage,
         agentId,
         prompt,
         sessionMode,
+        activeTurnBehavior,
         logger: childLogger,
       });
+      // A background caller observes before dispatch so a steered turn that finishes during
+      // admission still notifies. A blocking caller arms only if its wait runs out.
+      const notifying = background && armFinishNotification(dispatch);
+      const { disposition } = await dispatch;
 
       // If not running in background, wait for completion
       if (!background) {
@@ -1944,7 +1954,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         });
         // The wait ran out while the agent keeps working, so its result arrives as a
         // finish notification instead of in this response.
-        const notifying =
+        const notifyingAfterWait =
           result.timedOut &&
           agentManager.getAgent(agentId)?.lifecycle === "running" &&
           armFinishNotification();
@@ -1954,7 +1964,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           status: result.status,
           lastMessage: result.lastMessage,
           permission: sanitizePermissionRequest(result.permission),
-          ...(notifying ? { guidance: PROMPTED_AGENT_NOTIFICATION_GUIDANCE } : {}),
+          ...(notifyingAfterWait ? { guidance: PROMPTED_AGENT_NOTIFICATION_GUIDANCE } : {}),
         };
         const validJson = ensureValidJson(responseData);
 
@@ -1964,8 +1974,6 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         };
         return response;
       }
-
-      const notifying = armFinishNotification();
 
       // Return once the provider has accepted the turn, so the status reports it running.
       if (disposition === "turn_started") {

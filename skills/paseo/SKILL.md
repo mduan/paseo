@@ -61,7 +61,7 @@ Detach is an explicit user action in the subagents track, not an agent tool. A c
 
 Agent-scoped `create_agent` defaults `notifyOnFinish` to true. Set it to `false` only for truly fire-and-forget agents.
 
-**`send_agent_prompt`** — `{ agentId, prompt }`. Use for follow-ups to an existing agent. Agent-scoped prompt calls default to `background: true` and `notifyOnFinish: true`; top-level calls default to blocking with no callback. For a synchronous follow-up, pass `background: false` and use the returned result.
+**`send_agent_prompt`** — `{ agentId, prompt, activeTurnBehavior? }`. Use for follow-ups to an existing agent. Agent-scoped prompt calls default to `background: true`, `notifyOnFinish: true`, and `activeTurnBehavior: "steer"`; top-level calls default to blocking, no callback, and `"interrupt"`. Steering falls back to interrupting when the provider can't steer. CLI sends from an agent use the same default and accept `--behavior steer|interrupt`. For a synchronous follow-up, pass `background: false` and use the returned result.
 
 **`update_agent`** — `{ agentId, name?, labels?, settings? }`. Use `settings` for runtime changes on an existing agent: `modeId`, `model`, `thinkingOptionId`, and provider-specific `features`. For Codex fast mode, pass `settings: { features: { "fast_mode": true } }`.
 

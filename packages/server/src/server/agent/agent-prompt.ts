@@ -377,6 +377,12 @@ export interface SetupFinishNotificationParams {
   childAgentId: string;
   callerAgentId: string;
   requireParentOwnership?: boolean;
+  /**
+   * The prompt dispatch this observation is armed ahead of. Arming before dispatch keeps a
+   * turn that finishes during steering admission from going unobserved; its notifications
+   * wait for the dispatch and are dropped if it fails.
+   */
+  dispatch?: Promise<unknown>;
   logger: Logger;
 }
 
@@ -425,37 +431,77 @@ interface NotifySafelyOptions {
   permissionRequest?: AgentPermissionRequest;
 }
 
-// A caller waits on a child through one armed notification. Arming again, such as a
-// follow-up prompt while the child still runs, replaces the earlier one so the child's
-// next finish reaches the caller once.
-const armedFinishNotifications = new WeakMap<AgentManager, Map<string, () => void>>();
+// A caller waits on a child through one armed observation. Arming again, such as a
+// follow-up prompt while the child still runs, joins the existing observation so the
+// child's next finish reaches the caller once, even when sends overlap or fail.
+const armedFinishNotifications = new WeakMap<
+  AgentManager,
+  Map<string, (params: SetupFinishNotificationParams) => void>
+>();
 
 export function setupFinishNotification(params: SetupFinishNotificationParams): void {
-  const {
-    agentManager,
-    agentStorage,
-    childAgentId,
-    callerAgentId,
-    requireParentOwnership = false,
-    logger,
-  } = params;
+  const { agentManager, agentStorage, childAgentId, callerAgentId, logger } = params;
+  const armedByManager = armedFinishNotifications.get(agentManager) ?? new Map();
+  armedFinishNotifications.set(agentManager, armedByManager);
+  const armedKey = JSON.stringify([childAgentId, callerAgentId]);
+  const armed = armedByManager.get(armedKey);
+  if (armed) {
+    armed(params);
+    return;
+  }
+  armedByManager.set(armedKey, rearm);
+
   let hasSeenRunning = false;
   let stopped = false;
   const notifiedPermissionRequestIds = new Set<string>();
   let unsubscribe: (() => void) | null = null;
   let notificationQueue = Promise.resolve();
+  let requireParentOwnership = false;
+  // Accepted once any arming is not tied to a dispatch, or any tracked dispatch succeeds.
+  let accepted = false;
+  const dispatches: Promise<unknown>[] = [];
+  rearm(params);
 
-  const armedByManager = armedFinishNotifications.get(agentManager) ?? new Map();
-  armedFinishNotifications.set(agentManager, armedByManager);
-  const armedKey = JSON.stringify([childAgentId, callerAgentId]);
-  armedByManager.get(armedKey)?.();
-  armedByManager.set(armedKey, stop);
+  function rearm(next: SetupFinishNotificationParams): void {
+    requireParentOwnership = next.requireParentOwnership ?? false;
+    const { dispatch } = next;
+    if (!dispatch) {
+      accepted = true;
+      return;
+    }
+    dispatches.push(dispatch);
+    void (async () => {
+      try {
+        await dispatch;
+        accepted = true;
+      } catch {
+        if (!(await dispatchAccepted())) stop();
+      }
+    })();
+  }
+
+  /** Resolves once a tracked dispatch succeeds, or false when every one has failed. */
+  async function dispatchAccepted(): Promise<boolean> {
+    let tracked = 0;
+    while (!accepted && tracked < dispatches.length) {
+      tracked = dispatches.length;
+      if (
+        await Promise.any(dispatches).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        accepted = true;
+      }
+    }
+    return accepted;
+  }
 
   function stop(): void {
     if (stopped) return;
     stopped = true;
     unsubscribe?.();
-    if (armedByManager.get(armedKey) === stop) {
+    if (armedByManager.get(armedKey) === rearm) {
       armedByManager.delete(armedKey);
     }
   }
@@ -464,6 +510,9 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     reason: FinishNotificationReason,
     permissionRequest?: AgentPermissionRequest,
   ): Promise<void> {
+    if (!(await dispatchAccepted())) {
+      return;
+    }
     const callerRecord = await agentStorage.get(callerAgentId);
     if (callerRecord?.archivedAt) {
       return;
@@ -576,6 +625,11 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
   // not have started yet (streamAgent sets a pending run before
   // transitioning to "running").
   const childSnapshot = agentManager.getAgent(childAgentId);
+  if (params.dispatch) {
+    // The dispatch may still load the child or start a turn that clears a stale error.
+    hasSeenRunning = childSnapshot?.lifecycle === "running";
+    return;
+  }
   if (!childSnapshot || childSnapshot.lifecycle === "closed") {
     stop();
     return;
