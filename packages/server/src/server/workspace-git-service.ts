@@ -3085,9 +3085,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         target.refreshState.queued = this.mergeRefreshRequests(target.refreshState.queued, request);
       }
       // The caller now waits on this refresh — promote its remaining Git work.
-      if (request.origin === WorkspaceGitRefreshOrigin.Demand) {
-        active.origin = WorkspaceGitRefreshOrigin.Demand;
-      }
+      active.origin = mergeRefreshOrigins(active.origin, request.origin);
       return target.refreshState.promise;
     }
 
