@@ -586,8 +586,6 @@ test("observation refreshes run in the background Git lane until a caller joins 
   await service.getCheckout(repo, { priority: "background" });
   expect(priorities(await settle(0))).toEqual(new Set(["background"]));
 
-  // A caller that joins an in-flight observation refresh moves its remaining Git work out of
-  // the background lane.
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   factsGate = { entered: entered.resolve, release: release.promise };

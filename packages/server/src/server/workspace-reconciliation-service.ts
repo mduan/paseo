@@ -20,8 +20,7 @@ import { deriveProjectKey } from "./project-key.js";
 
 const DEFAULT_RESCAN_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_DEBOUNCE_MS = 100;
-// Each checkout read runs ~15 Git commands; reading every sibling worktree at once queued
-// over 1,000 commands per rescan on projects with many worktrees.
+// ~15 Git commands per read — unbounded sibling reads queued 1,000+ commands per rescan.
 const CHECKOUT_READ_CONCURRENCY = 4;
 
 export type ProjectUpdate =
@@ -539,8 +538,6 @@ export class WorkspaceReconciliationService {
         mainRepoRoot: null,
       };
     }
-    // Reconciliation converges in the background and must not queue ahead of Git work a user
-    // is waiting for.
     return this.workspaceGitService.getCheckout(cwd, { priority: "background" });
   }
 

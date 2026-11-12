@@ -16,8 +16,7 @@ export interface ScheduledGitProcess<T> {
   exited: Promise<void>;
 }
 
-// Lanes drain in this order. "background" is daemon-initiated fan-out (reconciliation,
-// observation-driven refreshes, fetches) and never starts ahead of queued high or normal work.
+// Drain order. "background" is daemon fan-out: reconciliation, watcher refreshes, fetches.
 export type GitProcessPriority = "high" | "normal" | "background";
 
 function parsePositiveInteger(value: string | undefined): number | undefined {
@@ -46,9 +45,8 @@ export function resolveGitProcessPolicy(input: {
   };
 }
 
-// Admission reserves a process slot and a start-rate token. The job is chosen when the token
-// fires, not when the slot is reserved, so normal work submitted while background jobs wait on
-// the rate limiter still takes the next start.
+// Admission reserves a slot and a start-rate token; the job is chosen when the token fires, so
+// work submitted while background reservations wait on the rate limit takes the next start.
 export class GitProcessScheduler {
   private readonly startThrottled;
   private readonly queues: Record<GitProcessPriority, Array<() => Promise<void>>> = {

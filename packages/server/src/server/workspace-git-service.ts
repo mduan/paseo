@@ -336,10 +336,7 @@ export interface WorkspaceGitCheckoutReadOptions {
   priority?: GitProcessPriority;
 }
 
-/**
- * Who waits for a refresh. Demand refreshes answer a caller and keep the caller's Git lane.
- * Observation refreshes react to watchers and polls and run in the background lane.
- */
+// Demand refreshes keep the caller's Git lane; watcher and poll refreshes run in background.
 enum WorkspaceGitRefreshOrigin {
   Demand = "demand",
   Observation = "observation",
@@ -3087,8 +3084,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       if (request.queueIfBusy || addsWork) {
         target.refreshState.queued = this.mergeRefreshRequests(target.refreshState.queued, request);
       }
-      // The caller now waits on the in-flight refresh, so its remaining Git work leaves the
-      // background lane.
+      // The caller now waits on this refresh — promote its remaining Git work.
       if (request.origin === WorkspaceGitRefreshOrigin.Demand) {
         active.origin = WorkspaceGitRefreshOrigin.Demand;
       }
@@ -3269,9 +3265,8 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     return snapshot;
   }
 
-  // Reads the origin per command so a demand caller that joins an observation refresh promotes
-  // the rest of its Git work. Demand keeps the caller's ambient lane, so a "high" user action
-  // is not demoted.
+  // Origin is read per command so a joining demand caller promotes the rest of the refresh.
+  // Demand uses the ambient lane so a "high" user action is not demoted.
   private createRefreshGitCommand(request: WorkspaceGitRefreshRequest): RunGitCommand {
     const provenance = `workspace-refresh:${request.reason}`;
     const runDemand = createRunGitCommand(provenance);
