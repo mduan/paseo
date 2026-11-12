@@ -1,4 +1,5 @@
 import { statSync, watch as watchPath } from "node:fs";
+import pLimit from "p-limit";
 import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
 import type pino from "pino";
 import type {
@@ -19,6 +20,8 @@ import { deriveProjectKey } from "./project-key.js";
 
 const DEFAULT_RESCAN_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_DEBOUNCE_MS = 100;
+// ~15 Git commands per read — unbounded sibling reads queued 1,000+ commands per rescan.
+const CHECKOUT_READ_CONCURRENCY = 4;
 
 export type ProjectUpdate =
   | { kind: "upsert"; project: PersistedProjectRecord }
@@ -310,10 +313,11 @@ export class WorkspaceReconciliationService {
     changes: ReconciliationChange[],
   ): Promise<void> {
     const checkoutReads: CachedCheckoutRead[] = [];
+    const checkoutReadLimit = pLimit(CHECKOUT_READ_CONCURRENCY);
     const readCheckout = (cwd: string): Promise<ProjectCheckoutLitePayload> => {
       const existing = checkoutReads.find((read) => areEquivalentPaths(read.cwd, cwd));
       if (existing) return existing.checkout;
-      const checkout = this.readCheckout(cwd);
+      const checkout = checkoutReadLimit(() => this.readCheckout(cwd));
       checkoutReads.push({ cwd, checkout });
       return checkout;
     };
@@ -534,7 +538,7 @@ export class WorkspaceReconciliationService {
         mainRepoRoot: null,
       };
     }
-    return this.workspaceGitService.getCheckout(cwd);
+    return this.workspaceGitService.getCheckout(cwd, { priority: "background" });
   }
 
   private inspectDirectory(targetPath: string): DirectoryState {
