@@ -17,6 +17,7 @@ export interface WorkToggle {
 
 export interface FoldedTail {
   items: StreamItem[];
+  expandedWorkItemIds: ReadonlySet<string>;
   /** The "Worked for" row of each completed turn, keyed by the row it renders above. */
   toggles: ReadonlyMap<string, WorkToggle>;
 }
@@ -39,6 +40,7 @@ export function foldCompletedTurns(input: {
     (head.length > 0 && continuesTurn(tail[tail.length - 1] ?? null, head[0]!));
 
   const items: StreamItem[] = [];
+  const expandedWorkItemIds = new Set<string>();
   const toggles = new Map<string, WorkToggle>();
   const turns = completedTurnFolds({
     items: tail,
@@ -73,6 +75,9 @@ export function foldCompletedTurns(input: {
     }
 
     const expanded = expandedTurnKeys.has(turnKey);
+    if (expanded) {
+      for (const item of folded) expandedWorkItemIds.add(item.id);
+    }
     const visible = expanded ? turn : turn.filter(isVisibleWhenFolded);
     // The toggle stays where the work starts, so expanding reveals the work below it.
     const anchor = expanded
@@ -82,7 +87,7 @@ export function foldCompletedTurns(input: {
     items.push(...visible);
   });
   // A subsequence of the same length is the tail itself; keep its identity for layout caches.
-  return { items: items.length === tail.length ? tail : items, toggles };
+  return { items: items.length === tail.length ? tail : items, toggles, expandedWorkItemIds };
 }
 
 const EMPTY_TURN_KEYS: ReadonlySet<string> = new Set();
@@ -153,19 +158,29 @@ export function useFoldedTail(input: {
       tail: folded.items,
       expandedTurnKeys,
       expand,
-      workToggles: { toggles: folded.toggles, onToggle, onToggleLayout },
+      workToggles: {
+        toggles: folded.toggles,
+        expandedWorkItemIds: folded.expandedWorkItemIds,
+        onToggle,
+        onToggleLayout,
+      },
     };
   }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle, onToggleLayout, expand]);
 }
 
 export interface WorkToggleContextValue {
   toggles: ReadonlyMap<string, WorkToggle>;
+  expandedWorkItemIds: ReadonlySet<string>;
   onToggle: (target: WorkToggleTarget) => void;
   onToggleLayout: (target: Required<WorkToggleTarget>) => void;
 }
 
 /** Rows read their toggle from context, so memoized history rows update when it changes. */
 export const WorkToggleContext = createContext<WorkToggleContextValue | undefined>(undefined);
+
+export function useIsExpandedWork(itemId: string): boolean {
+  return useContext(WorkToggleContext)?.expandedWorkItemIds.has(itemId) ?? false;
+}
 
 export function useWorkToggle(itemId: string | undefined) {
   const value = useContext(WorkToggleContext);

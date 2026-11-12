@@ -55,13 +55,18 @@ function fold(input: { isTurnActive?: boolean; activeTurnId?: string; expanded?:
     activeTurnId: input.activeTurnId ?? null,
     expandedTurnKeys: new Set(input.expanded),
   });
-  return { ids: folded.items.map((item) => item.id), toggles: Object.fromEntries(folded.toggles) };
+  return {
+    ids: folded.items.map((item) => item.id),
+    toggles: Object.fromEntries(folded.toggles),
+    expandedWorkIds: [...folded.expandedWorkItemIds],
+  };
 }
 
 describe("foldCompletedTurns", () => {
   it("hides work before the final message and keeps user messages", () => {
     expect(fold({})).toMatchObject({
       ids: ["p1", "steer", "final:0", "final:1", "p2", "a2"],
+      expandedWorkIds: [],
       toggles: {
         steer: { turnKey: "t1", expanded: false },
         a2: { turnKey: "t2", expanded: false },
@@ -70,9 +75,10 @@ describe("foldCompletedTurns", () => {
   });
 
   it("keeps an expanded turn whole with the toggle above its first work row", () => {
-    const { ids, toggles } = fold({ expanded: ["t1"] });
+    const { ids, toggles, expandedWorkIds } = fold({ expanded: ["t1"] });
     expect(ids.slice(0, turn1.length)).toEqual(turn1.map((item) => item.id));
     expect(toggles.w1).toMatchObject({ turnKey: "t1", expanded: true });
+    expect(expandedWorkIds).toEqual(["w1", "a1", "w2"]);
   });
 
   it("times the turn from its prompt to its last row", () => {
@@ -171,10 +177,12 @@ describe("foldCompletedTurns", () => {
   });
 
   it("never folds the active turn", () => {
-    expect(fold({ isTurnActive: true, activeTurnId: "t2" }).ids.slice(-3)).toEqual([
-      "p2",
-      "w3",
-      "a2",
-    ]);
+    const { ids, expandedWorkIds } = fold({
+      isTurnActive: true,
+      activeTurnId: "t2",
+      expanded: ["t2"],
+    });
+    expect(ids.slice(-3)).toEqual(["p2", "w3", "a2"]);
+    expect(expandedWorkIds).toEqual([]);
   });
 });

@@ -115,6 +115,7 @@ import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import {
   useFoldedTail,
+  useIsExpandedWork,
   useWorkToggle,
   WorkToggleContext,
   type WorkToggle,
@@ -1790,6 +1791,12 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
   },
+  expandedWork: {
+    marginStart: theme.spacing[1],
+    paddingStart: theme.spacing[3],
+    borderStartWidth: theme.borderWidth[1],
+    borderStartColor: theme.colors.border,
+  },
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -1930,27 +1937,34 @@ function StreamItemWrapper({
   responseMessageId,
   children,
 }: StreamItemWrapperProps) {
+  const isExpandedWork = useIsExpandedWork(itemId);
   // The toggle moves between the final message and the first work row, which take different
   // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
   const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
   const gap = isAboveWorkToggle ? 0 : gapBelow;
   // Response rows take the gap as padding inside their hover target, so the pointer stays over
   // the response between paragraphs.
-  const marginBottom = responseMessageId ? 0 : gap;
+  const workPaddingBottom = responseMessageId ? 0 : gap;
+  const marginBottom = isExpandedWork ? 0 : workPaddingBottom;
   const wrapperStyle = useMemo(
     () => [stylesheet.streamItemWrapper, { marginBottom }],
     [marginBottom],
   );
+  const expandedWorkStyle = useMemo(
+    () => [stylesheet.expandedWork, { paddingBottom: workPaddingBottom }],
+    [workPaddingBottom],
+  );
+  const content = responseMessageId ? (
+    <ResponseHoverTarget messageId={responseMessageId} paddingBottom={gap}>
+      {children}
+    </ResponseHoverTarget>
+  ) : (
+    children
+  );
   return (
     <View style={wrapperStyle}>
       <WorkToggleButton itemId={itemId} />
-      {responseMessageId ? (
-        <ResponseHoverTarget messageId={responseMessageId} paddingBottom={gap}>
-          {children}
-        </ResponseHoverTarget>
-      ) : (
-        children
-      )}
+      {isExpandedWork ? <View style={expandedWorkStyle}>{content}</View> : content}
     </View>
   );
 }
