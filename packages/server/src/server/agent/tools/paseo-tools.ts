@@ -1942,8 +1942,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         activeTurnBehavior,
         logger: childLogger,
       });
-      // A background caller observes before dispatch so a steered turn that finishes during
-      // admission still notifies. A blocking caller arms only if its wait runs out.
+      // Background callers observe before dispatch; blocking callers arm only if the wait runs out.
       const notifying = background && armFinishNotification(dispatch);
       const { disposition } = await dispatch;
 

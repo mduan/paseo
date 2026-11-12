@@ -378,9 +378,8 @@ export interface SetupFinishNotificationParams {
   callerAgentId: string;
   requireParentOwnership?: boolean;
   /**
-   * The prompt dispatch this observation is armed ahead of. Arming before dispatch keeps a
-   * turn that finishes during steering admission from going unobserved; its notifications
-   * wait for the dispatch and are dropped if it fails.
+   * Dispatch this observation is armed ahead of — catches a turn finishing during steering
+   * admission. Notifications wait for it and are dropped if it fails.
    */
   dispatch?: Promise<unknown>;
   logger: Logger;
@@ -431,9 +430,8 @@ interface NotifySafelyOptions {
   permissionRequest?: AgentPermissionRequest;
 }
 
-// A caller waits on a child through one armed observation. Arming again, such as a
-// follow-up prompt while the child still runs, joins the existing observation so the
-// child's next finish reaches the caller once, even when sends overlap or fail.
+// One observation per caller/child pair. Re-arming (e.g. a follow-up while the child runs)
+// joins it, so the next finish notifies once even when sends overlap or fail.
 const armedFinishNotifications = new WeakMap<
   AgentManager,
   Map<string, (params: SetupFinishNotificationParams) => void>
