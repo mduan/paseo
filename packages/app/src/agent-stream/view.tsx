@@ -1793,7 +1793,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   expandedWork: {
     marginStart: theme.spacing[1],
-    paddingStart: theme.spacing[3],
+    paddingStart: theme.spacing[4],
     borderStartWidth: theme.borderWidth[1],
     borderStartColor: theme.colors.border,
   },
