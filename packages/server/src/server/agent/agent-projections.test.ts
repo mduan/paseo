@@ -575,6 +575,12 @@ describe("toAssistantPreview", () => {
     );
   });
 
+  it("omits markdown separators from response previews", () => {
+    expect(toAssistantPreview("---\nFixed in abebcb42e. Dragging a sidebar tab works.")).toBe(
+      "Fixed in abebcb42e. Dragging a sidebar tab works.",
+    );
+  });
+
   it("caps the length and skips empty text", () => {
     expect(toAssistantPreview("a".repeat(1000))).toHaveLength(300);
     expect(toAssistantPreview("  \n ")).toBeUndefined();

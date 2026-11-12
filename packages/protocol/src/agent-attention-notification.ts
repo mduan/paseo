@@ -50,7 +50,7 @@ const truncateNotificationText = (text: string, limit: number): string => {
   return trimmed.length > 0 ? `${trimmed}...` : text.slice(0, limit);
 };
 
-const stripMarkdownToText = (markdown: string): string => {
+export function stripMarkdownToText(markdown: string): string {
   let text = markdown.replace(/\r\n/g, "\n");
 
   // Strip fenced code markers but keep the code content itself.
@@ -79,7 +79,7 @@ const stripMarkdownToText = (markdown: string): string => {
   text = text.replace(/<([^>\n]+)>/g, "$1");
 
   return text;
-};
+}
 
 const buildNotificationPreview = (text: string | null | undefined): string | null => {
   if (!text) {
