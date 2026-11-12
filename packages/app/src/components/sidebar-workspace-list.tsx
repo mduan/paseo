@@ -35,7 +35,7 @@ import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
 import {
   useWorkspaceSessionRows,
-  WorkspaceSessionPressContext,
+  WorkspaceSessionListContext,
   WorkspaceSessionRowList,
 } from "@/components/sidebar/workspace-session-rows";
 import { type GestureType } from "react-native-gesture-handler";
@@ -1269,9 +1269,6 @@ function WorkspaceRowInner({
         });
         return (
           <View
-            {...dragAttributes}
-            {...dragHandleProps?.listeners}
-            ref={dragHandleProps?.setActivatorNodeRef as unknown as Ref<View>}
             style={[
               styles.workspaceRowContainer,
               selected && styles.workspaceRowContainerSelected,
@@ -1281,85 +1278,90 @@ function WorkspaceRowInner({
             ]}
             {...hoverHandlers}
           >
-            {/* Scoped to the workspace row so nested session rows show their own tooltip. */}
-            <WorkspaceHoverCard
-              workspace={workspace}
-              prHint={workspace.prHint}
-              isDragging={isDragging}
-              disabled={contextMenuOpen}
+            <View
+              {...dragAttributes}
+              {...dragHandleProps?.listeners}
+              ref={dragHandleProps?.setActivatorNodeRef as unknown as Ref<View>}
             >
-              <SidebarWorkspaceContextMenu
-                contextMenuOpen={contextMenuOpen}
-                onContextMenuOpenChange={onContextMenuOpenChange}
+              <WorkspaceHoverCard
                 workspace={workspace}
-                leadingProjectName={leadingProjectName}
-                hostBadgeLabel={hostBadge?.label}
-                workspaceKey={workspace.workspaceKey}
-                onCopyPath={onCopyPath}
-                onCopyBranchName={onCopyBranchName}
-                onRename={onRename}
-                onMarkAsRead={onMarkAsRead}
-                onMarkAsUnread={onMarkAsUnread}
-                onArchive={onArchive}
-                archiveLabel={archiveLabel}
-                archiveStatus={archiveStatus}
-                archivePendingLabel={archivePendingLabel}
-                archiveShortcutKeys={archiveShortcutKeys}
-                isPinned={isPinned}
-                onTogglePin={onTogglePin}
-                openInFileManagerPath={workspace.workspaceDirectory}
-                disabled={isArchiving}
-                aria-selected={selected}
-                accessibilityRole="button"
-                accessibilityState={accessibilityState}
-                style={[
-                  workspaceRowStyle,
-                  sessions.rows.length > 0 && styles.workspaceRowWithSessions,
-                ]}
-                highlightStyle={styles.workspaceRowPressed}
-                onPressIn={handleWorkspacePressIn}
-                onTouchMove={interaction.handleTouchMove}
-                onPressOut={handleWorkspacePressOut}
-                onPress={handlePress}
-                testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
+                prHint={workspace.prHint}
+                isDragging={isDragging}
+                disabled={contextMenuOpen}
               >
-                <SidebarWorkspaceRowContent
+                <SidebarWorkspaceContextMenu
+                  contextMenuOpen={contextMenuOpen}
+                  onContextMenuOpenChange={onContextMenuOpenChange}
                   workspace={workspace}
-                  hostBadge={hostBadge}
                   leadingProjectName={leadingProjectName}
-                  leadingProjectIconDataUri={leadingProjectIconDataUri}
-                  serviceSummary={serviceSummary}
-                  backdrop={backdrop}
-                  isHovered={isHovered}
-                  isLoading={isArchiving}
-                  shortcutNumber={shortcutNumber}
-                  showShortcutBadge={showShortcutBadge}
-                  reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
-                  expandToggle={sessions.expandToggle}
+                  hostBadgeLabel={hostBadge?.label}
+                  workspaceKey={workspace.workspaceKey}
+                  onCopyPath={onCopyPath}
+                  onCopyBranchName={onCopyBranchName}
+                  onRename={onRename}
+                  onMarkAsRead={onMarkAsRead}
+                  onMarkAsUnread={onMarkAsUnread}
+                  onArchive={onArchive}
+                  archiveLabel={archiveLabel}
+                  archiveStatus={archiveStatus}
+                  archivePendingLabel={archivePendingLabel}
+                  archiveShortcutKeys={archiveShortcutKeys}
+                  isPinned={isPinned}
+                  onTogglePin={onTogglePin}
+                  openInFileManagerPath={workspace.workspaceDirectory}
+                  disabled={isArchiving}
+                  aria-selected={selected}
+                  accessibilityRole="button"
+                  accessibilityState={accessibilityState}
+                  style={[
+                    workspaceRowStyle,
+                    sessions.rows.length > 0 && styles.workspaceRowWithSessions,
+                  ]}
+                  highlightStyle={styles.workspaceRowPressed}
+                  onPressIn={handleWorkspacePressIn}
+                  onTouchMove={interaction.handleTouchMove}
+                  onPressOut={handleWorkspacePressOut}
+                  onPress={handlePress}
+                  testID={`sidebar-workspace-row-${workspace.workspaceKey}`}
                 >
-                  <WorkspaceRowRightGroup
+                  <SidebarWorkspaceRowContent
                     workspace={workspace}
+                    hostBadge={hostBadge}
+                    leadingProjectName={leadingProjectName}
+                    leadingProjectIconDataUri={leadingProjectIconDataUri}
+                    serviceSummary={serviceSummary}
                     backdrop={backdrop}
                     isHovered={isHovered}
-                    isTouchPlatform={isTouchPlatform}
-                    showShortcutBadge={showShortcutBadge}
+                    isLoading={isArchiving}
                     shortcutNumber={shortcutNumber}
-                    archiveLabel={archiveLabel}
-                    archiveStatus={archiveStatus}
-                    archivePendingLabel={archivePendingLabel}
-                    archiveShortcutKeys={archiveShortcutKeys}
-                    onArchive={onArchive}
-                    onCopyBranchName={onCopyBranchName}
-                    onCopyPath={onCopyPath}
-                    onRename={onRename}
-                    onMarkAsRead={onMarkAsRead}
-                    onMarkAsUnread={onMarkAsUnread}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                </SidebarWorkspaceRowContent>
-              </SidebarWorkspaceContextMenu>
-            </WorkspaceHoverCard>
+                    showShortcutBadge={showShortcutBadge}
+                    reserveIdleStatusIndicatorSpace={reserveIdleStatusIndicatorSpace}
+                    expandToggle={sessions.expandToggle}
+                  >
+                    <WorkspaceRowRightGroup
+                      workspace={workspace}
+                      backdrop={backdrop}
+                      isHovered={isHovered}
+                      isTouchPlatform={isTouchPlatform}
+                      showShortcutBadge={showShortcutBadge}
+                      shortcutNumber={shortcutNumber}
+                      archiveLabel={archiveLabel}
+                      archiveStatus={archiveStatus}
+                      archivePendingLabel={archivePendingLabel}
+                      archiveShortcutKeys={archiveShortcutKeys}
+                      onArchive={onArchive}
+                      onCopyBranchName={onCopyBranchName}
+                      onCopyPath={onCopyPath}
+                      onRename={onRename}
+                      onMarkAsRead={onMarkAsRead}
+                      onMarkAsUnread={onMarkAsUnread}
+                      isPinned={isPinned}
+                      onTogglePin={onTogglePin}
+                    />
+                  </SidebarWorkspaceRowContent>
+                </SidebarWorkspaceContextMenu>
+              </WorkspaceHoverCard>
+            </View>
             <WorkspaceSessionRowList
               workspace={workspace}
               sessions={sessions}
@@ -2221,10 +2223,19 @@ export function SidebarWorkspaceList({
       />
     );
 
+  const sessionListContext = useMemo(
+    () => ({
+      onPress: onWorkspacePress,
+      simultaneousGestureRef: parentGestureRef,
+      gestureHostPresented: dragGestureHostActive,
+    }),
+    [onWorkspacePress, parentGestureRef, dragGestureHostActive],
+  );
+
   return (
-    <WorkspaceSessionPressContext.Provider value={onWorkspacePress}>
+    <WorkspaceSessionListContext.Provider value={sessionListContext}>
       {content}
-    </WorkspaceSessionPressContext.Provider>
+    </WorkspaceSessionListContext.Provider>
   );
 }
 

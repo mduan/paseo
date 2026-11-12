@@ -1,3 +1,12 @@
+import {
+  DraggableList,
+  type DraggableListProps,
+  type DraggableRenderItemInfo,
+} from "@/components/draggable-list";
+import type { DraggableListDragHandleProps } from "@/components/draggable-list.types";
+import { applyStoredOrdering } from "@/hooks/sidebar-workspaces-view-model";
+import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
+import { mergeWithRemainder } from "@/utils/sidebar-reorder";
 import { useMarkAgentUnread } from "@/hooks/use-mark-agent-unread";
 import { ConversationTitleTarget } from "@getpaseo/protocol/messages";
 import { useAiRename } from "@/workspace/ai-rename/use-ai-rename";
@@ -7,6 +16,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
 } from "react";
@@ -89,11 +99,19 @@ export interface WorkspaceSessionRows {
   showsFocusedRow: boolean;
 }
 
-/** Runs before a nested row navigates; the mobile sidebar uses it to close itself. */
-export const WorkspaceSessionPressContext = createContext<(() => void) | undefined>(undefined);
+type WorkspaceSessionListContextValue = Pick<
+  DraggableListProps<WorkspaceSessionRow>,
+  "simultaneousGestureRef" | "gestureHostPresented"
+> & { onPress?: () => void };
+
+export const WorkspaceSessionListContext = createContext<WorkspaceSessionListContextValue>({});
 
 const EMPTY_TABS: WorkspaceTab[] = [];
 const EMPTY_IDS: string[] = [];
+
+function sessionRowKey(row: WorkspaceSessionRow): string {
+  return row.key;
+}
 
 export function useWorkspaceSessionRows(workspace: SidebarWorkspaceEntry): WorkspaceSessionRows {
   const { serverId, workspaceId, workspaceDirectory } = workspace;
@@ -188,9 +206,17 @@ export function useWorkspaceSessionRows(workspace: SidebarWorkspaceEntry): Works
     });
   }, [terminals, workspace.scripts]);
 
+  const storedOrder = useSidebarOrderStore(
+    (state) => state.sessionOrderByWorkspace[layoutKey] ?? EMPTY_IDS,
+  );
   const rows = useMemo(
-    () => orderWorkspaceSessions({ tabs, agentIds, terminalIds, kinds }),
-    [tabs, agentIds, terminalIds, kinds],
+    () =>
+      applyStoredOrdering({
+        items: orderWorkspaceSessions({ tabs, agentIds, terminalIds, kinds }),
+        storedOrder,
+        getKey: sessionRowKey,
+      }),
+    [tabs, agentIds, terminalIds, kinds, storedOrder],
   );
   const onToggle = useCallback(
     () => toggleWorkspaceCollapsed(layoutKey),
@@ -228,18 +254,49 @@ export const WorkspaceSessionRowList = memo(function WorkspaceSessionRowList({
   sessions: WorkspaceSessionRows;
   workspaceSelected: boolean;
 }) {
+  const { simultaneousGestureRef, gestureHostPresented } = useContext(WorkspaceSessionListContext);
+  const handleDragEnd = useCallback(
+    (rows: WorkspaceSessionRow[]) => {
+      const store = useSidebarOrderStore.getState();
+      store.setSessionOrder(
+        workspace.workspaceKey,
+        mergeWithRemainder({
+          currentOrder: store.sessionOrderByWorkspace[workspace.workspaceKey] ?? EMPTY_IDS,
+          reorderedVisibleKeys: rows.map(sessionRowKey),
+        }),
+      );
+    },
+    [workspace.workspaceKey],
+  );
+  const renderRow = useCallback(
+    ({ item, drag, isActive, dragHandleProps }: DraggableRenderItemInfo<WorkspaceSessionRow>) => (
+      <WorkspaceSessionRowItem
+        row={item}
+        serverId={workspace.serverId}
+        workspaceId={workspace.workspaceId}
+        selected={workspaceSelected && item.tabId !== null && item.tabId === sessions.focusedTabId}
+        drag={drag}
+        isDragging={isActive}
+        dragHandleProps={dragHandleProps}
+      />
+    ),
+    [workspace.serverId, workspace.workspaceId, workspaceSelected, sessions.focusedTabId],
+  );
   if (sessions.rows.length === 0) return null;
   return (
     <View style={styles.list} testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}>
-      {sessions.rows.map((row) => (
-        <WorkspaceSessionRowItem
-          key={row.key}
-          row={row}
-          serverId={workspace.serverId}
-          workspaceId={workspace.workspaceId}
-          selected={workspaceSelected && row.tabId !== null && row.tabId === sessions.focusedTabId}
-        />
-      ))}
+      <DraggableList
+        data={sessions.rows}
+        keyExtractor={sessionRowKey}
+        renderItem={renderRow}
+        onDragEnd={handleDragEnd}
+        scrollEnabled={false}
+        useDragHandle
+        nestable={isNative}
+        simultaneousGestureRef={simultaneousGestureRef}
+        gestureHostPresented={gestureHostPresented}
+        extraData={sessions.focusedTabId}
+      />
     </View>
   );
 });
@@ -249,11 +306,17 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
   serverId,
   workspaceId,
   selected,
+  drag,
+  isDragging,
+  dragHandleProps,
 }: {
   row: WorkspaceSessionRow;
   serverId: string;
   workspaceId: string;
   selected: boolean;
+  drag: () => void;
+  isDragging: boolean;
+  dragHandleProps?: DraggableListDragHandleProps;
 }) {
   const { t } = useTranslation();
   const tab = useMemo<WorkspaceTabDescriptor>(
@@ -265,8 +328,17 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
     }),
     [row],
   );
-  const onSessionPress = useContext(WorkspaceSessionPressContext);
+  const { onPress: onSessionPress } = useContext(WorkspaceSessionListContext);
+  const didDragRef = useRef(false);
+  const handlePressIn = useCallback(() => {
+    didDragRef.current = false;
+  }, []);
+  const handleLongPress = useCallback(() => {
+    didDragRef.current = true;
+    drag();
+  }, [drag]);
   const handlePress = useCallback(() => {
+    if (didDragRef.current) return;
     onSessionPress?.();
     navigateToWorkspace({ serverId, workspaceId, target: row.target });
   }, [onSessionPress, row.target, serverId, workspaceId]);
@@ -297,10 +369,16 @@ const WorkspaceSessionRowItem = memo(function WorkspaceSessionRowItem({
           row={row}
           serverId={serverId}
           presentation={presentation}
+          isDragging={isDragging}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
         >
           <Pressable
+            {...dragHandleProps?.attributes}
+            {...dragHandleProps?.listeners}
+            ref={dragHandleProps?.setActivatorNodeRef}
+            onPressIn={handlePressIn}
+            onLongPress={isNative ? handleLongPress : undefined}
             onPress={handlePress}
             style={pressableStyle}
             accessibilityRole="button"
@@ -364,6 +442,7 @@ function SessionRowHoverTarget({
   row,
   serverId,
   presentation,
+  isDragging,
   onPointerEnter,
   onPointerLeave,
   children,
@@ -371,6 +450,7 @@ function SessionRowHoverTarget({
   row: WorkspaceSessionRow;
   serverId: string;
   presentation: WorkspaceTabPresentation;
+  isDragging: boolean;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   children: ReactElement;
@@ -384,7 +464,12 @@ function SessionRowHoverTarget({
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
-      <Tooltip delayDuration={300} enabledOnDesktop={!open} enabledOnMobile={false} interactive>
+      <Tooltip
+        delayDuration={300}
+        enabledOnDesktop={!open && !isDragging}
+        enabledOnMobile={false}
+        interactive
+      >
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
           testID={`sidebar-workspace-session-tooltip-${row.key}`}

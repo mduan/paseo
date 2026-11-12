@@ -110,3 +110,48 @@ test("projects, workspaces, and pinned chats reorder with an immediate mouse dra
     await secondProject.cleanup();
   }
 });
+
+test("dragging a sidebar tab reorders tabs without moving its workspace", async ({ page }) => {
+  const workspace = await seedWorkspace({ repoPrefix: "sidebar-tab-reorder-" });
+  try {
+    const secondWorkspace = await workspace.client.createWorkspace({
+      source: { kind: "directory", path: workspace.repoPath, projectId: workspace.projectId },
+      title: "Other workspace",
+    });
+    if (!secondWorkspace.workspace) throw new Error("Failed to seed second workspace");
+    for (const title of ["First tab", "Second tab"]) {
+      await workspace.client.createAgent({
+        provider: "mock",
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title,
+        modeId: "load-test",
+        model: "e2e-fast-stream",
+      });
+    }
+    await gotoAppShell(page);
+    await waitForSidebarHydration(page);
+    const sessions = page.getByTestId(
+      `sidebar-workspace-sessions-${getServerId()}:${workspace.workspaceId}`,
+    );
+    const rows = sessions.locator('[data-testid^="sidebar-workspace-session-agent:"]');
+    await expect(rows).toHaveCount(2);
+    const before = await rowTestIds(rows);
+    const workspaces = page.locator('[data-testid^="sidebar-workspace-row-"]');
+    const workspaceOrder = await rowTestIds(workspaces);
+    const source = await visibleBoundingBox(rows.nth(0));
+    const target = await visibleBoundingBox(rows.nth(1));
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => rowTestIds(rows)).toEqual([before[1], before[0]]);
+    await expect.poll(() => rowTestIds(workspaces)).toEqual(workspaceOrder);
+    await page.reload();
+    await waitForSidebarHydration(page);
+    await expect.poll(() => rowTestIds(rows)).toEqual([before[1], before[0]]);
+    await expect.poll(() => rowTestIds(workspaces)).toEqual(workspaceOrder);
+  } finally {
+    await workspace.cleanup();
+  }
+});

@@ -8,6 +8,8 @@ interface SidebarOrderStoreState {
   projectOrder: string[];
   pinnedWorkspaceOrder: string[];
   workspaceOrderByProject: Record<string, string[]>;
+  sessionOrderByWorkspace: Record<string, string[]>;
+  setSessionOrder: (workspaceKey: string, keys: string[]) => void;
   getProjectOrder: () => string[];
   setProjectOrder: (keys: string[]) => void;
   getPinnedWorkspaceOrder: () => string[];
@@ -20,6 +22,7 @@ interface SidebarOrderPersistedState {
   projectOrder?: string[];
   pinnedWorkspaceOrder?: string[];
   workspaceOrderByProject?: Record<string, string[]>;
+  sessionOrderByWorkspace?: Record<string, string[]>;
   projectOrderByServerId?: Record<string, string[]>;
   workspaceOrderByServerAndProject?: Record<string, string[]>;
 }
@@ -29,6 +32,7 @@ const SidebarOrderPersistedStateSchema = z.strictObject({
   projectOrder: z.array(z.string()).optional(),
   pinnedWorkspaceOrder: z.array(z.string()).optional(),
   workspaceOrderByProject: StringArrayRecordSchema.optional(),
+  sessionOrderByWorkspace: StringArrayRecordSchema.optional(),
   projectOrderByServerId: StringArrayRecordSchema.optional(),
   workspaceOrderByServerAndProject: StringArrayRecordSchema.optional(),
 });
@@ -156,6 +160,15 @@ export const useSidebarOrderStore = create<SidebarOrderStoreState>()(
       projectOrder: [],
       pinnedWorkspaceOrder: [],
       workspaceOrderByProject: {},
+      sessionOrderByWorkspace: {},
+      setSessionOrder: (workspaceKey, keys) => {
+        set((state) => ({
+          sessionOrderByWorkspace: {
+            ...state.sessionOrderByWorkspace,
+            [workspaceKey]: dedupeKeys(keys),
+          },
+        }));
+      },
       getProjectOrder: () => get().projectOrder,
       setProjectOrder: (keys) => {
         set({ projectOrder: dedupeKeys(keys) });
@@ -185,6 +198,7 @@ export const useSidebarOrderStore = create<SidebarOrderStoreState>()(
         projectOrder: state.projectOrder,
         pinnedWorkspaceOrder: state.pinnedWorkspaceOrder,
         workspaceOrderByProject: state.workspaceOrderByProject,
+        sessionOrderByWorkspace: state.sessionOrderByWorkspace,
       }),
       version: 1,
       migrate: migrateSidebarOrderState,
