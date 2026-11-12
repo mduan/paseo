@@ -378,13 +378,15 @@ export function buildSidebarWorkspaceEntries(input: {
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   previousEntries?: ReadonlyMap<string, SidebarWorkspaceEntry>;
   portsFeatures?: ReadonlyMap<string, boolean>;
-}): Map<string, SidebarWorkspaceEntry> {
+}): ReadonlyMap<string, SidebarWorkspaceEntry> {
   if (input.placements.length === 0 || input.sessions.length === 0) {
     return new Map();
   }
 
   const sessionByServerId = new Map(input.sessions.map((session) => [session.serverId, session]));
   const entries = new Map<string, SidebarWorkspaceEntry>();
+  const previousKeys = input.previousEntries?.keys();
+  let unchanged = true;
 
   for (const placement of input.placements) {
     const session = sessionByServerId.get(placement.serverId);
@@ -405,15 +407,22 @@ export function buildSidebarWorkspaceEntries(input: {
       supportsPorts: input.portsFeatures?.get(placement.serverId),
     });
     const previousEntry = input.previousEntries?.get(placement.workspaceKey);
-    entries.set(
-      placement.workspaceKey,
+    const nextEntry =
       previousEntry && areSidebarWorkspaceEntriesEqual(previousEntry, entry)
         ? previousEntry
-        : entry,
-    );
+        : entry;
+    entries.set(placement.workspaceKey, nextEntry);
+    unchanged =
+      unchanged &&
+      previousKeys?.next().value === placement.workspaceKey &&
+      previousEntry === nextEntry;
   }
 
-  return entries;
+  // Reopening a retained sidebar must not invalidate downstream project and
+  // filter projections when no entry changed while it was hidden.
+  return unchanged && input.previousEntries?.size === entries.size
+    ? input.previousEntries
+    : entries;
 }
 
 function areSidebarWorkspaceEntriesEqual(

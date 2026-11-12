@@ -480,6 +480,72 @@ describe("shared sidebar workspace model", () => {
     expect(model.projectNamesByViewKey).toEqual(new Map([["getpaseo/paseo", "getpaseo/paseo"]]));
   });
 
+  it("reuses the entry collection only while keys, order and entries are unchanged", () => {
+    const model = buildSidebarWorkspacePlacementModel({
+      projects: [project({ projectKey: "project", workspaceKeys: ["srv:one", "srv:two"] })],
+    });
+    const one = {
+      ...workspace({ id: "one", name: "one", projectId: "project", projectDisplayName: "project" }),
+      ports: [{ workspaceId: "one", host: "127.0.0.1", port: 3000 }],
+    };
+    const two = workspace({
+      id: "two",
+      name: "two",
+      projectId: "project",
+      projectDisplayName: "project",
+    });
+    const sessions = [
+      {
+        serverId: "srv",
+        workspaceAgentActivity: new Map(),
+        workspaces: new Map([
+          ["one", one],
+          ["two", two],
+        ]),
+      },
+    ];
+    const portsFeatures = new Map([["srv", true]]);
+    const previousEntries = buildSidebarWorkspaceEntries({
+      placements: model.workspaces,
+      sessions,
+      portsFeatures,
+    });
+
+    expect(
+      buildSidebarWorkspaceEntries({
+        placements: model.workspaces,
+        sessions,
+        portsFeatures,
+        previousEntries,
+      }),
+    ).toBe(previousEntries);
+
+    const reordered = buildSidebarWorkspaceEntries({
+      placements: model.workspaces.toReversed(),
+      sessions,
+      portsFeatures,
+      previousEntries,
+    });
+    expect([...reordered.keys()]).toEqual(["srv:two", "srv:one"]);
+
+    const removed = buildSidebarWorkspaceEntries({
+      placements: model.workspaces.slice(0, 1),
+      sessions,
+      portsFeatures,
+      previousEntries,
+    });
+    expect([...removed.keys()]).toEqual(["srv:one"]);
+
+    const portsDisabled = buildSidebarWorkspaceEntries({
+      placements: model.workspaces,
+      sessions,
+      portsFeatures: new Map([["srv", false]]),
+      previousEntries,
+    });
+    expect(portsDisabled).not.toBe(previousEntries);
+    expect(portsDisabled.get("srv:one")?.ports).toBeUndefined();
+  });
+
   it("preserves unchanged row identities when another workspace updates", () => {
     const model = buildSidebarWorkspacePlacementModel({
       projects: [project({ projectKey: "project", workspaceKeys: ["srv:one", "srv:two"] })],
