@@ -1,3 +1,4 @@
+import { stripMarkdownToText } from "@getpaseo/protocol/agent-attention-notification";
 import type {
   AgentListItemPayload,
   AgentSnapshotPayload,
@@ -528,13 +529,8 @@ function sanitizeRuntimeInfo(
 
 const ASSISTANT_PREVIEW_MAX_LENGTH = 300;
 
-// ponytail: drops only inline markdown markers; a preview of a table or code block still reads raw.
 export function toAssistantPreview(text: string): string | undefined {
-  const plain = text
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
-    .replace(/[`*]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const plain = stripMarkdownToText(text).replace(/\s+/g, " ").trim();
   if (!plain) return undefined;
   return plain.length > ASSISTANT_PREVIEW_MAX_LENGTH
     ? `${plain.slice(0, ASSISTANT_PREVIEW_MAX_LENGTH - 1)}…`
