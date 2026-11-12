@@ -109,6 +109,8 @@ const PersistedWorkspaceRecordSchema = z.object({
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
   linearIssues: z.array(LinearIssueSchema).optional(),
+  // When a person last prompted an agent here from a client; see `recordHumanPrompt`.
+  lastHumanPromptAt: z.string().optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
 });
 

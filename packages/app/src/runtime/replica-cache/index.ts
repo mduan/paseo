@@ -327,6 +327,10 @@ const StoredWorkspaceSchema = z.strictObject({
   name: z.string(),
   title: z.string().nullable(),
   pinnedAt: z.string().nullable(),
+  // Optional for entries written before the sort times existed. Like labels below, a cached
+  // workspace that dropped them would keep its wrong place: reconnect sends nothing newer.
+  createdAt: z.string().optional(),
+  lastHumanPromptAt: z.string().nullable().optional(),
   // Optional because entries written before labels existed have none. A cached workspace that
   // dropped them painted its row without its chips and stayed that way: the directory cursor is
   // current on reconnect, so the daemon has nothing newer to send back.
@@ -740,6 +744,8 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     name: workspace.name,
     title: workspace.title ?? null,
     pinnedAt: workspace.pinnedAt ?? null,
+    createdAt: workspace.createdAt,
+    lastHumanPromptAt: workspace.lastHumanPromptAt,
     labels: workspace.labels,
     linearIssues: workspace.linearIssues,
     status: workspace.status,

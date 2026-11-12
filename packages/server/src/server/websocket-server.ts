@@ -1871,6 +1871,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceSetupRun: true,
         workspaceLinearIssues: true,
         workspaceMetadataRefresh: true,
+        // COMPAT(workspaceSortTimes): added in v0.11.0-fork.35, remove gate after 2027-05-11.
+        workspaceSortTimes: true,
         linearIntegration: true,
         // COMPAT(turnDiffs): added in v0.11.0, remove gate after 2027-10-03.
         turnDiffs: true,

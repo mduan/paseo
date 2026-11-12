@@ -4113,6 +4113,43 @@ export class Session {
   }
 
   /**
+   * Stamps `lastHumanPromptAt`, which the sidebar's Last prompt sort reads. Only prompts a
+   * client sends call this, so schedules, loops, and agent tool calls never move a workspace.
+   * Callers stamp before dispatch so the agent update the prompt causes carries the new time.
+   */
+  private async recordHumanPrompt(input: {
+    agentId?: string;
+    workspaceId?: string;
+  }): Promise<void> {
+    try {
+      const workspaceId =
+        input.workspaceId ??
+        (input.agentId
+          ? (this.agentManager.getAgent(input.agentId)?.workspaceId ??
+            (await this.agentStorage.get(input.agentId))?.workspaceId)
+          : undefined);
+      if (!workspaceId) return;
+      const lastHumanPromptAt = new Date().toISOString();
+      await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        lastHumanPromptAt,
+      }));
+    } catch (error) {
+      // Sort metadata must never fail the prompt it describes.
+      this.sessionLogger.warn({ err: error, ...input }, "session: failed to record human prompt");
+    }
+  }
+
+  /** A caller agent creating a child is automation, not a person prompting. */
+  private async recordCreationPrompt(
+    msg: CreateAgentRequestMessage,
+    workspaceId: string,
+  ): Promise<void> {
+    if (msg.callerAgentId || !hasInitialCreationPrompt(msg)) return;
+    await this.recordHumanPrompt({ workspaceId });
+  }
+
+  /**
    * Handle text message to agent (with optional image attachments)
    */
   private async handleSendAgentMessage(
@@ -4142,6 +4179,7 @@ export class Session {
 
     const promptText = options?.spokenInput ? wrapSpokenInput(text) : text;
     const prompt = buildAgentPrompt(promptText, images, attachments);
+    await this.recordHumanPrompt({ agentId });
 
     try {
       await sendPromptToAgent({
@@ -4547,6 +4585,7 @@ export class Session {
         throw new Error(`Working directory does not exist or is not a directory: ${resolvedCwd}`);
       }
 
+      await this.recordCreationPrompt(msg, resolvedIntent.intent.workspaceId);
       const { snapshot, liveSnapshot } = await createAgentCommand(
         {
           agentManager: this.agentManager,
@@ -5929,6 +5968,8 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
+      createdAt: workspace.createdAt,
+      lastHumanPromptAt: workspace.lastHumanPromptAt,
       linearIssues: await this.linearIntegration.resolve(workspace.linearIssues),
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       archivingAt: null,
@@ -6032,6 +6073,7 @@ export class Session {
       }),
       title: result.workspace.title,
       pinnedAt: result.workspace.pinnedAt,
+      createdAt: result.workspace.createdAt,
       ...(result.workspace.labels && result.workspace.labels.length > 0
         ? { labels: result.workspace.labels }
         : {}),
@@ -8697,6 +8739,7 @@ export class Session {
         "agent.session.send_agent_message",
       );
       const send = async () => {
+        await this.recordHumanPrompt({ agentId });
         const result = await sendPromptToAgent({
           agentManager: this.agentManager,
           agentStorage: this.agentStorage,

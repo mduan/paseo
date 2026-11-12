@@ -17,9 +17,11 @@ import {
   selectWorkspaceOrderByScope,
   selectWorkspaceStatusesForBadges,
   selectWorkspaceStructureProjects,
+  selectWorkspaceTimeOrderByScope,
   workspaceEqualityFns,
   type SidebarOrderSnapshot,
 } from "./selectors";
+import { SidebarSortMode } from "@/stores/sidebar-view-store";
 import {
   useSessionStore,
   type ProjectDescriptor,
@@ -503,6 +505,59 @@ describe("workspace structure composition", () => {
       projectViewKey("project-a"),
     ]);
     expect(after).not.toEqual(before);
+  });
+});
+
+describe("selectWorkspaceTimeOrderByScope", () => {
+  function timedWorkspace(
+    id: string,
+    createdAt: string,
+    lastHumanPromptAt: string | null = null,
+  ): WorkspaceDescriptor {
+    return { ...createWorkspace({ id }), createdAt, lastHumanPromptAt };
+  }
+
+  const workspaces = [
+    timedWorkspace("oldest", "2026-01-01T00:00:00.000Z", "2026-03-01T00:00:00.000Z"),
+    timedWorkspace("newest", "2026-02-01T00:00:00.000Z"),
+    timedWorkspace("middle", "2026-01-15T00:00:00.000Z", "2026-01-20T00:00:00.000Z"),
+  ];
+  function snapshot(features: { workspaceSortTimes?: boolean }) {
+    return {
+      sessions: {
+        [SERVER_ID]: {
+          workspaces: new Map(workspaces.map((workspace) => [workspace.id, workspace])),
+          serverInfo: { serverId: SERVER_ID, hostname: null, version: null, features },
+        },
+      },
+    };
+  }
+  const keys = (ids: string[]) => ids.map((id) => `${SERVER_ID}:${id}`);
+
+  it("orders by creation, newest first", () => {
+    expect(
+      selectWorkspaceTimeOrderByScope(
+        snapshot({ workspaceSortTimes: true }),
+        [SERVER_ID],
+        SidebarSortMode.Created,
+      ),
+    ).toEqual({ [projectViewKey("project-1")]: keys(["newest", "middle", "oldest"]) });
+  });
+
+  it("orders by latest human prompt, falling back to creation for unprompted workspaces", () => {
+    expect(
+      selectWorkspaceTimeOrderByScope(
+        snapshot({ workspaceSortTimes: true }),
+        [SERVER_ID],
+        SidebarSortMode.LastPrompt,
+      ),
+    ).toEqual({ [projectViewKey("project-1")]: keys(["oldest", "newest", "middle"]) });
+  });
+
+  it("leaves hosts without workspaceSortTimes on their manual order", () => {
+    expect(
+      selectWorkspaceTimeOrderByScope(snapshot({}), [SERVER_ID], SidebarSortMode.Created),
+    ).toEqual({});
   });
 });
 

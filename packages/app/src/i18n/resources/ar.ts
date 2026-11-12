@@ -1219,6 +1219,12 @@ export const ar: TranslationResources = {
         status: "الحالة",
         labels: "التسميات",
       },
+      sort: {
+        label: "الترتيب",
+        created: "تاريخ الإنشاء",
+        lastPrompt: "آخر طلب",
+        manual: "يدوي",
+      },
       titleSource: {
         label: "العنوان",
         title: "العنوان",
