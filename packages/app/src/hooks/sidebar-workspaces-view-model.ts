@@ -386,7 +386,7 @@ export function buildSidebarWorkspaceEntries(input: {
   const sessionByServerId = new Map(input.sessions.map((session) => [session.serverId, session]));
   const entries = new Map<string, SidebarWorkspaceEntry>();
   const previousKeys = input.previousEntries?.keys();
-  let unchanged = input.previousEntries !== undefined;
+  let unchanged = true;
 
   for (const placement of input.placements) {
     const session = sessionByServerId.get(placement.serverId);
