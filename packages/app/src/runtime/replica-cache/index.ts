@@ -327,8 +327,7 @@ const StoredWorkspaceSchema = z.strictObject({
   name: z.string(),
   title: z.string().nullable(),
   pinnedAt: z.string().nullable(),
-  // Optional for entries written before the sort times existed. Like labels below, a cached
-  // workspace that dropped them would keep its wrong place: reconnect sends nothing newer.
+  // Persisted like labels below — reconnect sends nothing newer, so a dropped time would stick.
   createdAt: z.string().optional(),
   lastHumanPromptAt: z.string().nullable().optional(),
   // Optional because entries written before labels existed have none. A cached workspace that

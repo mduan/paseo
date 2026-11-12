@@ -247,12 +247,9 @@ export function selectProjectIdForServer(
 const EMPTY_WORKSPACE_ORDER_BY_SCOPE: Record<string, string[]> = {};
 
 /**
- * Workspace order per project for the timestamp sort modes, newest first, in the same shape as
- * the manual `workspaceOrderByProject` it overrides. Hosts without `workspaceSortTimes` are left
- * out, so their projects keep the manual order. Manual mode returns nothing to override with.
- *
- * Recomputes only when a selected host's workspaces or server info change. Callers compare the
- * result deeply, so a prompt that does not move a workspace re-renders nothing.
+ * Timestamp-sort workspace order per project, newest first, shaped like the manual
+ * `workspaceOrderByProject` it overrides. Hosts without `workspaceSortTimes` are omitted so they
+ * keep the manual order. Recomputes only when a host's workspaces or server info change.
  */
 export function createWorkspaceTimeOrderSelector(
   serverIds: readonly string[],

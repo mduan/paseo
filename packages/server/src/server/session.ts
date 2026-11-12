@@ -4113,9 +4113,8 @@ export class Session {
   }
 
   /**
-   * Stamps `lastHumanPromptAt`, which the sidebar's Last prompt sort reads. Only prompts a
-   * client sends call this, so schedules, loops, and agent tool calls never move a workspace.
-   * Callers stamp before dispatch so the agent update the prompt causes carries the new time.
+   * Stamps `lastHumanPromptAt`. Call only for client-sent prompts, and before dispatch — the agent
+   * update the prompt causes is what carries the new time to every session.
    */
   private async recordHumanPrompt(input: {
     agentId?: string;

@@ -138,8 +138,7 @@ export function useWorkspaceStructure(serverIds: string[]): WorkspaceStructure {
       composeWorkspaceStructure({
         projects,
         projectOrder,
-        // A timestamp sort overrides the manual order without touching it, so switching back to
-        // Manual restores the saved arrangement.
+        // Overrides without writing the manual order, so Manual restores the saved arrangement.
         workspaceOrderByScope: { ...manualWorkspaceOrderByScope, ...timeWorkspaceOrderByScope },
       }),
     [manualWorkspaceOrderByScope, projectOrder, projects, timeWorkspaceOrderByScope],
