@@ -377,8 +377,21 @@ export interface SetupFinishNotificationParams {
   childAgentId: string;
   callerAgentId: string;
   requireParentOwnership?: boolean;
+  /**
+   * Dispatch this observation is armed ahead of — catches a turn finishing during steering
+   * admission. Notifications wait for it and are dropped if it fails.
+   */
+  dispatch?: Promise<unknown>;
+  /** How the armed prompt meets a running turn; a steer can be answered after that turn ends. */
+  activeTurnBehavior?: ActiveTurnBehavior;
   logger: Logger;
 }
+
+/**
+ * Claude answers a steer that arrives after its last tool call in a follow-up turn, started
+ * once the steered turn ends. Keep observing that long so the follow-up's finish is reported.
+ */
+const STEER_FOLLOW_UP_WINDOW_MS = 10_000;
 
 type FinishNotificationReason = "finished" | "errored" | "needs permission" | "was closed";
 
@@ -390,6 +403,7 @@ interface FinishNotificationBodyInput {
   reason: FinishNotificationReason;
   lastAssistantMessage: string | null;
   permissionRequest?: AgentPermissionRequest;
+  followUpPossible?: boolean;
 }
 
 function formatFinishNotificationBody(params: FinishNotificationBodyInput): string {
@@ -417,53 +431,103 @@ function formatFinishNotificationBody(params: FinishNotificationBodyInput): stri
     }
     sections.push(`<agent-response>\n${lastAssistantMessage}\n</agent-response>`);
   }
+  if (params.followUpPossible) {
+    sections.push(
+      "If this response does not answer the message you steered into this agent's turn, the agent may still be answering it. A follow-up report will arrive when it finishes.",
+    );
+  }
   return sections.join("\n\n");
 }
 
 interface NotifySafelyOptions {
   terminal?: boolean;
   permissionRequest?: AgentPermissionRequest;
+  followUpPossible?: boolean;
 }
 
-// A caller waits on a child through one armed notification. Arming again, such as a
-// follow-up prompt while the child still runs, replaces the earlier one so the child's
-// next finish reaches the caller once.
-const armedFinishNotifications = new WeakMap<AgentManager, Map<string, () => void>>();
+// One observation per caller/child pair. Re-arming (e.g. a follow-up while the child runs)
+// joins it, so the next finish notifies once even when sends overlap or fail.
+const armedFinishNotifications = new WeakMap<
+  AgentManager,
+  Map<string, (params: SetupFinishNotificationParams) => void>
+>();
 
 export function setupFinishNotification(params: SetupFinishNotificationParams): void {
-  const {
-    agentManager,
-    agentStorage,
-    childAgentId,
-    callerAgentId,
-    requireParentOwnership = false,
-    logger,
-  } = params;
+  const { agentManager, agentStorage, childAgentId, callerAgentId, logger } = params;
+  const armedByManager = armedFinishNotifications.get(agentManager) ?? new Map();
+  armedFinishNotifications.set(agentManager, armedByManager);
+  const armedKey = JSON.stringify([childAgentId, callerAgentId]);
+  const armed = armedByManager.get(armedKey);
+  if (armed) {
+    armed(params);
+    return;
+  }
+  armedByManager.set(armedKey, arm);
+
   let hasSeenRunning = false;
   let stopped = false;
   const notifiedPermissionRequestIds = new Set<string>();
   let unsubscribe: (() => void) | null = null;
   let notificationQueue = Promise.resolve();
+  let requireParentOwnership = false;
+  // Accepted once any arming is not tied to a dispatch, or any tracked dispatch succeeds.
+  let accepted = false;
+  let steeredIntoRunningTurn = false;
+  let followUpWindow: ReturnType<typeof setTimeout> | undefined;
+  const dispatches: Promise<unknown>[] = [];
+  arm(params);
 
-  const armedByManager = armedFinishNotifications.get(agentManager) ?? new Map();
-  armedFinishNotifications.set(agentManager, armedByManager);
-  const armedKey = JSON.stringify([childAgentId, callerAgentId]);
-  armedByManager.get(armedKey)?.();
-  armedByManager.set(armedKey, stop);
+  function arm(next: SetupFinishNotificationParams): void {
+    requireParentOwnership = next.requireParentOwnership ?? false;
+    if (
+      next.activeTurnBehavior === "steer" &&
+      agentManager.getAgent(childAgentId)?.lifecycle === "running"
+    ) {
+      steeredIntoRunningTurn = true;
+    }
+    const { dispatch } = next;
+    if (!dispatch) {
+      accepted = true;
+      return;
+    }
+    dispatches.push(dispatch);
+    void (async () => {
+      if (!(await dispatchAccepted())) stop();
+    })();
+  }
+
+  /** Resolves once a tracked dispatch succeeds, or false when every one has failed. */
+  async function dispatchAccepted(): Promise<boolean> {
+    let tracked = 0;
+    while (!accepted && tracked < dispatches.length) {
+      tracked = dispatches.length;
+      if (
+        await Promise.any(dispatches).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        accepted = true;
+      }
+    }
+    return accepted;
+  }
 
   function stop(): void {
     if (stopped) return;
     stopped = true;
+    clearTimeout(followUpWindow);
     unsubscribe?.();
-    if (armedByManager.get(armedKey) === stop) {
-      armedByManager.delete(armedKey);
-    }
+    armedByManager.delete(armedKey);
   }
 
   async function notify(
     reason: FinishNotificationReason,
-    permissionRequest?: AgentPermissionRequest,
+    options: NotifySafelyOptions,
   ): Promise<void> {
+    if (!(await dispatchAccepted())) {
+      return;
+    }
     const callerRecord = await agentStorage.get(callerAgentId);
     if (callerRecord?.archivedAt) {
       return;
@@ -480,7 +544,8 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
       title,
       reason,
       lastAssistantMessage,
-      permissionRequest,
+      permissionRequest: options.permissionRequest,
+      followUpPossible: options.followUpPossible,
     });
 
     await sendPromptToAgent({
@@ -498,13 +563,25 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     if (stopped) return;
     if (options.terminal ?? true) stop();
     notificationQueue = notificationQueue
-      .then(() => notify(reason, options.permissionRequest))
+      .then(() => notify(reason, options))
       .catch((error) => {
         logger.error(
           { err: error, childAgentId, callerAgentId, reason },
           "Failed to notify caller agent",
         );
       });
+  }
+
+  function notifyFinished(): void {
+    if (!steeredIntoRunningTurn) {
+      notifySafely("finished");
+      return;
+    }
+    steeredIntoRunningTurn = false;
+    hasSeenRunning = false;
+    notifySafely("finished", { terminal: false, followUpPossible: true });
+    followUpWindow = setTimeout(stop, STEER_FOLLOW_UP_WINDOW_MS);
+    followUpWindow.unref?.();
   }
 
   unsubscribe = agentManager.subscribe(
@@ -520,6 +597,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
           }
         }
         if (event.agent.lifecycle === "running") {
+          clearTimeout(followUpWindow);
           if (event.agent.pendingPermissions.size === 0) {
             hasSeenRunning = true;
           }
@@ -530,7 +608,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
           return;
         }
         if (event.agent.lifecycle === "idle" && hasSeenRunning) {
-          notifySafely("finished");
+          notifyFinished();
           return;
         }
         if (event.agent.lifecycle === "closed") {
@@ -576,6 +654,11 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
   // not have started yet (streamAgent sets a pending run before
   // transitioning to "running").
   const childSnapshot = agentManager.getAgent(childAgentId);
+  if (params.dispatch) {
+    // The dispatch may still load the child or start a turn that clears a stale error.
+    hasSeenRunning = childSnapshot?.lifecycle === "running";
+    return;
+  }
   if (!childSnapshot || childSnapshot.lifecycle === "closed") {
     stop();
     return;

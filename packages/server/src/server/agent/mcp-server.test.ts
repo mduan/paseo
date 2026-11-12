@@ -240,6 +240,7 @@ function buildAgentManagerSpies() {
     emitLiveTimelineItem: vi.fn().mockResolvedValue(undefined),
     hasInFlightRun: vi.fn().mockReturnValue(false),
     tryRunOutOfBand: vi.fn().mockReturnValue(false),
+    steerOrReplaceActiveTurn: vi.fn().mockResolvedValue({ status: "inactive" }),
     subscribe: vi.fn().mockReturnValue(() => {}),
     streamAgent: vi.fn(() => (async function* noop() {})()),
     waitForAgentRunStart: vi.fn().mockResolvedValue(undefined),
@@ -3705,6 +3706,8 @@ class HeldTurnAgentSession implements AgentSession {
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
   private activeTurnId: string | null = null;
   private turnStartGate: Promise<void> | null = null;
+  /** Unset means the provider cannot steer, so a steer falls back to replacing the turn. */
+  steerActiveTurn?: AgentSession["steerActiveTurn"];
 
   constructor(
     readonly provider: AgentProvider,
@@ -3730,12 +3733,21 @@ class HeldTurnAgentSession implements AgentSession {
     const turnId = randomUUID();
     this.activeTurnId = turnId;
     setTimeout(() => {
+      // A turn finished before its start was announced is never announced.
+      if (this.activeTurnId !== turnId) return;
       this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
-      if (!this.holdTurns && this.activeTurnId === turnId) {
+      if (!this.holdTurns) {
         this.finishTurn();
       }
     }, 0);
     return { turnId };
+  }
+
+  /** Start a turn the provider opens on its own, as Claude does to answer a late steer. */
+  startFollowUpTurn(): void {
+    const turnId = randomUUID();
+    this.activeTurnId = turnId;
+    this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
   }
 
   finishTurn(): void {
@@ -4215,6 +4227,223 @@ describe("send_agent_prompt MCP tool", () => {
       });
     } finally {
       await removeAgentStateDir(agentManager, storage, workdir);
+    }
+  });
+
+  async function createRunningChild(options: { callerScoped: boolean }) {
+    const workdir = await mkdtemp(join(tmpdir(), "mcp-send-active-turn-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const parentClient = new HeldTurnAgentClient("claude", false);
+    const childClient = new HeldTurnAgentClient("codex", true);
+    const agentManager = new AgentManager({
+      clients: { claude: parentClient, codex: childClient },
+      registry: storage,
+      logger,
+    });
+    const parent = await agentManager.createAgent(
+      { provider: "claude", cwd: existingCwd },
+      undefined,
+      { workspaceId: "wks_parent" },
+    );
+    const child = await agentManager.createAgent(
+      { provider: "codex", cwd: existingCwd },
+      undefined,
+      { workspaceId: "wks_parent" },
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage: storage,
+      callerAgentId: options.callerScoped ? parent.id : undefined,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      logger,
+    });
+    const childSession = childClient.sessions[0]!;
+    const steeredPrompts: string[] = [];
+    function send(input: Record<string, unknown>) {
+      return invokeToolWithParsedInput(registeredTool(server, "send_agent_prompt"), {
+        agentId: child.id,
+        background: true,
+        ...input,
+      });
+    }
+    // Start the turn without arming a notification so each test controls its own.
+    await send({ prompt: "Long task", notifyOnFinish: false });
+    await vi.waitFor(() => expect(agentManager.getAgent(child.id)?.lifecycle).toBe("running"));
+
+    return {
+      childSession,
+      steeredPrompts,
+      send,
+      acceptSteering(onSteer?: () => void) {
+        childSession.steerActiveTurn = async (prompt) => {
+          onSteer?.();
+          steeredPrompts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));
+          return { status: "accepted" };
+        };
+      },
+      finishNotifications() {
+        return (parentClient.sessions[0]?.prompts ?? []).filter((prompt) =>
+          prompt.includes(`Agent ${child.id} (`),
+        );
+      },
+      lifecycle: () => agentManager.getAgent(child.id)?.lifecycle,
+      cleanup: () => removeAgentStateDir(agentManager, storage, workdir),
+    };
+  }
+
+  function settle() {
+    return new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  it("steers by default for agent callers and interrupts when asked", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+      expect(child.steeredPrompts).toEqual(["Also check the docs"]);
+      expect(child.childSession.prompts).toEqual(["Long task"]);
+
+      await child.send({ prompt: "Stop and reply", activeTurnBehavior: "interrupt" });
+      expect(child.steeredPrompts).toHaveLength(1);
+      expect(child.childSession.prompts).toEqual(["Long task", "Stop and reply"]);
+
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("interrupts by default for top-level callers and steers when asked", async () => {
+    const child = await createRunningChild({ callerScoped: false });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Stop and reply" });
+      expect(child.steeredPrompts).toEqual([]);
+      expect(child.childSession.prompts).toEqual(["Long task", "Stop and reply"]);
+
+      await child.send({ prompt: "Also check the docs", activeTurnBehavior: "steer" });
+      expect(child.steeredPrompts).toEqual(["Also check the docs"]);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("notifies once when the turn finishes before steering is acknowledged", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering(() => child.childSession.finishTurn());
+      await child.send({ prompt: "Also check the docs" });
+
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("drops the completion observed by a rejected steer", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.childSession.steerActiveTurn = async () => {
+        child.childSession.finishTurn();
+        throw new Error("steer rejected");
+      };
+      await expect(child.send({ prompt: "Also check the docs" })).rejects.toThrow("steer rejected");
+
+      await settle();
+      expect(child.finishNotifications()).toEqual([]);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("keeps an earlier notification when a later steer is rejected", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+      child.childSession.steerActiveTurn = async () => {
+        throw new Error("steer rejected");
+      };
+      await expect(child.send({ prompt: "And the tests" })).rejects.toThrow("steer rejected");
+
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("notifies once when an overlapping send fails and the next one steers", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      let steerCount = 0;
+      child.childSession.steerActiveTurn = async () => {
+        steerCount += 1;
+        if (steerCount === 1) throw new Error("steer rejected");
+        return { status: "accepted" };
+      };
+      const results = await Promise.allSettled([
+        child.send({ prompt: "Also check the docs" }),
+        child.send({ prompt: "And the tests" }),
+      ]);
+      expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("reports the follow-up turn that answers a steer after the steered turn ends", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      expect(child.finishNotifications()[0]).toContain("A follow-up report will arrive");
+
+      child.childSession.startFollowUpTurn();
+      await vi.waitFor(() => expect(child.lifecycle()).toBe("running"));
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(2));
+      expect(child.finishNotifications()[1]).not.toContain("A follow-up report will arrive");
+    } finally {
+      await child.cleanup();
+    }
+  });
+
+  it("stops watching a steered child once the follow-up window passes", async () => {
+    const child = await createRunningChild({ callerScoped: true });
+    try {
+      child.acceptSteering();
+      await child.send({ prompt: "Also check the docs" });
+
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      child.childSession.finishTurn();
+      await vi.waitFor(() => expect(child.finishNotifications()).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(11_000);
+      vi.useRealTimers();
+
+      child.childSession.startFollowUpTurn();
+      await vi.waitFor(() => expect(child.lifecycle()).toBe("running"));
+      child.childSession.finishTurn();
+      await settle();
+      expect(child.finishNotifications()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      await child.cleanup();
     }
   });
 });

@@ -51,7 +51,7 @@ Agents can prompt each other by **agent ID**, the identifier Paseo uses to addre
 
 > Use Paseo to send this prompt to agent [paste agent ID here]: “Review the parser changes in your workspace and report any missing test cases.”
 
-The receiving agent gets the prompt in its existing conversation. To have it send a separate message back, give it the sender's agent ID too.
+The receiving agent gets the prompt in its existing conversation. If it is mid-turn, an agent's prompt steers the running turn, falling back to interrupting it when the provider can't steer. Set MCP `activeTurnBehavior` or CLI `--behavior` to `steer` or `interrupt` to override. To have it send a separate message back, give it the sender's agent ID too.
 
 Underneath, the agent calls `send_agent_prompt` with the recipient's `agentId` and a `prompt`. Agents can also discover IDs with `list_agents`; the CLI uses [`paseo send <id>`](/docs/cli#sending-messages). For another host, use the [remote CLI workflow](#work-on-another-machine).
 
