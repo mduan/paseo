@@ -19,7 +19,6 @@ const ThemedChevronLeft = withUnistyles(ChevronLeft);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 
-/** The parent of a managed agent, or undefined for a root or detached agent. */
 export function useParentAgentId(serverId: string, agentId: string): string | undefined {
   return useSessionStore((state) => {
     const session = state.sessions[serverId];
@@ -28,7 +27,6 @@ export function useParentAgentId(serverId: string, agentId: string): string | un
   });
 }
 
-/** The parent as its own tab presents it, and the way back to it wherever it lives. */
 function useParentAgent(serverId: string, parentAgentId: string) {
   const { t } = useTranslation();
   const descriptor = useAgentPanelDescriptor(
@@ -67,7 +65,6 @@ function useParentAgent(serverId: string, parentAgentId: string) {
   };
 }
 
-/** Leads the composer track rail of an interactive subagent: the parent's title and the way back. */
 export function ParentAgentPill({
   serverId,
   parentAgentId,
@@ -123,7 +120,6 @@ function ParentIcon({
 
 const ThemedParentIcon = withUnistyles(ParentIcon);
 
-/** Sits below a read-only subagent's transcript, where a composer would be. */
 export function ParentAgentCard({
   serverId,
   parentAgentId,
