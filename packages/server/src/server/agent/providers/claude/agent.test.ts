@@ -1288,6 +1288,99 @@ describe("ClaudeAgentSession features", () => {
     }
   });
 
+  describe("a steer Claude reads only after finishing its answer", () => {
+    const successResult = {
+      type: "result",
+      subtype: "success",
+      result: "done",
+      usage: { input_tokens: 1, cache_read_input_tokens: 0, output_tokens: 1 },
+      total_cost_usd: 0,
+    };
+
+    async function startSteeredTurn() {
+      const { queryFactory } = createQueryMock();
+      const client = new ClaudeAgentClient({
+        logger,
+        queryFactory,
+        resolveBinary: async () => "/test/claude/bin",
+      });
+      const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+      const events: AgentStreamEvent[] = [];
+      session.subscribe((event) => events.push(event));
+      const internal = session as unknown as {
+        routeSdkMessageFromPump(message: unknown): Promise<void>;
+      };
+      const { turnId } = await session.startTurn("first turn");
+      const input = queryFactory.mock.calls[0]?.[0].prompt as AsyncIterable<SDKUserMessage>;
+      const iterator = input[Symbol.asyncIterator]();
+      const prompt = await iterator.next();
+      await session.steerActiveTurn?.("follow-up", { expectedTurnId: turnId });
+      const steer = await iterator.next();
+      return {
+        session,
+        route: (message: unknown) => internal.routeSdkMessageFromPump(message),
+        lifecycle: (uuid: string | undefined, state: string) =>
+          internal.routeSdkMessageFromPump({
+            type: "command_lifecycle",
+            command_uuid: uuid,
+            state,
+          }),
+        promptUuid: prompt.value?.uuid,
+        steerUuid: steer.value?.uuid,
+        turnEventTypes: () =>
+          events
+            .map((event) => event.type)
+            .filter((type) => ["turn_completed", "turn_canceled", "turn_started"].includes(type)),
+      };
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("continues the same turn when the steer starts right after the answer", async () => {
+      const turn = await startSteeredTurn();
+      try {
+        await turn.route(successResult);
+        await turn.lifecycle(turn.promptUuid, "completed");
+        await turn.lifecycle(turn.steerUuid, "started");
+        expect(turn.turnEventTypes()).toEqual(["turn_started"]);
+
+        await turn.route(successResult);
+        expect(turn.turnEventTypes()).toEqual(["turn_started", "turn_completed"]);
+      } finally {
+        await turn.session.close();
+      }
+    });
+
+    test("ends the turn when the steer does not start within the window", async () => {
+      const turn = await startSteeredTurn();
+      try {
+        vi.useFakeTimers();
+        await turn.route(successResult);
+        expect(turn.turnEventTypes()).toEqual(["turn_started"]);
+
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(turn.turnEventTypes()).toEqual(["turn_started", "turn_completed"]);
+      } finally {
+        await turn.session.close();
+      }
+    });
+
+    test("ends the turn once when it is interrupted while the steer is pending", async () => {
+      const turn = await startSteeredTurn();
+      try {
+        vi.useFakeTimers();
+        await turn.route(successResult);
+        await turn.session.interrupt();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(turn.turnEventTypes()).toEqual(["turn_started", "turn_canceled"]);
+      } finally {
+        await turn.session.close();
+      }
+    });
+  });
+
   test.each([
     ["supported model", "claude-opus-4-8", { type: "disabled" }, undefined],
     ["Haiku 5.5", "claude-haiku-5-5", { type: "disabled" }, undefined],
