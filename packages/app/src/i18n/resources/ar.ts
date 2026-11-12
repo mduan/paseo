@@ -2007,6 +2007,12 @@ export const ar: TranslationResources = {
     backdrop: "خلفية القائمة",
   },
   subagents: {
+    parent: {
+      backTo: "العودة إلى {{label}}",
+      parent: "الأصل",
+      parentAgent: "الوكيل الأصل",
+      openParent: "فتح الأصل",
+    },
     title: "الوكلاء الفرعيون",
     pillLabelOne: "وكيل فرعي واحد",
     pillLabelMany: "{{count}} وكلاء فرعيين",

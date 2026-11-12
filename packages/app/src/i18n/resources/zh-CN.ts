@@ -1985,6 +1985,12 @@ export const zhCN: TranslationResources = {
     backdrop: "菜单背景",
   },
   subagents: {
+    parent: {
+      backTo: "返回 {{label}}",
+      parent: "父级",
+      parentAgent: "父级代理",
+      openParent: "打开父级",
+    },
     title: "Subagent",
     pillLabelOne: "1 个 subagent",
     pillLabelMany: "{{count}} 个 subagent",

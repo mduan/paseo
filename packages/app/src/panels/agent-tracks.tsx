@@ -14,6 +14,7 @@ import {
   useDetachSubagent,
   type SubagentRow,
 } from "@/subagents";
+import { ParentAgentPill } from "@/subagents/parent-link";
 import { SubagentsTrack } from "@/subagents/track";
 import type { TodoEntry } from "@/types/stream";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
@@ -22,8 +23,8 @@ import { openPreferredWorkspaceTarget } from "@/workspace-tabs/open-beside";
 import { openComposerChanges } from "@/workspace-tabs/open-supporting-view";
 
 /**
- * The pane's ambient context — workspace changes, subagents, and tasks — as a row of pills above
- * the composer.
+ * The pane's ambient context — parent agent, workspace changes, subagents, and tasks — as a row
+ * of pills above the composer.
  *
  * The row shares the composer's keyboard transform and owns the space between itself and the
  * transcript. Each pill owns its action while tab placement stays behind the workspace boundary.
@@ -33,6 +34,7 @@ export const AgentTracks = memo(function AgentTracks({
   workspaceId,
   agentId,
   cwd,
+  parentAgentId,
   subagentRows,
   tasks,
   archiveFinishedStatus,
@@ -43,6 +45,7 @@ export const AgentTracks = memo(function AgentTracks({
   workspaceId: string;
   agentId: string;
   cwd: string;
+  parentAgentId: string | undefined;
   subagentRows: SubagentRow[];
   tasks: TodoEntry[] | undefined;
   archiveFinishedStatus: ArchiveFinishedStatus;
@@ -84,19 +87,19 @@ export const AgentTracks = memo(function AgentTracks({
     [canSplit, isCompact, openInSidePane, serverId, tabId, workspaceId, workspaceKey],
   );
   const handleOpenProviderSubagent = useCallback(
-    (parentAgentId: string, subagentId: string) => {
+    (ownerAgentId: string, subagentId: string) => {
       if (canSplit && workspaceKey) {
         openPreferredWorkspaceTarget({
           isCompact,
           workspaceKey,
-          target: { kind: "provider_subagent", parentAgentId, subagentId },
+          target: { kind: "provider_subagent", parentAgentId: ownerAgentId, subagentId },
           source: "subagents",
           preferences: openInSidePane,
           parentTabId: tabId,
         });
         return;
       }
-      openTab({ kind: "provider_subagent", parentAgentId, subagentId });
+      openTab({ kind: "provider_subagent", parentAgentId: ownerAgentId, subagentId });
     },
     [canSplit, isCompact, openInSidePane, openTab, tabId, workspaceKey],
   );
@@ -115,6 +118,7 @@ export const AgentTracks = memo(function AgentTracks({
   if (
     !hasWorkspaceDiffStat &&
     !hasAgentTracks({
+      parentAgentId,
       subagentRows,
       tasks,
       archiveFinishedStatus,
@@ -126,6 +130,7 @@ export const AgentTracks = memo(function AgentTracks({
 
   return (
     <ComposerTrackBar>
+      {parentAgentId ? <ParentAgentPill serverId={serverId} parentAgentId={parentAgentId} /> : null}
       <AgentTaskList tasks={tasks} />
       <SubagentsTrack
         serverId={serverId}
@@ -153,17 +158,20 @@ export const AgentTracks = memo(function AgentTracks({
 });
 
 export function hasAgentTracks({
+  parentAgentId,
   subagentRows,
   tasks,
   archiveFinishedStatus,
   hasPluginComposerPills = false,
 }: {
+  parentAgentId: string | undefined;
   subagentRows: readonly SubagentRow[];
   tasks: readonly TodoEntry[] | undefined;
   archiveFinishedStatus: ArchiveFinishedStatus;
   hasPluginComposerPills?: boolean;
 }): boolean {
   return (
+    Boolean(parentAgentId) ||
     subagentRows.length > 0 ||
     Boolean(tasks?.length) ||
     archiveFinishedStatus.kind !== "idle" ||

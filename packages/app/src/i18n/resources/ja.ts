@@ -2027,6 +2027,12 @@ export const ja: TranslationResources = {
     backdrop: "メニューの背景",
   },
   subagents: {
+    parent: {
+      backTo: "{{label}} に戻る",
+      parent: "親",
+      parentAgent: "親エージェント",
+      openParent: "親を開く",
+    },
     title: "サブエージェント",
     pillLabelOne: "サブエージェント 1 件",
     pillLabelMany: "サブエージェント {{count}} 件",

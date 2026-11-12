@@ -2032,6 +2032,12 @@ export const en = {
     backdrop: "Menu backdrop",
   },
   subagents: {
+    parent: {
+      backTo: "Back to {{label}}",
+      parent: "Parent",
+      parentAgent: "Parent agent",
+      openParent: "Open parent",
+    },
     title: "Subagents",
     pillLabelOne: "1 subagent",
     pillLabelMany: "{{count}} subagents",

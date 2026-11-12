@@ -2057,6 +2057,12 @@ export const es: TranslationResources = {
     backdrop: "Fondo del menú",
   },
   subagents: {
+    parent: {
+      backTo: "Volver a {{label}}",
+      parent: "Principal",
+      parentAgent: "Agente principal",
+      openParent: "Abrir principal",
+    },
     title: "Subagentes",
     pillLabelOne: "1 subagente",
     pillLabelMany: "{{count}} subagentes",
