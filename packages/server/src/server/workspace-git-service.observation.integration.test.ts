@@ -556,35 +556,35 @@ test("observation refreshes run in the background Git lane until a caller joins 
   });
   const priorities = (submissions: GitCommandSubmissionMetric[]) =>
     new Set(submissions.map((submission) => submission.priority));
-  const settle = async (quietMs: number) => {
+  const collectWhenIdle = async (quietMs: number) => {
     await waitForGitCommandMetricsIdle({ quietMs, timeoutMs: 10_000 });
     return stopGitCommandMetrics().submissions;
   };
   // Registration and observation setup settle before the measured changes.
   startGitCommandMetrics();
   await service.getSnapshot(repo, { includeForge: false });
-  await settle(500);
+  await collectWhenIdle(500);
 
   startGitCommandMetrics();
   git("switch", "-c", "feature");
   await expect.poll(() => heads, { timeout: 10_000 }).toContain("feature");
-  const observed = await settle(300);
+  const observed = await collectWhenIdle(300);
   expect(observed.length).toBeGreaterThan(0);
   expect(priorities(observed)).toEqual(new Set(["background"]));
 
   startGitCommandMetrics();
   await service.getSnapshot(repo, { force: true, reason: "test-demand", includeForge: false });
-  expect(priorities(await settle(0))).toEqual(new Set(["normal"]));
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["normal"]));
 
   startGitCommandMetrics();
   await runWithGitCommandPriority("high", () =>
     service.getSnapshot(repo, { force: true, reason: "test-user-action", includeForge: false }),
   );
-  expect(priorities(await settle(0))).toEqual(new Set(["high"]));
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["high"]));
 
   startGitCommandMetrics();
   await service.getCheckout(repo, { priority: "background" });
-  expect(priorities(await settle(0))).toEqual(new Set(["background"]));
+  expect(priorities(await collectWhenIdle(0))).toEqual(new Set(["background"]));
 
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
@@ -592,12 +592,12 @@ test("observation refreshes run in the background Git lane until a caller joins 
   startGitCommandMetrics();
   git("switch", "-c", "second");
   await entered.promise;
-  const joinedAt = getGitCommandMetrics().submitted;
+  const submittedBeforeJoin = getGitCommandMetrics().submitted;
   const joined = service.refresh(repo);
   release.resolve();
   await joined;
-  const joinedEnd = getGitCommandMetrics().submitted;
-  const promoted = (await settle(0)).slice(joinedAt, joinedEnd);
+  const submittedThroughJoin = getGitCommandMetrics().submitted;
+  const promoted = (await collectWhenIdle(0)).slice(submittedBeforeJoin, submittedThroughJoin);
   expect(promoted.length).toBeGreaterThan(0);
   expect(priorities(promoted)).toEqual(new Set(["normal"]));
 }, 30_000);
