@@ -447,7 +447,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     armed(params);
     return;
   }
-  armedByManager.set(armedKey, rearm);
+  armedByManager.set(armedKey, arm);
 
   let hasSeenRunning = false;
   let stopped = false;
@@ -458,9 +458,9 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
   // Accepted once any arming is not tied to a dispatch, or any tracked dispatch succeeds.
   let accepted = false;
   const dispatches: Promise<unknown>[] = [];
-  rearm(params);
+  arm(params);
 
-  function rearm(next: SetupFinishNotificationParams): void {
+  function arm(next: SetupFinishNotificationParams): void {
     requireParentOwnership = next.requireParentOwnership ?? false;
     const { dispatch } = next;
     if (!dispatch) {
@@ -469,12 +469,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     }
     dispatches.push(dispatch);
     void (async () => {
-      try {
-        await dispatch;
-        accepted = true;
-      } catch {
-        if (!(await dispatchAccepted())) stop();
-      }
+      if (!(await dispatchAccepted())) stop();
     })();
   }
 
@@ -499,9 +494,7 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
     if (stopped) return;
     stopped = true;
     unsubscribe?.();
-    if (armedByManager.get(armedKey) === rearm) {
-      armedByManager.delete(armedKey);
-    }
+    armedByManager.delete(armedKey);
   }
 
   async function notify(
