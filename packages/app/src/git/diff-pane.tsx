@@ -377,7 +377,6 @@ export function DiffModeMenu({
         >
           {t(DIFF_MODE_LABEL_KEYS.uncommitted)}
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem
           testID={`${testIDPrefix}-mode-committed`}
           selected={diffMode === "base"}
@@ -386,28 +385,22 @@ export function DiffModeMenu({
           {t(DIFF_MODE_LABEL_KEYS.base)}
         </DropdownMenuItem>
         {onSelectAll ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              testID={`${testIDPrefix}-mode-all`}
-              selected={diffMode === LiveDiffComparison.All}
-              onSelect={onSelectAll}
-            >
-              {t(DIFF_MODE_LABEL_KEYS[LiveDiffComparison.All])}
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem
+            testID={`${testIDPrefix}-mode-all`}
+            selected={diffMode === LiveDiffComparison.All}
+            onSelect={onSelectAll}
+          >
+            {t(DIFF_MODE_LABEL_KEYS[LiveDiffComparison.All])}
+          </DropdownMenuItem>
         ) : null}
         {turnModes ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              testID={`${testIDPrefix}-mode-last-turn`}
-              selected={diffMode === "last_turn"}
-              onSelect={turnModes.selectLastTurn}
-            >
-              {t(DIFF_MODE_LABEL_KEYS.last_turn)}
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem
+            testID={`${testIDPrefix}-mode-last-turn`}
+            selected={diffMode === "last_turn"}
+            onSelect={turnModes.selectLastTurn}
+          >
+            {t(DIFF_MODE_LABEL_KEYS.last_turn)}
+          </DropdownMenuItem>
         ) : null}
         {commitRanges ? (
           <CommitRangeMenuSection
