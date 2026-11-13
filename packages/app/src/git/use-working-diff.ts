@@ -94,6 +94,7 @@ export function useWorkingDiff({
     cwd,
     turnComparison,
     commitRange,
+    baseRef,
     ignoreWhitespace,
     enabled: enabled && isGit,
   });
@@ -299,6 +300,7 @@ function useSnapshotDiff(input: {
   cwd: string;
   turnComparison: TurnDiffComparison | null;
   commitRange: CommitRange | undefined;
+  baseRef?: string;
   ignoreWhitespace: boolean;
   enabled: boolean;
 }) {
@@ -314,6 +316,7 @@ function useSnapshotDiff(input: {
     serverId,
     cwd,
     commitRange,
+    baseRef: input.baseRef,
     ignoreWhitespace,
     enabled,
   });
@@ -326,20 +329,21 @@ function useCommitRangeComparisonDiff(input: {
   serverId: string;
   cwd: string;
   commitRange: CommitRange | undefined;
+  baseRef?: string;
   ignoreWhitespace: boolean;
   enabled: boolean;
 }) {
-  const { serverId, cwd, commitRange, ignoreWhitespace } = input;
+  const { serverId, cwd, commitRange, baseRef, ignoreWhitespace } = input;
   const client = useHostRuntimeClient(serverId);
   const query = useFetchQuery({
-    queryKey: ["checkout-commit-range-diff", serverId, cwd, commitRange, ignoreWhitespace],
+    queryKey: ["checkout-commit-range-diff", serverId, cwd, commitRange, baseRef, ignoreWhitespace],
     queryFn: () => {
       if (!client || !commitRange) throw new Error("Host disconnected");
       return client.getCommitRangeDiff({ cwd, ...commitRange, ignoreWhitespace });
     },
     enabled: input.enabled && Boolean(client) && Boolean(commitRange),
     dataShape: "value",
-    // Commits are immutable, so a range's diff never changes.
+    // Commits are immutable; only the base ref changes which merged-in base changes are left out.
     immutableWhen: () => true,
   });
   const payload = query.data;
