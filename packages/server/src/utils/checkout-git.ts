@@ -767,12 +767,18 @@ async function getTrackedDiffTextForPath(input: {
   cwd: string;
   refsForDiff: CheckoutDiffRefs;
   path: string;
+  oldPath?: string;
   ignoreWhitespace: boolean;
 }): Promise<{ path: string; text: string; truncated: boolean }> {
+  const paths = input.oldPath ? [input.oldPath, input.path] : [input.path];
   const result = await runGitCommand(
     buildGitDiffArgs({
       ignoreWhitespace: input.ignoreWhitespace,
-      extra: [...getCheckoutDiffRefArgs(input.refsForDiff), "--", `:(literal)${input.path}`],
+      extra: [
+        ...getCheckoutDiffRefArgs(input.refsForDiff),
+        "--",
+        ...paths.map((path) => `:(literal)${path}`),
+      ],
     }),
     {
       cwd: input.cwd,
@@ -3451,26 +3457,29 @@ async function processTrackedChanges(
 
   let trackedDiffText = "";
   let trackedDiffBytes = 0;
-  const renamedPaths = new Set(
-    trackedChanges.filter((change) => change.oldPath).map((change) => change.path),
+  const oldPathByPath = new Map(
+    trackedChanges
+      .filter((change) => change.oldPath)
+      .map((change) => [change.path, change.oldPath]),
   );
   for (let start = 0; start < trackedDiffPaths.length; start += TRACKED_DIFF_BATCH_SIZE) {
     const paths = trackedDiffPaths.slice(start, start + TRACKED_DIFF_BATCH_SIZE);
-    // Keep rename/copy path filtering identical to the existing per-file command.
+    // Git needs both paths to recognize a rename instead of a whole-file addition.
     const ordinary = await getTrackedDiffTexts({
       cwd,
       refsForDiff,
-      paths: paths.filter((path) => !renamedPaths.has(path)),
+      paths: paths.filter((path) => !oldPathByPath.has(path)),
       ignoreWhitespace,
     });
     const renamed = await Promise.all(
       paths
-        .filter((path) => renamedPaths.has(path))
+        .filter((path) => oldPathByPath.has(path))
         .map((path) =>
           getTrackedDiffTextForPath({
             cwd,
             refsForDiff,
             path,
+            oldPath: oldPathByPath.get(path),
             ignoreWhitespace,
           }),
         ),

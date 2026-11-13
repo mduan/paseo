@@ -565,8 +565,35 @@ describe("checkout git utilities", () => {
     });
 
     expect(diff.structured).toContainEqual(
-      expect.objectContaining({ path: "renamed.txt", oldPath: "file.txt" }),
+      expect.objectContaining({
+        path: "renamed.txt",
+        oldPath: "file.txt",
+        additions: 0,
+        deletions: 0,
+        hunks: [],
+      }),
     );
+  });
+
+  it("counts only edits in a committed rename", async () => {
+    const original = "hello\nkeep this line\nand this line\nand this one too\n";
+    writeFileSync(join(repoDir, "file.txt"), original);
+    await commitAll(repoDir, "extend file");
+    execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+    execFileSync("git", ["mv", "file.txt", "renamed [file].txt"], { cwd: repoDir });
+    writeFileSync(join(repoDir, "renamed [file].txt"), original.replace("hello", "updated"));
+    await commitAll(repoDir, "rename and edit file");
+
+    const diff = await getCheckoutDiff(repoDir, {
+      mode: "base",
+      baseRef: "main",
+      includeStructured: true,
+    });
+
+    expect(diff.structured).toMatchObject([
+      { path: "renamed [file].txt", oldPath: "file.txt", additions: 1, deletions: 1 },
+    ]);
+    expect(diff.diff).toContain("-hello\n+updated\n");
   });
 
   it("reads the origin URL once when collecting facts for an origin-tracking branch", async () => {
