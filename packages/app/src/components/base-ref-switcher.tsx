@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { Combobox } from "@/components/ui/combobox";
@@ -23,7 +23,7 @@ interface BaseRefSwitcherProps {
   cwd: string;
 }
 
-const ThemedArrowRight = withUnistyles(ArrowRight);
+const ThemedArrowLeft = withUnistyles(ArrowLeft);
 
 export function BaseRefSwitcher({
   baseRefLabel,
@@ -93,7 +93,6 @@ export function BaseRefSwitcher({
 
   return (
     <View style={styles.row}>
-      <ThemedArrowRight size={12} uniProps={extraMutedIconColorMapping} />
       <View ref={anchorRef} collapsable={false} style={styles.anchor}>
         <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
           <TooltipTrigger asChild>
@@ -130,6 +129,7 @@ export function BaseRefSwitcher({
           desktopMinWidth={280}
         />
       </View>
+      <ThemedArrowLeft size={12} uniProps={extraMutedIconColorMapping} />
     </View>
   );
 }
