@@ -46,10 +46,7 @@ export function useWorkspaceCommits(input: { serverId: string; cwd: string; enab
   return { query, commits, shas };
 }
 
-/**
- * The diff mode menu's commit range picker. Checkbox clicks edit a draft that keeps the range
- * contiguous; Save applies it.
- */
+/** Checkbox clicks edit a contiguous draft range; Save applies it. */
 export function CommitRangeMenuSection({
   serverId,
   cwd,

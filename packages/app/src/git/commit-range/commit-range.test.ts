@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toggleCommitInRange } from "./commit-range";
 
-// Newest first, as the picker lists them.
+// Newest first.
 const shas = ["e", "d", "c", "b", "a"];
 
 function click(range: { fromSha: string; toSha: string } | undefined, sha: string) {

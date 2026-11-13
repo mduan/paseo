@@ -16,10 +16,7 @@ export function commitRangeSpan(
   return newest === -1 || oldest === -1 || newest > oldest ? undefined : { newest, oldest };
 }
 
-/**
- * The range after clicking `sha`. The range stays contiguous: an outside commit extends it, an
- * end shrinks it, and an inside commit collapses it to that commit.
- */
+/** Stays contiguous: an outside commit extends the range, an end shrinks it, an inside one collapses to it. */
 export function toggleCommitInRange(input: {
   shas: readonly string[];
   range: CommitRange | undefined;
