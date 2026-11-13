@@ -20,7 +20,6 @@ import {
   AlignJustify,
   ChevronDown,
   Columns2,
-  ExternalLink,
   ListChevronsDownUp,
   ListChevronsUpDown,
   MoreHorizontal,
@@ -34,11 +33,7 @@ import { defaultChangesState } from "@/panels/changes/state";
 import { DiffDocument, type WorkingDiffMode } from "@/git/diff-document";
 import { ChangedFilesTree } from "@/git/changed-files-tree";
 import { JUMP_TO_FILE_CLEARANCE, JumpToFile } from "@/git/jump-to-file";
-import {
-  selectPrHintFromStatus,
-  type PrHint,
-  useCheckoutPrStatusQuery,
-} from "@/git/use-pr-status-query";
+import { useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
 import {
   CommitRangeMenuSection,
   formatCommitRange,
@@ -90,16 +85,11 @@ import {
   toolbarLabelTriggerFrameStyle,
   toolbarLabelTriggerStyle,
 } from "@/components/ui/toolbar-label-trigger";
-import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { isWeb } from "@/constants/platform";
 import { useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { DiffTooLargeState } from "@/git/diff-too-large-state";
 import { useRevealInFileManager } from "@/workspace/open-in-file-manager/reveal";
-import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
-import { openExternalUrl } from "@/utils/open-external-url";
-import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
-import type { PullRequestOpenLocation } from "@/hooks/use-settings";
 import {
   LiveDiffComparison,
   isSnapshotDiffComparison,
@@ -211,7 +201,6 @@ const ThemedListChevronsUpDown = withUnistyles(ListChevronsUpDown);
 const noopStateChange = () => {};
 const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedMoreHorizontal = withUnistyles(MoreHorizontal);
-const ThemedExternalLink = withUnistyles(ExternalLink);
 const DIFF_OPTIONS_WHITESPACE_ICON = (
   <ThemedPilcrow size={14} uniProps={foregroundMutedIconColorMapping} />
 );
@@ -506,16 +495,11 @@ function buildChangesToolbarMode(input: {
   };
 }
 
-interface ChangesPullRequestLinkModel extends Pick<PrHint, "forge" | "number" | "state" | "url"> {
-  onOpen: () => void;
-}
-
 interface ChangesRepositoryToolbarModel {
   baseRefLabel: string | null;
   branchName: string | null;
   cwd: string;
   gitActions: GitActions | null;
-  pullRequest: ChangesPullRequestLinkModel | null;
   serverId: string;
   workspaceId?: string | null;
 }
@@ -548,11 +532,9 @@ interface BuildChangesHeaderModelInput {
   commitRanges: CommitRangeModes | null;
   gitActions: GitActions;
   mode: ChangesToolbarMode;
-  onOpenPullRequest: () => void;
   onSelectBase: () => void;
   onSelectAll?: () => void;
   onSelectUncommitted: () => void;
-  pullRequest: PrHint | null;
   selectedDiffStat: { additions: number; deletions: number } | null;
   serverId: string;
   workspaceId?: string | null;
@@ -570,9 +552,6 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       // Commit and push act on the live checkout, not on a turn or commit range snapshot.
       gitActions:
         input.compact && !isSnapshotDiffComparison(input.diffMode) ? input.gitActions : null,
-      pullRequest: input.pullRequest
-        ? { ...input.pullRequest, onOpen: input.onOpenPullRequest }
-        : null,
       serverId: input.serverId,
       workspaceId: input.workspaceId,
     },
@@ -715,76 +694,9 @@ function ChangesRepositoryToolbar({
         ) : null}
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
-        {model.pullRequest ? (
-          <>
-            <ChangesPullRequestLink model={model.pullRequest} />
-            <ChangesPullRequestExternalLink compact={compact} model={model.pullRequest} />
-          </>
-        ) : null}
         {model.gitActions ? <GitActionsSplitButton gitActions={model.gitActions} menuOnly /> : null}
       </ChangesToolbarTrailing>
     </ChangesToolbarRow>
-  );
-}
-
-function ChangesPullRequestLink({ model }: { model: ChangesPullRequestLinkModel }) {
-  const { t } = useTranslation();
-  const presentation = getForgePresentation(model.forge);
-  const label = `${presentation.numberPrefix}${model.number}`;
-  return (
-    <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
-      <TooltipTrigger
-        testID="changes-open-pull-request"
-        accessibilityRole="button"
-        accessibilityLabel={`${t("panels.pullRequest.label")} ${label}`}
-        onPress={model.onOpen}
-        style={toolbarLabelTriggerStyle}
-      >
-        {(state) => {
-          const highlighted = isToolbarLabelTriggerHighlighted(state);
-          return (
-            <>
-              <ToolbarLabelTriggerIcon>
-                <PullRequestStateIcon state={model.state} size={14} strokeWidth={1.5} />
-              </ToolbarLabelTriggerIcon>
-              <Text style={toolbarLabelTriggerTextStyle(highlighted)}>{label}</Text>
-            </>
-          );
-        }}
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <Text style={styles.tooltipText}>{t("panels.pullRequest.label")}</Text>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function ChangesPullRequestExternalLink({
-  compact,
-  model,
-}: {
-  compact: boolean;
-  model: ChangesPullRequestLinkModel;
-}) {
-  const { t } = useTranslation();
-  const presentation = getForgePresentation(model.forge);
-  const label = t("workspace.git.pr.actions.openOn", { brand: presentation.brandLabel });
-  const handlePress = useCallback(() => {
-    void openExternalUrl(model.url);
-  }, [model.url]);
-  return (
-    <ToolbarButton
-      compact={compact}
-      label={label}
-      onPress={handlePress}
-      testID="changes-open-pull-request-external"
-    >
-      <ThemedExternalLink
-        size={paneContentToolbarIconSize(compact)}
-        strokeWidth={1.5}
-        uniProps={extraMutedIconColorMapping}
-      />
-    </ToolbarButton>
   );
 }
 
@@ -1402,37 +1314,6 @@ function ChangesBody({
   );
 }
 
-function useDiffTabNavigation({
-  serverId,
-  workspaceId,
-  cwd,
-  isMobile,
-  pullRequestOpenLocation,
-}: {
-  serverId: string;
-  workspaceId?: string | null;
-  cwd: string;
-  isMobile: boolean;
-  pullRequestOpenLocation: PullRequestOpenLocation;
-}) {
-  const persistenceKey = useMemo(
-    () => buildWorkspaceTabPersistenceKey({ serverId, workspaceId: workspaceId ?? cwd }),
-    [cwd, serverId, workspaceId],
-  );
-  const openPullRequest = useCallback(() => {
-    if (!persistenceKey) return;
-    openWorkspacePullRequest({
-      isCompact: isMobile,
-      workspaceKey: persistenceKey,
-      checkout: { serverId, cwd, isGit: true },
-      destination: pullRequestOpenLocation,
-    });
-  }, [cwd, isMobile, persistenceKey, pullRequestOpenLocation, serverId]);
-  return {
-    openPullRequest,
-  };
-}
-
 export function ChangesSurface({
   serverId,
   workspaceId,
@@ -1489,13 +1370,6 @@ export function ChangesSurface({
 
   const toast = useToast();
   const fileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
-  const { openPullRequest: handleOpenPullRequest } = useDiffTabNavigation({
-    serverId,
-    workspaceId,
-    cwd,
-    isMobile,
-    pullRequestOpenLocation: appSettings.pullRequestOpenLocation,
-  });
   const refreshSupported = useSessionStore(
     (s) => s.sessions[serverId]?.serverInfo?.features?.checkoutRefresh === true,
   );
@@ -1550,7 +1424,6 @@ export function ChangesSurface({
     enabled: enabled !== false,
   });
   const {
-    status: pullRequestStatus,
     githubFeaturesEnabled,
     forge,
     authState,
@@ -1843,11 +1716,9 @@ export function ChangesSurface({
         commitRanges,
         gitActions,
         mode: toolbarMode,
-        onOpenPullRequest: handleOpenPullRequest,
         onSelectBase: handleSelectBase,
         onSelectAll: handleSelectAll,
         onSelectUncommitted: handleSelectUncommitted,
-        pullRequest: selectPrHintFromStatus(pullRequestStatus, forge),
         selectedDiffStat,
         serverId,
         workspaceId,
@@ -1860,13 +1731,10 @@ export function ChangesSurface({
       turnModes,
       commitRanges,
       gitActions,
-      handleOpenPullRequest,
       handleSelectBase,
       handleSelectAll,
       handleSelectUncommitted,
       isMobile,
-      forge,
-      pullRequestStatus,
       selectedDiffStat,
       serverId,
       toolbarMode,
