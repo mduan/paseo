@@ -41,7 +41,10 @@ vi.mock("@/screens/workspace/workspace-tab-presentation", () => ({
     }),
 }));
 
-vi.mock("@/workspace-tabs/launcher", () => ({ useWorkspaceTabLaunchCatalog: () => [] }));
+vi.mock("@/workspace-tabs/launcher", async () => {
+  const { WorkspaceTabLaunchPurpose } = await import("@/workspace-tabs/launcher/internal/catalog");
+  return { useWorkspaceTabLaunchCatalog: () => [], WorkspaceTabLaunchPurpose };
+});
 vi.mock("@/plugins/workspace-panels/locations", () => ({ panelTargetSupportsHost: () => false }));
 vi.mock("@/components/ui/context-menu", () => {
   const Content = ({ children }: { children?: ReactNode }) => children;

@@ -29,9 +29,11 @@ import {
   getTerminalProfileIcon,
   resolveTerminalProfiles,
 } from "@getpaseo/protocol/terminal-profiles";
-import { getBuiltInLaunchOrder, type BuiltInLaunchItemId } from "./internal/catalog";
-
-export type WorkspaceTabLaunchPurpose = "primary" | "supporting";
+import {
+  getBuiltInLaunchOrder,
+  type BuiltInLaunchItemId,
+  type WorkspaceTabLaunchPurpose,
+} from "./internal/catalog";
 
 export type WorkspaceTabLaunchDestination =
   | { kind: "open"; paneId?: string }
@@ -262,4 +264,4 @@ export function useWorkspaceTabLaunchCatalog(input: {
   ]);
 }
 
-export { getBuiltInLaunchOrder } from "./internal/catalog";
+export { getBuiltInLaunchOrder, WorkspaceTabLaunchPurpose } from "./internal/catalog";

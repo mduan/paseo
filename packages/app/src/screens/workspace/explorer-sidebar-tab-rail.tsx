@@ -33,6 +33,7 @@ import type { WorkspaceDesktopTabRowItem } from "@/screens/workspace/workspace-d
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import {
   useWorkspaceTabLaunchCatalog,
+  WorkspaceTabLaunchPurpose,
   type WorkspaceTabLaunchItem,
 } from "@/workspace-tabs/launcher";
 import { workspaceTabTargetsEqual } from "@/workspace-tabs/identity";
@@ -309,7 +310,7 @@ export function ExplorerSidebarTabRail({
   const { t } = useTranslation();
   const groups = useWorkspaceTabLaunchCatalog({
     serverId: normalizedServerId,
-    purpose: "supporting",
+    purpose: WorkspaceTabLaunchPurpose.Configuration,
     host: "explorer",
   });
   const singletonConfigurationItems = useMemo(

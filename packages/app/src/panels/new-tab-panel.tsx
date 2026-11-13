@@ -22,6 +22,7 @@ import { definePanel, type PanelIconProps } from "@/panels/panel-registry";
 import { ICON_SIZE, SPACING, type Theme } from "@/styles/theme";
 import {
   useWorkspaceTabLaunchCatalog,
+  WorkspaceTabLaunchPurpose,
   type WorkspaceTabLaunchItem,
 } from "@/workspace-tabs/launcher";
 
@@ -135,7 +136,10 @@ const NewTabPanel = memo(function NewTabPanel(): ReactElement {
   const containerRef = useRef<View | null>(null);
   const groups = useWorkspaceTabLaunchCatalog({
     serverId,
-    purpose: host === "explorer" ? "supporting" : "primary",
+    purpose:
+      host === "explorer"
+        ? WorkspaceTabLaunchPurpose.Supporting
+        : WorkspaceTabLaunchPurpose.Primary,
     host,
   });
   const itemsById = useMemo(

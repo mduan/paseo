@@ -70,6 +70,7 @@ import { formatCompactTimeAgoAsProse } from "@/utils/time";
 import { buildWorkspaceKeyboardHandlerId } from "@/keyboard/handler-id";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import { WorkspaceNewTabMenuContent } from "@/screens/workspace/workspace-new-tab-menu";
+import { WorkspaceTabLaunchPurpose } from "@/workspace-tabs/launcher";
 import {
   paneContentToolbarTrailingPadding,
   ToolbarButton,
@@ -225,7 +226,7 @@ function WorkspaceNewTabButton({
       </ToolbarButton>
       <WorkspaceNewTabMenuContent
         serverId={serverId}
-        purpose="primary"
+        purpose={WorkspaceTabLaunchPurpose.Primary}
         host="main"
         paneId={paneId}
       />
