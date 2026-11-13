@@ -620,7 +620,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       serverId: resolvedServerId,
       agentId,
       enabled: turnDiffsEnabled,
-      prefetchLatest: isActive,
     });
     const turnDiffCards = useMemo<TurnDiffCardsValue | undefined>(
       () =>
