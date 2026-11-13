@@ -5,6 +5,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import {
   composeWorkspaceStructure,
   createWorkspaceStructureProjectsSelector,
+  createWorkspaceTimeOrderSelector,
   selectHasWorkspaces,
   selectHydratedWorkspaceServerIds,
   selectWorkspaceDirectoryServerIds,
@@ -538,7 +539,7 @@ describe("selectWorkspaceTimeOrderByScope", () => {
       },
     };
   }
-  const keys = (ids: string[]) => ids.map((id) => `${SERVER_ID}:${id}`);
+  const keys = (ids: readonly string[]) => ids.map((id) => `${SERVER_ID}:${id}`);
 
   it("orders by creation, newest first", () => {
     expect(
@@ -568,6 +569,71 @@ describe("selectWorkspaceTimeOrderByScope", () => {
         SidebarSortMode.LastResponse,
       ),
     ).toEqual({ [projectViewKey("project-1")]: keys(["middle", "newest", "oldest"]) });
+  });
+
+  it.each([
+    {
+      mode: SidebarSortMode.LastResponse,
+      order: ["running-newer-prompt", "running-older-prompt", "middle", "newest", "oldest"],
+    },
+    {
+      mode: SidebarSortMode.LastPrompt,
+      order: ["oldest", "running-newer-prompt", "newest", "middle", "running-older-prompt"],
+    },
+    {
+      mode: SidebarSortMode.Created,
+      order: ["newest", "middle", "running-newer-prompt", "oldest", "running-older-prompt"],
+    },
+  ] as const)(
+    "prioritizes running workspaces by last prompt only in Last response mode ($mode)",
+    ({ mode, order }) => {
+      const state = snapshot({ workspaceSortTimes: true });
+      const runningWorkspaces: WorkspaceDescriptor[] = [
+        {
+          ...timedWorkspace(
+            "running-older-prompt",
+            "2025-12-01T00:00:00.000Z",
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-31T00:00:00.000Z",
+          ),
+          status: "running",
+        },
+        {
+          ...timedWorkspace(
+            "running-newer-prompt",
+            "2026-01-10T00:00:00.000Z",
+            "2026-02-15T00:00:00.000Z",
+          ),
+          status: "running",
+        },
+      ];
+      for (const workspace of runningWorkspaces) {
+        state.sessions[SERVER_ID].workspaces.set(workspace.id, workspace);
+      }
+
+      expect(selectWorkspaceTimeOrderByScope(state, [SERVER_ID], mode)).toEqual({
+        [projectViewKey("project-1")]: keys(order),
+      });
+    },
+  );
+
+  it("returns a finished workspace to response-time order when its status changes", () => {
+    const state = snapshot({ workspaceSortTimes: true });
+    const workspace = timedWorkspace("oldest", "2026-01-01T00:00:00.000Z");
+    workspace.status = "running";
+    state.sessions[SERVER_ID].workspaces.set(workspace.id, workspace);
+    const selectOrder = createWorkspaceTimeOrderSelector([SERVER_ID], SidebarSortMode.LastResponse);
+
+    expect(selectOrder(state)).toEqual({
+      [projectViewKey("project-1")]: keys(["oldest", "middle", "newest"]),
+    });
+
+    state.sessions[SERVER_ID].workspaces = new Map(state.sessions[SERVER_ID].workspaces);
+    state.sessions[SERVER_ID].workspaces.set(workspace.id, { ...workspace, status: "done" });
+
+    expect(selectOrder(state)).toEqual({
+      [projectViewKey("project-1")]: keys(["middle", "newest", "oldest"]),
+    });
   });
 
   it("leaves hosts without workspaceSortTimes on their manual order", () => {
