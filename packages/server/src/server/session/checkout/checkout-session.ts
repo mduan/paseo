@@ -310,7 +310,12 @@ export class CheckoutSession {
     try {
       assertSafeGitRef(sha, "commit");
       assertSafeRelativePath(path);
-      const file = await getCommitFileDiff({ cwd: expandTilde(cwd), sha, path });
+      const file = await getCommitFileDiff({
+        cwd: expandTilde(cwd),
+        sha,
+        path,
+        context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
+      });
       this.host.emit({
         type: "checkout.commits.file_diff.response",
         payload: { cwd, sha, path, file, error: null, requestId },
@@ -334,6 +339,7 @@ export class CheckoutSession {
         fromSha,
         toSha,
         ignoreWhitespace,
+        context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
       });
       this.host.emit({
         type: "checkout.commits.range_diff.response",

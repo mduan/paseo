@@ -142,4 +142,22 @@ describe("getCommitRangeDiff", () => {
     expect(result.structured?.map((file) => file.path)).toEqual(["a.txt", "b.txt"]);
     expect(result.targetRef).toBe(second);
   });
+
+  it("leaves out base branch changes that a merge in the range brought in", async () => {
+    const repoDir = initRepo();
+    commitFile(repoDir, "README.md", "base\n", "initial");
+    git(["checkout", "-b", "feature"], repoDir);
+    commitFile(repoDir, "a.txt", "a\n", "add a");
+    const first = headSha(repoDir);
+    git(["checkout", "main"], repoDir);
+    commitFile(repoDir, "main.txt", "main\n", "advance main");
+    git(["checkout", "feature"], repoDir);
+    git(["-c", "commit.gpgsign=false", "merge", "--no-ff", "main", "-m", "merge main"], repoDir);
+    commitFile(repoDir, "b.txt", "b\n", "add b");
+    const last = headSha(repoDir);
+
+    const result = await getCommitRangeDiff({ cwd: repoDir, fromSha: first, toSha: last });
+
+    expect(result.structured?.map((file) => file.path)).toEqual(["a.txt", "b.txt"]);
+  });
 });
