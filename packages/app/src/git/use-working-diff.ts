@@ -342,7 +342,7 @@ function useCommitRangeComparisonDiff(input: {
     // Commits are immutable, so a range's diff never changes.
     immutableWhen: () => true,
   });
-  const payload = commitRange ? query.data : undefined;
+  const payload = query.data;
   const queryError = query.error
     ? { code: "UNKNOWN" as const, message: query.error.message }
     : null;

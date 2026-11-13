@@ -78,7 +78,7 @@ export function selectWorkingDiffComparisonInState(
         serverId: input.serverId.trim(),
         cwd: normalizeCwd(input.cwd),
         comparison: input.comparison,
-        ...(input.comparison === "commit_range" ? { commitRange: input.commitRange } : {}),
+        commitRange: input.commitRange,
         isDirtyAtSelection: input.isDirty,
       },
     },
