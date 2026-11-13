@@ -16,6 +16,11 @@ import { withPreviewCsp } from "./html-preview-csp";
 // over with a directive browsers ignore.
 const SANDBOX = "allow-scripts";
 
+// A srcdoc document resolves relative URLs against the parent's URL, so `#section`
+// would navigate the frame to the Paseo app URL and blank the preview. Basing on
+// the document's own URL turns fragment links into in-page jumps.
+const BASE_HREF = "about:srcdoc";
+
 const iframeStyle = {
   flex: 1,
   minHeight: 0,
@@ -25,7 +30,7 @@ const iframeStyle = {
 
 export function FileHtmlPreview({ html, testID }: { html: string; testID?: string }) {
   const { t } = useTranslation();
-  const document = useMemo(() => withPreviewCsp(html), [html]);
+  const document = useMemo(() => withPreviewCsp(html, BASE_HREF), [html]);
   return (
     <iframe
       data-testid={testID}

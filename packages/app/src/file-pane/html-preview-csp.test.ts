@@ -12,6 +12,12 @@ describe("withPreviewCsp", () => {
     expect(output.indexOf("Content-Security-Policy")).toBeLessThan(output.indexOf("<script>"));
   });
 
+  it("places a requested base before the policy so base-uri does not refuse it", () => {
+    expect(withPreviewCsp("<h1>Plan</h1>", "about:srcdoc")).toMatch(
+      /^<!doctype html><base href="about:srcdoc"><meta http-equiv="Content-Security-Policy"/,
+    );
+  });
+
   it("keeps the original document intact", () => {
     const source = "<!doctype html><html><head></head><body><h1>Visual plan</h1></body></html>";
 
