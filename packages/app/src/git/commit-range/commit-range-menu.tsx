@@ -11,6 +11,7 @@ import { formatDiffCount, sumDiffStat } from "@/git/file-header-presentation";
 import { useCheckoutCommitsQuery, type ClassifiedCheckoutCommit } from "@/git/use-commits-query";
 import type { CommitRange } from "@/git/working-diff-comparison/state";
 import { useTimeAgo } from "@/hooks/use-time-ago";
+import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import { normalizeBranchOptionName } from "@/utils/branch-suggestions";
 import { commitRangeSpan, toggleCommitInRange } from "./commit-range";
 
@@ -39,7 +40,8 @@ export function formatCommitRange(input: {
 
 /** The checkout's commits ahead of base, newest first. */
 export function useWorkspaceCommits(input: { serverId: string; cwd: string; enabled: boolean }) {
-  const query = useCheckoutCommitsQuery(input);
+  const { preferences } = useChangesPreferences();
+  const query = useCheckoutCommitsQuery({ ...input, ignoreWhitespace: preferences.hideWhitespace });
   const data = query.status === "loaded" ? query.data : undefined;
   const commits = useMemo(
     () => (data ? data.commits.filter((commit) => !commit.isOnBase) : EMPTY_COMMITS),

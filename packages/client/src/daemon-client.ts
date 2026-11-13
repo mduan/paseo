@@ -52,6 +52,7 @@ import type {
   CheckoutStatusResponse,
   SubscribeCheckoutDiffRequest,
   CheckoutCommit,
+  CheckoutCommitsListRequest,
   ParsedDiffFile,
   CheckoutCommitResponse,
   CheckoutDiffContextResponse,
@@ -4466,15 +4467,16 @@ export class DaemonClient {
   }
 
   async listCheckoutCommits(
-    cwd: string,
+    input: string | Pick<CheckoutCommitsListRequest, "cwd" | "ignoreWhitespace">,
     requestId?: string,
   ): Promise<{ baseRef: string | null; commits: CheckoutCommit[] }> {
+    const options = typeof input === "string" ? { cwd: input } : input;
     const payload =
       await this.sendNamespacedCorrelatedSessionRequest<"checkout.commits.list.response">({
         requestId,
         message: {
           type: "checkout.commits.list.request",
-          cwd,
+          ...options,
         },
         timeout: 60000,
       });

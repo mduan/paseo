@@ -2532,6 +2532,7 @@ const CheckoutCommitSchema = z.object({
 export const CheckoutCommitsListRequestSchema = z.object({
   type: z.literal("checkout.commits.list.request"),
   cwd: z.string(),
+  ignoreWhitespace: z.boolean().optional(),
   requestId: z.string(),
 });
 

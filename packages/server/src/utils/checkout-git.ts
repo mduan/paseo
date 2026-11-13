@@ -2485,6 +2485,7 @@ interface CheckoutCommitLogInput {
   cwd: string;
   revision: string;
   maxCount?: number;
+  ignoreWhitespace?: boolean;
 }
 
 function mapNameStatusLetter(letter: string): CheckoutCommitFileStatus | undefined {
@@ -2633,6 +2634,7 @@ async function getCheckoutCommitRecords({
   cwd,
   revision,
   maxCount,
+  ignoreWhitespace,
 }: CheckoutCommitLogInput): Promise<ParsedCheckoutCommit[]> {
   const args = [
     "log",
@@ -2642,6 +2644,7 @@ async function getCheckoutCommitRecords({
     "--raw",
     "--numstat",
     "-M",
+    ...(ignoreWhitespace ? ["-w"] : []),
   ];
   if (maxCount !== undefined) {
     args.splice(2, 0, `--max-count=${maxCount}`);
@@ -2748,6 +2751,7 @@ async function listMergeCommitFiles(input: {
   cwd: string;
   sha: string;
   baseRef: string;
+  ignoreWhitespace?: boolean;
 }): Promise<CheckoutCommitFile[]> {
   const { cwd, sha, baseRef } = input;
   const base = await resolveCommitRangeDiffBase({
@@ -2756,19 +2760,24 @@ async function listMergeCommitFiles(input: {
     toSha: sha,
     resolveBaseRef: async () => baseRef,
   });
-  const { stdout } = await runGitCommand(["diff", "--raw", "--numstat", "-M", base, sha], {
-    cwd,
-    envOverlay: READ_ONLY_GIT_ENV,
-  });
+  const { stdout } = await runGitCommand(
+    buildGitDiffArgs({
+      ignoreWhitespace: input.ignoreWhitespace,
+      extra: ["--raw", "--numstat", "-M", base, sha],
+    }),
+    { cwd, envOverlay: READ_ONLY_GIT_ENV },
+  );
   return parseCommitFiles(stdout.split("\n"));
 }
 
 export async function listCheckoutCommits({
   cwd,
   context,
+  ignoreWhitespace,
 }: {
   cwd: string;
   context?: CheckoutContext;
+  ignoreWhitespace?: boolean;
 }): Promise<CheckoutCommitsResult> {
   const comparisonBaseRef = await resolveCheckoutCommitsBaseRef(cwd, context);
 
@@ -2776,7 +2785,7 @@ export async function listCheckoutCommits({
   let baseRevision = "HEAD";
   if (comparisonBaseRef) {
     const [records, mergeBase, merges] = await Promise.all([
-      getCheckoutCommitRecords({ cwd, revision: `${comparisonBaseRef}..HEAD` }),
+      getCheckoutCommitRecords({ cwd, revision: `${comparisonBaseRef}..HEAD`, ignoreWhitespace }),
       tryResolveMergeBase(cwd, comparisonBaseRef),
       runGitCommand(["rev-list", "--merges", `${comparisonBaseRef}..HEAD`], {
         cwd,
@@ -2792,6 +2801,7 @@ export async function listCheckoutCommits({
             cwd,
             sha: record.sha,
             baseRef: comparisonBaseRef,
+            ignoreWhitespace,
           });
         }),
     );
@@ -2804,6 +2814,7 @@ export async function listCheckoutCommits({
         cwd,
         revision: baseRevision,
         maxCount: CHECKOUT_BASE_COMMIT_LIMIT,
+        ignoreWhitespace,
       })
     : [];
   const records = [...workspaceRecords, ...baseRecords];

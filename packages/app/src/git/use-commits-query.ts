@@ -14,6 +14,7 @@ interface UseCheckoutCommitsQueryOptions {
   serverId: string;
   cwd: string;
   enabled?: boolean;
+  ignoreWhitespace?: boolean;
 }
 
 export interface CheckoutCommitsData {
@@ -72,6 +73,7 @@ export function useCheckoutCommitsQuery({
   serverId,
   cwd,
   enabled = true,
+  ignoreWhitespace = false,
 }: UseCheckoutCommitsQueryOptions): CheckoutCommitsQueryResult {
   const retainedPanelActive = useRetainedPanelActive();
   const queryEnabledByCaller = enabled && retainedPanelActive;
@@ -90,12 +92,12 @@ export function useCheckoutCommitsQuery({
   const queryEnabled = queryEnabledByCaller && capabilityPresent && canFetch;
 
   const query = useFetchQuery<CheckoutCommitsData>({
-    queryKey: checkoutCommitsQueryKey(serverId, cwd),
+    queryKey: [...checkoutCommitsQueryKey(serverId, cwd), ignoreWhitespace],
     queryFn: async () => {
       if (!client) {
         throw new Error("Host disconnected");
       }
-      const data = await client.listCheckoutCommits(cwd);
+      const data = await client.listCheckoutCommits({ cwd, ignoreWhitespace });
       const commits = data.commits.map((commit) => {
         invariant(commit.isOnBase !== undefined, "Host omitted commit base classification");
         return { ...commit, isOnBase: commit.isOnBase };
