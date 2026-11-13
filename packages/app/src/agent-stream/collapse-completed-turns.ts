@@ -178,8 +178,9 @@ export interface WorkToggleContextValue {
 /** Rows read their toggle from context, so memoized history rows update when it changes. */
 export const WorkToggleContext = createContext<WorkToggleContextValue | undefined>(undefined);
 
-export function useIsExpandedWork(itemId: string): boolean {
-  return useContext(WorkToggleContext)?.expandedWorkItemIds.has(itemId) ?? false;
+export function useIsExpandedWork(itemId: string | undefined): boolean {
+  const value = useContext(WorkToggleContext);
+  return itemId !== undefined && (value?.expandedWorkItemIds.has(itemId) ?? false);
 }
 
 export function useWorkToggle(itemId: string | undefined) {

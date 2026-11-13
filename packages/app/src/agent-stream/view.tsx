@@ -1793,10 +1793,16 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   expandedWork: {
     marginStart: theme.spacing[1],
-    paddingStart: theme.spacing[4],
-    borderStartWidth: theme.borderWidth[1],
-    borderStartColor: theme.colors.border,
+    paddingStart: theme.spacing[4] + theme.borderWidth[2],
   },
+  expandedWorkRail: (isLast: boolean) => ({
+    position: "absolute",
+    top: 0,
+    bottom: isLast ? theme.spacing[3] : 0,
+    start: 0,
+    borderStartWidth: theme.borderWidth[2],
+    borderStartColor: theme.colors.border,
+  }),
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -1938,6 +1944,8 @@ function StreamItemWrapper({
   children,
 }: StreamItemWrapperProps) {
   const isExpandedWork = useIsExpandedWork(itemId);
+  const isBelowExpandedWork = useIsExpandedWork(belowItemId);
+  const isLastExpandedWork = isExpandedWork && !isBelowExpandedWork;
   // The toggle moves between the final message and the first work row, which take different
   // gaps below this row. The toggle sets the gap instead, so expanding resizes no row above it.
   const isAboveWorkToggle = useWorkToggle(belowItemId) !== undefined;
@@ -1964,7 +1972,14 @@ function StreamItemWrapper({
   return (
     <View style={wrapperStyle}>
       <WorkToggleButton itemId={itemId} />
-      {isExpandedWork ? <View style={expandedWorkStyle}>{content}</View> : content}
+      {isExpandedWork ? (
+        <View style={expandedWorkStyle}>
+          <View style={stylesheet.expandedWorkRail(isLastExpandedWork)} pointerEvents="none" />
+          {content}
+        </View>
+      ) : (
+        content
+      )}
     </View>
   );
 }
