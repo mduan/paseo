@@ -610,7 +610,7 @@ test.describe("Sidebar workspace list", () => {
       [
         "-e",
         `const net = require('node:net');
-         Promise.all([0, 1].map(() => new Promise(resolve => {
+         Promise.all(Array.from({ length: 12 }, () => new Promise(resolve => {
            net.createServer().listen(0, '127.0.0.1', resolve);
          }))).then(() => process.send('ready'));`,
       ],
@@ -626,8 +626,8 @@ test.describe("Sidebar workspace list", () => {
       await expect(ports).toHaveCSS("cursor", "auto");
       await ports.hover();
       const panel = card.getByTestId("hover-card-ports-panel");
-      const rows = panel.locator(":scope > div").filter({ has: page.getByRole("button") });
-      await expect(rows).toHaveCount(2);
+      const rows = panel.getByTestId(/^hover-card-port-\d+$/);
+      await expect(rows).toHaveCount(12);
       const actions = panel.getByRole("button").locator("..");
 
       await expect(card).toHaveCSS("-webkit-app-region", "no-drag");
@@ -649,6 +649,9 @@ test.describe("Sidebar workspace list", () => {
       await panel.getByText("Live ports", { exact: true }).hover();
       await expect(actions.nth(0)).toHaveCSS("opacity", "0");
       await expect(actions.nth(1)).toHaveCSS("opacity", "0");
+      await rows.last().scrollIntoViewIfNeeded();
+      await rows.last().hover();
+      await expect(actions.last().getByRole("button")).toBeVisible();
       await expectHoverPanelCloseDelay({ page, card, source: ports, panel });
     } finally {
       await killProcessTree(listeners);

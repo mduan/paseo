@@ -493,10 +493,10 @@ function WorkspaceDetailsPanel({
   scheduleClose: () => void;
 }) {
   const { t } = useTranslation();
-  if (activePanel === HoverPanel.Ports && ports?.length) {
+  if (activePanel === HoverPanel.Ports && ports?.length && maxHeight) {
     return (
       <View
-        style={styles.portsPanel}
+        style={styles.portsPanel(maxHeight)}
         {...(isWeb && { onMouseEnter: cancelClose, onMouseLeave: scheduleClose })}
         testID="hover-card-ports-panel"
       >
@@ -504,7 +504,9 @@ function WorkspaceDetailsPanel({
           <ThemedPlug size={12} uniProps={foregroundMutedColorMapping} />
           <Text style={styles.panelTitle}>{t("workspace.hoverCard.livePorts")}</Text>
         </View>
-        <PortsList ports={ports} serverId={serverId} />
+        <ScrollView style={styles.panelList}>
+          <PortsList ports={ports} serverId={serverId} />
+        </ScrollView>
       </View>
     );
   }
@@ -519,7 +521,7 @@ function WorkspaceDetailsPanel({
           <ThemedLinear size={12} uniProps={foregroundMutedColorMapping} />
           <Text style={styles.panelTitle}>{t("workspace.hoverCard.linearIssues")}</Text>
         </View>
-        <ScrollView style={styles.issueList}>
+        <ScrollView style={styles.panelList}>
           {issues.map((issue) => (
             <LinearIssueRow key={issue.url} issue={issue} />
           ))}
@@ -763,7 +765,10 @@ function PortRow({ port, isLocal }: { port: WorkspacePort; isLocal: boolean }) {
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      <View style={[styles.portRow, hovered && styles.listRowHovered]}>
+      <View
+        style={[styles.portRow, hovered && styles.listRowHovered]}
+        testID={`hover-card-port-${port.port}`}
+      >
         <Text style={styles.portNumber} pointerEvents="none">
           {port.port}
         </Text>
@@ -913,14 +918,15 @@ const styles = StyleSheet.create((theme) => ({
     alignSelf: "flex-start",
     paddingBottom: theme.spacing[1],
   },
-  portsPanel: {
+  portsPanel: (maxHeight: number) => ({
+    maxHeight,
     maxWidth: 290,
     minWidth: 0,
     flexShrink: 1,
     borderLeftWidth: 1,
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
-  },
+  }),
   panelHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -942,7 +948,7 @@ const styles = StyleSheet.create((theme) => ({
     borderLeftColor: theme.colors.border,
     paddingBottom: theme.spacing[2],
   }),
-  issueList: { flexShrink: 1 },
+  panelList: { flexShrink: 1 },
   issueSummaryLink: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   issueRow: {
     paddingHorizontal: theme.spacing[3],
