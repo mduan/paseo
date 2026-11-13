@@ -658,14 +658,6 @@ function ChangesRepositoryToolbar({
       trailing={model.gitActions ? "framed" : "glyph"}
     >
       <ChangesToolbarLeading>
-        {model.baseRefLabel ? (
-          <BaseRefSwitcher
-            baseRefLabel={model.baseRefLabel}
-            serverId={model.serverId}
-            workspaceId={model.workspaceId ?? model.cwd}
-            cwd={model.cwd}
-          />
-        ) : null}
         <View style={toolbarLabelTriggerFrameStyle()}>
           <Text
             testID="changes-current-branch"
@@ -675,6 +667,14 @@ function ChangesRepositoryToolbar({
             {model.branchName ?? t("branchSwitcher.detachedHead")}
           </Text>
         </View>
+        {model.baseRefLabel ? (
+          <BaseRefSwitcher
+            baseRefLabel={model.baseRefLabel}
+            serverId={model.serverId}
+            workspaceId={model.workspaceId ?? model.cwd}
+            cwd={model.cwd}
+          />
+        ) : null}
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
         {model.gitActions ? <GitActionsSplitButton gitActions={model.gitActions} menuOnly /> : null}
