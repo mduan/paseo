@@ -1029,7 +1029,6 @@ export const ko: TranslationResources = {
       },
       diff: {
         openChangesTab: "변경사항 탭 열기",
-        openDiffTab: "Diff 탭 열기",
         closeChangesTab: "변경사항 탭 닫기",
         jumpToFile: {
           title: "파일로 이동",
@@ -1047,7 +1046,6 @@ export const ko: TranslationResources = {
         switchToUnified: "통합 diff로 전환",
         switchToSplit: "나란히 보기 diff로 전환",
         options: "Diff 옵션",
-        inlineDiff: "인라인 Diff",
         hideWhitespace: "공백 숨기기",
         showWhitespace: "공백 표시",
         scrollLongLines: "긴 줄 스크롤",

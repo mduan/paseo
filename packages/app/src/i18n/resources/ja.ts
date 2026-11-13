@@ -1035,7 +1035,6 @@ export const ja: TranslationResources = {
       },
       diff: {
         openChangesTab: "変更タブを開く",
-        openDiffTab: "差分タブを開く",
         closeChangesTab: "変更タブを閉じる",
         jumpToFile: {
           title: "ファイルへ移動",
@@ -1053,7 +1052,6 @@ export const ja: TranslationResources = {
         switchToUnified: "ユニファイド差分に切り替え",
         switchToSplit: "左右比較差分に切り替え",
         options: "差分オプション",
-        inlineDiff: "インライン差分",
         hideWhitespace: "空白を非表示",
         showWhitespace: "空白を表示",
         scrollLongLines: "長い行をスクロール",

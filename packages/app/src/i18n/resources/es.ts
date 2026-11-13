@@ -1056,7 +1056,6 @@ export const es: TranslationResources = {
       },
       diff: {
         openChangesTab: "Abrir la pestaña Cambios",
-        openDiffTab: "Abrir la pestaña Diferencia",
         closeChangesTab: "Cerrar la pestaña Cambios",
         jumpToFile: {
           title: "Ir al archivo",
@@ -1074,7 +1073,6 @@ export const es: TranslationResources = {
         switchToUnified: "Cambiar a diferencia unificada",
         switchToSplit: "Cambiar a diferencia lado a lado",
         options: "Opciones de diferencia",
-        inlineDiff: "Diferencia integrada",
         hideWhitespace: "Ocultar espacios en blanco",
         showWhitespace: "Mostrar espacios en blanco",
         scrollLongLines: "Desplazarse por largas filas",

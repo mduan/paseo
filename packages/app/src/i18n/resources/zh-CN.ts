@@ -1014,7 +1014,6 @@ export const zhCN: TranslationResources = {
       },
       diff: {
         openChangesTab: "打开“更改”标签页",
-        openDiffTab: "打开 Diff 标签页",
         closeChangesTab: "关闭“更改”标签页",
         jumpToFile: {
           title: "跳转到文件",
@@ -1032,7 +1031,6 @@ export const zhCN: TranslationResources = {
         switchToUnified: "切换到统一差异视图",
         switchToSplit: "切换到并排差异视图",
         options: "Diff 选项",
-        inlineDiff: "内联 Diff",
         hideWhitespace: "隐藏空白差异",
         showWhitespace: "显示空白差异",
         scrollLongLines: "滚动长行",

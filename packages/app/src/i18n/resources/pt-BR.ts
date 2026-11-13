@@ -1046,7 +1046,6 @@ export const ptBR: TranslationResources = {
       },
       diff: {
         openChangesTab: "Abrir a aba Alterações",
-        openDiffTab: "Abrir a aba Diff",
         closeChangesTab: "Fechar a aba Alterações",
         jumpToFile: {
           title: "Ir para o arquivo",
@@ -1064,7 +1063,6 @@ export const ptBR: TranslationResources = {
         switchToUnified: "Alternar para diff unificado",
         switchToSplit: "Alternar para diff lado a lado",
         options: "Opções do diff",
-        inlineDiff: "Diff embutido",
         hideWhitespace: "Ocultar espaços em branco",
         showWhitespace: "Mostrar espaços em branco",
         scrollLongLines: "Rolar linhas longas",

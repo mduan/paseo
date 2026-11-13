@@ -106,14 +106,6 @@ function PanelState({
   );
 }
 
-function resolveChangesPresentation(
-  isTree: boolean,
-  inlineDiff: boolean,
-): "tree" | "diff" | "combined" {
-  if (!isTree) return "diff";
-  return inlineDiff ? "combined" : "tree";
-}
-
 function ChangesPanel() {
   const { t } = useTranslation();
   const {
@@ -126,7 +118,6 @@ function ChangesPanel() {
     revealFileInExplorer,
   } = usePaneContext();
   const [changesState, setChangesState] = usePanelState(changesStateSchema, defaultChangesState);
-  const { preferences } = useChangesPreferences();
   const cwd = useWorkspaceDirectory(serverId, workspaceId);
   const isActive = useRetainedPanelActive();
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
@@ -159,7 +150,7 @@ function ChangesPanel() {
     return <PanelState message={t("panels.diff.directoryMissing")} />;
   }
 
-  const presentation = resolveChangesPresentation(isTree, preferences.inlineDiff);
+  const presentation = isTree ? "tree" : "diff";
   const testID = isTree ? "changes-tree-panel" : "working-diff-panel";
   const profileId = isTree ? `ChangesTreePanel:${tabId}` : `WorkingDiffPanel:${tabId}`;
 

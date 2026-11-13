@@ -23,7 +23,6 @@ import {
   ExternalLink,
   ListChevronsDownUp,
   ListChevronsUpDown,
-  Maximize,
   MoreHorizontal,
   Pilcrow,
   RotateCw,
@@ -210,7 +209,6 @@ const ThemedPilcrow = withUnistyles(Pilcrow);
 const ThemedWrapText = withUnistyles(WrapText);
 const ThemedListChevronsDownUp = withUnistyles(ListChevronsDownUp);
 const ThemedListChevronsUpDown = withUnistyles(ListChevronsUpDown);
-const ThemedMaximize = withUnistyles(Maximize);
 const noopStateChange = () => {};
 const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedMoreHorizontal = withUnistyles(MoreHorizontal);
@@ -229,9 +227,6 @@ const DIFF_OPTIONS_COLLAPSE_ICON = (
 );
 const DIFF_OPTIONS_EXPAND_ICON = (
   <ThemedListChevronsUpDown size={14} uniProps={foregroundMutedIconColorMapping} />
-);
-const DIFF_OPTIONS_CHANGES_TAB_ICON = (
-  <ThemedMaximize size={14} uniProps={foregroundMutedIconColorMapping} />
 );
 
 interface DiffLayoutToggleProps {
@@ -387,11 +382,6 @@ interface ChangesToolbarRefreshAction {
   onRefresh: () => void;
 }
 
-interface ChangesToolbarInlineDiffToggle {
-  value: boolean;
-  onToggle: () => void;
-}
-
 export interface ChangesToolbarDiffOptions {
   collapse: {
     allFilesCollapsed: boolean;
@@ -411,8 +401,6 @@ export interface ChangesToolbarDiffOptions {
 type ChangesToolbarMode =
   | {
       kind: "tree";
-      onOpenDiff: () => void;
-      inlineDiff: ChangesToolbarInlineDiffToggle | null;
       refresh: ChangesToolbarRefreshAction | null;
     }
   | {
@@ -425,7 +413,6 @@ type ChangesToolbarMode =
       options: ChangesToolbarDiffOptions;
       refresh: ChangesToolbarRefreshAction | null;
       treeToggle: { visible: boolean; onToggle: () => void } | null;
-      inlineDiff: ChangesToolbarInlineDiffToggle | null;
     };
 
 function buildChangesToolbarMode(input: {
@@ -439,8 +426,6 @@ function buildChangesToolbarMode(input: {
   hideWhitespace: boolean;
   wrapLines: boolean;
   treeVisible: boolean;
-  onOpenDiff: () => void;
-  inlineDiff: ChangesToolbarInlineDiffToggle | null;
   onRefresh: () => void;
   onCollapseAll: () => void;
   onExpandAll: () => void;
@@ -456,8 +441,6 @@ function buildChangesToolbarMode(input: {
   if (input.presentation === "tree") {
     return {
       kind: "tree",
-      onOpenDiff: input.onOpenDiff,
-      inlineDiff: input.inlineDiff,
       refresh,
     };
   }
@@ -488,7 +471,6 @@ function buildChangesToolbarMode(input: {
       !input.compact && input.hasChanges
         ? { visible: input.treeVisible, onToggle: input.onToggleTree }
         : null,
-    inlineDiff: input.inlineDiff,
   };
 }
 
@@ -811,12 +793,7 @@ function ChangesComparisonToolbar({
 
 function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; compact: boolean }) {
   if (mode.kind === "tree") {
-    return (
-      <>
-        {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
-        <ChangesOptionsMenu mode={mode} compact={compact} />
-      </>
-    );
+    return mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null;
   }
   if (mode.kind === "diff") {
     return (
@@ -836,7 +813,7 @@ function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; co
         />
       ) : null}
       {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
-      <ChangesOptionsMenu mode={mode} compact={compact} />
+      <ChangesOptionsMenu options={mode.options} compact={compact} />
     </>
   );
 }
@@ -952,26 +929,15 @@ function ChangesRefreshButton({
   );
 }
 
-type ChangesOptionsMenuMode = Extract<ChangesToolbarMode, { kind: "tree" | "combined" }>;
-
-function ChangesOptionsMenu({ mode, compact }: { mode: ChangesOptionsMenuMode; compact: boolean }) {
+function ChangesOptionsMenu({
+  options,
+  compact,
+}: {
+  options: ChangesToolbarDiffOptions;
+  compact: boolean;
+}) {
   const { t } = useTranslation();
   const optionsLabel = t("workspace.git.diff.options");
-  const content =
-    mode.kind === "tree" ? (
-      <ChangesTreeOptions onOpenDiff={mode.onOpenDiff} inlineDiff={mode.inlineDiff} />
-    ) : (
-      <>
-        <ChangesDiffOptions options={mode.options} />
-        {mode.inlineDiff ? (
-          <>
-            <DropdownMenuSeparator />
-            <ChangesInlineDiffOption toggle={mode.inlineDiff} />
-          </>
-        ) : null}
-      </>
-    );
-
   return (
     <DropdownMenu>
       <ToolbarButton
@@ -986,49 +952,9 @@ function ChangesOptionsMenu({ mode, compact }: { mode: ChangesOptionsMenuMode; c
         />
       </ToolbarButton>
       <DropdownMenuContent align="end" width={240} testID="changes-options-menu-content">
-        {content}
+        <ChangesDiffOptions options={options} />
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function ChangesTreeOptions({
-  onOpenDiff,
-  inlineDiff,
-}: {
-  onOpenDiff: () => void;
-  inlineDiff: ChangesToolbarInlineDiffToggle | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <DropdownMenuItem
-        leading={DIFF_OPTIONS_CHANGES_TAB_ICON}
-        testID="changes-open-tab"
-        onSelect={onOpenDiff}
-      >
-        {t("workspace.git.diff.openDiffTab")}
-      </DropdownMenuItem>
-      {inlineDiff ? (
-        <>
-          <DropdownMenuSeparator />
-          <ChangesInlineDiffOption toggle={inlineDiff} />
-        </>
-      ) : null}
-    </>
-  );
-}
-
-function ChangesInlineDiffOption({ toggle }: { toggle: ChangesToolbarInlineDiffToggle }) {
-  const { t } = useTranslation();
-  return (
-    <DropdownMenuItem
-      selected={toggle.value}
-      testID="changes-toggle-inline-diff"
-      onSelect={toggle.onToggle}
-    >
-      {t("workspace.git.diff.inlineDiff")}
-    </DropdownMenuItem>
   );
 }
 
@@ -1489,12 +1415,6 @@ function useDiffTabNavigation({
     () => buildWorkspaceTabPersistenceKey({ serverId, workspaceId: workspaceId ?? cwd }),
     [cwd, serverId, workspaceId],
   );
-  const openDiff = useCallback(() => {
-    if (!persistenceKey || isMobile) {
-      return;
-    }
-    openWorkspaceTab(persistenceKey, { kind: "working_diff" }, FOCUSED_PANE_PLACEMENT);
-  }, [isMobile, openWorkspaceTab, persistenceKey]);
   const openCommit = useCallback(
     (sha: string) => {
       if (persistenceKey) {
@@ -1513,7 +1433,6 @@ function useDiffTabNavigation({
     });
   }, [cwd, isMobile, persistenceKey, pullRequestOpenLocation, serverId]);
   return {
-    openDiff,
     openCommit,
     openPullRequest,
   };
@@ -1567,10 +1486,6 @@ export function ChangesSurface({
     void updatePreferences({ hideWhitespace: !preferences.hideWhitespace });
   }, [preferences.hideWhitespace, updatePreferences]);
 
-  const handleToggleInlineDiff = useCallback(() => {
-    void updatePreferences({ inlineDiff: !preferences.inlineDiff });
-  }, [preferences.inlineDiff, updatePreferences]);
-
   const handleToggleLayout = useCallback(() => {
     const layout = preferences.layout === "unified" ? "split" : "unified";
     void updatePreferences({ layout });
@@ -1579,17 +1494,14 @@ export function ChangesSurface({
 
   const toast = useToast();
   const fileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
-  const {
-    openDiff: handleOpenDiff,
-    openCommit: handleCommitPress,
-    openPullRequest: handleOpenPullRequest,
-  } = useDiffTabNavigation({
-    serverId,
-    workspaceId,
-    cwd,
-    isMobile,
-    pullRequestOpenLocation: appSettings.pullRequestOpenLocation,
-  });
+  const { openCommit: handleCommitPress, openPullRequest: handleOpenPullRequest } =
+    useDiffTabNavigation({
+      serverId,
+      workspaceId,
+      cwd,
+      isMobile,
+      pullRequestOpenLocation: appSettings.pullRequestOpenLocation,
+    });
   const refreshSupported = useSessionStore(
     (s) => s.sessions[serverId]?.serverInfo?.features?.checkoutRefresh === true,
   );
@@ -1890,10 +1802,6 @@ export function ChangesSurface({
         hideWhitespace: preferences.hideWhitespace,
         wrapLines,
         treeVisible: desktopTreeVisible,
-        onOpenDiff: handleOpenDiff,
-        inlineDiff: !isMobile
-          ? { value: preferences.inlineDiff, onToggle: handleToggleInlineDiff }
-          : null,
         onRefresh: handleRefresh,
         onCollapseAll: handleCollapseAllFiles,
         onExpandAll: handleExpandAllFiles,
@@ -1909,8 +1817,6 @@ export function ChangesSurface({
       desktopTreeVisible,
       handleCollapseAllFiles,
       handleExpandAllFiles,
-      handleOpenDiff,
-      handleToggleInlineDiff,
       handleRefresh,
       handleToggleDesktopTree,
       handleToggleHideWhitespace,
@@ -1918,7 +1824,6 @@ export function ChangesSurface({
       handleToggleWrapLines,
       hasChanges,
       preferences.hideWhitespace,
-      preferences.inlineDiff,
       preferences.layout,
       isMobile,
       isRefreshing,

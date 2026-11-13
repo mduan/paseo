@@ -31,14 +31,14 @@ describe("loadChangesPreferencesFromStorage", () => {
       desktopTreeVisible: false,
       wrapLines: true,
       hideWhitespace: false,
-      inlineDiff: false,
       commitsCollapsed: true,
     });
     expect(storage.entries.get(CHANGES_PREFERENCES_STORAGE_KEY)).toBe(JSON.stringify(result));
   });
 
-  it("loads persisted layout and whitespace preferences without rewriting storage", async () => {
+  it("loads persisted display preferences and ignores removed fields without rewriting storage", async () => {
     const persisted = JSON.stringify({
+      inlineDiff: true,
       layout: "split",
       viewMode: "tree",
       hideWhitespace: true,
@@ -55,7 +55,6 @@ describe("loadChangesPreferencesFromStorage", () => {
       desktopTreeVisible: true,
       hideWhitespace: true,
       wrapLines: false,
-      inlineDiff: false,
       commitsCollapsed: true,
     });
     expect(storage.entries.get(CHANGES_PREFERENCES_STORAGE_KEY)).toBe(persisted);
@@ -86,22 +85,6 @@ describe("changes preferences commitsCollapsed", () => {
     const prefs = await loadChangesPreferencesFromStorage(storage);
 
     expect(prefs.commitsCollapsed).toBe(true);
-  });
-});
-
-describe("changes preferences inlineDiff", () => {
-  it("keeps inline diff disabled by default", () => {
-    expect(DEFAULT_CHANGES_PREFERENCES.inlineDiff).toBe(false);
-  });
-
-  it("round-trips the inline diff preference", async () => {
-    const storage = createInMemoryKeyValueStorage({
-      [CHANGES_PREFERENCES_STORAGE_KEY]: JSON.stringify({ inlineDiff: true }),
-    });
-
-    const prefs = await loadChangesPreferencesFromStorage(storage);
-
-    expect(prefs.inlineDiff).toBe(true);
   });
 });
 

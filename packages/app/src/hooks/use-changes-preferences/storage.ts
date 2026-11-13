@@ -6,14 +6,13 @@ export const CHANGES_PREFERENCES_STORAGE_KEY = "@paseo:changes-preferences";
 export const LEGACY_WRAP_LINES_STORAGE_KEY = "diff-wrap-lines";
 export const CHANGES_PREFERENCES_QUERY_KEY = ["changes-preferences"];
 
-const changesPreferencesSchema = z.strictObject({
+const changesPreferencesSchema = z.object({
   layout: z.enum(["unified", "split"]).optional(),
   desktopTreeVisible: z.boolean().optional(),
   // Read the former overloaded preference once so existing installations keep their desktop tree.
   viewMode: z.enum(["flat", "tree"]).optional(),
   wrapLines: z.boolean().optional(),
   hideWhitespace: z.boolean().optional(),
-  inlineDiff: z.boolean().optional(),
   commitsCollapsed: z.boolean().optional(),
 });
 
@@ -22,7 +21,6 @@ export interface ChangesPreferences {
   desktopTreeVisible: boolean;
   wrapLines: boolean;
   hideWhitespace: boolean;
-  inlineDiff: boolean;
   commitsCollapsed: boolean;
 }
 
@@ -31,7 +29,6 @@ export const DEFAULT_CHANGES_PREFERENCES: ChangesPreferences = {
   desktopTreeVisible: false,
   wrapLines: false,
   hideWhitespace: false,
-  inlineDiff: false,
   commitsCollapsed: true,
 };
 

@@ -1022,7 +1022,6 @@ export const ar: TranslationResources = {
       },
       diff: {
         openChangesTab: "فتح علامة تبويب التغييرات",
-        openDiffTab: "فتح علامة تبويب الفرق",
         closeChangesTab: "إغلاق علامة تبويب التغييرات",
         jumpToFile: {
           title: "الانتقال إلى ملف",
@@ -1040,7 +1039,6 @@ export const ar: TranslationResources = {
         switchToUnified: "التبديل إلى الفرق الموحد",
         switchToSplit: "التبديل إلى الفرق جنبًا إلى جنب",
         options: "خيارات الفرق",
-        inlineDiff: "فرق مضمّن",
         hideWhitespace: "إخفاء المسافة البيضاء",
         showWhitespace: "إظهار المسافة البيضاء",
         scrollLongLines: "قم بتمرير الخطوط الطويلة",

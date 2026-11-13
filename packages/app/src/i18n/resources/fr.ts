@@ -1055,7 +1055,6 @@ export const fr: TranslationResources = {
       },
       diff: {
         openChangesTab: "Ouvrir l'onglet Modifications",
-        openDiffTab: "Ouvrir l'onglet Diff",
         closeChangesTab: "Fermer l'onglet Modifications",
         jumpToFile: {
           title: "Aller au fichier",
@@ -1073,7 +1072,6 @@ export const fr: TranslationResources = {
         switchToUnified: "Passer au diff unifié",
         switchToSplit: "Passer au diff côte à côte",
         options: "Options du diff",
-        inlineDiff: "Diff intégré",
         hideWhitespace: "Masquer les espaces",
         showWhitespace: "Afficher les espaces",
         scrollLongLines: "Faire défiler les longues lignes",

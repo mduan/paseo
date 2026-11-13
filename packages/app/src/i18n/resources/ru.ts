@@ -1040,7 +1040,6 @@ export const ru: TranslationResources = {
       },
       diff: {
         openChangesTab: "Открыть вкладку «Изменения»",
-        openDiffTab: "Открыть вкладку «Дифф»",
         closeChangesTab: "Закрыть вкладку «Изменения»",
         jumpToFile: {
           title: "Перейти к файлу",
@@ -1058,7 +1057,6 @@ export const ru: TranslationResources = {
         switchToUnified: "Переключиться на унифицированный дифф",
         switchToSplit: "Переключиться на параллельный дифф",
         options: "Параметры диффа",
-        inlineDiff: "Встроенный дифф",
         hideWhitespace: "Скрыть пробельные изменения",
         showWhitespace: "Показать пробельные изменения",
         scrollLongLines: "Прокручивать длинные строки",

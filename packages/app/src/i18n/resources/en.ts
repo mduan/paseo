@@ -1030,7 +1030,6 @@ export const en = {
       },
       diff: {
         openChangesTab: "Open Changes tab",
-        openDiffTab: "Open Diff tab",
         closeChangesTab: "Close Changes tab",
         jumpToFile: {
           title: "Jump to file",
@@ -1048,7 +1047,6 @@ export const en = {
         switchToUnified: "Switch to unified diff",
         switchToSplit: "Switch to side-by-side diff",
         options: "Diff options",
-        inlineDiff: "Inline diff",
         hideWhitespace: "Hide whitespace",
         showWhitespace: "Show whitespace",
         scrollLongLines: "Scroll long lines",
