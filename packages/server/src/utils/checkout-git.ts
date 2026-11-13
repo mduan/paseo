@@ -3368,17 +3368,33 @@ function isWhitespaceOnlyTrackedChange(input: {
   );
 }
 
-function readTrackedDiffContents(
-  cwd: string,
-  changes: CheckoutFileChange[],
-  refs: CheckoutDiffRefs,
-): Promise<Map<string, string | null> | null> {
+async function* readTrackedDiffBatches(input: {
+  cwd: string;
+  changes: CheckoutFileChange[];
+  refs: CheckoutDiffRefs;
+  parsedByPath: Map<string, ParsedDiffFile>;
+  placeholdersByPath: AppendStructuredTrackedDiffsInput["trackedPlaceholderByPath"];
+}): AsyncGenerator<{
+  changes: CheckoutFileChange[];
+  contents: Map<string, string | null> | null;
+}> {
+  const { cwd, changes, refs, parsedByPath, placeholdersByPath } = input;
   const specs: string[] = [];
   for (const change of changes) {
+    if (placeholdersByPath.has(change.path) || !parsedByPath.has(change.path)) continue;
     if (!change.isNew) specs.push(`${refs.baseRef}:${change.oldPath ?? change.path}`);
     if (refs.targetRef) specs.push(`${refs.targetRef}:${change.path}`);
   }
-  return readGitFileContents(cwd, specs);
+  const contents =
+    changes.length <= TRACKED_DIFF_BATCH_SIZE ? await readGitFileContents(cwd, specs) : null;
+  if (!contents && changes.length > 1) {
+    const middle = Math.ceil(changes.length / 2);
+    // Consume each bounded batch before reading the next, including large generated files.
+    yield* readTrackedDiffBatches({ ...input, changes: changes.slice(0, middle) });
+    yield* readTrackedDiffBatches({ ...input, changes: changes.slice(middle) });
+  } else {
+    yield { changes, contents };
+  }
 }
 
 async function appendStructuredTrackedDiffs(
@@ -3399,16 +3415,13 @@ async function appendStructuredTrackedDiffs(
   const parsedTrackedFiles = trackedDiffText.length > 0 ? parseDiff(trackedDiffText) : [];
   const parsedTrackedByPath = new Map(parsedTrackedFiles.map((file) => [file.path, file]));
 
-  for (let start = 0; start < trackedChanges.length; start += TRACKED_DIFF_BATCH_SIZE) {
-    const changes = trackedChanges.slice(start, start + TRACKED_DIFF_BATCH_SIZE);
-    const contents = await readTrackedDiffContents(
-      cwd,
-      changes.filter(
-        (change) =>
-          !trackedPlaceholderByPath.has(change.path) && parsedTrackedByPath.has(change.path),
-      ),
-      refsForDiff,
-    );
+  for await (const { changes, contents } of readTrackedDiffBatches({
+    cwd,
+    changes: trackedChanges,
+    refs: refsForDiff,
+    parsedByPath: parsedTrackedByPath,
+    placeholdersByPath: trackedPlaceholderByPath,
+  })) {
     for (const change of changes) {
       const placeholder = trackedPlaceholderByPath.get(change.path);
       if (placeholder) {

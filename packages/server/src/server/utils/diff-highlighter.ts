@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { highlightCode, isLanguageSupported, type HighlightToken } from "@getpaseo/highlight";
 
 const MAX_DIFF_HIGHLIGHT_LINE_CHARS = 10_000;
+const MAX_FULL_FILE_HIGHLIGHT_CHARS = 1024 * 1024;
 
 export interface DiffLine {
   type: "add" | "remove" | "context" | "header";
@@ -275,7 +276,9 @@ function buildFullFileTokenLookup(
   fileContent: string,
   path: string,
 ): Map<number, HighlightToken[]> | null {
-  if (hasOversizedLine(fileContent)) return null;
+  // Bound full-file parsing; diff callers fall back to hunk context.
+  if (fileContent.length > MAX_FULL_FILE_HIGHLIGHT_CHARS || hasOversizedLine(fileContent))
+    return null;
 
   const lookup = new Map<number, HighlightToken[]>();
   const highlighted = highlightCode(fileContent, path);
@@ -437,7 +440,7 @@ export function countFileLines(content: string): number {
 
 /**
  * Returns highlighted lines [startLine, startLine + lineCount) of a file.
- * Highlights the whole file so multi-line constructs tokenize the same as the diff.
+ * Full-file tokens preserve multi-line context within the highlighting budget.
  */
 export function highlightFileLines(input: {
   content: string;
