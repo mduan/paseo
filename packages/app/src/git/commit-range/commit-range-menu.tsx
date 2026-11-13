@@ -201,6 +201,8 @@ function CommitRangeItem({
       onPress={handlePress}
       style={pressableStyle}
     >
+      {checked && !rangeStart ? <View style={[styles.rail, styles.railAbove]} /> : null}
+      {checked && !rangeEnd ? <View style={[styles.rail, styles.railBelow]} /> : null}
       <View style={checked ? [styles.checkbox, styles.checkboxChecked] : styles.checkbox}>
         {checked ? <ThemedCheck size={12} uniProps={checkedIconMapping} /> : null}
       </View>
@@ -219,6 +221,8 @@ function CommitRangeItem({
 }
 
 const TITLE_LINE_HEIGHT = 18;
+const CHECKBOX_SIZE = 16;
+const RAIL_WIDTH = 2;
 
 const styles = StyleSheet.create((theme) => ({
   list: {
@@ -258,6 +262,22 @@ const styles = StyleSheet.create((theme) => ({
   rowCheckedHovered: {
     backgroundColor: theme.colors.surface3,
   },
+  // Joins the checkboxes of a multi-commit range; each half reaches the row edge it shares.
+  rail: {
+    position: "absolute",
+    left: theme.spacing[2] + (CHECKBOX_SIZE - RAIL_WIDTH) / 2,
+    width: RAIL_WIDTH,
+    backgroundColor: theme.colors.accent,
+    opacity: theme.opacity[50],
+  },
+  railAbove: {
+    top: -theme.borderWidth[1],
+    height: theme.spacing[1] + TITLE_LINE_HEIGHT / 2 + theme.borderWidth[1],
+  },
+  railBelow: {
+    top: theme.spacing[1] + TITLE_LINE_HEIGHT / 2,
+    bottom: -theme.borderWidth[1],
+  },
   rowContent: {
     flex: 1,
     minWidth: 0,
@@ -282,10 +302,10 @@ const styles = StyleSheet.create((theme) => ({
     fontFamily: theme.fontFamily.mono,
   },
   checkbox: {
-    width: 16,
-    height: 16,
+    width: CHECKBOX_SIZE,
+    height: CHECKBOX_SIZE,
     // Centres the box on the title's first line.
-    marginTop: (TITLE_LINE_HEIGHT - 16) / 2,
+    marginTop: (TITLE_LINE_HEIGHT - CHECKBOX_SIZE) / 2,
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
