@@ -28,6 +28,9 @@ const POLICY = [
 
 const META = `<meta http-equiv="Content-Security-Policy" content="${POLICY}">`;
 
+// Left where it is, a BOM would sit mid-document and render as a zero-width space.
+const BOM = "\uFEFF";
+
 // The policy must reach the parser before any markup the document declares, and it
 // only counts if it lands in `<head>` — once the parser has moved on to `<body>`, a
 // meta http-equiv CSP is ignored outright.
@@ -40,16 +43,13 @@ const META = `<meta http-equiv="Content-Security-Policy" content="${POLICY}">`;
 // rule that a doctype closes at the first `>` in every state. Each of those rules
 // cost a bug before it was right.
 //
-// So the prologue isn't found, it's supplied: our doctype, then the policy, then
-// the file verbatim. The file's own doctype becomes a stray DOCTYPE token, which
-// the parser ignores wherever it appears. Standards mode is guaranteed, the policy
-// is always the first element and therefore always in the head, and no part of the
-// document has to be parsed to place it.
-const PROLOGUE = `<!doctype html>${META}`;
-
-// Left where it is, a BOM would sit mid-document and render as a zero-width space.
-const BOM = "\uFEFF";
-
-export function withPreviewCsp(html: string): string {
-  return PROLOGUE + (html.startsWith(BOM) ? html.slice(BOM.length) : html);
+// So the prologue isn't found, it's supplied: our doctype, an optional <base>, the
+// policy, then the file verbatim. The file's own doctype becomes a stray DOCTYPE
+// token, which the parser ignores wherever it appears. Standards mode is
+// guaranteed, the policy always lands in the head, and no part of the document has
+// to be parsed to place it. `baseHref` goes before the policy because
+// `base-uri 'none'` refuses any <base> parsed after it, including the file's own.
+export function withPreviewCsp(html: string, baseHref?: string): string {
+  const base = baseHref ? `<base href="${baseHref}">` : "";
+  return `<!doctype html>${base}${META}${html.startsWith(BOM) ? html.slice(BOM.length) : html}`;
 }
