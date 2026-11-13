@@ -157,7 +157,6 @@ export function useWorkspaceTabLaunchCatalog(input: {
         id: "diff",
         label: diffPresentation.label(t),
         Icon: diffPresentation.icon,
-        shortcutActionId: "workspace-tab-target-changes",
         disabled: false,
         panelKind: "working_diff",
         toggleTarget: null,

@@ -177,7 +177,6 @@ export const SHORTCUT_HELP_ROW_ORDER: Record<ShortcutSectionId, readonly string[
     "workspace-tab-target-agent",
     "workspace-terminal-new",
     "workspace-tab-target-browser",
-    "workspace-tab-target-changes",
     "workspace-tab-target-files",
     "workspace-tab-close-current",
     "workspace-tab-rename",
@@ -215,7 +214,6 @@ const SHORTCUT_HELP_LABEL_KEYS: Record<string, string> = {
   "workspace-tab-new": "settings.shortcuts.help.newTab",
   "workspace-tab-target-agent": "workspace.tabs.actions.newAgent",
   "workspace-tab-target-browser": "workspace.tabs.actions.newBrowser",
-  "workspace-tab-target-changes": "workspace.tabs.actions.changes",
   "workspace-tab-target-files": "workspace.tabs.actions.files",
   "workspace-tab-close-current": "settings.shortcuts.help.closeCurrentTab",
   "workspace-tab-rename": "settings.shortcuts.help.renameTab",
@@ -503,30 +501,6 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
       id: "workspace-tab-target-browser",
       section: "tabs-panes",
       label: "New browser",
-    },
-  },
-  {
-    // Keep the binding id stable so saved overrides from the former Cmd+Shift+C default survive.
-    id: "workspace-tab-target-changes-cmd-shift-c-mac",
-    action: "workspace.tab.target.changes",
-    combo: "Cmd+Shift+G",
-    when: { mac: true, commandCenter: false },
-    help: {
-      id: "workspace-tab-target-changes",
-      section: "tabs-panes",
-      label: "Changes",
-    },
-  },
-  {
-    // Keep the binding id stable so saved overrides from the former Ctrl+Shift+C default survive.
-    id: "workspace-tab-target-changes-ctrl-shift-c-non-mac",
-    action: "workspace.tab.target.changes",
-    combo: "Ctrl+Shift+G",
-    when: { mac: false, commandCenter: false, terminal: false },
-    help: {
-      id: "workspace-tab-target-changes",
-      section: "tabs-panes",
-      label: "Changes",
     },
   },
   {

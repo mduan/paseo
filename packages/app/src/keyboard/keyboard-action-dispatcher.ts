@@ -17,7 +17,6 @@ export type KeyboardActionId =
   | "workspace.tab.menu.open"
   | "workspace.tab.target.agent"
   | "workspace.tab.target.browser"
-  | "workspace.tab.target.changes"
   | "workspace.tab.target.files"
   | "workspace.tab.close-current"
   | "workspace.tab.navigate-index"
@@ -70,7 +69,6 @@ export type KeyboardActionDefinition =
   | { id: "workspace.tab.menu.open"; scope: KeyboardActionScope }
   | { id: "workspace.tab.target.agent"; scope: KeyboardActionScope }
   | { id: "workspace.tab.target.browser"; scope: KeyboardActionScope }
-  | { id: "workspace.tab.target.changes"; scope: KeyboardActionScope }
   | { id: "workspace.tab.target.files"; scope: KeyboardActionScope }
   | { id: "workspace.tab.close-current"; scope: KeyboardActionScope }
   | { id: "workspace.tab.navigate-index"; scope: KeyboardActionScope; index: number }
