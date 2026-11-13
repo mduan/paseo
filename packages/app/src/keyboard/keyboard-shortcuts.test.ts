@@ -1234,7 +1234,6 @@ describe("direct new-tab target shortcuts", () => {
   const targetCases = [
     ["a", "KeyA", "workspace.tab.target.agent"],
     ["b", "KeyB", "workspace.tab.target.browser"],
-    ["g", "KeyG", "workspace.tab.target.changes"],
     ["e", "KeyE", "workspace.tab.target.files"],
   ] as const;
 
@@ -1242,6 +1241,16 @@ describe("direct new-tab target shortcuts", () => {
     const result = resolveShortcut({
       event: { key: "a", code: "KeyA" },
       context: { ...desktopNonMac, focusScope: "other" },
+      bindings: buildEffectiveBindings({}),
+    });
+
+    expect(result.match).toBeNull();
+  });
+
+  it.each([false, true])("leaves Shift+G unbound with the primary modifier (isMac=%s)", (isMac) => {
+    const result = resolveShortcut({
+      event: { key: "G", code: "KeyG", ctrlKey: !isMac, metaKey: isMac, shiftKey: true },
+      context: { isMac, isDesktop: true, focusScope: "other" },
       bindings: buildEffectiveBindings({}),
     });
 

@@ -27,7 +27,6 @@ const SHORTCUT_HELP_IDS: Record<keyof WorkspaceCommandCenterShortcuts, string> =
   renameTab: "workspace-tab-rename",
   newTab: "workspace-tab-new",
   newBrowser: "workspace-tab-target-browser",
-  changes: "workspace-tab-target-changes",
   files: "workspace-tab-target-files",
   searchFiles: "search-files",
   previousWorkspace: "workspace-prev",

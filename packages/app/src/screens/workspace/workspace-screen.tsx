@@ -3367,16 +3367,6 @@ function WorkspaceScreenContent({
         case "workspace.tab.target.browser":
           handleCreateBrowserTab({ paneId });
           return true;
-        case "workspace.tab.target.changes":
-          if (persistenceKey && isGitCheckout) {
-            openExplorerSidebarView({
-              isCompact: isMobile,
-              workspaceKey: persistenceKey,
-              checkout: activeExplorerCheckout,
-              view: "changes",
-            });
-          }
-          return true;
         case "workspace.tab.target.files":
           if (persistenceKey) {
             openExplorerSidebarView({
@@ -3396,7 +3386,6 @@ function WorkspaceScreenContent({
       activeExplorerCheckout,
       handleCreateBrowserTab,
       handleCreateDraftTab,
-      isGitCheckout,
       isMobile,
       persistenceKey,
     ],
@@ -3543,7 +3532,6 @@ function WorkspaceScreenContent({
     actions: [
       "workspace.tab.target.agent",
       "workspace.tab.target.browser",
-      "workspace.tab.target.changes",
       "workspace.tab.target.files",
     ] as const,
     enabled: workspaceActionsEnabled,

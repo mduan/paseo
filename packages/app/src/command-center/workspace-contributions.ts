@@ -126,7 +126,6 @@ export interface WorkspaceCommandCenterShortcuts {
   renameTab?: ShortcutKey[][];
   newTab?: ShortcutKey[][];
   newBrowser?: ShortcutKey[][];
-  changes?: ShortcutKey[][];
   files?: ShortcutKey[][];
   searchFiles?: ShortcutKey[][];
   previousWorkspace?: ShortcutKey[][];
@@ -258,7 +257,6 @@ function buildPanelContributions(
       target: "changes",
       name: source.labels.changes,
       icon: source.icons.changes,
-      shortcutKeys: source.shortcuts.changes,
     },
     {
       target: "files",

@@ -209,12 +209,6 @@ const NewTabPanel = memo(function NewTabPanel(): ReactElement {
         itemsById.get("browser")?.launch({ kind: "replace", tabId });
         return true;
       }
-      if (action.id === "workspace.tab.target.changes") {
-        const changesItem = itemsById.get("changes") ?? itemsById.get("diff");
-        if (!changesItem) return false;
-        changesItem.launch({ kind: "replace", tabId });
-        return true;
-      }
       if (action.id === "workspace.tab.target.files") {
         const filesItem = itemsById.get("files");
         if (!filesItem) return false;
@@ -233,7 +227,6 @@ const NewTabPanel = memo(function NewTabPanel(): ReactElement {
       "workspace.browser.new",
       "workspace.tab.target.agent",
       "workspace.tab.target.browser",
-      "workspace.tab.target.changes",
       "workspace.tab.target.files",
     ],
     enabled: handlesWorkspaceShortcuts,

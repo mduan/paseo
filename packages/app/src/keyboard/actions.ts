@@ -22,7 +22,6 @@ export type KeyboardActionId =
   | "workspace.tab.menu.open"
   | "workspace.tab.target.agent"
   | "workspace.tab.target.browser"
-  | "workspace.tab.target.changes"
   | "workspace.tab.target.files"
   | "workspace.tab.close.current"
   | "workspace.tab.navigate.index"
