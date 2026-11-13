@@ -7002,6 +7002,77 @@ test("creation lifecycle sends the keyed agent and initial prompt as one intent"
   expect(transport.sent).toHaveLength(1);
 });
 
+test.each([false, true])(
+  "creation finish notifications stay outside provider config (modern=%s)",
+  async (modern) => {
+    const transport = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "creation-finish-wire",
+      transportFactory: () => transport.transport,
+      reconnect: { enabled: false },
+    });
+    clients.push(client);
+    const connected = client.connect();
+    transport.triggerOpen({
+      features: { creationLifecycle: modern, agentCreationFinishNotifications: true },
+    });
+    await connected;
+    const creation = client.createAgent({
+      provider: "codex",
+      cwd: "/project",
+      callerAgentId: "parent",
+      initialPrompt: "Do work",
+      notifyOnFinish: true,
+    });
+    void creation.catch(() => undefined);
+    const request = parseSentFrame(transport.sent[0]);
+    expect(request).toMatchObject({ callerAgentId: "parent", notifyOnFinish: true });
+    expect(request.config).not.toHaveProperty("notifyOnFinish");
+    transport.triggerMessage(
+      wrapSessionMessage(
+        modern
+          ? {
+              type: "agent.create.response",
+              payload: { requestId: request.requestId, agent: null, error: "Provider failed" },
+            }
+          : {
+              type: "status",
+              payload: {
+                status: "agent_create_failed",
+                requestId: request.requestId,
+                error: "Provider failed",
+              },
+            },
+      ),
+    );
+    await expect(creation).rejects.toThrow("Provider failed");
+  },
+);
+
+test("creation finish notifications reject unsupported hosts before creating anything", async () => {
+  const transport = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "creation-finish-unsupported",
+    transportFactory: () => transport.transport,
+    reconnect: { enabled: false },
+  });
+  clients.push(client);
+  const connected = client.connect();
+  transport.triggerOpen({ features: { creationLifecycle: true } });
+  await connected;
+  await expect(
+    client.createAgent({
+      provider: "codex",
+      cwd: "/project",
+      callerAgentId: "parent",
+      notifyOnFinish: true,
+    }),
+  ).rejects.toThrow("Update the host");
+  expect(transport.sent).toHaveLength(0);
+});
+
 test("creation lifecycle acknowledgement reaches the observer before the final response", async () => {
   const transport = createMockTransport();
   const client = new DaemonClient({

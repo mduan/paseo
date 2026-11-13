@@ -55,6 +55,8 @@ export type EnsureWorkspaceForCreate = (
 
 export interface CreateAgentFromSessionInput {
   kind: "session";
+  callerAgentId?: string;
+  notifyOnFinish?: boolean;
   onAgentReady?: (agent: ManagedAgent) => Promise<void>;
   agentId?: string;
   config: AgentSessionConfig;
@@ -200,21 +202,15 @@ export async function createAgentCommand(
     input.onCreated?.({ agentId: snapshot.id, createdWorktree: resolved.createdWorktree ?? null });
   }
   if (resolved.prompt !== undefined) {
-    const sendResult = await sendInitialPrompt(dependencies, resolved, snapshot);
+    const sendResult = await sendInitialPrompt({
+      dependencies,
+      resolved,
+      snapshot,
+      callerAgentId: input.notifyOnFinish ? input.callerAgentId : undefined,
+    });
     initialPromptStarted = sendResult.started;
     liveSnapshot = sendResult.liveSnapshot;
     initialPromptError = sendResult.error ?? null;
-  }
-
-  if (input.kind === "mcp" && input.notifyOnFinish && input.callerAgentId && initialPromptStarted) {
-    setupFinishNotification({
-      agentManager: dependencies.agentManager,
-      agentStorage: dependencies.agentStorage,
-      childAgentId: snapshot.id,
-      callerAgentId: input.callerAgentId,
-      requireParentOwnership: true,
-      logger: dependencies.logger,
-    });
   }
 
   return {
@@ -448,17 +444,23 @@ async function ensureWorkspaceForMcpCreate(
   return dependencies.ensureWorkspaceForCreate(cwd, { prompt: initialPrompt });
 }
 
-async function sendInitialPrompt(
-  dependencies: CreateAgentCommandDependencies,
-  resolved: ResolvedCreateAgent,
-  snapshot: ManagedAgent,
-): Promise<{ started: boolean; liveSnapshot: ManagedAgent; error?: unknown }> {
+async function sendInitialPrompt({
+  dependencies,
+  resolved,
+  snapshot,
+  callerAgentId,
+}: {
+  dependencies: CreateAgentCommandDependencies;
+  resolved: ResolvedCreateAgent;
+  snapshot: ManagedAgent;
+  callerAgentId?: string;
+}): Promise<{ started: boolean; liveSnapshot: ManagedAgent; error?: unknown }> {
   try {
     const prompt = resolved.prompt;
     if (prompt === undefined) {
       return { started: false, liveSnapshot: snapshot };
     }
-    const liveSnapshot = await startCreatedAgentInitialPrompt({
+    const dispatch = startCreatedAgentInitialPrompt({
       agentManager: dependencies.agentManager,
       agentId: snapshot.id,
       snapshot,
@@ -466,6 +468,18 @@ async function sendInitialPrompt(
       runOptions: resolved.runOptions,
       logger: resolved.promptLogger ?? dependencies.logger,
     });
+    if (callerAgentId) {
+      setupFinishNotification({
+        agentManager: dependencies.agentManager,
+        agentStorage: dependencies.agentStorage,
+        childAgentId: snapshot.id,
+        callerAgentId,
+        requireParentOwnership: true,
+        dispatch,
+        logger: dependencies.logger,
+      });
+    }
+    const liveSnapshot = await dispatch;
     return { started: true, liveSnapshot };
   } catch (error) {
     if (resolved.promptFailure === "throw") {

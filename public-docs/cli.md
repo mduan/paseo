@@ -57,7 +57,7 @@ When an existing Paseo agent runs the same command, Paseo recognizes it through 
 
 Use `--output-schema` to return only matching JSON output. You can pass a schema file path or an inline JSON schema object. This mode cannot be used with `--background`.
 
-By default, `paseo run` waits for completion. Use `--background` to return immediately while the agent keeps running.
+By default, `paseo run` waits for completion. Use `--background` to return immediately while the agent keeps running. From an agent-scoped shell, background runs notify the parent when the child finishes, errors, or needs permission. Completion starts a new turn when the parent is idle. Foreground runs return through the waiting command without a callback.
 
 ## Projects
 

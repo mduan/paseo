@@ -284,3 +284,55 @@ test("legacy keyed creation preserves checkout error codes", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 }, 60000);
+
+test.each([undefined, false, true])(
+  "SDK creation callbacks are opt-in and creation replay does not re-arm them (notify=%s)",
+  async (notifyOnFinish) => {
+    const directory = await mkdtemp(join(tmpdir(), "creation-finish-replay-"));
+    const parentPrompts: string[] = [];
+    const daemon = await createTestPaseoDaemon({
+      agentClients: createTestAgentClients({
+        onStartTurn: (prompt) => {
+          if (typeof prompt === "string" && prompt.startsWith("<paseo-system>"))
+            parentPrompts.push(prompt);
+        },
+      }),
+    });
+    const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+    try {
+      await client.connect();
+      const workspace = await client.createWorkspace({
+        source: { kind: "directory", path: directory },
+      });
+      const parent = await client.createAgent({
+        provider: "claude",
+        cwd: directory,
+        workspaceId: workspace.workspace!.id,
+      });
+      const request = {
+        provider: "codex",
+        cwd: directory,
+        callerAgentId: parent.id,
+        notifyOnFinish,
+        initialPrompt: "Say done",
+        idempotencyKey: "child-callback",
+      };
+      const child = await client.createAgent(request);
+      await client.waitForFinish(child.id);
+      if (notifyOnFinish) await expect.poll(() => parentPrompts).toHaveLength(1);
+      const replay = await client.createAgent(request);
+      expect(replay.id).toBe(child.id);
+      await client.sendMessage(child.id, "A second turn without a callback");
+      await client.waitForFinish(child.id);
+      await expect
+        .poll(() => daemon.daemon.agentManager.getAgent(parent.id)?.lifecycle)
+        .toBe("idle");
+      expect(parentPrompts).toHaveLength(notifyOnFinish ? 1 : 0);
+    } finally {
+      await client.close();
+      await daemon.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);

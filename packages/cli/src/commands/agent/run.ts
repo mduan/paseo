@@ -703,6 +703,7 @@ export async function runRunCommand(
       model: resolvedProviderModel.model,
       thinkingOptionId,
       initialPrompt: prompt,
+      notifyOnFinish: Boolean(callerAgentId && runsInBackground(options)),
       images,
       env: requestEnv,
       labels: Object.keys(labels).length > 0 ? labels : undefined,
