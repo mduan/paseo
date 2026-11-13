@@ -513,13 +513,8 @@ describe("translation resources", () => {
     expect(en.projectPicker.opening).toBe("Opening project...");
     expect(en.projectPicker.searching).toBe("Searching...");
     expect(en.projectPicker.empty).toBe("Start typing a path");
-    expect(en.branchSwitcher.currentBranch).toBe(
-      "Current branch: {{branchName}}. Press to switch branch.",
-    );
-    expect(en.branchSwitcher.placeholder).toBe("Switch branch...");
     expect(en.branchSwitcher.searchPlaceholder).toBe("Filter branches...");
     expect(en.branchSwitcher.empty).toBe("No branches found.");
-    expect(en.branchSwitcher.title).toBe("Switch branch");
     expect(en.panels.file.loading).toBe("Loading file...");
     expect(en.panels.file.noPreview).toBe("No preview available");
     expect(en.panels.file.binaryPreviewUnavailable).toBe("Binary preview unavailable");
@@ -560,14 +555,6 @@ describe("translation resources", () => {
     expect(en.workspace.tabs.explorerSidebar.files).toBe("Files");
     expect(en.workspace.tabs.actions.maximizePane).toBe("Maximize pane");
     expect(en.workspace.tabs.actions.restorePane).toBe("Restore pane");
-    expect(en.branchSwitcher.triggerTooltip).toBe("Switch workspace branch");
-    expect(en.branchSwitcher.uncommittedTitle).toBe("Uncommitted changes");
-    expect(en.branchSwitcher.uncommittedMessage).toBe(
-      "You have uncommitted changes. Stash them before switching branches?",
-    );
-    expect(en.branchSwitcher.stashAndSwitch).toBe("Stash & Switch");
-    expect(en.branchSwitcher.failedToStash).toBe("Failed to stash changes");
-    expect(en.branchSwitcher.failedToSwitch).toBe("Failed to switch branch");
     expect(en.workspaceSetup.errors.failedCreateWorktree).toBe("Failed to create worktree");
     expect(en.workspaceSetup.errors.failedOpenProject).toBe("Failed to open project");
     expect(en.workspaceSetup.errors.selectModel).toBe("Select a model");
@@ -742,8 +729,6 @@ describe("translation resources", () => {
     expect(en.message.attachments.textAttachment).toBe("Text attachment");
     expect(en.composer.attachments.element).toBe("Element");
     expect(en.workspace.hoverCard.scriptsAccessibility).toBe("Workspace scripts");
-    expect(en.branchSwitcher.restoreStashTitle).toBe("Restore stashed changes?");
-    expect(en.branchSwitcher.stashRestored).toBe("Stashed changes restored");
     expect(en.agentAutocomplete.searchingWorkspace).toBe("Searching workspace...");
     expect(en.agentAutocomplete.noCommands).toBe("No commands found");
     expect(en.agentAutocomplete.failedToLoad).toBe("Failed to load");

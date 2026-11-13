@@ -138,8 +138,7 @@ const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    // Shares a row with the branch switcher: the branch name truncates first, and the cap
-    // keeps a long base name from taking the whole row.
+    // Cap the base branch width to leave room for the current branch label.
     flexShrink: 0,
     maxWidth: "50%",
     gap: theme.spacing[1],

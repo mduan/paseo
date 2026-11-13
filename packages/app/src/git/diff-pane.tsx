@@ -56,7 +56,6 @@ import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { GitActionsSplitButton } from "@/git/actions-split-button";
 import type { GitActions } from "@/git/policy";
-import { BranchSwitcher } from "@/components/branch-switcher";
 import { BaseRefSwitcher } from "@/components/base-ref-switcher";
 import { useGitActions } from "@/git/use-actions";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
@@ -83,6 +82,7 @@ import {
   isToolbarLabelTriggerHighlighted,
   ToolbarLabelTriggerIcon,
   toolbarLabelTriggerTextStyle,
+  toolbarLabelTriggerFrameStyle,
   toolbarLabelTriggerStyle,
 } from "@/components/ui/toolbar-label-trigger";
 import { FOCUSED_PANE_PLACEMENT, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
@@ -669,6 +669,7 @@ function ChangesRepositoryToolbar({
   model: ChangesRepositoryToolbarModel;
   sidebarSurface: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <ChangesToolbarRow
       compact={compact}
@@ -677,14 +678,15 @@ function ChangesRepositoryToolbar({
       trailing={model.gitActions ? "framed" : "glyph"}
     >
       <ChangesToolbarLeading>
-        <BranchSwitcher
-          currentBranchName={model.branchName}
-          serverId={model.serverId}
-          workspaceId={model.workspaceId ?? model.cwd}
-          workspaceDirectory={model.cwd}
-          isGitCheckout
-          testID="changes-branch-switcher"
-        />
+        <View style={toolbarLabelTriggerFrameStyle()}>
+          <Text
+            testID="changes-current-branch"
+            style={toolbarLabelTriggerTextStyle(false)}
+            numberOfLines={1}
+          >
+            {model.branchName ?? t("branchSwitcher.detachedHead")}
+          </Text>
+        </View>
         {model.baseRefLabel ? (
           <BaseRefSwitcher
             baseRefLabel={model.baseRefLabel}

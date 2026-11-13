@@ -14,11 +14,7 @@ import type { Page } from "@playwright/test";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
-import {
-  expectWorkspaceBranch,
-  openChangesPanel,
-  switchBranchFromChangesPanel,
-} from "../support/helpers/branch-switcher";
+import { expectWorkspaceBranch, openChangesPanel } from "../support/helpers/branch-switcher";
 import {
   createMockIdleAgent,
   expectSessionRowNotArchived,
@@ -290,9 +286,9 @@ test.describe("Worktree restore", () => {
     });
     await openChangesPanel(page);
     await expectWorkspaceBranch(page, worktree.workspaceName);
-    await switchBranchFromChangesPanel(page, {
-      from: worktree.workspaceName,
-      to: switchedBranch,
+    execFileSync("git", ["switch", switchedBranch], {
+      cwd: worktree.workspaceDirectory,
+      stdio: "pipe",
     });
     await expectWorkspaceBranch(page, switchedBranch);
     await expect(

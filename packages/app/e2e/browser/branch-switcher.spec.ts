@@ -1,10 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import {
   expectNoBranchSwitcherInWorkspaceHeader,
   expectWorkspaceBranch,
   openChangesPanel,
-  switchBranchFromChangesPanel,
 } from "../support/helpers/branch-switcher";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
@@ -41,12 +41,12 @@ async function renameWorkspaceViaSidebar(
   await expect(renameInput).toHaveCount(0, { timeout: 15_000 });
 }
 
-test.describe("Branch switcher", () => {
+test.describe("Current branch", () => {
   // The first test after a spec-file switch can fail while the shared daemon
   // releases stale sessions from the previous spec; one retry stabilizes it.
   test.describe.configure({ retries: 1 });
 
-  test("a custom workspace title stays in the header while the diff panel switches the real branch", async ({
+  test("Changes shows the current branch as read-only and follows external branch switches", async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -69,8 +69,6 @@ test.describe("Branch switcher", () => {
         title: customTitle,
       });
 
-      // The header shows the custom title verbatim (a plain static title), never a
-      // branch name, and the branch switcher does not live in the header.
       const headerTitle = page
         .getByTestId("workspace-header-title")
         .filter({ visible: true })
@@ -78,23 +76,26 @@ test.describe("Branch switcher", () => {
       await expect(headerTitle).toHaveText(customTitle, { timeout: 30_000 });
       await expectNoBranchSwitcherInWorkspaceHeader(page);
 
-      // The diff panel's switcher tracks the real branch ("main"), not the title,
-      // and switching it checks out the real branch on disk.
       await openChangesPanel(page);
       await expectWorkspaceBranch(page, "main");
-      await switchBranchFromChangesPanel(page, { from: "main", to: "dev" });
+      const branchLabel = page
+        .getByTestId("changes-current-branch")
+        .filter({ visible: true })
+        .first();
+      await expect(page.getByTestId("changes-branch-switcher")).toHaveCount(0);
+      await branchLabel.click();
+      await expect(page.getByPlaceholder("Filter branches...")).toHaveCount(0);
+      expect(
+        (await readWorktreeBranchInfo({ worktreePath: workspace.repoPath })).currentBranch,
+      ).toBe("main");
+      await expect(
+        page.getByTestId("changes-base-ref-switcher").filter({ visible: true }).first(),
+      ).toBeEnabled();
+
+      execFileSync("git", ["switch", "dev"], { cwd: workspace.repoPath, stdio: "pipe" });
       await expectWorkspaceBranch(page, "dev");
 
-      // The custom title is unaffected by the branch switch.
       await expect(headerTitle).toHaveText(customTitle, { timeout: 30_000 });
-
-      await expect
-        .poll(
-          async () =>
-            (await readWorktreeBranchInfo({ worktreePath: workspace.repoPath })).currentBranch,
-          { timeout: 30_000 },
-        )
-        .toBe("dev");
     } finally {
       await workspace.cleanup();
     }

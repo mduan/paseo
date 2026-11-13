@@ -1,8 +1,6 @@
 import { create } from "zustand";
 
-/** A branch or base-ref switch the daemon has not answered yet, shown before it lands. */
 export interface PendingCheckoutSwitch {
-  branch?: string;
   baseRefLabel?: string;
 }
 
