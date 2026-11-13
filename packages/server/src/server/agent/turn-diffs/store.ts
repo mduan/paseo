@@ -113,7 +113,11 @@ export class TurnDiffStore {
   }
 
   async resolveRange(agentId: string, target: AgentTurnDiffTarget): Promise<TurnDiffRange | null> {
-    const record = await this.enqueue(agentId, () => this.read(agentId));
+    let record = target.kind === "turn" ? await this.read(agentId) : null;
+    const hasSavedTurn =
+      target.kind === "turn" && record?.turns.some((turn) => turn.turnId === target.turnId);
+    // Atomic records let saved turns bypass later snapshots without exposing partial writes.
+    if (!hasSavedTurn) record = await this.enqueue(agentId, () => this.read(agentId));
     if (!record) return null;
     const { repoRoot } = record;
     switch (target.kind) {

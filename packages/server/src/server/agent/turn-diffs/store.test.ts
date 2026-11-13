@@ -77,6 +77,58 @@ describe("TurnDiffStore", () => {
     expect(await store.resolveRange(AGENT_ID, { kind: "turn", turnId: "t2" })).toBeNull();
   });
 
+  it("opens a saved turn without waiting for the next snapshot to finish", async () => {
+    await runTurn("t1", () => writeFileSync(path.join(repo, "a.txt"), "changed\n"));
+    const expected = await store.resolveRange(AGENT_ID, { kind: "turn", turnId: "t1" });
+    const start = await store.captureStart(repo);
+    if (!start) throw new Error("expected a start snapshot");
+
+    const gate = path.join(root, "block-filter");
+    const ready = path.join(root, "filter-ready");
+    const filter = path.join(root, "filter.cjs");
+    writeFileSync(
+      filter,
+      `const fs = require('node:fs');
+const input = fs.readFileSync(0);
+fs.writeFileSync(${JSON.stringify(ready)}, '');
+while (fs.existsSync(${JSON.stringify(gate)})) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+}
+process.stdout.write(input);
+`,
+    );
+    git(repo, "config", "filter.block.clean", `"${process.execPath}" "${filter}"`);
+    writeFileSync(path.join(repo, ".gitattributes"), "a.txt filter=block\n");
+    writeFileSync(path.join(repo, "a.txt"), "next turn\n");
+    writeFileSync(gate, "");
+    let recordingFinished = false;
+    const recording = store
+      .recordTurn({ agentId: AGENT_ID, start, turnId: "t2", userMessageIds: [] })
+      .finally(() => {
+        recordingFinished = true;
+      });
+    // Release a broken implementation too, so the assertion fails instead of hanging.
+    const releaseTimeout = setTimeout(() => rmSync(gate, { force: true }), 5_000);
+    let lastTurnResolved = false;
+    let lastTurn: ReturnType<TurnDiffStore["resolveRange"]> | undefined;
+    try {
+      await expect.poll(() => existsSync(ready), { timeout: 5_000 }).toBe(true);
+      lastTurn = store.resolveRange(AGENT_ID, { kind: "last_turn" }).then((range) => {
+        lastTurnResolved = true;
+        return range;
+      });
+      const range = await store.resolveRange(AGENT_ID, { kind: "turn", turnId: "t1" });
+      expect(range).toEqual(expected);
+      expect(recordingFinished).toBe(false);
+      expect(lastTurnResolved).toBe(false);
+    } finally {
+      clearTimeout(releaseTimeout);
+      rmSync(gate, { force: true });
+      await recording;
+      await lastTurn;
+    }
+  });
+
   async function changedFiles(turnId: string): Promise<string[] | undefined> {
     const turn = (await store.list(AGENT_ID)).find((candidate) => candidate.turnId === turnId);
     return turn?.files.map((file) => file.path);
