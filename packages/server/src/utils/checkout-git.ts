@@ -651,9 +651,13 @@ export async function readDiffContextLines(input: {
   });
 }
 
-async function tryResolveMergeBase(cwd: string, baseRef: string): Promise<string | null> {
+async function tryResolveMergeBase(
+  cwd: string,
+  baseRef: string,
+  ref = "HEAD",
+): Promise<string | null> {
   try {
-    const { stdout } = await runGitCommand(["merge-base", baseRef, "HEAD"], {
+    const { stdout } = await runGitCommand(["merge-base", baseRef, ref], {
       cwd,
       envOverlay: READ_ONLY_GIT_ENV,
     });
@@ -2550,6 +2554,34 @@ function parseNumstatLine(
   stats.set(path, { additions, deletions });
 }
 
+// Merges interleaved `--raw` (status) and `--numstat` (counts) lines by destination path.
+function parseCommitFiles(lines: readonly string[]): CheckoutCommitFile[] {
+  const stats = new Map<string, { additions: number; deletions: number }>();
+  const statuses = new Map<string, CheckoutCommitFileStatus>();
+  for (const line of lines) {
+    if (!line) {
+      continue;
+    }
+    if (line.startsWith(":")) {
+      parseRawStatusLine(line, statuses);
+    } else {
+      parseNumstatLine(line, stats);
+    }
+  }
+
+  const files: CheckoutCommitFile[] = [];
+  for (const [path, stat] of stats) {
+    const status = statuses.get(path);
+    files.push({
+      path,
+      additions: stat.additions,
+      deletions: stat.deletions,
+      ...(status ? { status } : {}),
+    });
+  }
+  return files;
+}
+
 // Parses the single combined `git log ... --raw --numstat -M` stream. Each record
 // (split on the record separator) starts with the NUL-field-separated header line,
 // then a blank line, then the interleaved `--raw` (status) and `--numstat` (counts)
@@ -2568,30 +2600,7 @@ function parseCheckoutCommitRecords(stdout: string): ParsedCheckoutCommit[] {
       continue;
     }
 
-    const stats = new Map<string, { additions: number; deletions: number }>();
-    const statuses = new Map<string, CheckoutCommitFileStatus>();
-    for (let index = 1; index < lines.length; index += 1) {
-      const line = lines[index] ?? "";
-      if (!line) {
-        continue;
-      }
-      if (line.startsWith(":")) {
-        parseRawStatusLine(line, statuses);
-      } else {
-        parseNumstatLine(line, stats);
-      }
-    }
-
-    const files: CheckoutCommitFile[] = [];
-    for (const [path, stat] of stats) {
-      const status = statuses.get(path);
-      files.push({
-        path,
-        additions: stat.additions,
-        deletions: stat.deletions,
-        ...(status ? { status } : {}),
-      });
-    }
+    const files = parseCommitFiles(lines.slice(1));
 
     commits.push({
       sha,
@@ -2672,13 +2681,11 @@ async function tryResolveCheckoutCommitsBaseRef(
   }
 }
 
-export async function listCheckoutCommits({
-  cwd,
-  context,
-}: {
-  cwd: string;
-  context?: CheckoutContext;
-}): Promise<CheckoutCommitsResult> {
+/** The base ref the checkout's own commits are listed and diffed against. */
+async function resolveCheckoutCommitsBaseRef(
+  cwd: string,
+  context?: CheckoutContext,
+): Promise<string | null> {
   // A detached HEAD still has commits ahead of its base; compare from HEAD itself.
   const currentBranch = (await getCurrentBranch(cwd)) ?? "HEAD";
 
@@ -2697,14 +2704,97 @@ export async function listCheckoutCommits({
       currentBranch,
     );
   }
+  return comparisonBaseRef;
+}
+
+/**
+ * The old side of the diff of the commits from `fromSha` through `toSha`: the parent of
+ * `fromSha`, plus the base branch changes that merges in the range brought in. Merging the base
+ * branch into a branch is not the branch's own work, so it should not show up as changes.
+ */
+async function resolveCommitRangeDiffBase(input: {
+  cwd: string;
+  fromSha: string;
+  toSha: string;
+  resolveBaseRef: () => Promise<string | null>;
+}): Promise<string> {
+  const { cwd, toSha } = input;
+  const parent = await tryResolveCommit(cwd, `${input.fromSha}^`);
+  // A root commit has no parent, so its changes are against the empty tree.
+  if (!parent) return EMPTY_TREE_OBJECT_ID;
+  const git = (args: string[]) => runGitCommand(args, { cwd, envOverlay: READ_ONLY_GIT_ENV });
+  const { stdout: merges } = await git([
+    "rev-list",
+    "--merges",
+    "--max-count=1",
+    `${parent}..${toSha}`,
+  ]);
+  if (!merges.trim()) return parent;
+  const baseRef = await input.resolveBaseRef();
+  const mergedBase = baseRef ? await tryResolveMergeBase(cwd, baseRef, toSha) : null;
+  // A commit already on the base branch keeps its first-parent diff.
+  if (!mergedBase || mergedBase === toSha) return parent;
+  try {
+    const { stdout } = await git(["merge-tree", "--write-tree", parent, mergedBase]);
+    return stdout.split("\n")[0]?.trim() || parent;
+  } catch {
+    // ponytail: a conflicting replay falls back to the plain range diff, base changes included.
+    return parent;
+  }
+}
+
+/** A workspace merge commit's own changes: conflict resolutions, not the branch it merged in. */
+async function listMergeCommitFiles(input: {
+  cwd: string;
+  sha: string;
+  baseRef: string;
+}): Promise<CheckoutCommitFile[]> {
+  const { cwd, sha, baseRef } = input;
+  const base = await resolveCommitRangeDiffBase({
+    cwd,
+    fromSha: sha,
+    toSha: sha,
+    resolveBaseRef: async () => baseRef,
+  });
+  const { stdout } = await runGitCommand(["diff", "--raw", "--numstat", "-M", base, sha], {
+    cwd,
+    envOverlay: READ_ONLY_GIT_ENV,
+  });
+  return parseCommitFiles(stdout.split("\n"));
+}
+
+export async function listCheckoutCommits({
+  cwd,
+  context,
+}: {
+  cwd: string;
+  context?: CheckoutContext;
+}): Promise<CheckoutCommitsResult> {
+  const comparisonBaseRef = await resolveCheckoutCommitsBaseRef(cwd, context);
 
   let workspaceRecords: ParsedCheckoutCommit[] = [];
   let baseRevision = "HEAD";
   if (comparisonBaseRef) {
-    const [records, mergeBase] = await Promise.all([
+    const [records, mergeBase, merges] = await Promise.all([
       getCheckoutCommitRecords({ cwd, revision: `${comparisonBaseRef}..HEAD` }),
       tryResolveMergeBase(cwd, comparisonBaseRef),
+      runGitCommand(["rev-list", "--merges", `${comparisonBaseRef}..HEAD`], {
+        cwd,
+        envOverlay: READ_ONLY_GIT_ENV,
+      }),
     ]);
+    const mergeShas = new Set(merges.stdout.split("\n").filter(Boolean));
+    await Promise.all(
+      records
+        .filter((record) => mergeShas.has(record.sha))
+        .map(async (record) => {
+          record.files = await listMergeCommitFiles({
+            cwd,
+            sha: record.sha,
+            baseRef: comparisonBaseRef,
+          });
+        }),
+    );
     workspaceRecords = records;
     baseRevision = mergeBase ?? "";
   }
@@ -2738,13 +2828,45 @@ export async function listCheckoutCommits({
   return { baseRef: comparisonBaseRef, commits };
 }
 
+/** The combined diff of the commits from `fromSha` through `toSha`, both included. */
+export async function getCommitRangeDiff(input: {
+  cwd: string;
+  fromSha: string;
+  toSha: string;
+  ignoreWhitespace?: boolean;
+  context?: CheckoutContext;
+}): Promise<CheckoutDiffResult & { baseRef: string; targetRef: string }> {
+  const { cwd, fromSha, toSha } = input;
+  const [from, targetRef] = await Promise.all([
+    tryResolveCommit(cwd, fromSha),
+    tryResolveCommit(cwd, toSha),
+  ]);
+  if (!from || !targetRef) {
+    throw new Error(`Unknown commit range: ${fromSha}..${toSha}`);
+  }
+  const baseRef = await resolveCommitRangeDiffBase({
+    cwd,
+    fromSha: from,
+    toSha: targetRef,
+    resolveBaseRef: () => resolveCheckoutCommitsBaseRef(cwd, input.context),
+  });
+  const result = await getCheckoutDiff(cwd, {
+    mode: "range",
+    baseRef,
+    targetRef,
+    ignoreWhitespace: input.ignoreWhitespace,
+    includeStructured: true,
+  });
+  return { ...result, baseRef, targetRef };
+}
+
 /**
  * Fetches the unified diff of a single file as introduced by one commit and
  * parses it into the same {@link ParsedDiffFile} shape the diff subscription
  * emits (so the client can reuse its existing renderer).
  *
- * Compares merge commits to their first parent, matching the linear history shown
- * in the explorer. The text is parsed and highlighted by
+ * Compares a merge commit to its first parent plus the base branch changes it merged in, so
+ * only the merge's own changes show. The text is parsed and highlighted by
  * {@link parseAndHighlightDiff} — the exact parser the diff subscription uses.
  * Returns `null` when the file is absent from the commit or the change is
  * binary-only (no textual hunks). Throws on git failure (e.g. an unknown sha),
@@ -2754,21 +2876,21 @@ export async function getCommitFileDiff({
   cwd,
   sha,
   path,
+  context,
 }: {
   cwd: string;
   sha: string;
   path: string;
+  context?: CheckoutContext;
 }): Promise<ParsedDiffFile | null> {
+  const base = await resolveCommitRangeDiffBase({
+    cwd,
+    fromSha: sha,
+    toSha: sha,
+    resolveBaseRef: () => resolveCheckoutCommitsBaseRef(cwd, context),
+  });
   const { stdout } = await runGitCommand(
-    [
-      "show",
-      sha,
-      "--format=",
-      "--diff-merges=first-parent",
-      ...STANDARD_DIFF_PREFIX_ARGS,
-      "--",
-      path,
-    ],
+    ["diff", base, sha, ...STANDARD_DIFF_PREFIX_ARGS, "--", path],
     {
       cwd,
       envOverlay: READ_ONLY_GIT_ENV,
@@ -2781,7 +2903,7 @@ export async function getCommitFileDiff({
 
   const newContents = new Map<string, string | null>();
   const parsedFiles = await parseAndHighlightDiff(stdout, cwd, {
-    getOldFileContent: (file) => readGitFileContentAtRef(cwd, `${sha}^`, file.path),
+    getOldFileContent: (file) => readGitFileContentAtRef(cwd, base, file.path),
     getNewFileContent: async (file) => {
       const content = await readGitFileContentAtRef(cwd, sha, file.path);
       newContents.set(file.path, content);

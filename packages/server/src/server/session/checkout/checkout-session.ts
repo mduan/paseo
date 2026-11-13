@@ -8,6 +8,7 @@ import type {
   BranchSuggestionsRequest,
   CheckoutCommitsListRequest,
   CheckoutCommitFileDiffRequest,
+  CheckoutCommitRangeDiffRequest,
   CheckoutDiffContextRequest,
   CheckoutRefreshRequest,
   CheckoutRenameBranchRequest,
@@ -55,6 +56,7 @@ import {
   pushCurrentBranch,
   listCheckoutCommits,
   getCommitFileDiff,
+  getCommitRangeDiff,
   readDiffContextLines,
   setCurrentBranchBaseRef,
 } from "../../../utils/checkout-git.js";
@@ -308,7 +310,12 @@ export class CheckoutSession {
     try {
       assertSafeGitRef(sha, "commit");
       assertSafeRelativePath(path);
-      const file = await getCommitFileDiff({ cwd: expandTilde(cwd), sha, path });
+      const file = await getCommitFileDiff({
+        cwd: expandTilde(cwd),
+        sha,
+        path,
+        context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
+      });
       this.host.emit({
         type: "checkout.commits.file_diff.response",
         payload: { cwd, sha, path, file, error: null, requestId },
@@ -317,6 +324,40 @@ export class CheckoutSession {
       this.host.emit({
         type: "checkout.commits.file_diff.response",
         payload: { cwd, sha, path, file: null, error: toCheckoutError(error), requestId },
+      });
+    }
+  }
+
+  async handleCommitRangeDiffRequest(msg: CheckoutCommitRangeDiffRequest): Promise<void> {
+    const { cwd, fromSha, toSha, ignoreWhitespace, requestId } = msg;
+
+    try {
+      assertSafeGitRef(fromSha, "commit");
+      assertSafeGitRef(toSha, "commit");
+      const result = await getCommitRangeDiff({
+        cwd: expandTilde(cwd),
+        fromSha,
+        toSha,
+        ignoreWhitespace,
+        context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
+      });
+      this.host.emit({
+        type: "checkout.commits.range_diff.response",
+        payload: {
+          cwd,
+          files: result.structured ?? [],
+          snapshot: { cwd, fromTree: result.baseRef, toTree: result.targetRef },
+          error: result.diffTooLarge
+            ? toCheckoutError(new Error("Diff too large to display"))
+            : null,
+          ...(result.diffTooLarge ? { diffTooLarge: true } : {}),
+          requestId,
+        },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.commits.range_diff.response",
+        payload: { cwd, files: [], error: toCheckoutError(error), requestId },
       });
     }
   }

@@ -12,11 +12,13 @@ export const changesStateSchema = z
     treeWidth: z.number().optional(),
     collapsedFilePaths: z.array(z.string()),
     collapsedFolderPaths: z.array(z.string()),
-    commitsCollapsed: z.boolean(),
+    // COMPAT(changesCommitsSection): persisted before v0.11.0-fork.40 removed the Commits section; remove after 2027-05-13.
+    commitsCollapsed: z.boolean().optional(),
   })
   .transform(
     ({
       mode: _mode,
+      commitsCollapsed: _commitsCollapsed,
       baseRef: _baseRef,
       layout: _layout,
       wrapLines: _wrapLines,
@@ -31,5 +33,4 @@ export const defaultChangesState: ChangesState = {
   treeVisible: false,
   collapsedFilePaths: [],
   collapsedFolderPaths: [],
-  commitsCollapsed: true,
 };

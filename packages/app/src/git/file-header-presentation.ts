@@ -29,6 +29,19 @@ export function formatDiffCount(value: number): string {
   return compactFormatter.format(value).toLowerCase();
 }
 
+export function sumDiffStat(files: readonly { additions: number; deletions: number }[]): {
+  additions: number;
+  deletions: number;
+} {
+  return files.reduce(
+    (total, file) => ({
+      additions: total.additions + file.additions,
+      deletions: total.deletions + file.deletions,
+    }),
+    { additions: 0, deletions: 0 },
+  );
+}
+
 export function fileNameForPath(path: string): string {
   return path.split("/").pop() ?? path;
 }

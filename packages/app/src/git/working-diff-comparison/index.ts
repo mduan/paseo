@@ -2,8 +2,10 @@ import { useCallback } from "react";
 import { create } from "zustand";
 import {
   expireWorkingDiffComparisonsInState,
+  resolveCommitRangeFromState,
   resolveWorkingDiffComparisonFromState,
   selectWorkingDiffComparisonInState,
+  type CommitRange,
   type WorkingDiffCheckoutIdentity,
   type WorkingDiffComparison,
   type WorkingDiffComparisonState,
@@ -13,6 +15,7 @@ interface WorkingDiffComparisonStore extends WorkingDiffComparisonState {
   select: (
     input: WorkingDiffCheckoutIdentity & {
       comparison: WorkingDiffComparison;
+      commitRange?: CommitRange;
       isDirty: boolean;
     },
   ) => void;
@@ -27,19 +30,30 @@ export function useWorkingDiffComparison(
   input: WorkingDiffCheckoutIdentity & { isDirty: boolean },
 ): {
   comparison: WorkingDiffComparison;
-  selectComparison: (comparison: WorkingDiffComparison) => void;
+  commitRange: CommitRange | undefined;
+  selectComparison: (comparison: WorkingDiffComparison, commitRange?: CommitRange) => void;
 } {
   const { serverId, workspaceId, cwd, isDirty } = input;
   const comparison = useWorkingDiffComparisonStore((state) =>
     resolveWorkingDiffComparisonFromState(state, { serverId, workspaceId, cwd, isDirty }),
   );
+  const commitRange = useWorkingDiffComparisonStore((state) =>
+    resolveCommitRangeFromState(state, { serverId, workspaceId, cwd }),
+  );
   const select = useWorkingDiffComparisonStore((state) => state.select);
   const selectComparison = useCallback(
-    (next: WorkingDiffComparison) =>
-      select({ serverId, workspaceId, cwd, isDirty, comparison: next }),
+    (next: WorkingDiffComparison, nextCommitRange?: CommitRange) =>
+      select({
+        serverId,
+        workspaceId,
+        cwd,
+        isDirty,
+        comparison: next,
+        commitRange: nextCommitRange,
+      }),
     [cwd, isDirty, select, serverId, workspaceId],
   );
-  return { comparison, selectComparison };
+  return { comparison, commitRange, selectComparison };
 }
 
 export function selectWorkingDiffComparison(

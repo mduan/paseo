@@ -5,10 +5,19 @@ export enum LiveDiffComparison {
 export type CheckoutDiffComparison = "uncommitted" | "base";
 /** Frozen snapshots of the focused agent's turns; they don't follow the dirty state. */
 export type TurnDiffComparison = "last_turn";
+/** A contiguous range of the checkout's commits, stored as `CommitRange` on the override. */
+export type CommitRangeComparison = "commit_range";
 export type WorkingDiffComparison =
   | CheckoutDiffComparison
   | LiveDiffComparison
-  | TurnDiffComparison;
+  | TurnDiffComparison
+  | CommitRangeComparison;
+
+/** From the oldest through the newest commit of the range, both included. */
+export interface CommitRange {
+  fromSha: string;
+  toSha: string;
+}
 
 export function isTurnDiffComparison(
   comparison: WorkingDiffComparison,
@@ -16,10 +25,18 @@ export function isTurnDiffComparison(
   return comparison === "last_turn";
 }
 
+/** Comparisons of fixed git objects; they don't follow the dirty state or the live checkout. */
+export function isSnapshotDiffComparison(
+  comparison: WorkingDiffComparison,
+): comparison is TurnDiffComparison | CommitRangeComparison {
+  return comparison === "last_turn" || comparison === "commit_range";
+}
+
 export interface WorkingDiffComparisonOverride {
   serverId: string;
   cwd: string;
   comparison: WorkingDiffComparison;
+  commitRange?: CommitRange;
   isDirtyAtSelection: boolean;
 }
 
@@ -50,6 +67,7 @@ export function selectWorkingDiffComparisonInState(
   state: WorkingDiffComparisonState,
   input: WorkingDiffCheckoutIdentity & {
     comparison: WorkingDiffComparison;
+    commitRange?: CommitRange;
     isDirty: boolean;
   },
 ): WorkingDiffComparisonState {
@@ -60,6 +78,7 @@ export function selectWorkingDiffComparisonInState(
         serverId: input.serverId.trim(),
         cwd: normalizeCwd(input.cwd),
         comparison: input.comparison,
+        commitRange: input.commitRange,
         isDirtyAtSelection: input.isDirty,
       },
     },
@@ -75,13 +94,21 @@ export function resolveWorkingDiffComparisonFromState(
   // selection under any ordering of the two updates.
   if (
     override &&
-    (isTurnDiffComparison(override.comparison) ||
+    (isSnapshotDiffComparison(override.comparison) ||
       override.comparison === LiveDiffComparison.All ||
       override.isDirtyAtSelection === input.isDirty)
   ) {
     return override.comparison;
   }
   return input.isDirty ? "uncommitted" : "base";
+}
+
+export function resolveCommitRangeFromState(
+  state: WorkingDiffComparisonState,
+  input: WorkingDiffCheckoutIdentity,
+): CommitRange | undefined {
+  const override = state.overrides[workingDiffComparisonKey(input)];
+  return override?.comparison === "commit_range" ? override.commitRange : undefined;
 }
 
 export function expireWorkingDiffComparisonsInState(
@@ -95,7 +122,7 @@ export function expireWorkingDiffComparisonsInState(
       ([, override]) =>
         override.serverId === input.serverId.trim() &&
         override.cwd === normalizeCwd(input.cwd) &&
-        !isTurnDiffComparison(override.comparison) &&
+        !isSnapshotDiffComparison(override.comparison) &&
         override.comparison !== LiveDiffComparison.All &&
         override.isDirtyAtSelection !== input.isDirty,
     )

@@ -130,6 +130,22 @@ describe("listCheckoutCommits", () => {
     expect(Number.isNaN(new Date(commits[0]?.authorDate ?? "").getTime())).toBe(false);
   });
 
+  it("counts only a merge's own changes when it merges the base branch in", async () => {
+    const { repoDir } = initRepoOnMain();
+    git(["checkout", "-b", "feature"], repoDir);
+    commitFile(repoDir, "foo.txt", "a\n", "Add foo");
+    git(["checkout", "main"], repoDir);
+    commitFile(repoDir, "main.txt", "main\n", "Advance main");
+    git(["checkout", "feature"], repoDir);
+    git(["-c", "commit.gpgsign=false", "merge", "--no-ff", "main", "-m", "Merge main"], repoDir);
+
+    const { commits } = await listCheckoutCommits({ cwd: repoDir });
+
+    const merge = commits.find((entry) => entry.subject === "Merge main");
+    expect(merge?.isOnBase).toBe(false);
+    expect(merge?.files).toEqual([]);
+  });
+
   it("shows recent history on the base branch", async () => {
     const { repoDir } = initRepoOnMain();
     const { baseRef, commits } = await listCheckoutCommits({ cwd: repoDir });

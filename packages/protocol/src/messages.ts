@@ -2546,6 +2546,16 @@ export const CheckoutDiffContextRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const CheckoutCommitRangeDiffRequestSchema = z.object({
+  type: z.literal("checkout.commits.range_diff.request"),
+  cwd: z.string(),
+  // Oldest and newest commit of the range; the diff includes both.
+  fromSha: z.string(),
+  toSha: z.string(),
+  ignoreWhitespace: z.boolean().optional(),
+  requestId: z.string(),
+});
+
 export const CheckoutCommitFileDiffRequestSchema = z.object({
   type: z.literal("checkout.commits.file_diff.request"),
   cwd: z.string(),
@@ -3589,6 +3599,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeRequestSchema,
   CheckoutCommitsListRequestSchema,
   CheckoutCommitFileDiffRequestSchema,
+  CheckoutCommitRangeDiffRequestSchema,
   CheckoutDiffContextRequestSchema,
   CheckoutForgeGetCheckDetailsRequestSchema,
   CheckoutGithubGetCheckDetailsRequestSchema,
@@ -4011,6 +4022,8 @@ export const ServerInfoStatusPayloadSchema = z
         commitsList: z.boolean().optional(),
         // COMPAT(commitBaseClassification): added in v0.2.0, remove gate after 2027-01-23.
         commitBaseClassification: z.boolean().optional(),
+        // COMPAT(commitRangeDiff): added in v0.11.0-fork.40, remove gate after 2027-05-13.
+        commitRangeDiff: z.boolean().optional(),
         // COMPAT(providerRemoval): added in v0.1.105, drop the gate when floor >= v0.1.105.
         providerRemoval: z.boolean().optional(),
         // COMPAT(importSessionWorkspaceTarget): added in v0.1.110, remove gate after 2027-01-16.
@@ -6011,6 +6024,14 @@ export const CheckoutDiffContextResponseSchema = z.object({
   }),
 });
 
+export const CheckoutCommitRangeDiffResponseSchema = z.object({
+  type: z.literal("checkout.commits.range_diff.response"),
+  payload: CheckoutDiffSubscriptionPayloadSchema.omit({ subscriptionId: true }).extend({
+    requestId: z.string(),
+    snapshot: ReviewCommentSnapshotSchema.optional(),
+  }),
+});
+
 export const CheckoutCommitFileDiffResponseSchema = z.object({
   type: z.literal("checkout.commits.file_diff.response"),
   payload: z.object({
@@ -7443,6 +7464,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeResponseSchema,
   CheckoutCommitsListResponseSchema,
   CheckoutCommitFileDiffResponseSchema,
+  CheckoutCommitRangeDiffResponseSchema,
   CheckoutDiffContextResponseSchema,
   CheckoutForgeGetCheckDetailsResponseSchema,
   CheckoutGithubGetCheckDetailsResponseSchema,
@@ -7815,6 +7837,8 @@ export type CheckoutCommitsListRequest = z.infer<typeof CheckoutCommitsListReque
 export type CheckoutCommitsListResponse = z.infer<typeof CheckoutCommitsListResponseSchema>;
 export type CheckoutCommitFileDiffRequest = z.infer<typeof CheckoutCommitFileDiffRequestSchema>;
 export type CheckoutCommitFileDiffResponse = z.infer<typeof CheckoutCommitFileDiffResponseSchema>;
+export type CheckoutCommitRangeDiffRequest = z.infer<typeof CheckoutCommitRangeDiffRequestSchema>;
+export type CheckoutCommitRangeDiffResponse = z.infer<typeof CheckoutCommitRangeDiffResponseSchema>;
 export type CheckoutDiffContextRequest = z.infer<typeof CheckoutDiffContextRequestSchema>;
 export type CheckoutDiffContextResponse = z.infer<typeof CheckoutDiffContextResponseSchema>;
 export type ParsedDiffFile = z.infer<typeof ParsedDiffFileSchema>;

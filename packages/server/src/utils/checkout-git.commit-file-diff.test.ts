@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getCommitFileDiff, readDiffContextLines } from "./checkout-git.js";
+import { getCommitFileDiff, getCommitRangeDiff, readDiffContextLines } from "./checkout-git.js";
 
 const tempDirs: string[] = [];
 
@@ -125,5 +125,39 @@ describe("getCommitFileDiff", () => {
     expect(file?.isNew).toBe(true);
     expect(file?.additions).toBe(1);
     expect(file?.deletions).toBe(0);
+  });
+});
+
+describe("getCommitRangeDiff", () => {
+  it("includes both ends of the range, down to the root commit", async () => {
+    const repoDir = initRepo();
+    commitFile(repoDir, "a.txt", "a\n", "add a");
+    const first = headSha(repoDir);
+    commitFile(repoDir, "b.txt", "b\n", "add b");
+    const second = headSha(repoDir);
+    commitFile(repoDir, "c.txt", "c\n", "add c");
+
+    const result = await getCommitRangeDiff({ cwd: repoDir, fromSha: first, toSha: second });
+
+    expect(result.structured?.map((file) => file.path)).toEqual(["a.txt", "b.txt"]);
+    expect(result.targetRef).toBe(second);
+  });
+
+  it("leaves out base branch changes that a merge in the range brought in", async () => {
+    const repoDir = initRepo();
+    commitFile(repoDir, "README.md", "base\n", "initial");
+    git(["checkout", "-b", "feature"], repoDir);
+    commitFile(repoDir, "a.txt", "a\n", "add a");
+    const first = headSha(repoDir);
+    git(["checkout", "main"], repoDir);
+    commitFile(repoDir, "main.txt", "main\n", "advance main");
+    git(["checkout", "feature"], repoDir);
+    git(["-c", "commit.gpgsign=false", "merge", "--no-ff", "main", "-m", "merge main"], repoDir);
+    commitFile(repoDir, "b.txt", "b\n", "add b");
+    const last = headSha(repoDir);
+
+    const result = await getCommitRangeDiff({ cwd: repoDir, fromSha: first, toSha: last });
+
+    expect(result.structured?.map((file) => file.path)).toEqual(["a.txt", "b.txt"]);
   });
 });
