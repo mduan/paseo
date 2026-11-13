@@ -1109,6 +1109,8 @@ export const es: TranslationResources = {
           rangeTitle: "Selecciona un rango de commits",
           clear: "Borrar",
           save: "Guardar",
+          showCount_one: "Mostrar {{count}} commit",
+          showCount_other: "Mostrar {{count}} commits",
           single: "Commit {{sha}}",
           count_one: "{{count}} commit",
           count_other: "{{count}} commits",

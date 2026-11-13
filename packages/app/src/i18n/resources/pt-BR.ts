@@ -1099,6 +1099,8 @@ export const ptBR: TranslationResources = {
           rangeTitle: "Selecione um intervalo de commits",
           clear: "Limpar",
           save: "Salvar",
+          showCount_one: "Mostrar {{count}} commit",
+          showCount_other: "Mostrar {{count}} commits",
           single: "Commit {{sha}}",
           count_one: "{{count}} commit",
           count_other: "{{count}} commits",

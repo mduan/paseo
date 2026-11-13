@@ -1108,6 +1108,8 @@ export const fr: TranslationResources = {
           rangeTitle: "Sélectionner une plage de commits",
           clear: "Effacer",
           save: "Enregistrer",
+          showCount_one: "Afficher {{count}} commit",
+          showCount_other: "Afficher {{count}} commits",
           single: "Commit {{sha}}",
           count_one: "{{count}} commit",
           count_other: "{{count}} commits",

@@ -1093,6 +1093,8 @@ export const ru: TranslationResources = {
           rangeTitle: "Выберите диапазон коммитов",
           clear: "Очистить",
           save: "Сохранить",
+          showCount_one: "Показать коммиты: {{count}}",
+          showCount_other: "Показать коммиты: {{count}}",
           single: "Коммит {{sha}}",
           count_one: "Коммитов: {{count}}",
           count_other: "Коммитов: {{count}}",

@@ -1075,6 +1075,8 @@ export const ar: TranslationResources = {
           rangeTitle: "حدّد نطاقًا من الإيداعات",
           clear: "مسح",
           save: "حفظ",
+          showCount_one: "عرض {{count}} إيداع",
+          showCount_other: "عرض {{count}} إيداعات",
           single: "الإيداع {{sha}}",
           count_one: "{{count}} إيداع",
           count_other: "{{count}} إيداعات",

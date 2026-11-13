@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Check } from "lucide-react-native";
 import type { Theme } from "@/styles/theme";
 import { Button } from "@/components/ui/button";
-import { MenuHint, MenuItem, MenuLabel, MenuSeparator, useMenuContext } from "@/components/ui/menu";
+import { MenuHint, MenuLabel, MenuSeparator, useMenuContext } from "@/components/ui/menu";
+import { formatDiffCount, sumDiffStat } from "@/git/file-header-presentation";
 import { useCheckoutCommitsQuery, type ClassifiedCheckoutCommit } from "@/git/use-commits-query";
 import type { CommitRange } from "@/git/working-diff-comparison/state";
 import { useTimeAgo } from "@/hooks/use-time-ago";
@@ -16,6 +17,8 @@ import { commitRangeSpan, toggleCommitInRange } from "./commit-range";
 const ThemedCheck = withUnistyles(Check);
 const checkedIconMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
 const EMPTY_COMMITS: ClassifiedCheckoutCommit[] = [];
+// Lets the menu's keyboard navigation reach these rows, as it reaches `MenuItem`'s.
+const MENU_ITEM_DATASET = { menuItem: "true", menuDisabled: "false" };
 
 const shortSha = (sha: string) => sha.slice(0, 7);
 
@@ -107,6 +110,8 @@ export function CommitRangeMenuSection({
             key={commit.sha}
             commit={commit}
             checked={Boolean(span && index >= span.newest && index <= span.oldest)}
+            rangeStart={span?.newest === index}
+            rangeEnd={span?.oldest === index}
             onToggle={toggle}
           />
         ))}
@@ -116,17 +121,13 @@ export function CommitRangeMenuSection({
 
   const unchanged =
     validDraft?.fromSha === selected?.fromSha && validDraft?.toSha === selected?.toSha;
+  const draftCount = span ? span.oldest - span.newest + 1 : 0;
   return (
     <>
       <MenuSeparator />
       <MenuLabel trailing={clearButton}>{t("workspace.git.diff.commits.rangeTitle")}</MenuLabel>
       {body}
       <View style={styles.footer}>
-        <Text style={styles.summary} numberOfLines={1}>
-          {validDraft && span
-            ? formatCommitRange({ t, range: validDraft, count: span.oldest - span.newest + 1 })
-            : ""}
-        </Text>
         <Button variant="ghost" size="xs" onPress={cancel} testID="commit-range-cancel">
           {t("common.actions.cancel")}
         </Button>
@@ -137,53 +138,154 @@ export function CommitRangeMenuSection({
           disabled={!validDraft || unchanged}
           testID="commit-range-save"
         >
-          {t("workspace.git.diff.commits.save")}
+          {draftCount > 1
+            ? t("workspace.git.diff.commits.showCount", { count: draftCount })
+            : t("workspace.git.diff.commits.save")}
         </Button>
       </View>
     </>
   );
 }
 
+/**
+ * A multi-line row the generic `MenuItem` can't draw: the title wraps, the checkbox sits on its
+ * first line, and checked rows join into one band. The press still goes through `selectItem`.
+ */
 function CommitRangeItem({
   commit,
   checked,
+  rangeStart,
+  rangeEnd,
   onToggle,
 }: {
   commit: ClassifiedCheckoutCommit;
   checked: boolean;
+  rangeStart: boolean;
+  rangeEnd: boolean;
   onToggle: (sha: string) => void;
 }) {
+  const { selectItem } = useMenuContext("CommitRangeItem");
   const timeAgo = useTimeAgo(new Date(commit.authorDate));
-  const handleSelect = useCallback(() => onToggle(commit.sha), [commit.sha, onToggle]);
-  const checkbox = useMemo(
-    () => (
+  const stat = useMemo(() => sumDiffStat(commit.files), [commit.files]);
+  const handlePress = useCallback(
+    () => selectItem(() => onToggle(commit.sha), false),
+    [commit.sha, onToggle, selectItem],
+  );
+  const accessibilityState = useMemo(() => ({ checked }), [checked]);
+  const pressableStyle = useCallback(
+    ({
+      pressed,
+      hovered = false,
+      focused = false,
+    }: PressableStateCallbackType & { hovered?: boolean; focused?: boolean }) => {
+      const highlighted = hovered || focused || pressed;
+      if (!checked) return [styles.row, highlighted ? styles.rowHovered : null];
+      return [
+        styles.row,
+        styles.rowChecked,
+        rangeStart ? styles.rowRangeStart : null,
+        rangeEnd ? styles.rowRangeEnd : null,
+        highlighted ? styles.rowCheckedHovered : null,
+      ];
+    },
+    [checked, rangeEnd, rangeStart],
+  );
+  return (
+    <Pressable
+      testID={`commit-range-row-${commit.shortSha}`}
+      accessibilityRole="menuitem"
+      accessibilityState={accessibilityState}
+      aria-checked={checked}
+      tabIndex={-1}
+      dataSet={MENU_ITEM_DATASET}
+      onPress={handlePress}
+      style={pressableStyle}
+    >
       <View style={checked ? [styles.checkbox, styles.checkboxChecked] : styles.checkbox}>
         {checked ? <ThemedCheck size={12} uniProps={checkedIconMapping} /> : null}
       </View>
-    ),
-    [checked],
-  );
-  return (
-    <MenuItem
-      testID={`commit-range-row-${commit.shortSha}`}
-      closeOnSelect={false}
-      onSelect={handleSelect}
-      active={checked}
-      leading={checkbox}
-      description={`${commit.shortSha} · ${timeAgo}`}
-    >
-      {commit.subject}
-    </MenuItem>
+      <View style={styles.rowContent}>
+        <Text style={styles.title}>{commit.subject}</Text>
+        <Text style={styles.meta}>
+          {`${commit.authorName} · ${timeAgo} · `}
+          <Text style={styles.additions}>+{formatDiffCount(stat.additions)}</Text>{" "}
+          <Text style={styles.deletions}>-{formatDiffCount(stat.deletions)}</Text>
+          {" · "}
+          <Text style={styles.sha}>{commit.shortSha}</Text>
+        </Text>
+      </View>
+    </Pressable>
   );
 }
+
+const TITLE_LINE_HEIGHT = 18;
 
 const styles = StyleSheet.create((theme) => ({
   list: {
     maxHeight: 360,
   },
+  // `MenuItem`'s box (inset, border, padding), so the title lands on the menu's text rail.
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing[2],
+    marginHorizontal: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    borderWidth: theme.borderWidth[1],
+    borderColor: "transparent",
+    borderRadius: theme.borderRadius.md,
+    outlineWidth: 0,
+    outlineColor: "transparent",
+  },
+  rowHovered: {
+    backgroundColor: theme.colors.surface2,
+  },
+  // Checked rows square off their corners so adjacent ones read as one band; the band's ends
+  // take the row radius back.
+  rowChecked: {
+    backgroundColor: theme.colors.surface2,
+    borderRadius: 0,
+  },
+  rowRangeStart: {
+    borderTopLeftRadius: theme.borderRadius.md,
+    borderTopRightRadius: theme.borderRadius.md,
+  },
+  rowRangeEnd: {
+    borderBottomLeftRadius: theme.borderRadius.md,
+    borderBottomRightRadius: theme.borderRadius.md,
+  },
+  rowCheckedHovered: {
+    backgroundColor: theme.colors.surface3,
+  },
+  rowContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: theme.fontSize.base,
+    lineHeight: TITLE_LINE_HEIGHT,
+    color: theme.colors.foreground,
+  },
+  meta: {
+    marginTop: 2,
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
+  additions: {
+    color: theme.colors.statusSuccess,
+  },
+  deletions: {
+    color: theme.colors.statusDanger,
+  },
+  sha: {
+    fontFamily: theme.fontFamily.mono,
+  },
   checkbox: {
     width: 16,
     height: 16,
+    // Centres the box on the title's first line.
+    marginTop: (TITLE_LINE_HEIGHT - 16) / 2,
     borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -197,16 +299,11 @@ const styles = StyleSheet.create((theme) => ({
   footer: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: theme.spacing[2],
     borderTopWidth: theme.borderWidth[1],
     borderTopColor: theme.colors.border,
     marginTop: theme.spacing[1],
     padding: theme.spacing[2],
-  },
-  summary: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.foregroundMuted,
   },
 }));

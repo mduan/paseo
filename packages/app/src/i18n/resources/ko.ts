@@ -1082,6 +1082,8 @@ export const ko: TranslationResources = {
           rangeTitle: "커밋 범위 선택",
           clear: "지우기",
           save: "저장",
+          showCount_one: "커밋 {{count}}개 보기",
+          showCount_other: "커밋 {{count}}개 보기",
           single: "커밋 {{sha}}",
           count_one: "커밋 {{count}}개",
           count_other: "커밋 {{count}}개",

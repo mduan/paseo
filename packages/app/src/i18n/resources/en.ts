@@ -1083,6 +1083,8 @@ export const en = {
           rangeTitle: "Select a range of commits",
           clear: "Clear",
           save: "Save",
+          showCount_one: "Show {{count}} commit",
+          showCount_other: "Show {{count}} commits",
           single: "Commit {{sha}}",
           count_one: "{{count}} commit",
           count_other: "{{count}} commits",

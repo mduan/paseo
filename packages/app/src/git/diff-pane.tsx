@@ -46,6 +46,7 @@ import {
   useWorkspaceCommits,
 } from "@/git/commit-range/commit-range-menu";
 import { commitRangeSpan } from "@/git/commit-range/commit-range";
+import { sumDiffStat } from "@/git/file-header-presentation";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import {
@@ -127,13 +128,7 @@ function computeSelectedDiffStat(
   if (isLoading) {
     return null;
   }
-  return files.reduce(
-    (total, file) => ({
-      additions: total.additions + file.additions,
-      deletions: total.deletions + file.deletions,
-    }),
-    { additions: 0, deletions: 0 },
-  );
+  return sumDiffStat(files);
 }
 
 function useDiscardChangesAction({

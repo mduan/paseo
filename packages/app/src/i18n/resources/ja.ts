@@ -1088,6 +1088,8 @@ export const ja: TranslationResources = {
           rangeTitle: "コミットの範囲を選択",
           clear: "クリア",
           save: "保存",
+          showCount_one: "{{count}} 件のコミットを表示",
+          showCount_other: "{{count}} 件のコミットを表示",
           single: "コミット {{sha}}",
           count_one: "{{count}} 件のコミット",
           count_other: "{{count}} 件のコミット",

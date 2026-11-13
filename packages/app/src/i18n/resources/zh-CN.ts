@@ -1067,6 +1067,8 @@ export const zhCN: TranslationResources = {
           rangeTitle: "选择提交范围",
           clear: "清除",
           save: "保存",
+          showCount_one: "显示 {{count}} 个提交",
+          showCount_other: "显示 {{count}} 个提交",
           single: "提交 {{sha}}",
           count_one: "{{count}} 个提交",
           count_other: "{{count}} 个提交",
