@@ -698,6 +698,11 @@ export type AgentTurnDiffPayload = Extract<
   { type: "agent.turn_diffs.get_diff.response" }
 >["payload"];
 
+export type CommitRangeDiffPayload = Extract<
+  SessionOutboundMessage,
+  { type: "checkout.commits.range_diff.response" }
+>["payload"];
+
 export type AgentTimelineSearchPayload = Extract<
   SessionOutboundMessage,
   { type: "agent.timeline.search.response" }
@@ -4500,6 +4505,25 @@ export class DaemonClient {
       throw new Error(payload.error.message);
     }
     return { file: payload.file };
+  }
+
+  // Errors stay in the payload so callers can render them like checkout diff errors.
+  async getCommitRangeDiff(input: {
+    cwd: string;
+    fromSha: string;
+    toSha: string;
+    ignoreWhitespace?: boolean;
+  }): Promise<CommitRangeDiffPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"checkout.commits.range_diff.response">({
+      message: {
+        type: "checkout.commits.range_diff.request",
+        cwd: input.cwd,
+        fromSha: input.fromSha,
+        toSha: input.toSha,
+        ...(input.ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+      },
+      timeout: 60000,
+    });
   }
 
   async getDiffContextLines(input: {

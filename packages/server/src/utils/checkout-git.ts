@@ -2750,6 +2750,33 @@ export async function listCheckoutCommits({
  * binary-only (no textual hunks). Throws on git failure (e.g. an unknown sha),
  * which the caller maps to a typed checkout error.
  */
+/** The combined diff of the commits from `fromSha` through `toSha`, both included. */
+export async function getCommitRangeDiff(input: {
+  cwd: string;
+  fromSha: string;
+  toSha: string;
+  ignoreWhitespace?: boolean;
+}): Promise<CheckoutDiffResult & { baseRef: string; targetRef: string }> {
+  const { cwd, fromSha, toSha } = input;
+  const [from, targetRef] = await Promise.all([
+    tryResolveCommit(cwd, fromSha),
+    tryResolveCommit(cwd, toSha),
+  ]);
+  if (!from || !targetRef) {
+    throw new Error(`Unknown commit range: ${fromSha}..${toSha}`);
+  }
+  // A root commit has no parent, so its changes are against the empty tree.
+  const baseRef = (await tryResolveCommit(cwd, `${from}^`)) ?? EMPTY_TREE_OBJECT_ID;
+  const result = await getCheckoutDiff(cwd, {
+    mode: "range",
+    baseRef,
+    targetRef,
+    ignoreWhitespace: input.ignoreWhitespace,
+    includeStructured: true,
+  });
+  return { ...result, baseRef, targetRef };
+}
+
 export async function getCommitFileDiff({
   cwd,
   sha,

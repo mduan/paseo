@@ -40,7 +40,12 @@ import {
   type PrHint,
   useCheckoutPrStatusQuery,
 } from "@/git/use-pr-status-query";
-import { CommitsSection } from "@/git/commits-section/commits-section";
+import {
+  CommitRangeMenuSection,
+  formatCommitRange,
+  useWorkspaceCommits,
+} from "@/git/commit-range/commit-range-menu";
+import { commitRangeSpan } from "@/git/commit-range/commit-range";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import {
@@ -100,7 +105,9 @@ import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view"
 import type { PullRequestOpenLocation } from "@/hooks/use-settings";
 import {
   LiveDiffComparison,
-  isTurnDiffComparison,
+  isSnapshotDiffComparison,
+  type CommitRange,
+  type CommitRangeComparison,
   type WorkingDiffComparison,
 } from "@/git/working-diff-comparison/state";
 
@@ -288,6 +295,13 @@ interface TurnDiffModes {
   selectLastTurn: () => void;
 }
 
+interface CommitRangeModes {
+  serverId: string;
+  cwd: string;
+  selected: CommitRange | undefined;
+  select: (range: CommitRange) => void;
+}
+
 interface DiffModeMenuProps {
   diffMode: WorkingDiffComparison;
   testIDPrefix?: string;
@@ -295,6 +309,7 @@ interface DiffModeMenuProps {
   onSelectBase: () => void;
   onSelectAll?: () => void;
   turnModes?: TurnDiffModes | null;
+  commitRanges?: CommitRangeModes | null;
 }
 
 const DIFF_MODE_LABEL_KEYS = {
@@ -302,7 +317,25 @@ const DIFF_MODE_LABEL_KEYS = {
   base: "workspace.git.diff.committed",
   last_turn: "workspace.git.diff.lastTurn",
   [LiveDiffComparison.All]: "workspace.git.diff.allChanges",
-} as const satisfies Record<WorkingDiffComparison, string>;
+} as const satisfies Record<Exclude<WorkingDiffComparison, CommitRangeComparison>, string>;
+
+function useDiffModeLabel(input: {
+  diffMode: WorkingDiffComparison;
+  commitRanges?: CommitRangeModes | null;
+}): string {
+  const { t } = useTranslation();
+  const { diffMode, commitRanges } = input;
+  const range = diffMode === "commit_range" ? commitRanges?.selected : undefined;
+  const { shas } = useWorkspaceCommits({
+    serverId: commitRanges?.serverId ?? "",
+    cwd: commitRanges?.cwd ?? "",
+    enabled: Boolean(range),
+  });
+  if (diffMode !== "commit_range") return t(DIFF_MODE_LABEL_KEYS[diffMode]);
+  if (!range) return t("workspace.git.diff.committed");
+  const span = commitRangeSpan(shas, range);
+  return formatCommitRange({ t, range, count: span && span.oldest - span.newest + 1 });
+}
 
 export function DiffModeMenu({
   diffMode,
@@ -311,8 +344,10 @@ export function DiffModeMenu({
   onSelectBase,
   onSelectAll,
   turnModes,
+  commitRanges,
 }: DiffModeMenuProps) {
   const { t } = useTranslation();
+  const label = useDiffModeLabel({ diffMode, commitRanges });
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -326,7 +361,7 @@ export function DiffModeMenu({
           return (
             <>
               <Text style={toolbarLabelTriggerTextStyle(highlighted)} numberOfLines={1}>
-                {t(DIFF_MODE_LABEL_KEYS[diffMode])}
+                {label}
               </Text>
               <ToolbarLabelTriggerIcon>
                 <ThemedChevronDown size={12} uniProps={extraMutedIconColorMapping} />
@@ -335,7 +370,11 @@ export function DiffModeMenu({
           );
         }}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" width={260} testID={`${testIDPrefix}-status-menu`}>
+      <DropdownMenuContent
+        align="start"
+        width={commitRanges ? 380 : 260}
+        testID={`${testIDPrefix}-status-menu`}
+      >
         <DropdownMenuItem
           testID={`${testIDPrefix}-mode-uncommitted`}
           selected={diffMode === "uncommitted"}
@@ -374,6 +413,14 @@ export function DiffModeMenu({
               {t(DIFF_MODE_LABEL_KEYS.last_turn)}
             </DropdownMenuItem>
           </>
+        ) : null}
+        {commitRanges ? (
+          <CommitRangeMenuSection
+            serverId={commitRanges.serverId}
+            cwd={commitRanges.cwd}
+            selected={commitRanges.selected}
+            onSave={commitRanges.select}
+          />
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -509,6 +556,7 @@ interface ChangesRepositoryToolbarModel {
 interface ChangesComparisonToolbarModel {
   diffMode: WorkingDiffComparison;
   turnModes: TurnDiffModes | null;
+  commitRanges: CommitRangeModes | null;
   mode: ChangesToolbarMode;
   selectedDiffStat: { additions: number; deletions: number } | null;
   onSelectBase: () => void;
@@ -530,6 +578,7 @@ interface BuildChangesHeaderModelInput {
   cwd: string;
   diffMode: WorkingDiffComparison;
   turnModes: TurnDiffModes | null;
+  commitRanges: CommitRangeModes | null;
   gitActions: GitActions;
   mode: ChangesToolbarMode;
   onOpenPullRequest: () => void;
@@ -551,8 +600,9 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
       baseRefLabel: input.baseRefLabel,
       branchName: input.branchName,
       cwd: input.cwd,
-      // Commit and push act on the live checkout, not on a frozen turn snapshot.
-      gitActions: input.compact && !isTurnDiffComparison(input.diffMode) ? input.gitActions : null,
+      // Commit and push act on the live checkout, not on a turn or commit range snapshot.
+      gitActions:
+        input.compact && !isSnapshotDiffComparison(input.diffMode) ? input.gitActions : null,
       pullRequest: input.pullRequest
         ? { ...input.pullRequest, onOpen: input.onOpenPullRequest }
         : null,
@@ -562,6 +612,7 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
     comparison: {
       diffMode: input.diffMode,
       turnModes: input.turnModes,
+      commitRanges: input.commitRanges,
       mode: input.mode,
       selectedDiffStat: input.selectedDiffStat,
       onSelectBase: input.onSelectBase,
@@ -791,6 +842,7 @@ function ChangesComparisonToolbar({
           onSelectBase={model.onSelectBase}
           onSelectAll={model.onSelectAll}
           turnModes={model.turnModes}
+          commitRanges={model.commitRanges}
         />
         {model.selectedDiffStat ? (
           <DiffStat
@@ -1437,33 +1489,6 @@ function ChangesBody({
   );
 }
 
-function ChangesCommits({
-  presentation,
-  serverId,
-  cwd,
-  collapsed,
-  onCommitPress,
-  onCollapsedChange,
-}: {
-  presentation: ChangesPresentation;
-  serverId: string;
-  cwd: string;
-  collapsed: boolean;
-  onCommitPress: (sha: string) => void;
-  onCollapsedChange: (collapsed: boolean) => void;
-}) {
-  if (presentation === "diff") return null;
-  return (
-    <CommitsSection
-      serverId={serverId}
-      cwd={cwd}
-      onCommitPress={onCommitPress}
-      collapsed={collapsed}
-      onCollapsedChange={onCollapsedChange}
-    />
-  );
-}
-
 function useDiffTabNavigation({
   serverId,
   workspaceId,
@@ -1493,14 +1518,6 @@ function useDiffTabNavigation({
     }
     openWorkspaceTab(persistenceKey, { kind: "working_diff" }, FOCUSED_PANE_PLACEMENT);
   }, [isMobile, openWorkspaceTab, persistenceKey]);
-  const openCommit = useCallback(
-    (sha: string) => {
-      if (persistenceKey) {
-        openWorkspaceTab(persistenceKey, { kind: "commit_diff", sha }, FOCUSED_PANE_PLACEMENT);
-      }
-    },
-    [openWorkspaceTab, persistenceKey],
-  );
   const openPullRequest = useCallback(() => {
     if (!persistenceKey) return;
     openWorkspacePullRequest({
@@ -1512,7 +1529,6 @@ function useDiffTabNavigation({
   }, [cwd, isMobile, persistenceKey, pullRequestOpenLocation, serverId]);
   return {
     openDiff,
-    openCommit,
     openPullRequest,
   };
 }
@@ -1577,17 +1593,15 @@ export function ChangesSurface({
 
   const toast = useToast();
   const fileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
-  const {
-    openDiff: handleOpenDiff,
-    openCommit: handleCommitPress,
-    openPullRequest: handleOpenPullRequest,
-  } = useDiffTabNavigation({
-    serverId,
-    workspaceId,
-    cwd,
-    isMobile,
-    pullRequestOpenLocation: appSettings.pullRequestOpenLocation,
-  });
+  const { openDiff: handleOpenDiff, openPullRequest: handleOpenPullRequest } = useDiffTabNavigation(
+    {
+      serverId,
+      workspaceId,
+      cwd,
+      isMobile,
+      pullRequestOpenLocation: appSettings.pullRequestOpenLocation,
+    },
+  );
   const refreshSupported = useSessionStore(
     (s) => s.sessions[serverId]?.serverInfo?.features?.checkoutRefresh === true,
   );
@@ -1622,6 +1636,8 @@ export function ChangesSurface({
     selectBase: handleSelectBase,
     selectAll: handleSelectAll,
     turnModes,
+    commitRange,
+    selectCommitRange,
     isTurnSnapshotMissing,
     files,
     diffPayloadError,
@@ -1671,10 +1687,6 @@ export function ChangesSurface({
   const handleToggleDesktopTree = useCallback(() => {
     updateState({ ...instanceState, treeVisible: !desktopTreeVisible });
   }, [desktopTreeVisible, instanceState, updateState]);
-  const handleCommitsCollapsedChange = useCallback(
-    (commitsCollapsed: boolean) => updateState({ ...instanceState, commitsCollapsed }),
-    [instanceState, updateState],
-  );
   const handleChangesTreeWidth = useCallback(
     (treeWidth: number) => updateState({ ...instanceState, treeWidth }),
     [instanceState, updateState],
@@ -1925,6 +1937,13 @@ export function ChangesSurface({
       wrapLines,
     ],
   );
+  const commitRanges = useMemo(
+    () =>
+      selectCommitRange
+        ? { serverId, cwd, selected: commitRange, select: selectCommitRange }
+        : null,
+    [commitRange, cwd, selectCommitRange, serverId],
+  );
   const changesHeaderModel = useMemo(
     () =>
       buildChangesHeaderModel({
@@ -1934,6 +1953,7 @@ export function ChangesSurface({
         cwd,
         diffMode,
         turnModes,
+        commitRanges,
         gitActions,
         mode: toolbarMode,
         onOpenPullRequest: handleOpenPullRequest,
@@ -1951,6 +1971,7 @@ export function ChangesSurface({
       cwd,
       diffMode,
       turnModes,
+      commitRanges,
       gitActions,
       handleOpenPullRequest,
       handleSelectBase,
@@ -2003,15 +2024,6 @@ export function ChangesSurface({
           <JumpToFile files={files} mode={workingMode} onSelectFile={handleSelectTreeFile} />
         ) : null}
       </View>
-
-      <ChangesCommits
-        presentation={presentation}
-        serverId={serverId}
-        cwd={cwd}
-        onCommitPress={handleCommitPress}
-        collapsed={instanceState.commitsCollapsed}
-        onCollapsedChange={handleCommitsCollapsedChange}
-      />
     </View>
   );
 }

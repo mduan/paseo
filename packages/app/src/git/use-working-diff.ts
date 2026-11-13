@@ -18,12 +18,16 @@ import { useWorkingDiffComparison } from "@/git/working-diff-comparison";
 import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import {
   LiveDiffComparison,
+  isSnapshotDiffComparison,
   isTurnDiffComparison,
   type CheckoutDiffComparison,
+  type CommitRange,
   type TurnDiffComparison,
   type WorkingDiffComparison,
 } from "@/git/working-diff-comparison/state";
+import { useFetchQuery } from "@/data/query";
 import { useHostFeature } from "@/runtime/host-features";
+import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useFocusedChatTarget } from "@/panels/use-add-file-to-chat";
 import { useAgentTurnDiff, useTurnDiffsEnabled } from "@/turn-diffs/queries";
 import { toErrorMessage } from "@/utils/error-messages";
@@ -66,10 +70,12 @@ export function useWorkingDiff({
     checkoutMode,
     includeUncommitted,
     turnComparison,
+    commitRange,
     selectUncommitted,
     selectBase,
     selectAll,
     turnModes,
+    selectCommitRange,
   } = useResolvedDiffComparison({ serverId, workspaceId, cwd, isDirty: hasUncommittedChanges });
 
   const checkoutDiff = useCheckoutDiffQuery({
@@ -79,13 +85,15 @@ export function useWorkingDiff({
     includeUncommitted,
     baseRef,
     ignoreWhitespace,
-    enabled: enabled && isGit && !turnComparison,
+    enabled: enabled && isGit && !turnComparison && !commitRange,
     queryScope,
   });
-  const turnDiff = useTurnComparisonDiff({
+  const snapshotDiff = useSnapshotDiff({
     serverId,
     workspaceId,
-    comparison: turnComparison,
+    cwd,
+    turnComparison,
+    commitRange,
     ignoreWhitespace,
     enabled: enabled && isGit,
   });
@@ -98,8 +106,7 @@ export function useWorkingDiff({
     checkoutMode,
     includeUncommitted,
     baseRef,
-    turnComparison,
-    turnDiff,
+    snapshotDiff,
     checkoutFiles: checkoutDiff.files,
   });
   // Expanded lines give review comments on them their surrounding context.
@@ -111,7 +118,7 @@ export function useWorkingDiff({
   const reviewActions = useInlineReviewController({
     reviewDraftKey,
     buildContext,
-    snapshot: turnDiff.snapshot,
+    snapshot: snapshotDiff?.snapshot,
   });
 
   return {
@@ -127,36 +134,47 @@ export function useWorkingDiff({
     selectBase,
     selectAll,
     turnModes,
-    commentsCapabilityMissing: turnDiff.commentsCapabilityMissing,
-    ...(turnComparison
-      ? {
-          isTurnSnapshotMissing: turnDiff.isSnapshotMissing,
-          files: expansion.files,
-          onExpandGap: expansion.onExpandGap,
-          diffPayloadError: turnDiff.payloadError,
-          diffTooLarge: turnDiff.diffTooLarge,
-          isDiffLoading: turnDiff.isLoading,
-          historyStatus: undefined,
-          retryHistory: undefined,
-          reviewActions: turnDiff.snapshot ? reviewActions : undefined,
-        }
-      : {
-          isTurnSnapshotMissing: false,
-          files: expansion.files,
-          onExpandGap: expansion.onExpandGap,
-          diffPayloadError: checkoutDiff.payloadError,
-          diffTooLarge: checkoutDiff.diffTooLarge,
-          isDiffLoading: checkoutDiff.isLoading,
-          historyStatus: checkoutDiff.historyStatus,
-          retryHistory: checkoutDiff.retryHistory,
-          reviewActions,
-        }),
+    commitRange,
+    selectCommitRange,
+    files: expansion.files,
+    onExpandGap: expansion.onExpandGap,
+    ...selectDiffState({ snapshotDiff, checkoutDiff, reviewActions }),
+  };
+}
+
+function selectDiffState<ReviewActions>(input: {
+  snapshotDiff: ReturnType<typeof useSnapshotDiff>;
+  checkoutDiff: ReturnType<typeof useCheckoutDiffQuery>;
+  reviewActions: ReviewActions;
+}) {
+  const { snapshotDiff, checkoutDiff, reviewActions } = input;
+  if (snapshotDiff) {
+    return {
+      commentsCapabilityMissing: snapshotDiff.commentsCapabilityMissing,
+      isTurnSnapshotMissing: snapshotDiff.isSnapshotMissing,
+      diffPayloadError: snapshotDiff.payloadError,
+      diffTooLarge: snapshotDiff.diffTooLarge,
+      isDiffLoading: snapshotDiff.isLoading,
+      historyStatus: undefined,
+      retryHistory: undefined,
+      reviewActions: snapshotDiff.snapshot ? reviewActions : undefined,
+    };
+  }
+  return {
+    commentsCapabilityMissing: false,
+    isTurnSnapshotMissing: false,
+    diffPayloadError: checkoutDiff.payloadError,
+    diffTooLarge: checkoutDiff.diffTooLarge,
+    isDiffLoading: checkoutDiff.isLoading,
+    historyStatus: checkoutDiff.historyStatus,
+    retryHistory: checkoutDiff.retryHistory,
+    reviewActions,
   };
 }
 
 /**
- * The selected comparison. Turn comparisons apply only while turn diffs are enabled; otherwise
- * the checkout falls back to its dirty-state default.
+ * The selected comparison. Turn and commit range comparisons apply only while the host supports
+ * them; otherwise the checkout falls back to its dirty-state default.
  */
 function useResolvedDiffComparison(input: {
   serverId: string;
@@ -164,8 +182,17 @@ function useResolvedDiffComparison(input: {
   cwd: string;
   isDirty: boolean;
 }) {
-  const { comparison, selectComparison } = useWorkingDiffComparison(input);
+  const { comparison, commitRange, selectComparison } = useWorkingDiffComparison(input);
   const turnDiffsEnabled = useTurnDiffsEnabled(input.serverId);
+  // COMPAT(commitRangeDiff): added in v0.11.0-fork.40, remove after 2027-05-13.
+  const commitRangeSupported = useHostFeature(input.serverId, "commitRangeDiff");
+  const selectCommitRange = useMemo(
+    () =>
+      commitRangeSupported
+        ? (range: CommitRange) => selectComparison("commit_range", range)
+        : undefined,
+    [commitRangeSupported, selectComparison],
+  );
   // COMPAT(checkoutCombinedDiff): added in v0.11.0-fork.6, remove after 2027-04-08.
   const combinedDiffSupported = useHostFeature(input.serverId, "checkoutCombinedDiff");
   const selectAllChanges = useCallback(
@@ -180,21 +207,24 @@ function useResolvedDiffComparison(input: {
     () => (turnDiffsEnabled ? { selectLastTurn: () => selectComparison("last_turn") } : null),
     [selectComparison, turnDiffsEnabled],
   );
-  const isTurn = isTurnDiffComparison(comparison);
   const defaultCheckoutMode: CheckoutDiffComparison = input.isDirty ? "uncommitted" : "base";
-  const checkoutMode = isTurn ? defaultCheckoutMode : comparison;
+  const checkoutMode = isSnapshotDiffComparison(comparison) ? defaultCheckoutMode : comparison;
   const resolvedCheckoutMode = checkoutMode === LiveDiffComparison.All ? "base" : checkoutMode;
-  const turnComparison = turnDiffsEnabled && isTurn ? comparison : null;
-  const diffMode: WorkingDiffComparison = turnComparison ?? checkoutMode;
+  const turnComparison = turnDiffsEnabled && isTurnDiffComparison(comparison) ? comparison : null;
+  const activeCommitRange = commitRangeSupported ? commitRange : undefined;
+  const diffMode: WorkingDiffComparison =
+    turnComparison ?? (activeCommitRange ? "commit_range" : checkoutMode);
   return {
     diffMode,
     checkoutMode: resolvedCheckoutMode,
     includeUncommitted,
     turnComparison,
+    commitRange: activeCommitRange,
     selectUncommitted,
     selectBase,
     selectAll,
     turnModes,
+    selectCommitRange,
   };
 }
 
@@ -208,18 +238,17 @@ function useWorkingDiffExpansion(input: {
   checkoutMode: CheckoutDiffComparison;
   includeUncommitted: boolean;
   baseRef?: string;
-  turnComparison: TurnDiffComparison | null;
-  turnDiff: { cwd: string; agentId: string | null; files: ParsedDiffFile[] };
+  snapshotDiff: { cwd: string; scopeKey: string; files: ParsedDiffFile[] } | null;
   checkoutFiles: ParsedDiffFile[];
 }) {
-  const { serverId, turnComparison, turnDiff } = input;
+  const { serverId, snapshotDiff } = input;
   return useDiffContextExpansion({
     serverId,
-    ...(turnComparison
+    ...(snapshotDiff
       ? {
-          cwd: turnDiff.cwd,
-          scopeKey: `turn:${serverId}:${turnDiff.agentId}:${turnComparison}:${input.ignoreWhitespace}`,
-          files: turnDiff.files,
+          cwd: snapshotDiff.cwd,
+          scopeKey: `${snapshotDiff.scopeKey}:${input.ignoreWhitespace}`,
+          files: snapshotDiff.files,
         }
       : {
           cwd: input.cwd,
@@ -251,7 +280,7 @@ function useTurnComparisonDiff(input: {
     ? { code: "UNKNOWN" as const, message: query.error.message }
     : null;
   return {
-    agentId,
+    scopeKey: `turn:${input.serverId}:${agentId}:${input.comparison}`,
     cwd: payload?.cwd ?? "",
     files: payload?.files ?? EMPTY_FILES,
     snapshot: payload?.snapshot,
@@ -260,6 +289,73 @@ function useTurnComparisonDiff(input: {
     diffTooLarge: payload?.diffTooLarge === true,
     isLoading: Boolean(agentId) && !payload && !query.error,
     isSnapshotMissing: !agentId || payload?.available === false,
+  };
+}
+
+/** The selected turn or commit range diff, or null for a live checkout comparison. */
+function useSnapshotDiff(input: {
+  serverId: string;
+  workspaceId?: string;
+  cwd: string;
+  turnComparison: TurnDiffComparison | null;
+  commitRange: CommitRange | undefined;
+  ignoreWhitespace: boolean;
+  enabled: boolean;
+}) {
+  const { serverId, cwd, turnComparison, commitRange, ignoreWhitespace, enabled } = input;
+  const turnDiff = useTurnComparisonDiff({
+    serverId,
+    workspaceId: input.workspaceId,
+    comparison: turnComparison,
+    ignoreWhitespace,
+    enabled,
+  });
+  const commitRangeDiff = useCommitRangeComparisonDiff({
+    serverId,
+    cwd,
+    commitRange,
+    ignoreWhitespace,
+    enabled,
+  });
+  if (turnComparison) return turnDiff;
+  return commitRange ? commitRangeDiff : null;
+}
+
+/** The combined diff of a commit range, in the same shape as the turn snapshot diff. */
+function useCommitRangeComparisonDiff(input: {
+  serverId: string;
+  cwd: string;
+  commitRange: CommitRange | undefined;
+  ignoreWhitespace: boolean;
+  enabled: boolean;
+}) {
+  const { serverId, cwd, commitRange, ignoreWhitespace } = input;
+  const client = useHostRuntimeClient(serverId);
+  const query = useFetchQuery({
+    queryKey: ["checkout-commit-range-diff", serverId, cwd, commitRange, ignoreWhitespace],
+    queryFn: () => {
+      if (!client || !commitRange) throw new Error("Host disconnected");
+      return client.getCommitRangeDiff({ cwd, ...commitRange, ignoreWhitespace });
+    },
+    enabled: input.enabled && Boolean(client) && Boolean(commitRange),
+    dataShape: "value",
+    // Commits are immutable, so a range's diff never changes.
+    immutableWhen: () => true,
+  });
+  const payload = commitRange ? query.data : undefined;
+  const queryError = query.error
+    ? { code: "UNKNOWN" as const, message: query.error.message }
+    : null;
+  return {
+    scopeKey: `commits:${serverId}:${cwd}:${commitRange?.fromSha}..${commitRange?.toSha}`,
+    cwd,
+    files: payload?.files ?? EMPTY_FILES,
+    snapshot: payload?.snapshot,
+    commentsCapabilityMissing: false,
+    payloadError: payload?.error ?? queryError,
+    diffTooLarge: payload?.diffTooLarge === true,
+    isLoading: !payload && !query.error,
+    isSnapshotMissing: false,
   };
 }
 
