@@ -9,19 +9,24 @@ import {
 } from "./messages.js";
 
 describe("checkout.commits.list schemas", () => {
-  test("parses a valid request", () => {
-    expect(
-      CheckoutCommitsListRequestSchema.parse({
+  test.each([undefined, false, true])(
+    "parses a request with ignoreWhitespace=%s",
+    (ignoreWhitespace) => {
+      expect(
+        CheckoutCommitsListRequestSchema.parse({
+          type: "checkout.commits.list.request",
+          cwd: "/tmp/repo",
+          ignoreWhitespace,
+          requestId: "request-commits",
+        }),
+      ).toEqual({
         type: "checkout.commits.list.request",
         cwd: "/tmp/repo",
+        ignoreWhitespace,
         requestId: "request-commits",
-      }),
-    ).toEqual({
-      type: "checkout.commits.list.request",
-      cwd: "/tmp/repo",
-      requestId: "request-commits",
-    });
-  });
+      });
+    },
+  );
 
   test("parses a valid response with local-only and remote commits", () => {
     const payload = {

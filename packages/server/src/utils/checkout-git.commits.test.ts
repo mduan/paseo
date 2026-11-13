@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { listCheckoutCommits } from "./checkout-git.js";
+import { getCommitRangeDiff, listCheckoutCommits } from "./checkout-git.js";
 import { writePaseoWorktreeMetadata } from "./worktree-metadata.js";
 
 const tempDirs: string[] = [];
@@ -92,6 +92,51 @@ function addBareRemote(repoDir: string, tempDir: string): string {
 }
 
 describe("listCheckoutCommits", () => {
+  it.each([false, true])(
+    "matches the selected diff's counts with ignoreWhitespace=%s, including merge resolutions",
+    async (ignoreWhitespace) => {
+      const { repoDir } = initRepoOnMain();
+      git(["checkout", "-b", "feature"], repoDir);
+      commitFile(repoDir, "README.md", " base \nextra\n", "Feature work");
+      git(["checkout", "main"], repoDir);
+      commitFile(repoDir, "main.txt", "main\n", "Advance main");
+      git(["checkout", "feature"], repoDir);
+      git(["merge", "--no-ff", "--no-commit", "main"], repoDir);
+      commitFile(repoDir, "README.md", "  base  \n extra \nmerged\n", "Merge main");
+
+      const { commits } = await listCheckoutCommits({ cwd: repoDir, ignoreWhitespace });
+      const workspaceCommits = commits.filter((entry) => !entry.isOnBase);
+      expect(workspaceCommits.map((entry) => entry.subject)).toEqual([
+        "Merge main",
+        "Feature work",
+      ]);
+      for (const entry of workspaceCommits) {
+        const diff = await getCommitRangeDiff({
+          cwd: repoDir,
+          fromSha: entry.sha,
+          toSha: entry.sha,
+          ignoreWhitespace,
+        });
+        expect(entry.files).toEqual(
+          diff.structured?.map(({ path, additions, deletions }) => ({
+            path,
+            additions,
+            deletions,
+            status: "modified",
+          })),
+        );
+      }
+      expect(workspaceCommits[0]?.files).toEqual([
+        {
+          path: "README.md",
+          additions: ignoreWhitespace ? 1 : 3,
+          deletions: ignoreWhitespace ? 0 : 2,
+          status: "modified",
+        },
+      ]);
+    },
+  );
+
   it("lists recent commits newest-first with on-remote flags and file stats", async () => {
     const { repoDir, tempDir } = initRepoOnMain();
     git(["checkout", "-b", "feature"], repoDir);

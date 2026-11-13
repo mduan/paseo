@@ -290,6 +290,7 @@ export class CheckoutSession {
     try {
       const { baseRef, commits } = await listCheckoutCommits({
         cwd: expandTilde(cwd),
+        ignoreWhitespace: msg.ignoreWhitespace,
         context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
       });
       this.host.emit({
