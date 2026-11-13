@@ -278,22 +278,35 @@ export function selectWorkspaceTimeOrderByScope(
   serverIds: readonly string[],
   sortMode: Exclude<SidebarSortMode, SidebarSortMode.Manual>,
 ): Record<string, string[]> {
-  const entriesByScope: Record<string, Array<{ key: string; time: number }>> = {};
+  const entriesByScope: Record<
+    string,
+    Array<{ key: string; time: number; isRunning: boolean }>
+  > = {};
   for (const serverId of serverIds) {
     const session = state.sessions[serverId];
     if (!session || !hostSupportsFeature(session.serverInfo, "workspaceSortTimes")) continue;
     for (const workspace of session.workspaces.values()) {
-      const timestamp = selectWorkspaceSortTime(workspace, sortMode);
+      const isRunning = sortMode === SidebarSortMode.LastResponse && workspace.status === "running";
+      const timestamp = selectWorkspaceSortTime(
+        workspace,
+        isRunning ? SidebarSortMode.LastPrompt : sortMode,
+      );
       const scope = createProjectViewKey({ serverId, projectId: workspace.projectId });
       (entriesByScope[scope] ??= []).push({
         key: `${serverId}:${workspace.id}`,
         time: timestamp ? Date.parse(timestamp) : Number.NEGATIVE_INFINITY,
+        isRunning,
       });
     }
   }
   const orders: Record<string, string[]> = {};
   for (const [scope, entries] of Object.entries(entriesByScope)) {
-    entries.sort((left, right) => right.time - left.time || left.key.localeCompare(right.key));
+    entries.sort(
+      (left, right) =>
+        Number(right.isRunning) - Number(left.isRunning) ||
+        right.time - left.time ||
+        left.key.localeCompare(right.key),
+    );
     orders[scope] = entries.map((entry) => entry.key);
   }
   return orders;
