@@ -4596,6 +4596,8 @@ export class Session {
         },
         {
           kind: "session",
+          callerAgentId: msg.callerAgentId,
+          notifyOnFinish: msg.notifyOnFinish,
           onAgentReady: async (agent) => {
             createdAgentId = agent.id;
             await onAgentReady?.(await this.buildAgentPayload(agent));

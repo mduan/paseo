@@ -11,8 +11,80 @@ import { AgentStorage } from "../agent-storage.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.js";
 import { createAgentCommand } from "./create.js";
 import type { ManagedAgent } from "../agent-manager.js";
+import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 
 const logger = createTestLogger();
+
+test.each([false, true])(
+  "creation reports a child that finishes before startup returns (mcp=%s)",
+  async (mcp) => {
+    const workdir = mkdtempSync(join(tmpdir(), "create-agent-finish-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const parentPrompts: string[] = [];
+    const agentManager = new AgentManager({
+      clients: createTestAgentClients({
+        onStartTurn: (prompt) => {
+          if (typeof prompt === "string" && prompt.startsWith("<paseo-system>"))
+            parentPrompts.push(prompt);
+        },
+      }),
+      registry: storage,
+      logger,
+    });
+    try {
+      const parent = await agentManager.createAgent(
+        { provider: "claude", cwd: workdir },
+        undefined,
+        {
+          workspaceId: "ws-parent",
+        },
+      );
+      const waitForStart = agentManager.waitForAgentRunStart.bind(agentManager);
+      vi.spyOn(agentManager, "waitForAgentRunStart").mockImplementation(
+        async (agentId, options) => {
+          await waitForStart(agentId, options);
+          if (agentId !== parent.id) {
+            await vi.waitFor(() => expect(agentManager.getAgent(agentId)?.lifecycle).toBe("idle"));
+          }
+        },
+      );
+      const dependencies = {
+        agentManager,
+        agentStorage: storage,
+        logger,
+        providerSnapshotManager: createProviderSnapshotManagerStub().manager,
+      };
+      const common = { callerAgentId: parent.id, notifyOnFinish: true, initialPrompt: "Do work" };
+      const { snapshot } = await createAgentCommand(
+        dependencies,
+        mcp
+          ? {
+              ...common,
+              kind: "mcp",
+              provider: "codex/gpt-5.4",
+              title: "Child",
+              background: true,
+            }
+          : {
+              ...common,
+              kind: "session",
+              config: { provider: "codex", cwd: workdir, title: "Child" },
+              workspaceId: "ws-parent",
+              labels: { [PARENT_AGENT_ID_LABEL]: parent.id },
+              provisionalTitle: null,
+              firstAgentContext: { attachments: [] },
+              buildSessionConfig: async (config) => ({ sessionConfig: config }),
+            },
+      );
+      await vi.waitFor(() => expect(parentPrompts).toHaveLength(1));
+      expect(parentPrompts[0]).toContain(`Agent ${snapshot.id} (Child) finished.`);
+      await vi.waitFor(() => expect(agentManager.getAgent(parent.id)?.lifecycle).toBe("idle"));
+      expect(parentPrompts).toHaveLength(1);
+    } finally {
+      await removeRealAgentManagerWorkdir({ agentManager, storage, workdir });
+    }
+  },
+);
 
 function createRealAgentManager(storage: AgentStorage): AgentManager {
   return new AgentManager({
@@ -21,6 +93,48 @@ function createRealAgentManager(storage: AgentStorage): AgentManager {
     logger,
   });
 }
+
+test("failed initial dispatch removes its finish watcher without prompting the parent", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "create-agent-finish-failure-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const agentManager = createRealAgentManager(storage);
+  try {
+    const parent = await agentManager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
+      workspaceId: "ws-parent",
+    });
+    const subscriptions = agentManager.subscriptionCount();
+    vi.spyOn(agentManager, "waitForAgentRunStart").mockRejectedValue(new Error("Startup failed"));
+    await expect(
+      createAgentCommand(
+        {
+          agentManager,
+          agentStorage: storage,
+          logger,
+          providerSnapshotManager: createProviderSnapshotManagerStub().manager,
+        },
+        {
+          kind: "session",
+          callerAgentId: parent.id,
+          notifyOnFinish: true,
+          config: { provider: "codex", cwd: workdir },
+          workspaceId: "ws-parent",
+          initialPrompt: "Do work",
+          labels: { [PARENT_AGENT_ID_LABEL]: parent.id },
+          provisionalTitle: null,
+          firstAgentContext: { attachments: [] },
+          buildSessionConfig: async (config) => ({ sessionConfig: config }),
+        },
+      ),
+    ).rejects.toThrow("Startup failed");
+    await vi.waitFor(() => {
+      expect(agentManager.listAgents().every((agent) => agent.lifecycle === "idle")).toBe(true);
+      expect(agentManager.subscriptionCount()).toBe(subscriptions);
+    });
+    expect(agentManager.getAgent(parent.id)?.turnCount ?? 0).toBe(0);
+  } finally {
+    await removeRealAgentManagerWorkdir({ agentManager, storage, workdir });
+  }
+});
 
 async function removeRealAgentManagerWorkdir({
   agentManager,
