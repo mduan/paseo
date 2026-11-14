@@ -416,7 +416,8 @@ function paintNativeRange(input: PaintNativeRangeInput): void {
         input.canvas.drawText(
           row.label,
           row.deferredLoad ? (input.viewportWidth - font.getTextWidth(row.label)) / 2 : 12,
-          y + input.model.lineHeight,
+          // Vertically centered; equals the original lineHeight baseline for 24px-padded rows.
+          y + (row.height + input.model.lineHeight) / 2 - 12,
           row.deferredLoad === DeferredDiffLoad.Failed
             ? input.paints.statusDanger
             : input.paints.foregroundMuted,

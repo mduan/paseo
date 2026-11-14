@@ -76,7 +76,8 @@ function paintStatusRow(input: PaintWebViewportInput, row: DiffStatusRow, y: num
   const x = row.deferredLoad
     ? (input.viewportWidth - context.measureText(row.label).width) / 2
     : 12;
-  context.fillText(row.label, x, y + input.model.lineHeight + 6);
+  // Vertically centered; equals the original lineHeight + 6 baseline for 24px-padded rows.
+  context.fillText(row.label, x, y + (row.height + input.model.lineHeight) / 2 - 6);
 }
 
 export function paintWebViewport(input: PaintWebViewportInput): void {

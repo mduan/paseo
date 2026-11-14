@@ -232,8 +232,9 @@ function appendNewFileRows(candidate: {
   gutterWidth: number;
 }): FileRowsResult {
   if (candidate.file.status === "binary" || candidate.file.status === "too_large") {
-    const height = candidate.input.typography.lineHeight + 24;
     const { deferred } = candidate.file;
+    // Load rows are compact controls; other status rows keep their roomier message spacing.
+    const height = candidate.input.typography.lineHeight + (deferred ? 12 : 24);
     const deferredLoad = deferred
       ? (candidate.input.deferredFileLoads?.get(candidate.file.path) ?? DeferredDiffLoad.Idle)
       : undefined;
