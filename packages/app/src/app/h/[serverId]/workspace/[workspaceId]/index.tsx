@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useLocalSearchParams, useRootNavigationState } from "expo-router";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { RetainedPanel } from "@/components/retained-panel";
@@ -34,6 +35,7 @@ import {
   stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit,
 } from "@/utils/host-route-browser";
 import { prepareWorkspaceTab } from "@/utils/workspace-navigation";
+import { leavingWorkspaceKey } from "@/screens/workspace/leaving-workspace";
 import { isNative, isWeb } from "@/constants/platform";
 import { RenderProfile } from "@/utils/render-profiler";
 
@@ -225,6 +227,13 @@ function WorkspaceDeck({ recoveryRequested }: { recoveryRequested: boolean }) {
     [activeSelection, renderedSelections],
   );
 
+  const activeSelectionKey = activeSelection
+    ? getWorkspaceSelectionKey(activeSelection)
+    : undefined;
+  useLayoutEffect(() => {
+    leavingWorkspaceKey.value = undefined;
+  }, [activeSelectionKey]);
+
   useLayoutEffect(() => {
     if (!areRetainedWorkspaceSelectionListsEqual(retainedSelections, nextRetainedSelections)) {
       setRetainedSelections(nextRetainedSelections);
@@ -285,6 +294,11 @@ function WorkspaceDeckEntry({
 }) {
   const hasHydratedWorkspaces = useHasHydratedWorkspaces(selection.serverId);
   const workspaceExists = useWorkspaceExists(selection.serverId, selection.workspaceId);
+  const selectionKey = getWorkspaceSelectionKey(selection);
+  const leavingStyle = useAnimatedStyle(
+    () => ({ opacity: leavingWorkspaceKey.value === selectionKey ? 0 : 1 }),
+    [selectionKey],
+  );
   const shouldKeepMounted = shouldKeepWorkspaceDeckEntryMounted({
     isActive: active,
     hasHydratedWorkspaces,
@@ -306,12 +320,14 @@ function WorkspaceDeckEntry({
       active={active}
       testID={`workspace-deck-entry-${selection.serverId}:${selection.workspaceId}`}
     >
-      <WorkspaceScreen
-        serverId={selection.serverId}
-        workspaceId={selection.workspaceId}
-        isRouteFocused={active}
-        recoveryRequested={active && recoveryRequested}
-      />
+      <Animated.View style={[styles.deck, leavingStyle]}>
+        <WorkspaceScreen
+          serverId={selection.serverId}
+          workspaceId={selection.workspaceId}
+          isRouteFocused={active}
+          recoveryRequested={active && recoveryRequested}
+        />
+      </Animated.View>
     </RetainedPanel>
   );
 }

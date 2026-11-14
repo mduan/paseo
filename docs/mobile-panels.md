@@ -105,7 +105,9 @@ definition, no longer eligible to begin.
   `transform` and `opacity`; layout props still wait for the pause.
 - Do not mount a large subtree while a panel slides. Android mounts on the UI thread, so the mount
   still drops slide frames. Native `RetainedChatContent` defers the chat's first mount until the
-  agent panel settles.
+  agent panel settles. Until the new workspace commits, the deck hides the workspace being left
+  through a shared value (`screens/workspace/leaving-workspace.ts`), so the slide never reveals the
+  previous chat.
 - Gesture start and progress must not update React state. The retained overlay is already mounted and
   offscreen; only the shared position and its derived native styles move during a drag.
 - Hidden tabs and workspaces use `RetainedPanel`. It owns a non-collapsible native root, visibility,

@@ -2,7 +2,9 @@ package sh.paseo.scroll
 
 import android.graphics.Rect
 import android.text.Selection
+import android.os.SystemClock
 import android.text.Spannable
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -45,6 +47,18 @@ class ScrollSelectionTest {
     val before = scroll.scrollY
     text.requestRectangleOnScreen(Rect(0, 0, 80, 40), true)
     assertNotEquals(before, scroll.scrollY)
+  }
+
+  @Test fun hiddenCollapsedScrollViewKeepsItsOffsetAfterCancel() = withScroll(inverted = false) { scroll, _ ->
+    // display: none collapses the subtree to zero size while the offset stays.
+    scroll.getChildAt(0).layout(0, 0, 300, 0)
+    val cancel = MotionEvent.obtain(0, 0, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+    scroll.onInterceptTouchEvent(cancel)
+    scroll.onTouchEvent(cancel)
+    cancel.recycle()
+    SystemClock.sleep(500)
+    scroll.computeScroll()
+    assertEquals("A cancel must not queue a spring back to the top", 400, scroll.scrollY)
   }
 
   private fun withScroll(inverted: Boolean, check: (ReactScrollView, TextView) -> Unit) {
