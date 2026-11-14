@@ -31,6 +31,7 @@ import type {
   DiffLineRow,
   DiffPalette,
   DiffSelection,
+  DiffStatusRow,
   DiffTypography,
   TextMeasurer,
 } from "./types";
@@ -52,9 +53,30 @@ export interface PaintWebViewportInput {
   selection: DiffSelection | null;
   lineHighlight?: ResolvedLineHighlight;
   activeHeaderPath: string | null;
+  hoveredLoadPath?: string;
   devicePixelRatio: number;
   paintTop?: number;
   paintHeight?: number;
+}
+
+function statusRowColor(row: DiffStatusRow, palette: DiffPalette, hovered: boolean): string {
+  if (row.deferredLoad === DeferredDiffLoad.Failed) return palette.statusDanger;
+  return hovered ? palette.foreground : palette.foregroundMuted;
+}
+
+function paintStatusRow(input: PaintWebViewportInput, row: DiffStatusRow, y: number): void {
+  const { context } = input;
+  // Only deferred load rows are pressable, so only they react to hover.
+  const hovered = Boolean(row.deferredLoad) && row.path === input.hoveredLoadPath;
+  if (hovered) {
+    context.fillStyle = input.palette.headerActiveSurface;
+    context.fillRect(0, y, input.viewportWidth, row.height);
+  }
+  context.fillStyle = statusRowColor(row, input.palette, hovered);
+  const x = row.deferredLoad
+    ? (input.viewportWidth - context.measureText(row.label).width) / 2
+    : 12;
+  context.fillText(row.label, x, y + input.model.lineHeight + 6);
 }
 
 export function paintWebViewport(input: PaintWebViewportInput): void {
@@ -79,14 +101,7 @@ export function paintWebViewport(input: PaintWebViewportInput): void {
     if (!row) continue;
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
-      context.fillStyle =
-        row.deferredLoad === DeferredDiffLoad.Failed
-          ? input.palette.statusDanger
-          : input.palette.foregroundMuted;
-      const x = row.deferredLoad
-        ? (input.viewportWidth - context.measureText(row.label).width) / 2
-        : 12;
-      context.fillText(row.label, x, y + input.model.lineHeight + 6);
+      paintStatusRow(input, row, y);
       continue;
     }
     paintLine({

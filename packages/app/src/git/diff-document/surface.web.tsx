@@ -126,6 +126,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const lineDragRef = useRef<LineDrag | undefined>(undefined);
   const frameRef = useRef<number | null>(null);
   const activeHeaderPathRef = useRef<string | null>(null);
+  const hoveredLoadPathRef = useRef<string>(undefined);
   const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeReleaseFrameRef = useRef<number | null>(null);
   const resizePointerActiveRef = useRef(false);
@@ -383,6 +384,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       selection: selectionRef.current,
       lineHighlight: lineHighlightRef.current,
       activeHeaderPath: activeHeaderPathRef.current,
+      hoveredLoadPath: hoveredLoadPathRef.current,
       devicePixelRatio: ratio,
       paintTop,
       paintHeight,
@@ -394,6 +396,14 @@ export function DiffSurface(props: DiffSurfaceProps) {
       if (frameRef.current === null) frameRef.current = requestAnimationFrame(paint);
     },
     [paint],
+  );
+  const setHoveredLoadPath = useCallback(
+    (path: string | undefined) => {
+      if (hoveredLoadPathRef.current === path) return;
+      hoveredLoadPathRef.current = path;
+      schedulePaint();
+    },
+    [schedulePaint],
   );
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -571,6 +581,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         activeHeaderPathRef.current = null;
         schedulePaint();
       }
+      setHoveredLoadPath(undefined);
       updateInteractionFiles(scrollTop);
       extendLineDrag();
       if (hasHoveredAffordanceRef.current) {
@@ -598,7 +609,14 @@ export function DiffSurface(props: DiffSurfaceProps) {
       const nextTop = Math.round(requestedTop * ratio) / ratio;
       if (nextTop !== currentWindow.top) schedulePaint(false);
     },
-    [extendLineDrag, paintStickyHeaderPool, schedulePaint, updateInteractionFiles, viewport.height],
+    [
+      extendLineDrag,
+      paintStickyHeaderPool,
+      schedulePaint,
+      setHoveredLoadPath,
+      updateInteractionFiles,
+      viewport.height,
+    ],
   );
   useEffect(() => {
     const scroll = scrollRef.current;
@@ -759,6 +777,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       }
       const hit = pointHit(event);
       event.currentTarget.style.cursor = pointerCursor(hit, event.clientX, event.clientY);
+      setHoveredLoadPath(hit?.kind === "load" ? hit.path : undefined);
       const drag = dragRef.current;
       if (drag) {
         drag.moved = hasPointerDragStarted({
@@ -799,7 +818,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       if (!drag || hit?.kind !== "cell") return;
       setSelection({ anchor: drag.anchor, focus: hit.position });
     },
-    [extendLineDrag, pointHit, pointerCursor, setSelection, updateActiveHeader],
+    [extendLineDrag, pointHit, pointerCursor, setHoveredLoadPath, setSelection, updateActiveHeader],
   );
   // The pinned add button sits on the bottom line of a highlight that resolves in this layout.
   const pinnedTargetKey = lineHighlight?.addButtonTargetKey;
@@ -888,7 +907,10 @@ export function DiffSurface(props: DiffSurfaceProps) {
     },
     [lineGutterHitAt, pointHitAt, setSelection],
   );
-  const pointerLeave = useCallback(() => updateActiveHeader(null), [updateActiveHeader]);
+  const pointerLeave = useCallback(() => {
+    updateActiveHeader(null);
+    setHoveredLoadPath(undefined);
+  }, [setHoveredLoadPath, updateActiveHeader]);
   const copy = useCallback(
     (event: React.ClipboardEvent<HTMLDivElement>) => {
       if (!selectionRef.current) return;
