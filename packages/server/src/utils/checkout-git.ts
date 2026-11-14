@@ -3673,10 +3673,12 @@ async function findDeferredTrackedDiffs(input: {
     const oldObject = change.isNew
       ? undefined
       : objects.get(`${refs.baseRef}:${change.oldPath ?? change.path}`);
-    const newSide =
-      refs.targetRef || change.isDeleted
-        ? objects.get(`${refs.targetRef}:${change.path}`)
-        : await statWorkingTreeFile(resolve(cwd, change.path));
+    let newSide: { id: string; size: number } | undefined;
+    if (refs.targetRef && !change.isDeleted) {
+      newSide = objects.get(`${refs.targetRef}:${change.path}`);
+    } else if (!change.isDeleted) {
+      newSide = await statWorkingTreeFile(resolve(cwd, change.path));
+    }
     const size = Math.max(oldObject?.size ?? 0, newSide?.size ?? 0);
     if (size <= DEFER_DIFF_ABOVE_BYTES) continue;
     deferred.set(change.path, {
