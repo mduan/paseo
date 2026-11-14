@@ -136,11 +136,11 @@ describe("DaemonConfigStore", () => {
     const sonnet = { provider: "claude", model: "sonnet" };
     const haiku = { provider: "claude", model: "haiku" };
 
+    store.patch({ metadataGeneration: { providers: [haiku] } });
     store.patch({
       metadataGeneration: { suggestedNextActions: { enabled: true, providers: [sonnet] } },
     });
     store.patch({ metadataGeneration: { suggestedNextActions: { enabled: false } } });
-    store.patch({ metadataGeneration: { providers: [haiku] } });
 
     const expected = {
       providers: [haiku],

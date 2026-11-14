@@ -171,6 +171,15 @@ const MutableMetadataGenerationConfigSchema = z
   })
   .passthrough();
 
+// No defaults: Zod applies `.default()` even under `.partial()`, so a patch to one field
+// would reset the others.
+const MutableMetadataGenerationPatchSchema = z
+  .object({
+    providers: z.array(MutableStructuredGenerationProviderSchema).optional(),
+    suggestedNextActions: MutableSuggestedNextActionsConfigSchema.optional(),
+  })
+  .passthrough();
+
 const MutableBrowserToolsConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -231,7 +240,7 @@ export const MutableDaemonConfigPatchSchema = z
       .record(z.string(), MutableDaemonProviderConfigSchema.partial().passthrough())
       .optional(),
     removeProviders: z.array(z.string().min(1)).optional(),
-    metadataGeneration: MutableMetadataGenerationConfigSchema.partial().optional(),
+    metadataGeneration: MutableMetadataGenerationPatchSchema.optional(),
     autoArchiveAfterMerge: z.boolean().optional(),
     enableTerminalAgentHooks: z.boolean().optional(),
     appendSystemPrompt: z.string().optional(),
