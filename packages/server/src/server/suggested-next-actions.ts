@@ -29,7 +29,7 @@ export function attachSuggestedNextActions(input: {
   generateSuggestions: GenerateSuggestions;
 }): () => void {
   const { logger, agentManager } = input;
-  const latestCompletion = new Map<string, number>();
+  const latestCompletionByAgent = new Map<string, number>();
 
   async function suggest(agentId: string, completion: number): Promise<void> {
     const agent = agentManager.getAgent(agentId);
@@ -37,7 +37,7 @@ export function attachSuggestedNextActions(input: {
     const prompt = buildPrompt(agentManager.getTimeline(agentId));
     if (!prompt) return;
     const suggestions = normalizeSuggestions(await input.generateSuggestions({ agent, prompt }));
-    if (latestCompletion.get(agentId) !== completion) return;
+    if (latestCompletionByAgent.get(agentId) !== completion) return;
     agentManager.setSuggestedNextActions(agentId, suggestions);
   }
 
@@ -47,8 +47,8 @@ export function attachSuggestedNextActions(input: {
       const agent = agentManager.getAgent(event.agentId);
       if (!agent || agent.internal || agent.labels[PARENT_AGENT_ID_LABEL]) return;
       if (!input.isEnabled()) return;
-      const completion = (latestCompletion.get(event.agentId) ?? 0) + 1;
-      latestCompletion.set(event.agentId, completion);
+      const completion = (latestCompletionByAgent.get(event.agentId) ?? 0) + 1;
+      latestCompletionByAgent.set(event.agentId, completion);
       void suggest(event.agentId, completion).catch((error) => {
         logger.warn({ err: error, agentId: event.agentId }, "Suggested next actions failed");
       });

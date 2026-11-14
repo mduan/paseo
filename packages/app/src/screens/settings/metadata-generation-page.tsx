@@ -128,7 +128,7 @@ function useModelPreference({
     setDraftManual(undefined);
   }, [configuredProvider?.model, configuredProvider?.provider]);
 
-  const run = useCallback(async (task: () => Promise<unknown>) => {
+  const runSave = useCallback(async (task: () => Promise<unknown>) => {
     setIsSaving(true);
     setSaveError(undefined);
     try {
@@ -142,8 +142,8 @@ function useModelPreference({
   }, []);
 
   const saveProviders = useCallback(
-    (providers: ModelProviders) => run(() => save(providers)),
-    [run, save],
+    (providers: ModelProviders) => runSave(() => save(providers)),
+    [runSave, save],
   );
 
   const setManual = useCallback(
@@ -193,7 +193,7 @@ function useModelPreference({
     isManual,
     isSaving,
     saveError,
-    run,
+    runSave,
     setManual,
     selectModel,
     selectThinking,
@@ -418,13 +418,13 @@ function SuggestedNextActionsSection({ serverId, config, patchConfig, snapshot }
     snapshot,
     save,
   });
-  const { run } = preference;
+  const { runSave } = preference;
   const handleEnabledChange = useCallback(
     (next: boolean) =>
-      void run(() =>
+      void runSave(() =>
         patchConfig({ metadataGeneration: { suggestedNextActions: { enabled: next } } }),
       ),
-    [patchConfig, run],
+    [patchConfig, runSave],
   );
   const labels = useMemo(
     () => ({
