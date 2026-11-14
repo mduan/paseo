@@ -51,7 +51,10 @@ function setup(options: { enabled?: boolean; agents?: Record<string, FakeAgent> 
     pending[index]?.(suggestions);
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
-  return { published, prompts, pending, completeTurn, resolveGeneration };
+  function rewind(agentId: string) {
+    subscriber?.({ type: "timeline_replacement", agentId, epoch: "rewound" });
+  }
+  return { published, prompts, pending, completeTurn, rewind, resolveGeneration };
 }
 
 test("publishes up to three unique suggestions after a completed turn", async () => {
@@ -75,6 +78,16 @@ test("drops a result that arrives after a newer turn completed", async () => {
 
   await resolveGeneration(1, ["Fresh"]);
   expect(published.get("chat")).toEqual(["Fresh"]);
+});
+
+test("drops a result that arrives after the conversation was rewound", async () => {
+  const { published, completeTurn, rewind, resolveGeneration } = setup();
+
+  completeTurn("chat");
+  rewind("chat");
+  await resolveGeneration(0, ["Rewound away"]);
+
+  expect(published.has("chat")).toBe(false);
 });
 
 test("skips disabled hosts, internal agents, and subagents", () => {

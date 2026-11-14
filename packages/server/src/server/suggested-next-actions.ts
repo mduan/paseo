@@ -44,6 +44,14 @@ export function attachSuggestedNextActions(input: {
 
   return agentManager.subscribe(
     (event) => {
+      // A rewritten timeline (rewind) invalidates any suggestion still being generated.
+      if (event.type === "timeline_replacement") {
+        latestCompletionByAgent.set(
+          event.agentId,
+          (latestCompletionByAgent.get(event.agentId) ?? 0) + 1,
+        );
+        return;
+      }
       if (event.type !== "agent_stream" || event.event.type !== "turn_completed") return;
       const agent = agentManager.getAgent(event.agentId);
       if (!agent || agent.internal || agent.labels[PARENT_AGENT_ID_LABEL]) return;

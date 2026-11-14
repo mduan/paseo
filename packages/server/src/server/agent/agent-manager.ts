@@ -3495,6 +3495,7 @@ export class AgentManager {
       );
       await invokeRewindCapability(agent.session, { messageId: providerMessageId, mode });
       if (mode !== "files") {
+        agent.suggestedNextActions = undefined;
         await this.hydrateTimelineFromProvider(agentId, {
           force: true,
           broadcast: true,
