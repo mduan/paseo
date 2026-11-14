@@ -120,6 +120,7 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: CHIP_HEIGHT,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
+    backgroundColor: theme.colors.surface1,
     borderRadius: theme.borderRadius["2xl"],
     overflow: "hidden",
   },
@@ -145,6 +146,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   highlighted: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surface2,
   },
 }));
