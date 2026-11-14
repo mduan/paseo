@@ -29,13 +29,19 @@ export function attachSuggestedNextActions(input: {
   generateSuggestions: GenerateSuggestions;
 }): () => void {
   const { logger, agentManager } = input;
-  const latestCompletionByAgent = new Map<string, number>();
+  const latestGenerationByAgent = new Map<string, number>();
 
-  async function suggest(agent: ManagedAgent, completion: number): Promise<void> {
+  function invalidate(agentId: string): number {
+    const next = (latestGenerationByAgent.get(agentId) ?? 0) + 1;
+    latestGenerationByAgent.set(agentId, next);
+    return next;
+  }
+
+  async function suggest(agent: ManagedAgent, generation: number): Promise<void> {
     const prompt = buildPrompt(agentManager.getTimeline(agent.id));
     if (!prompt) return;
     const suggestions = normalizeSuggestions(await input.generateSuggestions({ agent, prompt }));
-    const stale = latestCompletionByAgent.get(agent.id) !== completion;
+    const stale = latestGenerationByAgent.get(agent.id) !== generation;
     // An empty result looks the same as no run in the UI, so record every outcome.
     logger.info({ agentId: agent.id, count: suggestions.length, stale }, "Suggested next actions");
     if (stale) return;
@@ -44,21 +50,18 @@ export function attachSuggestedNextActions(input: {
 
   return agentManager.subscribe(
     (event) => {
-      // A rewritten timeline (rewind) invalidates any suggestion still being generated.
-      if (event.type === "timeline_replacement") {
-        latestCompletionByAgent.set(
-          event.agentId,
-          (latestCompletionByAgent.get(event.agentId) ?? 0) + 1,
-        );
+      // A new turn or a rewritten timeline (rewind) makes any suggestion still being generated stale.
+      const isTurnStart = event.type === "agent_stream" && event.event.type === "turn_started";
+      if (isTurnStart || event.type === "timeline_replacement") {
+        invalidate(event.agentId);
         return;
       }
       if (event.type !== "agent_stream" || event.event.type !== "turn_completed") return;
       const agent = agentManager.getAgent(event.agentId);
       if (!agent || agent.internal || agent.labels[PARENT_AGENT_ID_LABEL]) return;
       if (!input.isEnabled()) return;
-      const completion = (latestCompletionByAgent.get(event.agentId) ?? 0) + 1;
-      latestCompletionByAgent.set(event.agentId, completion);
-      void suggest(agent, completion).catch((error) => {
+      const generation = invalidate(event.agentId);
+      void suggest(agent, generation).catch((error) => {
         logger.warn({ err: error, agentId: event.agentId }, "Suggested next actions failed");
       });
     },
