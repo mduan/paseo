@@ -9,7 +9,7 @@ import { useIsMobilePanelActive } from "@/mobile-panels/provider";
  * work already stops through the retained-panel signal.
  *
  * On compact layouts the chat's first mount waits until the agent panel settles.
- * Mounting it during the slide pauses the slide (docs/mobile-panels.md). Once
+ * Mounting it during the slide drops slide frames (docs/mobile-panels.md). Once
  * mounted, it stays mounted when another panel opens.
  */
 export function RetainedChatContent({ children }: { children: ReactNode }) {
