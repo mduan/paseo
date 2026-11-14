@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import invariant from "tiny-invariant";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { buildDiffDocumentModel, retainReusableModels, reviewGeometryKey } from "./model";
 import type {
   BuildDiffDocumentModelInput,
@@ -121,6 +122,7 @@ function modelVariantKey(input: Omit<BuildDiffDocumentModelInput, "reuseFrom">):
     input.labels.tooLarge,
     // The gap label is a formatter; a sample output tracks its language.
     input.labels.gap({ lines: 2, comments: 1 }),
+    input.labels.deferred({ size: 1, load: DeferredDiffLoad.Idle }),
     input.expandableGaps === true,
   ]);
 }
@@ -131,7 +133,13 @@ function exactModelKey(input: Omit<BuildDiffDocumentModelInput, "reuseFrom">): s
   const materializationWindow = input.materializationWindow
     ? [input.materializationWindow.top, input.materializationWindow.height]
     : null;
-  return JSON.stringify([collapsedFilePaths, reviewGeometry, materializationWindow]);
+  const deferredFileLoads = [...(input.deferredFileLoads ?? [])].sort();
+  return JSON.stringify([
+    collapsedFilePaths,
+    reviewGeometry,
+    materializationWindow,
+    deferredFileLoads,
+  ]);
 }
 
 function typographyKey(typography: DiffTypography): string {

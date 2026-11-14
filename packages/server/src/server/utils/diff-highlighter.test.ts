@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as highlight from "@getpaseo/highlight";
 import {
   countFileLines,
   highlightFileLines,
@@ -599,6 +600,27 @@ describe("highlightDiffFromHunks", () => {
 });
 
 describe("highlightDiffWithFileContent", () => {
+  it("highlights hunks without tokenizing megabytes of unchanged content", async () => {
+    const file = parseDiff(SIMPLE_DIFF)[0];
+    const padding = "const unchanged = 1;\n".repeat(60_000);
+    const highlightCode = vi.spyOn(highlight, "highlightCode");
+    try {
+      const highlighted = await highlightDiffWithFileContent(file, ".", {
+        oldFileContent: `const foo = 1;\nconst bar = 2;\n${padding}`,
+        newFileContent: `const foo = 1;\nconst bar = 3;\n${padding}`,
+      });
+      expect(highlighted.hunks[0].lines.find((line) => line.type === "add")?.tokens).toContainEqual(
+        {
+          text: "3",
+          style: "number",
+        },
+      );
+      expect(highlightCode.mock.calls.every(([code]) => code.length < 1024 * 1024)).toBe(true);
+    } finally {
+      highlightCode.mockRestore();
+    }
+  });
+
   it("leaves files with an oversized line unhighlighted", async () => {
     const oversizedLine = `const payload = "${"x".repeat(10_001)}";`;
     const [file] = parseDiff(

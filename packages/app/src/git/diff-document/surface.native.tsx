@@ -29,6 +29,7 @@ import {
   resolveVisibleFileSections,
 } from "./header-layout";
 import { gapSeparatorLabel } from "./gap-separator";
+import { deferredDiffLoadLabel } from "@/git/deferred-diff-load";
 import { hitTestDiffBodyPoint } from "./native-hit-testing";
 import { retainDiffViewport } from "./viewport";
 import { HorizontalScroll } from "./horizontal-scroll.native";
@@ -136,7 +137,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
         gap: gapSeparatorLabel(t),
+        deferred: deferredDiffLoadLabel(t),
       },
+      deferredFileLoads: props.deferredFileLoads,
       expandableGaps,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
       reuseFrom,
@@ -151,6 +154,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     measurement,
     fileWindowTop,
     props.collapsedFilePaths,
+    props.deferredFileLoads,
     props.displayPreferences.layout,
     props.displayPreferences.wrapLines,
     props.files,
@@ -307,6 +311,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
             mode={props.mode}
             horizontalOffsets={horizontalOffsets}
             onExpandGap={props.onExpandGap}
+            onLoadDeferredFile={props.onLoadDeferredFile}
           />
         ))}
         <NativeReviewOverlays model={model} mode={props.mode} />
@@ -438,12 +443,14 @@ function NativeFileBody({
   mode,
   horizontalOffsets,
   onExpandGap,
+  onLoadDeferredFile,
 }: {
   file: DiffFileSection;
   model: DiffDocumentModel;
   mode: DiffSurfaceProps["mode"];
   horizontalOffsets: SharedValue<DiffHorizontalOffsets>;
   onExpandGap: DiffSurfaceProps["onExpandGap"];
+  onLoadDeferredFile: DiffSurfaceProps["onLoadDeferredFile"];
 }) {
   const touchRef = useRef<{ x: number; y: number; startedAt: number; moved: boolean } | null>(null);
   const reviewActions = mode.kind === "working" ? mode.reviewActions : undefined;
@@ -480,9 +487,13 @@ function NativeFileBody({
         onExpandGap?.({ path: hit.path, gapIndex: hit.gapIndex, direction: hit.direction });
         return;
       }
+      if (hit?.kind === "load") {
+        onLoadDeferredFile?.(hit.path);
+        return;
+      }
       if (hit?.kind === "cell" && hit.target) reviewActions?.onStartComment(hit.target);
     },
-    [file, horizontalOffsets, model, onExpandGap, reviewActions],
+    [file, horizontalOffsets, model, onExpandGap, onLoadDeferredFile, reviewActions],
   );
   return (
     <View

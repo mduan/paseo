@@ -9,6 +9,7 @@ import {
 import { compactHighlightTokens } from "@/utils/diff-rendering";
 import { getInlineReviewThreadState, getSplitInlineReviewThreadState } from "@/review/geometry";
 import { canExpandDiffFile, diffGaps, gapDirections, type DiffGap } from "@/git/diff-gaps";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { gapSeparatorHeight } from "./gap-separator";
 import { advancesFor } from "./text-measurement";
 import type {
@@ -84,13 +85,16 @@ export function buildDiffDocumentModel(input: BuildDiffDocumentModelInput): Diff
     const gutterWidth = lineNumberGutterWidth(maximumLineNumber(file), input.typography.size);
     let maximumHorizontalOverflow = 0;
 
-    const reusable = findReusableFileRows({
-      indexes: reusableModels,
-      buildInput: input,
-      sourceFile: file,
-      fileTop,
-      bodyTop,
-    });
+    // A deferred file's load row changes with its load state, so it is always rebuilt.
+    const reusable = file.deferred
+      ? null
+      : findReusableFileRows({
+          indexes: reusableModels,
+          buildInput: input,
+          sourceFile: file,
+          fileTop,
+          bodyTop,
+        });
     const reusableModel = reusable?.model;
     const reusableFile = reusable?.file;
 
@@ -228,7 +232,17 @@ function appendNewFileRows(candidate: {
   gutterWidth: number;
 }): FileRowsResult {
   if (candidate.file.status === "binary" || candidate.file.status === "too_large") {
-    const height = candidate.input.typography.lineHeight + 24;
+    const { deferred } = candidate.file;
+    // Load rows are compact controls; other status rows keep their roomier message spacing.
+    const height = candidate.input.typography.lineHeight + (deferred ? 12 : 24);
+    const deferredLoad = deferred
+      ? (candidate.input.deferredFileLoads?.get(candidate.file.path) ?? DeferredDiffLoad.Idle)
+      : undefined;
+    let label = candidate.input.labels.tooLarge;
+    if (candidate.file.status === "binary") label = candidate.input.labels.binary;
+    if (deferred && deferredLoad) {
+      label = candidate.input.labels.deferred({ size: deferred.size, load: deferredLoad });
+    }
     candidate.rows.push({
       kind: "status",
       index: candidate.rows.length,
@@ -236,10 +250,8 @@ function appendNewFileRows(candidate: {
       path: candidate.file.path,
       top: candidate.bodyTop,
       height,
-      label:
-        candidate.file.status === "binary"
-          ? candidate.input.labels.binary
-          : candidate.input.labels.tooLarge,
+      label,
+      ...(deferredLoad ? { deferredLoad } : {}),
     });
     return {
       bottom: candidate.bodyTop + height + DIFF_BODY_BORDER_HEIGHT,

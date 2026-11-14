@@ -46,11 +46,12 @@ export function useAgentTurnDiff(input: {
   agentId: string | null;
   target: AgentTurnDiffTarget;
   ignoreWhitespace: boolean;
+  deferLargeFiles?: boolean;
   enabled: boolean;
 }) {
   const client = useHostRuntimeClient(input.serverId);
   const latestTurnDiffAt = useLatestTurnDiffAt(input.serverId, input.agentId);
-  const { agentId, target, ignoreWhitespace } = input;
+  const { agentId, target, ignoreWhitespace, deferLargeFiles } = input;
   return useFetchQuery({
     queryKey: [
       "agent-turn-diff",
@@ -58,11 +59,12 @@ export function useAgentTurnDiff(input: {
       agentId,
       target,
       ignoreWhitespace,
+      deferLargeFiles,
       latestTurnDiffAt,
     ],
     queryFn: () => {
       if (!client || !agentId) throw new Error("Host disconnected");
-      return client.getAgentTurnDiff({ agentId, target, ignoreWhitespace });
+      return client.getAgentTurnDiff({ agentId, target, ignoreWhitespace, deferLargeFiles });
     },
     enabled: input.enabled && Boolean(client) && Boolean(agentId),
     dataShape: "value",

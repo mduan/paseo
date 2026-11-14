@@ -160,7 +160,7 @@ function buildModel(layout: "unified" | "split"): DiffDocumentModel {
       statusWarning: "orange",
       syntax: {},
     },
-    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "" },
+    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "", deferred: () => "Load diff" },
   });
 }
 

@@ -63,6 +63,9 @@ const fileChanges = {
   lineCount: (value) => {
     value.lineCount = 99;
   },
+  deferred: (value) => {
+    value.deferred = { baseRef: "main", size: 2_000_000, version: "old:new" };
+  },
 } satisfies Record<keyof ParsedDiffFile, (value: ParsedDiffFile) => void>;
 type Hunk = ParsedDiffFile["hunks"][number];
 const hunkChanges = {

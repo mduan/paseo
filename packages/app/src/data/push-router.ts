@@ -38,6 +38,7 @@ interface CheckoutDiffCompare {
   baseRef?: string;
   ignoreWhitespace?: boolean;
   includeUncommitted?: boolean;
+  deferLargeFiles?: boolean;
 }
 
 interface CheckoutDiffRoute {

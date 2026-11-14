@@ -1416,6 +1416,8 @@ export function ChangesSurface({
     reviewActions,
     commentsCapabilityMissing,
     onExpandGap,
+    deferredFileLoads,
+    onLoadDeferredFile,
   } = useWorkingDiff({
     serverId,
     workspaceId: workspaceId ?? undefined,
@@ -1633,6 +1635,8 @@ export function ChangesSurface({
         displayPreferences={sharedDisplayPreferences}
         mode={workingMode}
         onExpandGap={onExpandGap}
+        deferredFileLoads={deferredFileLoads}
+        onLoadDeferredFile={onLoadDeferredFile}
       />
     </DiffBodyContent>
   );

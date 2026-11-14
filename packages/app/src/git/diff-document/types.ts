@@ -2,6 +2,7 @@ import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
 import type { InlineReviewActions, InlineReviewGeometry } from "@/review";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
 import type { DiffGapDirection, ExpandDiffGapInput } from "@/git/diff-gaps";
+import type { DeferredDiffLoad } from "@/git/deferred-diff-load";
 
 interface DiffDocumentBaseProps {
   files: ParsedDiffFile[];
@@ -15,6 +16,9 @@ interface DiffDocumentBaseProps {
   };
   /** Replaces hunk headers with expandable "N unmodified lines" rows. */
   onExpandGap?: (input: ExpandDiffGapInput) => void;
+  /** Deferred large files that are loading or failed, by path. Absent paths have not loaded. */
+  deferredFileLoads?: ReadonlyMap<string, DeferredDiffLoad>;
+  onLoadDeferredFile?: (path: string) => void;
 }
 
 export interface WorkingDiffMode {
@@ -146,6 +150,8 @@ export interface DiffStatusRow {
   top: number;
   height: number;
   label: string;
+  /** Set on a deferred large file's row, which loads the file when pressed unless loading. */
+  deferredLoad?: DeferredDiffLoad;
 }
 
 export type DiffRow = DiffLineRow | DiffStatusRow;
@@ -198,7 +204,9 @@ export interface BuildDiffDocumentModelInput {
     binary: string;
     tooLarge: string;
     gap: (input: { lines: number; comments: number }) => string;
+    deferred: (input: { size: number; load: DeferredDiffLoad }) => string;
   };
+  deferredFileLoads?: ReadonlyMap<string, DeferredDiffLoad>;
   /** Show gap separators instead of hunk headers for files that support expansion. */
   expandableGaps?: boolean;
   materializationWindow?: { top: number; height: number };
@@ -218,6 +226,7 @@ export interface DiffCharacterPosition {
 export type DiffHit =
   | { kind: "header"; path: string }
   | { kind: "gap"; path: string; gapIndex: number; direction: DiffGapDirection }
+  | { kind: "load"; path: string }
   | {
       kind: "cell";
       target: ReviewableDiffTarget | null;

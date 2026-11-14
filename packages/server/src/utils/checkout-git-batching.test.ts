@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { startGitCommandMetrics, stopGitCommandMetrics } from "@server/utils/run-git-command.js";
 
-import { getCheckoutDiff } from "./checkout-git.js";
+import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
+import { getCheckoutDiff, getCheckoutFileDiff } from "./checkout-git.js";
 
 function initRepoWithTrackedChanges(fileCount: number): { tempDir: string; repoDir: string } {
   const tempDir = realpathSync(mkdtempSync(join(tmpdir(), "checkout-git-batch-test-")));
@@ -94,4 +95,119 @@ describe("checkout git diff batching", () => {
     expect(result.diff).toContain("+after-19");
     expect(result.diff).not.toContain("x".repeat(1_000));
   });
+
+  it("keeps large file contents batched when their combined size exceeds the read budget", async () => {
+    const padding = '  "unchanged": 0,\n'.repeat(150_000);
+    const paths = Array.from({ length: 5 }, (_, index) => `large-${index}.json`);
+    for (const path of paths) {
+      writeFileSync(join(repoDir, path), `{\n  "version": 1,\n${padding}  "end": true\n}\n`);
+    }
+    execFileSync("git", ["add", "."], { cwd: repoDir });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "large files"], {
+      cwd: repoDir,
+    });
+    execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+    for (const path of paths) {
+      writeFileSync(join(repoDir, path), `{\n  "version": 2,\n${padding}  "end": true\n}\n`);
+    }
+    execFileSync("git", ["add", "."], { cwd: repoDir });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "edit large files"], {
+      cwd: repoDir,
+    });
+    startGitCommandMetrics();
+    const result = await getCheckoutDiff(repoDir, {
+      mode: "base",
+      baseRef: "main",
+      includeStructured: true,
+    });
+    const metrics = stopGitCommandMetrics();
+
+    expect(
+      result.structured?.map((file) => ({
+        path: file.path,
+        additions: file.additions,
+        deletions: file.deletions,
+        lineCount: file.lineCount,
+      })),
+    ).toEqual(paths.map((path) => ({ path, additions: 1, deletions: 1, lineCount: 150_004 })));
+    expect(metrics.commands.filter(({ args }) => args[0] === "show")).toHaveLength(0);
+    expect(metrics.commands.filter(({ args }) => args[0] === "cat-file")).toHaveLength(3);
+  });
+
+  it("defers large files until each one is loaded", async () => {
+    commitLargeJson(repoDir, 1);
+    execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+    writeLargeJson(repoDir, 2);
+    execFileSync("git", ["add", "."], { cwd: repoDir });
+    execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "edit"], { cwd: repoDir });
+    const compare = { mode: "base", baseRef: "main", includeStructured: true } as const;
+
+    const deferred = await getCheckoutDiff(repoDir, { ...compare, deferLargeFiles: true });
+    const placeholder = deferred.structured?.find((file) => file.path === "large.json");
+
+    expect(placeholder).toMatchObject({
+      status: "too_large",
+      hunks: [],
+      additions: 1,
+      deletions: 1,
+    });
+    expect(placeholder?.deferred?.size).toBeGreaterThan(1024 * 1024);
+    expect(deferred.structured?.filter((file) => file.status === "ok")).toHaveLength(20);
+    const full = await getCheckoutDiff(repoDir, compare);
+    expect(
+      await getCheckoutFileDiff({
+        cwd: repoDir,
+        path: "large.json",
+        baseRef: placeholder!.deferred!.baseRef,
+        targetRef: placeholder!.targetRef,
+      }),
+    ).toEqual(full.structured?.find((file) => file.path === "large.json"));
+  });
+
+  it("loads deferred working tree files and versions them by their contents", async () => {
+    commitLargeJson(repoDir, 1);
+    writeLargeJson(repoDir, 2);
+    const compare = {
+      mode: "uncommitted",
+      includeStructured: true,
+      deferLargeFiles: true,
+    } as const;
+
+    const first = (await getCheckoutDiff(repoDir, compare)).structured?.find(
+      (file) => file.path === "large.json",
+    );
+    const loaded = await getCheckoutFileDiff({
+      cwd: repoDir,
+      path: "large.json",
+      baseRef: first!.deferred!.baseRef,
+    });
+    writeLargeJson(repoDir, 33);
+    const second = (await getCheckoutDiff(repoDir, compare)).structured?.find(
+      (file) => file.path === "large.json",
+    );
+
+    expect(first?.targetRef).toBeUndefined();
+    expect(lineContents(loaded)).toContain('  "version": 2,');
+    expect(second?.deferred?.version).not.toBe(first?.deferred?.version);
+  });
 });
+
+function lineContents(file: ParsedDiffFile | null): string[] {
+  return file?.hunks.flatMap((hunk) => hunk.lines.map((line) => line.content)) ?? [];
+}
+
+function writeLargeJson(repoDir: string, version: number): void {
+  const padding = '  "unchanged": 0,\n'.repeat(80_000);
+  writeFileSync(
+    join(repoDir, "large.json"),
+    `{\n  "version": ${version},\n${padding}  "end": true\n}\n`,
+  );
+}
+
+function commitLargeJson(repoDir: string, version: number): void {
+  writeLargeJson(repoDir, version);
+  execFileSync("git", ["add", "large.json"], { cwd: repoDir });
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "large file"], {
+    cwd: repoDir,
+  });
+}

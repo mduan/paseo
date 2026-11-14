@@ -12,6 +12,7 @@ import {
 import { buildDiffReviewContext } from "@/review/context";
 import type { ReviewLineRange } from "@/review/range";
 import { useDiffContextExpansion } from "@/git/diff-context-expansion";
+import { useDeferredDiffFiles } from "@/git/deferred-diff-files";
 import { useCheckoutDiffQuery } from "@/git/use-diff-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { useWorkingDiffComparison } from "@/git/working-diff-comparison";
@@ -139,6 +140,8 @@ export function useWorkingDiff({
     selectCommitRange,
     files: expansion.files,
     onExpandGap: expansion.onExpandGap,
+    deferredFileLoads: expansion.deferredFileLoads,
+    onLoadDeferredFile: expansion.onLoadDeferredFile,
     ...selectDiffState({ snapshotDiff, checkoutDiff, reviewActions }),
   };
 }
@@ -243,21 +246,28 @@ function useWorkingDiffExpansion(input: {
   checkoutFiles: ParsedDiffFile[];
 }) {
   const { serverId, snapshotDiff } = input;
-  return useDiffContextExpansion({
+  const cwd = snapshotDiff ? snapshotDiff.cwd : input.cwd;
+  // Loaded large files replace their placeholders before context expansion, so their gaps expand.
+  const deferred = useDeferredDiffFiles({
     serverId,
-    ...(snapshotDiff
-      ? {
-          cwd: snapshotDiff.cwd,
-          scopeKey: `${snapshotDiff.scopeKey}:${input.ignoreWhitespace}`,
-          files: snapshotDiff.files,
-        }
-      : {
-          cwd: input.cwd,
-          // Expanded gaps belong to one checkout comparison.
-          scopeKey: `${input.reviewDraftKey}:mode=${input.checkoutMode}:includeUncommitted=${input.includeUncommitted}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
-          files: input.checkoutFiles,
-        }),
+    cwd,
+    files: snapshotDiff ? snapshotDiff.files : input.checkoutFiles,
+    ignoreWhitespace: input.ignoreWhitespace,
   });
+  const expansion = useDiffContextExpansion({
+    serverId,
+    cwd,
+    files: deferred.files,
+    scopeKey: snapshotDiff
+      ? `${snapshotDiff.scopeKey}:${input.ignoreWhitespace}`
+      : // Expanded gaps belong to one checkout comparison.
+        `${input.reviewDraftKey}:mode=${input.checkoutMode}:includeUncommitted=${input.includeUncommitted}:base=${input.baseRef ?? ""}:ignoreWhitespace=${input.ignoreWhitespace}`,
+  });
+  return {
+    ...expansion,
+    deferredFileLoads: deferred.loads,
+    onLoadDeferredFile: deferred.loadFile,
+  };
 }
 
 /** The focused agent's frozen turn snapshot, in the same shape as the checkout diff. */
@@ -274,6 +284,7 @@ function useTurnComparisonDiff(input: {
     agentId,
     target: LAST_TURN_TARGET,
     ignoreWhitespace: input.ignoreWhitespace,
+    deferLargeFiles: true,
     enabled: input.enabled && input.comparison !== null,
   });
   const payload = input.comparison ? query.data : undefined;
@@ -339,7 +350,12 @@ function useCommitRangeComparisonDiff(input: {
     queryKey: ["checkout-commit-range-diff", serverId, cwd, commitRange, baseRef, ignoreWhitespace],
     queryFn: () => {
       if (!client || !commitRange) throw new Error("Host disconnected");
-      return client.getCommitRangeDiff({ cwd, ...commitRange, ignoreWhitespace });
+      return client.getCommitRangeDiff({
+        cwd,
+        ...commitRange,
+        ignoreWhitespace,
+        deferLargeFiles: true,
+      });
     },
     enabled: input.enabled && Boolean(client) && Boolean(commitRange),
     dataShape: "value",

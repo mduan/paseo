@@ -1,4 +1,5 @@
 import { gapChevronSegments } from "./gap-separator";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { selectionRectangles } from "./hit-testing";
 import { isLineHighlighted, type ResolvedLineHighlight } from "./line-range";
 import {
@@ -30,6 +31,7 @@ import type {
   DiffLineRow,
   DiffPalette,
   DiffSelection,
+  DiffStatusRow,
   DiffTypography,
   TextMeasurer,
 } from "./types";
@@ -51,9 +53,33 @@ export interface PaintWebViewportInput {
   selection: DiffSelection | null;
   lineHighlight?: ResolvedLineHighlight;
   activeHeaderPath: string | null;
+  hoveredLoadPath?: string;
   devicePixelRatio: number;
   paintTop?: number;
   paintHeight?: number;
+}
+
+function statusRowColor(row: DiffStatusRow, palette: DiffPalette, hovered: boolean): string {
+  if (row.deferredLoad === DeferredDiffLoad.Failed) return palette.statusDanger;
+  return hovered ? palette.foreground : palette.foregroundMuted;
+}
+
+function paintStatusRow(input: PaintWebViewportInput, row: DiffStatusRow, y: number): void {
+  const { context } = input;
+  // Only deferred load rows are pressable, so only they react to hover.
+  const hovered = Boolean(row.deferredLoad) && row.path === input.hoveredLoadPath;
+  if (hovered) {
+    context.fillStyle = input.palette.headerActiveSurface;
+    context.fillRect(0, y, input.viewportWidth, row.height);
+  }
+  context.fillStyle = statusRowColor(row, input.palette, hovered);
+  const x = row.deferredLoad
+    ? (input.viewportWidth - context.measureText(row.label).width) / 2
+    : 12;
+  // Vertically centered; equals the original lineHeight + 6 baseline for 24px-padded rows.
+  const baseline = y + (row.height + input.model.lineHeight) / 2 - 6;
+  // Whole-pixel origin: centering lands on fractional pixels, which blurs canvas glyphs.
+  context.fillText(row.label, Math.round(x), Math.round(baseline));
 }
 
 export function paintWebViewport(input: PaintWebViewportInput): void {
@@ -78,8 +104,7 @@ export function paintWebViewport(input: PaintWebViewportInput): void {
     if (!row) continue;
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
-      context.fillStyle = input.palette.foregroundMuted;
-      context.fillText(row.label, 12, y + input.model.lineHeight + 6);
+      paintStatusRow(input, row, y);
       continue;
     }
     paintLine({

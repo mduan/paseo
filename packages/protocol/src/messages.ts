@@ -2071,6 +2071,8 @@ export const AgentTurnDiffsGetDiffRequestMessageSchema = z.object({
   requestId: z.string(),
   target: AgentTurnDiffTargetSchema,
   ignoreWhitespace: z.boolean().optional(),
+  // Large tracked files arrive as `deferred` placeholders; load each with checkout.diff.file.
+  deferLargeFiles: z.boolean().optional(),
 });
 
 export const ProviderSubagentListRequestMessageSchema = z.object({
@@ -2396,6 +2398,8 @@ export const CheckoutDiffCompareSchema = z.object({
   includeUncommitted: z.boolean().optional(),
   baseRef: z.string().optional(),
   ignoreWhitespace: z.boolean().optional(),
+  // Large tracked files arrive as `deferred` placeholders; load each with checkout.diff.file.
+  deferLargeFiles: z.boolean().optional(),
 });
 
 export const CheckoutStatusRequestSchema = z.object({
@@ -2553,6 +2557,20 @@ export const CheckoutCommitRangeDiffRequestSchema = z.object({
   // Oldest and newest commit of the range; the diff includes both.
   fromSha: z.string(),
   toSha: z.string(),
+  ignoreWhitespace: z.boolean().optional(),
+  // Large tracked files arrive as `deferred` placeholders; load each with checkout.diff.file.
+  deferLargeFiles: z.boolean().optional(),
+  requestId: z.string(),
+});
+
+export const CheckoutDiffFileRequestSchema = z.object({
+  type: z.literal("checkout.diff.file.request"),
+  cwd: z.string(),
+  path: z.string(),
+  oldPath: z.string().optional(),
+  // The refs from the file's `deferred` placeholder. An absent targetRef reads the working tree.
+  baseRef: z.string(),
+  targetRef: z.string().optional(),
   ignoreWhitespace: z.boolean().optional(),
   requestId: z.string(),
 });
@@ -2986,6 +3004,17 @@ const ParsedDiffFileSchema = z.object({
   targetRef: z.string().optional(),
   // New-side line count, so the client can size the gap after the last hunk.
   lineCount: z.number().int().nonnegative().optional(),
+  // Set on a "too_large" placeholder whose diff the daemon skipped because the file is large.
+  // Clients that asked for deferLargeFiles load it with checkout.diff.file.
+  deferred: z
+    .object({
+      baseRef: z.string(),
+      // Larger of the old and new file sizes, in bytes.
+      size: z.number().int().nonnegative(),
+      // Changes whenever either side of the file changes.
+      version: z.string(),
+    })
+    .optional(),
 });
 
 const FileExplorerEntrySchema = z.object({
@@ -3602,6 +3631,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutCommitFileDiffRequestSchema,
   CheckoutCommitRangeDiffRequestSchema,
   CheckoutDiffContextRequestSchema,
+  CheckoutDiffFileRequestSchema,
   CheckoutForgeGetCheckDetailsRequestSchema,
   CheckoutGithubGetCheckDetailsRequestSchema,
   CheckoutPrStatusRequestSchema,
@@ -6025,6 +6055,15 @@ export const CheckoutDiffContextResponseSchema = z.object({
   }),
 });
 
+export const CheckoutDiffFileResponseSchema = z.object({
+  type: z.literal("checkout.diff.file.response"),
+  payload: z.object({
+    file: ParsedDiffFileSchema.nullable(),
+    error: CheckoutErrorSchema.nullable(),
+    requestId: z.string(),
+  }),
+});
+
 export const CheckoutCommitRangeDiffResponseSchema = z.object({
   type: z.literal("checkout.commits.range_diff.response"),
   payload: CheckoutDiffSubscriptionPayloadSchema.omit({ subscriptionId: true }).extend({
@@ -7467,6 +7506,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutCommitFileDiffResponseSchema,
   CheckoutCommitRangeDiffResponseSchema,
   CheckoutDiffContextResponseSchema,
+  CheckoutDiffFileResponseSchema,
   CheckoutForgeGetCheckDetailsResponseSchema,
   CheckoutGithubGetCheckDetailsResponseSchema,
   CheckoutPrStatusResponseSchema,
@@ -7842,6 +7882,8 @@ export type CheckoutCommitRangeDiffRequest = z.infer<typeof CheckoutCommitRangeD
 export type CheckoutCommitRangeDiffResponse = z.infer<typeof CheckoutCommitRangeDiffResponseSchema>;
 export type CheckoutDiffContextRequest = z.infer<typeof CheckoutDiffContextRequestSchema>;
 export type CheckoutDiffContextResponse = z.infer<typeof CheckoutDiffContextResponseSchema>;
+export type CheckoutDiffFileRequest = z.infer<typeof CheckoutDiffFileRequestSchema>;
+export type CheckoutDiffFileResponse = z.infer<typeof CheckoutDiffFileResponseSchema>;
 export type ParsedDiffFile = z.infer<typeof ParsedDiffFileSchema>;
 export type CheckoutPrCreateRequest = z.infer<typeof CheckoutPrCreateRequestSchema>;
 export type CheckoutPrCreateResponse = z.infer<typeof CheckoutPrCreateResponseSchema>;
