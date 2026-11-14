@@ -37,7 +37,6 @@ export const SuggestedNextActions = memo(function SuggestedNextActions({
   onEdit: (text: string) => void;
   toast: ToastApi;
 }) {
-  const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
 
   const send = useCallback(
@@ -57,7 +56,6 @@ export const SuggestedNextActions = memo(function SuggestedNextActions({
 
   return (
     <View style={styles.container} testID="suggested-next-actions">
-      <Text style={styles.label}>{t("agentStream.suggestedNextActions.label")}</Text>
       {suggestions.map((suggestion) => (
         <SuggestionChip key={suggestion} text={suggestion} onSend={send} onEdit={onEdit} />
       ))}
@@ -108,10 +106,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.spacing[3],
     gap: theme.spacing[2],
     alignItems: "flex-start",
-  },
-  label: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
   },
   chip: {
     flexDirection: "row",

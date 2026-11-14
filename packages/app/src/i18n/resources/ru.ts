@@ -241,7 +241,6 @@ export const ru: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "Предлагаемые запросы",
       send: "Отправить: {{text}}",
       edit: "Изменить: {{text}}",
     },

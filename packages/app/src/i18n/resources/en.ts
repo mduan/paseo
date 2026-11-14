@@ -235,7 +235,6 @@ export const en = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "Suggested prompts",
       send: "Send: {{text}}",
       edit: "Edit: {{text}}",
     },

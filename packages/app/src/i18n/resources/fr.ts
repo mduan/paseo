@@ -243,7 +243,6 @@ export const fr: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "Messages suggérés",
       send: "Envoyer : {{text}}",
       edit: "Modifier : {{text}}",
     },

@@ -239,7 +239,6 @@ export const ar: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "رسائل مقترحة",
       send: "إرسال: {{text}}",
       edit: "تعديل: {{text}}",
     },
