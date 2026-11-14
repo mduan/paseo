@@ -4,6 +4,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   View,
   Text,
+  Platform,
   Pressable,
   ScrollView,
   type GestureResponderEvent,
@@ -2388,12 +2389,13 @@ function ProjectModeList({
   } = useLimitedSidebarGroup(pinnedChats);
   const nativeScrollGestureProps = useMemo(
     () =>
-      parentGestureRef
+      // NestableScrollContainer forwards props to RNGH ScrollView. On iOS, keep
+      // vertical scroll and sidebar close pan simultaneous so clear horizontal
+      // intent can still close from inside the list. On Android, simultaneity
+      // lets the list keep scrolling during the close swipe; without it,
+      // whichever gesture activates first cancels the other.
+      parentGestureRef && Platform.OS !== "android"
         ? ({
-            // NestableScrollContainer forwards props to RNGH ScrollView. Keep
-            // vertical scroll and sidebar close pan simultaneous: vertical
-            // intent scrolls immediately, clear horizontal intent can still
-            // activate close from inside the list.
             simultaneousHandlers: parentGestureRef,
           } as object)
         : undefined,
