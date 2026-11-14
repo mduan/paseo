@@ -29,7 +29,7 @@ function setup(options: { enabled?: boolean; agents?: Record<string, FakeAgent> 
         subscriber = callback;
         return () => {};
       },
-      getAgent: ((id: string) => agents[id] ?? null) as never,
+      getAgent: ((id: string) => (agents[id] ? { id, ...agents[id] } : null)) as never,
       getTimeline: () => TIMELINE,
       setSuggestedNextActions: (id, suggestions) => published.set(id, suggestions),
     },

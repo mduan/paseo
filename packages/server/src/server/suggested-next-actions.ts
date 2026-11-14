@@ -31,14 +31,12 @@ export function attachSuggestedNextActions(input: {
   const { logger, agentManager } = input;
   const latestCompletionByAgent = new Map<string, number>();
 
-  async function suggest(agentId: string, completion: number): Promise<void> {
-    const agent = agentManager.getAgent(agentId);
-    if (!agent) return;
-    const prompt = buildPrompt(agentManager.getTimeline(agentId));
+  async function suggest(agent: ManagedAgent, completion: number): Promise<void> {
+    const prompt = buildPrompt(agentManager.getTimeline(agent.id));
     if (!prompt) return;
     const suggestions = normalizeSuggestions(await input.generateSuggestions({ agent, prompt }));
-    if (latestCompletionByAgent.get(agentId) !== completion) return;
-    agentManager.setSuggestedNextActions(agentId, suggestions);
+    if (latestCompletionByAgent.get(agent.id) !== completion) return;
+    agentManager.setSuggestedNextActions(agent.id, suggestions);
   }
 
   return agentManager.subscribe(
@@ -49,7 +47,7 @@ export function attachSuggestedNextActions(input: {
       if (!input.isEnabled()) return;
       const completion = (latestCompletionByAgent.get(event.agentId) ?? 0) + 1;
       latestCompletionByAgent.set(event.agentId, completion);
-      void suggest(event.agentId, completion).catch((error) => {
+      void suggest(agent, completion).catch((error) => {
         logger.warn({ err: error, agentId: event.agentId }, "Suggested next actions failed");
       });
     },
