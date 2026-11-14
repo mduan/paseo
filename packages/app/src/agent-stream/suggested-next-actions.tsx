@@ -1,7 +1,7 @@
 import { memo, useCallback } from "react";
 import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, Pencil } from "lucide-react-native";
+import { Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ToastApi } from "@/components/toast-host";
 import { dispatchComposerAgentMessage } from "@/composer/actions";
@@ -10,7 +10,6 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { encodeImages } from "@/utils/encode-images";
 import type { Theme } from "@/styles/theme";
 
-const ThemedArrowUp = withUnistyles(ArrowUp);
 const ThemedPencil = withUnistyles(Pencil);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -86,7 +85,6 @@ function SuggestionChip({
         accessibilityRole="button"
         accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
       >
-        <ThemedArrowUp size={14} uniProps={mutedColorMapping} />
         <Text style={styles.chipText} numberOfLines={1}>
           {text}
         </Text>
@@ -130,9 +128,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing[2],
-    paddingLeft: theme.spacing[3],
-    paddingRight: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
   },
   chipText: {
     flexShrink: 1,
