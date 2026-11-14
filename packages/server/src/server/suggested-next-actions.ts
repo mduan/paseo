@@ -35,7 +35,10 @@ export function attachSuggestedNextActions(input: {
     const prompt = buildPrompt(agentManager.getTimeline(agent.id));
     if (!prompt) return;
     const suggestions = normalizeSuggestions(await input.generateSuggestions({ agent, prompt }));
-    if (latestCompletionByAgent.get(agent.id) !== completion) return;
+    const stale = latestCompletionByAgent.get(agent.id) !== completion;
+    // An empty result looks the same as no run in the UI, so record every outcome.
+    logger.info({ agentId: agent.id, count: suggestions.length, stale }, "Suggested next actions");
+    if (stale) return;
     agentManager.setSuggestedNextActions(agent.id, suggestions);
   }
 
