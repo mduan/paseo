@@ -97,6 +97,11 @@ definition, no longer eligible to begin.
   stall across a panel settle loses the final position, and the next React commit reverts the overlay
   to its last synced props: a backdrop over the workspace while the store says closed. Upstream fixed
   the collector in 4.4.3, which needs React Native 0.83.
+- Do not mount a large subtree while a panel slides. Reanimated pauses its own commits from React's
+  commit hook until Android reports that the commit mounted, so the slide freezes through the
+  commit's layout and mount. Opening a chat in another workspace mounts a whole workspace (native
+  keeps one), which froze the slide mid-way. Native `RetainedChatContent` defers the chat's first
+  mount until the agent panel settles.
 - Gesture start and progress must not update React state. The retained overlay is already mounted and
   offscreen; only the shared position and its derived native styles move during a drag.
 - Hidden tabs and workspaces use `RetainedPanel`. It owns a non-collapsible native root, visibility,
