@@ -51,10 +51,7 @@ function displayedLoadedFile(
   return { ...file, status: loaded?.status ?? "ok" };
 }
 
-/**
- * Replaces the deferred placeholders of large files the user loads with their diffs, and reports
- * which ones are still loading or failed.
- */
+/** Swaps loaded large files in for their placeholders and reports loading or failed ones. */
 export function useDeferredDiffFiles(input: {
   serverId: string;
   cwd: string;

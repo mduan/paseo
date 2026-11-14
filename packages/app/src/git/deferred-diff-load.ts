@@ -1,7 +1,6 @@
 import type { TFunction } from "i18next";
 import { formatFileSize } from "@/utils/format-file-size";
 
-/** Where a deferred large file is in loading its diff. */
 export enum DeferredDiffLoad {
   Idle = "idle",
   Loading = "loading",

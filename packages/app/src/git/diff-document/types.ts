@@ -18,7 +18,6 @@ interface DiffDocumentBaseProps {
   onExpandGap?: (input: ExpandDiffGapInput) => void;
   /** Deferred large files that are loading or failed, by path. Absent paths have not loaded. */
   deferredFileLoads?: ReadonlyMap<string, DeferredDiffLoad>;
-  /** Loads a deferred large file when its load row is pressed. */
   onLoadDeferredFile?: (path: string) => void;
 }
 
