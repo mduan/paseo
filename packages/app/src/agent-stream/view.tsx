@@ -1401,6 +1401,12 @@ function agentStreamViewPropsEqual(
   if (left.onOpenWorkspaceFile !== right.onOpenWorkspaceFile) reasons.push("onOpenWorkspaceFile");
   if (left.onOpenTurnDiff !== right.onOpenTurnDiff) reasons.push("onOpenTurnDiff");
   if (left.readOnly !== right.readOnly) reasons.push("readOnly");
+  if (left.bottomOverlayTailClearance !== right.bottomOverlayTailClearance) {
+    reasons.push("bottomOverlayTailClearance");
+  }
+  if (left.bottomOverlayControlClearance !== right.bottomOverlayControlClearance) {
+    reasons.push("bottomOverlayControlClearance");
+  }
   if (left.tailAccessory !== right.tailAccessory) reasons.push("tailAccessory");
   if (!historyPaginationPropsEqual(left.historyPagination, right.historyPagination)) {
     reasons.push("historyPagination");
