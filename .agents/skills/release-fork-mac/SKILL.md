@@ -46,7 +46,7 @@ If relevant inputs match the published build, skip publication.
 
 ## Build and report the Mac app
 
-1. If publication was skipped or deferred, merge the release branch into local `main` first. Run `npm run build:fork` from the `main` checkout. It disables desktop publication and uses ad hoc signing without notarization.
+1. If publication was skipped or deferred, merge the release branch into local `main` first. Run `npm run build:fork` from the `main` checkout. It disables desktop publication and uses ad hoc signing without notarization. It reuses the server build from `release:fork:cli` when HEAD and the clean tree are unchanged, and rebuilds otherwise; the log says which.
 2. Verify a nonempty `packages/desktop/release/Paseo-<version>-arm64.dmg` for the workspace version. Leave it unopened and unmounted. Installation and main-daemon restart (port 6767) require separate permission.
 3. Check this project's workspaces/worktrees for commits missing from local `main`, accounting for equivalent changes already merged. List workspace, branch, and outstanding commits after the DMG link, or state none. This check is informational and must not block the release.
 4. Report publication status (skipped, verified, pending, or failed), version/release commit, signing limitation, and unfinished-step logs. In the final response, output a clickable Markdown file link to the verified DMG. Use its full absolute path as both the link label and target: `[<checkout>/packages/desktop/release/Paseo-<version>-arm64.dmg](<checkout>/packages/desktop/release/Paseo-<version>-arm64.dmg)`.

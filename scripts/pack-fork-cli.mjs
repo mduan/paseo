@@ -19,6 +19,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildServerClean } from "./build-fork-mac.mjs";
 import { isMainModule } from "./is-main-module.mjs";
 
 const FORK_CLI_PACKAGE = "@mduan/paseo-cli";
@@ -239,7 +240,7 @@ function main() {
   }
 
   if (!args.skipBuild) {
-    run("npm", ["run", "build:server:clean"]);
+    buildServerClean();
     if (!args.skipWebUi) {
       run("npm", ["run", "build:daemon-web-ui"]);
     }

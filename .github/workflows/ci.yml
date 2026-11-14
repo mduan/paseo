@@ -115,7 +115,7 @@ jobs:
         run: node scripts/npm-retry.mjs ci
 
       - name: Test the fork release scripts
-        run: node --test scripts/pack-fork-cli.test.mjs scripts/bump-fork-version.test.mjs
+        run: node --test scripts/pack-fork-cli.test.mjs scripts/build-fork-mac.test.mjs scripts/bump-fork-version.test.mjs
 
       - name: Build server stack
         run: npm run build:server

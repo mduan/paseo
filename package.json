@@ -96,7 +96,7 @@
     "release:fork:cli": "node scripts/pack-fork-cli.mjs",
     "version:fork": "node scripts/bump-fork-version.mjs",
     "release:fork": "npm run version:fork && npm run release:fork:cli -- --publish && npm run build:fork",
-    "build:fork": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:desktop -- --publish never --mac dmg --arm64 -c.mac.notarize=false -c.mac.identity=- -c.mac.hardenedRuntime=false",
+    "build:fork": "node scripts/build-fork-mac.mjs",
     "db:query": "npm run db:query --workspace=@getpaseo/server --",
     "cli": "./scripts/dev-home.sh npx tsx packages/cli/src/index.js",
     "version": "npm run version:sync-internal && npm run fdroid:changelogs && npm run release:prepare && git add -A",
