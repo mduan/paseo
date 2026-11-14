@@ -1,7 +1,7 @@
 import { memo, useCallback } from "react";
 import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Pencil, Sparkles } from "lucide-react-native";
+import { Lightbulb, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ToastApi } from "@/components/toast-host";
 import { dispatchComposerAgentMessage } from "@/composer/actions";
@@ -11,7 +11,7 @@ import { encodeImages } from "@/utils/encode-images";
 import type { Theme } from "@/styles/theme";
 
 const ThemedPencil = withUnistyles(Pencil);
-const ThemedSparkles = withUnistyles(Sparkles);
+const ThemedLightbulb = withUnistyles(Lightbulb);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 type PressableState = PressableStateCallbackType & { hovered?: boolean };
@@ -84,7 +84,7 @@ function SuggestionChip({
         accessibilityRole="button"
         accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
       >
-        <ThemedSparkles size={14} style={styles.chipIcon} uniProps={mutedColorMapping} />
+        <ThemedLightbulb size={14} style={styles.chipIcon} uniProps={mutedColorMapping} />
         <Text style={styles.chipText}>{text}</Text>
       </Pressable>
       <View style={styles.chipSeparator} />
