@@ -101,7 +101,9 @@ definition, no longer eligible to begin.
   commit hook until Android reports that the commit mounted, so the slide freezes through the
   commit's layout and mount. Opening a chat in another workspace mounts a whole workspace (native
   keeps one), which froze the slide mid-way. Native `RetainedChatContent` defers the chat's first
-  mount until the agent panel settles.
+  mount until the agent panel settles. Until the new workspace commits, the deck hides the
+  workspace being left through a shared value (`screens/workspace/leaving-workspace.ts`), so the
+  slide never reveals the previous chat.
 - Gesture start and progress must not update React state. The retained overlay is already mounted and
   offscreen; only the shared position and its derived native styles move during a drag.
 - Hidden tabs and workspaces use `RetainedPanel`. It owns a non-collapsible native root, visibility,
