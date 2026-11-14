@@ -85,9 +85,7 @@ function SuggestionChip({
         accessibilityRole="button"
         accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
       >
-        <Text style={styles.chipText} numberOfLines={1}>
-          {text}
-        </Text>
+        <Text style={styles.chipText}>{text}</Text>
       </Pressable>
       <View style={styles.chipSeparator} />
       <Pressable
@@ -107,6 +105,7 @@ const CHIP_HEIGHT = 32;
 const styles = StyleSheet.create((theme) => ({
   container: {
     marginTop: theme.spacing[4],
+    paddingBottom: theme.spacing[3],
     gap: theme.spacing[2],
     alignItems: "flex-start",
   },
@@ -129,6 +128,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
   },
   chipText: {
     flexShrink: 1,
