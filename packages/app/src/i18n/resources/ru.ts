@@ -242,10 +242,6 @@ export const ru: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "Предлагаемый шаг",
-      options: "Параметры предложений",
-      turnOff: "Отключить предложения",
-      settings: "Настройки предложений…",
-      turnedOff: "Предложения отключены для этого хоста",
       send: "Отправить: {{text}}",
       edit: "Изменить: {{text}}",
     },

@@ -240,10 +240,6 @@ export const ko: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "추천 다음 단계",
-      options: "추천 옵션",
-      turnOff: "추천 끄기",
-      settings: "추천 설정…",
-      turnedOff: "이 호스트에서 추천이 꺼져 있습니다",
       send: "보내기: {{text}}",
       edit: "편집: {{text}}",
     },

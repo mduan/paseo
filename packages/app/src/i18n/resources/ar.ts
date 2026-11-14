@@ -240,10 +240,6 @@ export const ar: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "الخطوة التالية المقترحة",
-      options: "خيارات الاقتراحات",
-      turnOff: "إيقاف الاقتراحات",
-      settings: "إعدادات الاقتراحات…",
-      turnedOff: "الاقتراحات متوقفة على هذا المضيف",
       send: "إرسال: {{text}}",
       edit: "تعديل: {{text}}",
     },

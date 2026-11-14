@@ -236,10 +236,6 @@ export const en = {
   agentStream: {
     suggestedNextActions: {
       label: "Suggested next",
-      options: "Suggestion options",
-      turnOff: "Turn off suggestions",
-      settings: "Suggestion settings…",
-      turnedOff: "Suggestions are off for this host",
       send: "Send: {{text}}",
       edit: "Edit: {{text}}",
     },

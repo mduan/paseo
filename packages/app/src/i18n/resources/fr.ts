@@ -244,10 +244,6 @@ export const fr: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "Suite suggérée",
-      options: "Options des suggestions",
-      turnOff: "Désactiver les suggestions",
-      settings: "Paramètres des suggestions…",
-      turnedOff: "Les suggestions sont désactivées pour cet hôte",
       send: "Envoyer : {{text}}",
       edit: "Modifier : {{text}}",
     },

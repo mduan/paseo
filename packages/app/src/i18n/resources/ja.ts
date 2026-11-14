@@ -242,10 +242,6 @@ export const ja: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "次の候補",
-      options: "候補のオプション",
-      turnOff: "候補をオフにする",
-      settings: "候補の設定…",
-      turnedOff: "このホストでは候補がオフになっています",
       send: "送信: {{text}}",
       edit: "編集: {{text}}",
     },

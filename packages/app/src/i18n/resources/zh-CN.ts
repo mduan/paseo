@@ -240,10 +240,6 @@ export const zhCN: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "建议的下一步",
-      options: "建议选项",
-      turnOff: "关闭建议",
-      settings: "建议设置…",
-      turnedOff: "此主机已关闭建议",
       send: "发送：{{text}}",
       edit: "编辑：{{text}}",
     },

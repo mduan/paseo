@@ -241,10 +241,6 @@ export const ptBR: TranslationResources = {
   agentStream: {
     suggestedNextActions: {
       label: "Próximo passo sugerido",
-      options: "Opções de sugestões",
-      turnOff: "Desativar sugestões",
-      settings: "Configurações de sugestões…",
-      turnedOff: "As sugestões estão desativadas neste host",
       send: "Enviar: {{text}}",
       edit: "Editar: {{text}}",
     },
