@@ -77,7 +77,9 @@ function paintStatusRow(input: PaintWebViewportInput, row: DiffStatusRow, y: num
     ? (input.viewportWidth - context.measureText(row.label).width) / 2
     : 12;
   // Vertically centered; equals the original lineHeight + 6 baseline for 24px-padded rows.
-  context.fillText(row.label, x, y + (row.height + input.model.lineHeight) / 2 - 6);
+  const baseline = y + (row.height + input.model.lineHeight) / 2 - 6;
+  // Whole-pixel origin: centering lands on fractional pixels, which blurs canvas glyphs.
+  context.fillText(row.label, Math.round(x), Math.round(baseline));
 }
 
 export function paintWebViewport(input: PaintWebViewportInput): void {
