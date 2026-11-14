@@ -93,7 +93,7 @@ export function useDeferredDiffFiles(input: {
       if (current === DeferredDiffLoad.Loading || current === DeferredDiffLoad.Loaded) return;
       setLoad(key, { state: DeferredDiffLoad.Loading });
       void client
-        .getCheckoutDiffFile({
+        .getCheckoutFileDiff({
           cwd,
           path,
           ...(file.oldPath ? { oldPath: file.oldPath } : {}),

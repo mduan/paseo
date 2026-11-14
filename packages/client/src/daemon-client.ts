@@ -4535,7 +4535,7 @@ export class DaemonClient {
   }
 
   /** Loads one file that a checkout diff deferred, using the refs from its placeholder. */
-  async getCheckoutDiffFile(
+  async getCheckoutFileDiff(
     input: Omit<CheckoutDiffFileRequest, "type" | "requestId">,
   ): Promise<ParsedDiffFile | null> {
     const payload =

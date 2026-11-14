@@ -7,7 +7,7 @@ import type { CheckoutCommit, CheckoutCommitFile } from "@getpaseo/protocol/mess
 import { parseGitHubRemoteIdentity, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
 import { maxBase64EncryptedPlaintextByteLength } from "@getpaseo/relay";
 import type { Logger } from "pino";
-import type { DeferredDiffFile, ParsedDiffFile } from "../server/utils/diff-highlighter.js";
+import type { DiffDeferral, ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import {
   countFileLines,
   highlightDiffWithFileContent,
@@ -2352,7 +2352,7 @@ function buildPlaceholderParsedDiffFile(
     hunks: [],
     status: options.status,
     ...(options.deferred?.targetRef ? { targetRef: options.deferred.targetRef } : {}),
-    ...(options.deferred ? { deferred: options.deferred.file } : {}),
+    ...(options.deferred ? { deferred: options.deferred.deferral } : {}),
   };
 }
 
@@ -3625,12 +3625,12 @@ interface TrackedPlaceholder {
 }
 
 interface DeferredDiff {
-  file: DeferredDiffFile;
+  deferral: DiffDeferral;
   targetRef?: string;
 }
 
 // Matches the per-file diff budget: larger files cost more to read and highlight than to defer.
-const DEFERRED_DIFF_FILE_MIN_BYTES = PER_FILE_DIFF_MAX_BYTES;
+const DEFER_DIFF_ABOVE_BYTES = PER_FILE_DIFF_MAX_BYTES;
 
 /**
  * Finds tracked changes whose old or new file exceeds the deferral size, from object metadata and
@@ -3678,9 +3678,9 @@ async function findDeferredTrackedDiffs(input: {
         ? objects.get(`${refs.targetRef}:${change.path}`)
         : await statWorkingTreeFile(resolve(cwd, change.path));
     const size = Math.max(oldObject?.size ?? 0, newSide?.size ?? 0);
-    if (size <= DEFERRED_DIFF_FILE_MIN_BYTES) continue;
+    if (size <= DEFER_DIFF_ABOVE_BYTES) continue;
     deferred.set(change.path, {
-      file: {
+      deferral: {
         baseRef: refs.baseRef,
         size,
         version: `${oldObject?.id ?? "none"}:${newSide?.id ?? "none"}`,
