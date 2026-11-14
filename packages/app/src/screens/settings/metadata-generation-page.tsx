@@ -108,10 +108,7 @@ function MetadataEffortRow({
 type ModelProviders = MutableDaemonConfig["metadataGeneration"]["providers"];
 type ProvidersSnapshot = ReturnType<typeof useProvidersSnapshot>;
 
-/**
- * Selection state for an ordered provider list where an empty list means "use the default".
- * Both the metadata model and the suggestion model are saved this way.
- */
+/** Selection state for an ordered provider list where an empty list means "use the default". */
 function useModelPreference({
   configuredProviders,
   snapshot,
@@ -205,7 +202,6 @@ function useModelPreference({
 
 type ModelPreference = ReturnType<typeof useModelPreference>;
 
-/** The selection, model, and effort rows of a model preference card. */
 function ModelPreferenceRows({
   serverId,
   snapshot,

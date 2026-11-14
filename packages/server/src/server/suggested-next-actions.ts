@@ -18,11 +18,7 @@ const SuggestionsSchema = z.object({ suggestions: z.array(z.string()) });
 
 type GenerateSuggestions = (input: { agent: ManagedAgent; prompt: string }) => Promise<string[]>;
 
-/**
- * After a top-level agent finishes a turn, asks a fast model for up to three follow-up messages
- * and publishes them on the agent's state. Results for a turn that is no longer the latest are
- * dropped.
- */
+/** Publishes up to three suggested follow-ups after each top-level turn; drops stale results. */
 export function attachSuggestedNextActions(input: {
   logger: Logger;
   agentManager: Pick<
