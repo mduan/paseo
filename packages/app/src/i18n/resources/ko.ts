@@ -239,7 +239,7 @@ export const ko: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "추천 다음 단계",
+      label: "추천 프롬프트",
       send: "보내기: {{text}}",
       edit: "편집: {{text}}",
     },

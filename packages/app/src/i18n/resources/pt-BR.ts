@@ -240,7 +240,7 @@ export const ptBR: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "Próximo passo sugerido",
+      label: "Prompts sugeridos",
       send: "Enviar: {{text}}",
       edit: "Editar: {{text}}",
     },

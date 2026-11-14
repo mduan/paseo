@@ -241,7 +241,7 @@ export const es: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "Siguiente paso sugerido",
+      label: "Mensajes sugeridos",
       send: "Enviar: {{text}}",
       edit: "Editar: {{text}}",
     },
