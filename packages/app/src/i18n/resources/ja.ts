@@ -241,7 +241,6 @@ export const ja: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "次の候補",
       send: "送信: {{text}}",
       edit: "編集: {{text}}",
     },

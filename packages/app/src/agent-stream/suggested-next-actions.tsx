@@ -1,7 +1,7 @@
 import { memo, useCallback } from "react";
 import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Pencil } from "lucide-react-native";
+import { Lightbulb, Pencil } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ToastApi } from "@/components/toast-host";
 import { dispatchComposerAgentMessage } from "@/composer/actions";
@@ -11,6 +11,7 @@ import { encodeImages } from "@/utils/encode-images";
 import type { Theme } from "@/styles/theme";
 
 const ThemedPencil = withUnistyles(Pencil);
+const ThemedLightbulb = withUnistyles(Lightbulb);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 type PressableState = PressableStateCallbackType & { hovered?: boolean };
@@ -37,7 +38,6 @@ export const SuggestedNextActions = memo(function SuggestedNextActions({
   onEdit: (text: string) => void;
   toast: ToastApi;
 }) {
-  const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
 
   const send = useCallback(
@@ -57,7 +57,6 @@ export const SuggestedNextActions = memo(function SuggestedNextActions({
 
   return (
     <View style={styles.container} testID="suggested-next-actions">
-      <Text style={styles.label}>{t("agentStream.suggestedNextActions.label")}</Text>
       {suggestions.map((suggestion) => (
         <SuggestionChip key={suggestion} text={suggestion} onSend={send} onEdit={onEdit} />
       ))}
@@ -85,9 +84,8 @@ function SuggestionChip({
         accessibilityRole="button"
         accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
       >
-        <Text style={styles.chipText} numberOfLines={1}>
-          {text}
-        </Text>
+        <ThemedLightbulb size={14} style={styles.chipIcon} uniProps={mutedColorMapping} />
+        <Text style={styles.chipText}>{text}</Text>
       </Pressable>
       <View style={styles.chipSeparator} />
       <Pressable
@@ -107,12 +105,9 @@ const CHIP_HEIGHT = 32;
 const styles = StyleSheet.create((theme) => ({
   container: {
     marginTop: theme.spacing[4],
+    paddingBottom: theme.spacing[3],
     gap: theme.spacing[2],
     alignItems: "flex-start",
-  },
-  label: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
   },
   chip: {
     flexDirection: "row",
@@ -121,6 +116,7 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: CHIP_HEIGHT,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
+    backgroundColor: theme.colors.surface1,
     borderRadius: theme.borderRadius["2xl"],
     overflow: "hidden",
   },
@@ -128,7 +124,12 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
+    gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+  },
+  chipIcon: {
+    flexShrink: 0,
   },
   chipText: {
     flexShrink: 1,
@@ -145,6 +146,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   highlighted: {
-    backgroundColor: theme.colors.interactionHighlight,
+    backgroundColor: theme.colors.surface2,
   },
 }));

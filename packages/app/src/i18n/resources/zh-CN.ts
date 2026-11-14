@@ -239,7 +239,6 @@ export const zhCN: TranslationResources = {
   },
   agentStream: {
     suggestedNextActions: {
-      label: "建议的下一步",
       send: "发送：{{text}}",
       edit: "编辑：{{text}}",
     },
