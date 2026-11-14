@@ -44,7 +44,8 @@ export function attachSuggestedNextActions(input: {
     const stale = latestGenerationByAgent.get(agent.id) !== generation;
     // An empty result looks the same as no run in the UI, so record every outcome.
     logger.info({ agentId: agent.id, count: suggestions.length, stale }, "Suggested next actions");
-    if (stale) return;
+    // Turned off while generating: keep what's on screen, but show nothing new.
+    if (stale || !input.isEnabled()) return;
     agentManager.setSuggestedNextActions(agent.id, suggestions);
   }
 

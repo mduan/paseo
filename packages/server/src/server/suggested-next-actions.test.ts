@@ -97,6 +97,17 @@ test("drops a result that arrives after a newer turn started, even if it never c
   expect(published.has("chat")).toBe(false);
 });
 
+test("drops a result that arrives after suggestions were turned off", async () => {
+  const options = { enabled: true };
+  const { published, completeTurn, resolveGeneration } = setup(options);
+
+  completeTurn("chat");
+  options.enabled = false;
+  await resolveGeneration(0, ["Generated while turning off"]);
+
+  expect(published.has("chat")).toBe(false);
+});
+
 test("drops a result that arrives after the conversation was rewound", async () => {
   const { published, completeTurn, rewind, resolveGeneration } = setup();
 
