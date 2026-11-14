@@ -115,9 +115,11 @@ function buildPrompt(timeline: readonly AgentTimelineItem[]): string | null {
 
   return [
     "You suggest the next message a developer will send to their coding agent.",
-    "Read the developer's last message and the agent's reply, then return up to 3 short follow-up messages in the developer's voice, as instructions to the agent (for example: “Commit these changes”).",
-    "Return an empty list when the agent asked the developer a question, needs a decision only the developer can make, or the next step is not predictable.",
-    "Keep each suggestion under 80 characters. Do not repeat what the agent already did.",
+    "Read the developer's last message and the agent's reply, then return 1 to 3 short follow-up messages in the developer's voice, as instructions to the agent (for example: “Apply that fix”, “Run the tests”, “Commit these changes”).",
+    "Most replies have an obvious next step: approve a proposed change, verify the work, commit it, or continue the plan.",
+    "When the agent offers choices, suggest the choices as replies.",
+    "Return an empty list only when the agent asked an open-ended question that needs the developer's own input, or when the task is finished and nothing follows.",
+    "Keep each suggestion under 80 characters. Do not ask for work the agent already did.",
     "",
     "<developer_message>",
     lastUser?.type === "user_message" ? truncate(lastUser.text) : "(none)",
