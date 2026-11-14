@@ -29,6 +29,14 @@ export interface ParsedDiffFile {
   status?: "ok" | "too_large" | "binary";
   targetRef?: string;
   lineCount?: number;
+  deferred?: DeferredDiffFile;
+}
+
+/** A large file whose diff was skipped; clients load it with checkout.diff.file. */
+export interface DeferredDiffFile {
+  baseRef: string;
+  size: number;
+  version: string;
 }
 
 interface HighlightDiffWithFileContentOptions {

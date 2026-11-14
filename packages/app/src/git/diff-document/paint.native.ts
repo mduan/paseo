@@ -22,6 +22,7 @@ import {
   formatDiffCount,
 } from "@/git/file-header-presentation";
 import { gapChevronSegments } from "./gap-separator";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { DIFF_BODY_BORDER_HEIGHT, expandedBodyBorderTop, visibleRowRange } from "./model";
 import { nativeTextRuns } from "./native-text-runs";
 import { horizontalOffsetForPath, type DiffHorizontalOffsets } from "./horizontal-offsets";
@@ -411,12 +412,15 @@ function paintNativeRange(input: PaintNativeRangeInput): void {
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
       if (paintsFixedContent) {
+        const { font } = input.textLayout;
         input.canvas.drawText(
           row.label,
-          12,
+          row.deferredLoad ? (input.viewportWidth - font.getTextWidth(row.label)) / 2 : 12,
           y + input.model.lineHeight,
-          input.paints.foregroundMuted,
-          input.textLayout.font,
+          row.deferredLoad === DeferredDiffLoad.Failed
+            ? input.paints.statusDanger
+            : input.paints.foregroundMuted,
+          font,
         );
       }
       continue;

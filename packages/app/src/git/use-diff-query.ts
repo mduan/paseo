@@ -41,16 +41,25 @@ function normalizeCheckoutDiffCompare(compare: {
   baseRef?: string;
   ignoreWhitespace?: boolean;
   includeUncommitted?: boolean;
+  deferLargeFiles: true;
 } {
   const ignoreWhitespace = compare.ignoreWhitespace === true;
+  // The Changes panel loads large files on demand (see useDeferredDiffFiles).
+  const deferLargeFiles = true;
   if (compare.mode === "uncommitted") {
-    return { mode: "uncommitted", ignoreWhitespace };
+    return { mode: "uncommitted", ignoreWhitespace, deferLargeFiles };
   }
   const includeUncommitted = compare.includeUncommitted === true;
   const trimmedBaseRef = compare.baseRef?.trim();
   return trimmedBaseRef
-    ? { mode: "base", baseRef: trimmedBaseRef, ignoreWhitespace, includeUncommitted }
-    : { mode: "base", ignoreWhitespace, includeUncommitted };
+    ? {
+        mode: "base",
+        baseRef: trimmedBaseRef,
+        ignoreWhitespace,
+        includeUncommitted,
+        deferLargeFiles,
+      }
+    : { mode: "base", ignoreWhitespace, includeUncommitted, deferLargeFiles };
 }
 
 export function useCheckoutDiffQuery({
@@ -113,6 +122,7 @@ export function useCheckoutDiffQuery({
         includeUncommitted: compareIncludeUncommitted,
         ...(compareBaseRef ? { baseRef: compareBaseRef } : {}),
         ignoreWhitespace: compareIgnoreWhitespace,
+        deferLargeFiles: normalizedCompare.deferLargeFiles,
       },
     }),
   });

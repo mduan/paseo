@@ -114,7 +114,7 @@ function build(layout: "unified" | "split") {
       statusWarning: "orange",
       syntax: {},
     },
-    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "" },
+    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "", deferred: () => "Load diff" },
   };
   return buildDiffDocumentModel(input);
 }

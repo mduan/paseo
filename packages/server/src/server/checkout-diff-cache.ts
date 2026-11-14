@@ -39,6 +39,7 @@ export class CheckoutDiffCache {
       compare.ignoreWhitespace === true,
       compare.includeStructured === true,
       compare.includeUncommitted === true,
+      compare.deferLargeFiles === true,
     ]);
     const cached = this.values.get(key);
     const now = this.now();

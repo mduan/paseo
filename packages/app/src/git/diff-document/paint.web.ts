@@ -1,4 +1,5 @@
 import { gapChevronSegments } from "./gap-separator";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { selectionRectangles } from "./hit-testing";
 import { isLineHighlighted, type ResolvedLineHighlight } from "./line-range";
 import {
@@ -78,8 +79,14 @@ export function paintWebViewport(input: PaintWebViewportInput): void {
     if (!row) continue;
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
-      context.fillStyle = input.palette.foregroundMuted;
-      context.fillText(row.label, 12, y + input.model.lineHeight + 6);
+      context.fillStyle =
+        row.deferredLoad === DeferredDiffLoad.Failed
+          ? input.palette.statusDanger
+          : input.palette.foregroundMuted;
+      const x = row.deferredLoad
+        ? (input.viewportWidth - context.measureText(row.label).width) / 2
+        : 12;
+      context.fillText(row.label, x, y + input.model.lineHeight + 6);
       continue;
     }
     paintLine({

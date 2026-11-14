@@ -2897,6 +2897,8 @@ export class Session {
         return this.checkoutSession.handleCommitRangeDiffRequest(msg);
       case "checkout.diff.context.request":
         return this.checkoutSession.handleDiffContextRequest(msg);
+      case "checkout.diff.file.request":
+        return this.checkoutSession.handleDiffFileRequest(msg);
       case "validate_branch_request":
         return this.checkoutSession.handleValidateBranchRequest(msg);
       case "branch_suggestions_request":
@@ -8377,6 +8379,7 @@ export class Session {
         targetRef: range.toTree,
         ignoreWhitespace: msg.ignoreWhitespace === true,
         includeStructured: true,
+        deferLargeFiles: msg.deferLargeFiles === true,
       });
       const files = [...(result.structured ?? [])].sort((a, b) => (a.path < b.path ? -1 : 1));
       this.emitForSource(

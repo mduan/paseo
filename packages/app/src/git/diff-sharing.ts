@@ -48,21 +48,27 @@ export function shareCommitFileDiff(
     : next;
 }
 
+function equalFileFields(left: ParsedDiffFile, right: ParsedDiffFile): boolean {
+  return (
+    left.path === right.path &&
+    left.oldPath === right.oldPath &&
+    left.status === right.status &&
+    left.isNew === right.isNew &&
+    left.isDeleted === right.isDeleted &&
+    left.additions === right.additions &&
+    left.deletions === right.deletions &&
+    left.targetRef === right.targetRef &&
+    left.lineCount === right.lineCount &&
+    left.deferred?.baseRef === right.deferred?.baseRef &&
+    left.deferred?.size === right.deferred?.size &&
+    left.deferred?.version === right.deferred?.version &&
+    left.hunks.length === right.hunks.length
+  );
+}
+
 function equalFile(left: ParsedDiffFile, right: ParsedDiffFile): boolean {
   if (left === right) return true;
-  if (
-    left.path !== right.path ||
-    left.oldPath !== right.oldPath ||
-    left.status !== right.status ||
-    left.isNew !== right.isNew ||
-    left.isDeleted !== right.isDeleted ||
-    left.additions !== right.additions ||
-    left.deletions !== right.deletions ||
-    left.targetRef !== right.targetRef ||
-    left.lineCount !== right.lineCount ||
-    left.hunks.length !== right.hunks.length
-  )
-    return false;
+  if (!equalFileFields(left, right)) return false;
   for (let h = 0; h < left.hunks.length; h++) {
     const a = left.hunks[h]!;
     const b = right.hunks[h]!;

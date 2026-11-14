@@ -1,3 +1,4 @@
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { gapDirectionAt } from "./gap-separator";
 import { fileAtDocumentOffset, fragmentWidthForRange } from "./model";
 import type {
@@ -21,7 +22,12 @@ export function hitTestDiffDocument(input: {
   if (!file) return null;
   if (input.documentY < file.bodyTop) return { kind: "header", path: file.path };
   const row = rowAtOffset(input.model.rows, file.rowStart, file.rowEnd, input.documentY);
-  if (!row || row.kind !== "line") return null;
+  if (row?.kind === "status") {
+    const loadable =
+      row.deferredLoad === DeferredDiffLoad.Idle || row.deferredLoad === DeferredDiffLoad.Failed;
+    return loadable ? { kind: "load", path: file.path } : null;
+  }
+  if (!row) return null;
   if (row.separator) {
     const direction = gapDirectionAt({
       row,

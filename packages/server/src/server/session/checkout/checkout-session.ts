@@ -8,6 +8,7 @@ import type {
   BranchSuggestionsRequest,
   CheckoutCommitsListRequest,
   CheckoutCommitFileDiffRequest,
+  CheckoutDiffFileRequest,
   CheckoutCommitRangeDiffRequest,
   CheckoutDiffContextRequest,
   CheckoutRefreshRequest,
@@ -56,6 +57,7 @@ import {
   pushCurrentBranch,
   listCheckoutCommits,
   getCommitFileDiff,
+  getCheckoutFileDiff,
   getCommitRangeDiff,
   readDiffContextLines,
   setCurrentBranchBaseRef,
@@ -329,7 +331,7 @@ export class CheckoutSession {
   }
 
   async handleCommitRangeDiffRequest(msg: CheckoutCommitRangeDiffRequest): Promise<void> {
-    const { cwd, fromSha, toSha, ignoreWhitespace, requestId } = msg;
+    const { cwd, fromSha, toSha, ignoreWhitespace, deferLargeFiles, requestId } = msg;
 
     try {
       assertSafeGitRef(fromSha, "commit");
@@ -339,6 +341,7 @@ export class CheckoutSession {
         fromSha,
         toSha,
         ignoreWhitespace,
+        deferLargeFiles,
         context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
       });
       this.host.emit({
@@ -383,6 +386,34 @@ export class CheckoutSession {
       this.host.emit({
         type: "checkout.diff.context.response",
         payload: { lines: [], error: toCheckoutError(error), requestId },
+      });
+    }
+  }
+
+  async handleDiffFileRequest(msg: CheckoutDiffFileRequest): Promise<void> {
+    const { cwd, path, oldPath, baseRef, targetRef, ignoreWhitespace, requestId } = msg;
+
+    try {
+      assertSafeGitRef(baseRef, "diff base");
+      if (targetRef) assertSafeGitRef(targetRef, "diff target");
+      assertSafeRelativePath(path);
+      if (oldPath) assertSafeRelativePath(oldPath);
+      const file = await getCheckoutFileDiff({
+        cwd: expandTilde(cwd),
+        path,
+        oldPath,
+        baseRef,
+        targetRef,
+        ignoreWhitespace,
+      });
+      this.host.emit({
+        type: "checkout.diff.file.response",
+        payload: { file, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.diff.file.response",
+        payload: { file: null, error: toCheckoutError(error), requestId },
       });
     }
   }

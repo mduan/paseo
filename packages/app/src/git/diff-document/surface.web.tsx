@@ -45,6 +45,7 @@ import {
   type LineGutterHit,
 } from "./line-range";
 import { gapSeparatorLabel } from "./gap-separator";
+import { deferredDiffLoadLabel } from "@/git/deferred-diff-load";
 import { buildDiffDocumentModel, FILE_HEADER_HEIGHT, resolveRelayoutScrollTop } from "./model";
 import { paintWebFileHeader, paintWebViewport } from "./paint.web";
 import { hasPointerDragStarted } from "./pointer-gesture";
@@ -212,7 +213,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
         gap: gapSeparatorLabel(t),
+        deferred: deferredDiffLoadLabel(t),
       },
+      deferredFileLoads: props.deferredFileLoads,
       expandableGaps,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
     });
@@ -222,6 +225,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     fileWindowTop,
     measurement,
     props.collapsedFilePaths,
+    props.deferredFileLoads,
     props.displayPreferences.layout,
     props.displayPreferences.wrapLines,
     props.files,
@@ -670,10 +674,13 @@ export function DiffSurface(props: DiffSurfaceProps) {
   ]);
   const pointerCursor = useCallback(
     (hit: DiffHit | null, clientX: number, clientY: number) =>
-      hit?.kind === "gap" || lineGutterHitAt(hit, clientX, clientY) ? "pointer" : "text",
+      hit?.kind === "gap" || hit?.kind === "load" || lineGutterHitAt(hit, clientX, clientY)
+        ? "pointer"
+        : "text",
     [lineGutterHitAt],
   );
   const expandGap = useStableEvent((input: ExpandDiffGapInput) => props.onExpandGap?.(input));
+  const loadDeferredFile = useStableEvent((path: string) => props.onLoadDeferredFile?.(path));
   const pointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
@@ -681,6 +688,10 @@ export function DiffSurface(props: DiffSurfaceProps) {
       const hit = pointHit(event);
       if (hit?.kind === "gap") {
         expandGap({ path: hit.path, gapIndex: hit.gapIndex, direction: hit.direction });
+        return;
+      }
+      if (hit?.kind === "load") {
+        loadDeferredFile(hit.path);
         return;
       }
       const lineGutterHit =
@@ -717,7 +728,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       event.currentTarget.focus();
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [expandGap, lineGutterHitAt, pointHit, setSelection],
+    [expandGap, lineGutterHitAt, loadDeferredFile, pointHit, setSelection],
   );
   const updateActiveHeader = useCallback(
     (target: EventTarget | null) => {

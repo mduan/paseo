@@ -9,12 +9,42 @@ import {
   selectWordSource,
   selectedSourceText,
 } from "./hit-testing";
+import { DeferredDiffLoad } from "@/git/deferred-diff-load";
 import { buildDiffDocumentModel } from "./model";
 import type { BuildDiffDocumentModelInput, DiffCell, DiffSelection } from "./types";
 
 const measurer = { measure: (text: string) => Array.from(text).length * 10 };
 
 describe("diff hit testing", () => {
+  it("loads a deferred file from its row unless the file is already loading", () => {
+    const file: ParsedDiffFile = {
+      path: "large.json",
+      isNew: false,
+      isDeleted: false,
+      additions: 18,
+      deletions: 10,
+      hunks: [],
+      status: "too_large",
+      deferred: { baseRef: "main", size: 2_000_000, version: "old:new" },
+    };
+    const hitLoadRow = (load?: DeferredDiffLoad) => {
+      const model = buildModel("", {
+        files: [file],
+        ...(load ? { deferredFileLoads: new Map([[file.path, load]]) } : {}),
+      });
+      return hitTestDiffDocument({
+        model,
+        x: 90,
+        documentY: model.files[0]!.bodyTop + 1,
+        horizontalOffset: 0,
+      });
+    };
+
+    expect(hitLoadRow()).toEqual({ kind: "load", path: "large.json" });
+    expect(hitLoadRow(DeferredDiffLoad.Failed)).toEqual({ kind: "load", path: "large.json" });
+    expect(hitLoadRow(DeferredDiffLoad.Loading)).toBeNull();
+  });
+
   it("locates the closest character from measured wrapped geometry", () => {
     const cell = changedCell(buildModel("abcdef", { viewportWidth: 90 }));
     expect(characterOffsetAtPoint({ cell, x: 6, y: 20, lineHeight: 18 })).toBe(5);
@@ -268,7 +298,7 @@ function buildModel(changedContent: string, overrides: Partial<BuildDiffDocument
       statusWarning: "orange",
       syntax: {},
     },
-    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "" },
+    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "", deferred: () => "Load diff" },
     ...overrides,
   });
 }

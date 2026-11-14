@@ -68,7 +68,7 @@ function input(overrides: Partial<BuildDiffDocumentModelInput> = {}): BuildDiffD
       statusWarning: "orange",
       syntax: {},
     },
-    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "" },
+    labels: { binary: "Binary", tooLarge: "Too large", gap: () => "", deferred: () => "Load diff" },
     ...overrides,
   };
 }
@@ -123,6 +123,7 @@ describe("diff document model", () => {
           binary: "Binary",
           tooLarge: "Too large",
           gap: ({ lines, comments }) => `${lines} hidden, ${comments} comments`,
+          deferred: () => "Load diff",
         },
       }),
     );

@@ -55,6 +55,7 @@ import type {
   ParsedDiffFile,
   CheckoutCommitResponse,
   CheckoutDiffContextResponse,
+  CheckoutDiffFileRequest,
   CheckoutMergeResponse,
   CheckoutMergeFromBaseResponse,
   CheckoutPullResponse,
@@ -691,6 +692,7 @@ export interface AgentTurnDiffOptions {
   agentId: string;
   target: AgentTurnDiffTarget;
   ignoreWhitespace?: boolean;
+  deferLargeFiles?: boolean;
 }
 
 export type AgentTurnDiffPayload = Extract<
@@ -3447,6 +3449,7 @@ export class DaemonClient {
     agentId,
     target,
     ignoreWhitespace,
+    deferLargeFiles,
   }: AgentTurnDiffOptions): Promise<AgentTurnDiffPayload> {
     const requestId = this.createRequestId();
     return this.sendCorrelatedSessionRequest({
@@ -3457,6 +3460,7 @@ export class DaemonClient {
         agentId,
         target,
         ...(ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+        ...(deferLargeFiles ? { deferLargeFiles: true } : {}),
       },
       responseType: "agent.turn_diffs.get_diff.response",
     });
@@ -4319,10 +4323,11 @@ export class DaemonClient {
   private normalizeCheckoutDiffCompare(
     compare: SubscribeCheckoutDiffRequest["compare"],
   ): SubscribeCheckoutDiffRequest["compare"] {
+    const deferLargeFiles = compare.deferLargeFiles ? { deferLargeFiles: true } : {};
     if (compare.mode === "uncommitted") {
       return compare.ignoreWhitespace === true
-        ? { mode: "uncommitted", ignoreWhitespace: true }
-        : { mode: "uncommitted" };
+        ? { mode: "uncommitted", ignoreWhitespace: true, ...deferLargeFiles }
+        : { mode: "uncommitted", ...deferLargeFiles };
     }
     const baseRef = compare.baseRef?.trim();
     return {
@@ -4330,6 +4335,7 @@ export class DaemonClient {
       ...(baseRef ? { baseRef } : {}),
       ...(compare.ignoreWhitespace ? { ignoreWhitespace: true } : {}),
       ...(compare.includeUncommitted ? { includeUncommitted: true } : {}),
+      ...deferLargeFiles,
     };
   }
 
@@ -4513,6 +4519,7 @@ export class DaemonClient {
     fromSha: string;
     toSha: string;
     ignoreWhitespace?: boolean;
+    deferLargeFiles?: boolean;
   }): Promise<CommitRangeDiffPayload> {
     return this.sendNamespacedCorrelatedSessionRequest<"checkout.commits.range_diff.response">({
       message: {
@@ -4521,9 +4528,25 @@ export class DaemonClient {
         fromSha: input.fromSha,
         toSha: input.toSha,
         ...(input.ignoreWhitespace ? { ignoreWhitespace: true } : {}),
+        ...(input.deferLargeFiles ? { deferLargeFiles: true } : {}),
       },
       timeout: 60000,
     });
+  }
+
+  /** Loads one file that a checkout diff deferred, using the refs from its placeholder. */
+  async getCheckoutDiffFile(
+    input: Omit<CheckoutDiffFileRequest, "type" | "requestId">,
+  ): Promise<ParsedDiffFile | null> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"checkout.diff.file.response">({
+        message: { type: "checkout.diff.file.request", ...input },
+        timeout: 60000,
+      });
+    if (payload.error) {
+      throw new Error(payload.error.message);
+    }
+    return payload.file;
   }
 
   async getDiffContextLines(input: {

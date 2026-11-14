@@ -7,7 +7,7 @@ import type { CheckoutCommit, CheckoutCommitFile } from "@getpaseo/protocol/mess
 import { parseGitHubRemoteIdentity, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
 import { maxBase64EncryptedPlaintextByteLength } from "@getpaseo/relay";
 import type { Logger } from "pino";
-import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
+import type { DeferredDiffFile, ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import {
   countFileLines,
   highlightDiffWithFileContent,
@@ -952,6 +952,8 @@ export interface CheckoutDiffCompare {
   baseRef?: string;
   ignoreWhitespace?: boolean;
   includeStructured?: boolean;
+  /** Structured diffs replace tracked files over the deferral size with `deferred` placeholders. */
+  deferLargeFiles?: boolean;
 }
 
 /** Compares two fixed git objects (commits or trees), such as turn snapshots. */
@@ -961,6 +963,7 @@ export interface TreeRangeDiffCompare {
   targetRef: string;
   ignoreWhitespace?: boolean;
   includeStructured?: boolean;
+  deferLargeFiles?: boolean;
 }
 
 export interface MergeToBaseOptions {
@@ -2337,7 +2340,7 @@ async function inspectUntrackedFile(
 
 function buildPlaceholderParsedDiffFile(
   change: CheckoutFileChange,
-  options: { status: "too_large" | "binary"; stat?: FileStat },
+  options: { status: "too_large" | "binary"; stat?: FileStat; deferred?: DeferredDiff },
 ): ParsedDiffFile {
   return {
     path: change.path,
@@ -2348,6 +2351,8 @@ function buildPlaceholderParsedDiffFile(
     deletions: options.stat?.deletions ?? 0,
     hunks: [],
     status: options.status,
+    ...(options.deferred?.targetRef ? { targetRef: options.deferred.targetRef } : {}),
+    ...(options.deferred ? { deferred: options.deferred.file } : {}),
   };
 }
 
@@ -2834,6 +2839,7 @@ export async function getCommitRangeDiff(input: {
   fromSha: string;
   toSha: string;
   ignoreWhitespace?: boolean;
+  deferLargeFiles?: boolean;
   context?: CheckoutContext;
 }): Promise<CheckoutDiffResult & { baseRef: string; targetRef: string }> {
   const { cwd, fromSha, toSha } = input;
@@ -2856,6 +2862,7 @@ export async function getCommitRangeDiff(input: {
     targetRef,
     ignoreWhitespace: input.ignoreWhitespace,
     includeStructured: true,
+    deferLargeFiles: input.deferLargeFiles,
   });
   return { ...result, baseRef, targetRef };
 }
@@ -2930,6 +2937,52 @@ export async function getCommitFileDiff({
     targetRef: sha,
     ...(typeof newContent === "string" ? { lineCount: countFileLines(newContent) } : {}),
   };
+}
+
+/**
+ * Loads one file that a checkout diff deferred, comparing the refs from its placeholder with the
+ * same parsing and highlighting as the full diff. An absent targetRef reads the working tree.
+ * Returns `null` when the file no longer differs.
+ */
+export async function getCheckoutFileDiff(input: {
+  cwd: string;
+  path: string;
+  oldPath?: string;
+  baseRef: string;
+  targetRef?: string;
+  ignoreWhitespace?: boolean;
+}): Promise<ParsedDiffFile | null> {
+  const { cwd, path, oldPath, baseRef, targetRef } = input;
+  const refsForDiff: CheckoutDiffRefs = {
+    baseRef,
+    ...(targetRef ? { targetRef } : {}),
+    includeUntracked: false,
+  };
+  const { text, truncated } = await getTrackedDiffTextForPath({
+    cwd,
+    refsForDiff,
+    path,
+    oldPath,
+    ignoreWhitespace: input.ignoreWhitespace === true,
+  });
+  // A truncated body must not reach the parser; its header still identifies the change.
+  const hunkStart = text.indexOf("\n@@ ");
+  const parsedFile = parseDiff(truncated && hunkStart >= 0 ? text.slice(0, hunkStart) : text).find(
+    (file) => file.path === path,
+  );
+  if (!parsedFile) return null;
+  const change: CheckoutFileChange = {
+    path,
+    ...(oldPath ? { oldPath } : {}),
+    status: "M",
+    isNew: parsedFile.isNew,
+    isDeleted: parsedFile.isDeleted,
+  };
+  if (truncated) return buildPlaceholderParsedDiffFile(change, { status: "too_large" });
+  if (parsedFile.hunks.length === 0 && /^Binary files .* differ$/m.test(text)) {
+    return buildPlaceholderParsedDiffFile(change, { status: "binary" });
+  }
+  return buildHighlightedTrackedDiffFile({ cwd, change, parsedFile, refsForDiff });
 }
 
 export interface CheckoutShortstat {
@@ -3300,7 +3353,7 @@ interface AppendStructuredTrackedDiffsInput {
   cwd: string;
   trackedChanges: CheckoutFileChange[];
   trackedNumstatByPath: Map<string, FileStat>;
-  trackedPlaceholderByPath: Map<string, { status: "binary" | "too_large"; stat: FileStat }>;
+  trackedPlaceholderByPath: Map<string, TrackedPlaceholder>;
   trackedDiffText: string;
   refsForDiff: CheckoutDiffRefs;
   ignoreWhitespace: boolean;
@@ -3425,10 +3478,7 @@ async function appendStructuredTrackedDiffs(
     for (const change of changes) {
       const placeholder = trackedPlaceholderByPath.get(change.path);
       if (placeholder) {
-        const file = buildPlaceholderParsedDiffFile(change, {
-          status: placeholder.status,
-          stat: placeholder.stat,
-        });
+        const file = buildPlaceholderParsedDiffFile(change, placeholder);
         if (!appendStructuredFile(structured, file)) {
           return false;
         }
@@ -3558,33 +3608,121 @@ interface ProcessTrackedChangesInput {
   refsForDiff: CheckoutDiffRefs;
   trackedChanges: CheckoutFileChange[];
   ignoreWhitespace: boolean;
+  deferLargeFiles: boolean;
   appendDiff: (text: string) => void;
 }
 
 interface ProcessTrackedChangesResult {
   trackedNumstatByPath: Map<string, FileStat>;
-  trackedPlaceholderByPath: Map<string, { status: "binary" | "too_large"; stat: FileStat }>;
+  trackedPlaceholderByPath: Map<string, TrackedPlaceholder>;
   trackedDiffText: string;
+}
+
+interface TrackedPlaceholder {
+  status: "binary" | "too_large";
+  stat: FileStat;
+  deferred?: DeferredDiff;
+}
+
+interface DeferredDiff {
+  file: DeferredDiffFile;
+  targetRef?: string;
+}
+
+// Matches the per-file diff budget: larger files cost more to read and highlight than to defer.
+const DEFERRED_DIFF_FILE_MIN_BYTES = PER_FILE_DIFF_MAX_BYTES;
+
+/**
+ * Finds tracked changes whose old or new file exceeds the deferral size, from object metadata and
+ * working tree stats. Never reads file contents.
+ */
+async function findDeferredTrackedDiffs(input: {
+  cwd: string;
+  changes: CheckoutFileChange[];
+  refs: CheckoutDiffRefs;
+}): Promise<Map<string, DeferredDiff>> {
+  const { cwd, refs } = input;
+  // Batch input is newline-delimited, so such paths cannot be named; they load normally.
+  const changes = input.changes.filter(
+    (change) => !change.path.includes("\n") && !change.oldPath?.includes("\n"),
+  );
+  const specs = changes.flatMap((change) => [
+    ...(change.isNew ? [] : [`${refs.baseRef}:${change.oldPath ?? change.path}`]),
+    ...(refs.targetRef && !change.isDeleted ? [`${refs.targetRef}:${change.path}`] : []),
+  ]);
+  const objects = new Map<string, { id: string; size: number }>();
+  if (specs.length > 0) {
+    const result = await runGitCommand(["cat-file", "--batch-check=%(objectname) %(objectsize)"], {
+      cwd,
+      input: `${specs.join("\n")}\n`,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    // Missing objects print "<spec> missing" and count as absent.
+    result.stdout
+      .trimEnd()
+      .split("\n")
+      .forEach((line, index) => {
+        const [id, size] = line.split(" ");
+        const spec = specs[index];
+        if (spec && id && size && size !== "missing") objects.set(spec, { id, size: Number(size) });
+      });
+  }
+
+  const deferred = new Map<string, DeferredDiff>();
+  for (const change of changes) {
+    const oldObject = change.isNew
+      ? undefined
+      : objects.get(`${refs.baseRef}:${change.oldPath ?? change.path}`);
+    const newSide =
+      refs.targetRef || change.isDeleted
+        ? objects.get(`${refs.targetRef}:${change.path}`)
+        : await statWorkingTreeFile(resolve(cwd, change.path));
+    const size = Math.max(oldObject?.size ?? 0, newSide?.size ?? 0);
+    if (size <= DEFERRED_DIFF_FILE_MIN_BYTES) continue;
+    deferred.set(change.path, {
+      file: {
+        baseRef: refs.baseRef,
+        size,
+        version: `${oldObject?.id ?? "none"}:${newSide?.id ?? "none"}`,
+      },
+      ...(refs.targetRef ? { targetRef: refs.targetRef } : {}),
+    });
+  }
+  return deferred;
+}
+
+async function statWorkingTreeFile(
+  path: string,
+): Promise<{ id: string; size: number } | undefined> {
+  const metadata = await statFile(path).catch(() => null);
+  return metadata?.isFile()
+    ? { id: `${metadata.size}-${metadata.mtimeMs}`, size: metadata.size }
+    : undefined;
 }
 
 async function processTrackedChanges(
   input: ProcessTrackedChangesInput,
 ): Promise<ProcessTrackedChangesResult> {
-  const { cwd, refsForDiff, trackedChanges, ignoreWhitespace, appendDiff } = input;
+  const { cwd, refsForDiff, trackedChanges, ignoreWhitespace, deferLargeFiles, appendDiff } = input;
   const trackedNumstatByPath =
     trackedChanges.length > 0
       ? await getTrackedNumstatByPath(cwd, refsForDiff, ignoreWhitespace)
       : new Map<string, FileStat>();
   const trackedDiffPaths: string[] = [];
-  const trackedPlaceholderByPath = new Map<
-    string,
-    { status: "binary" | "too_large"; stat: FileStat }
-  >();
+  const trackedPlaceholderByPath = new Map<string, TrackedPlaceholder>();
+  const deferredByPath = deferLargeFiles
+    ? await findDeferredTrackedDiffs({ cwd, changes: trackedChanges, refs: refsForDiff })
+    : new Map<string, DeferredDiff>();
 
   for (const change of trackedChanges) {
     const stat = trackedNumstatByPath.get(change.path) ?? null;
     if (stat?.isBinary) {
       trackedPlaceholderByPath.set(change.path, { status: "binary", stat });
+      continue;
+    }
+    const deferred = deferredByPath.get(change.path);
+    if (deferred) {
+      trackedPlaceholderByPath.set(change.path, { status: "too_large", stat, deferred });
       continue;
     }
     trackedDiffPaths.push(change.path);
@@ -3742,6 +3880,7 @@ export async function getCheckoutDiff(
     refsForDiff: effectiveRefsForDiff,
     trackedChanges,
     ignoreWhitespace,
+    deferLargeFiles: compare.includeStructured === true && compare.deferLargeFiles === true,
     appendDiff,
   });
 
