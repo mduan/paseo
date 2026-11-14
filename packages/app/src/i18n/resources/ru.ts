@@ -244,6 +244,8 @@ export const ru: TranslationResources = {
       label: "Предлагаемый шаг",
       send: "Отправить: {{text}}",
       edit: "Изменить: {{text}}",
+      sendButton: "Отправить",
+      editButton: "Изменить",
     },
     empty: "Начните общаться с этим агентом...",
     scrollToBottom: "Прокрутить вниз",

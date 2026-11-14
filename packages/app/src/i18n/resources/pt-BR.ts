@@ -243,6 +243,8 @@ export const ptBR: TranslationResources = {
       label: "Próximo passo sugerido",
       send: "Enviar: {{text}}",
       edit: "Editar: {{text}}",
+      sendButton: "Enviar",
+      editButton: "Editar",
     },
     empty: "Comece a conversar com este agente...",
     scrollToBottom: "Rolar para o fim",

@@ -242,6 +242,8 @@ export const zhCN: TranslationResources = {
       label: "建议的下一步",
       send: "发送：{{text}}",
       edit: "编辑：{{text}}",
+      sendButton: "发送",
+      editButton: "编辑",
     },
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",

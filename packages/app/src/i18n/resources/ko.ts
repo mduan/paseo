@@ -242,6 +242,8 @@ export const ko: TranslationResources = {
       label: "추천 다음 단계",
       send: "보내기: {{text}}",
       edit: "편집: {{text}}",
+      sendButton: "보내기",
+      editButton: "편집",
     },
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
