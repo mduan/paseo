@@ -246,8 +246,6 @@ export const fr: TranslationResources = {
       label: "Suite suggérée",
       send: "Envoyer : {{text}}",
       edit: "Modifier : {{text}}",
-      sendButton: "Envoyer",
-      editButton: "Modifier",
     },
     empty: "Commencez à discuter avec cet agent...",
     scrollToBottom: "Faire défiler vers le bas",

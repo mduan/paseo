@@ -238,8 +238,6 @@ export const en = {
       label: "Suggested next",
       send: "Send: {{text}}",
       edit: "Edit: {{text}}",
-      sendButton: "Send",
-      editButton: "Edit",
     },
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",

@@ -242,8 +242,6 @@ export const ar: TranslationResources = {
       label: "الخطوة التالية المقترحة",
       send: "إرسال: {{text}}",
       edit: "تعديل: {{text}}",
-      sendButton: "إرسال",
-      editButton: "تعديل",
     },
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",

@@ -244,8 +244,6 @@ export const ja: TranslationResources = {
       label: "次の候補",
       send: "送信: {{text}}",
       edit: "編集: {{text}}",
-      sendButton: "送信",
-      editButton: "編集",
     },
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",

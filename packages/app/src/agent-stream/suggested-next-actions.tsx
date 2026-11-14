@@ -1,18 +1,30 @@
-import { memo, useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { memo, useCallback } from "react";
+import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ArrowUp, Pencil } from "lucide-react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ToastApi } from "@/components/toast-host";
-import { Button } from "@/components/ui/button";
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { isNative } from "@/constants/platform";
 import { dispatchComposerAgentMessage } from "@/composer/actions";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { encodeImages } from "@/utils/encode-images";
+import type { Theme } from "@/styles/theme";
 
-/** Follow-up messages under the last completed turn. Each row can be sent now or edited in the composer first. */
+const ThemedArrowUp = withUnistyles(ArrowUp);
+const ThemedPencil = withUnistyles(Pencil);
+const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+
+type PressableState = PressableStateCallbackType & { hovered?: boolean };
+
+function chipSendStyle({ hovered, pressed }: PressableState) {
+  return [styles.chipSend, (hovered || pressed) && styles.highlighted];
+}
+
+function chipEditStyle({ hovered, pressed }: PressableState) {
+  return [styles.chipEdit, (hovered || pressed) && styles.highlighted];
+}
+
+/** Follow-up messages under the last completed turn: the chip sends, the pencil edits first. */
 export const SuggestedNextActions = memo(function SuggestedNextActions({
   serverId,
   agentId,
@@ -47,18 +59,14 @@ export const SuggestedNextActions = memo(function SuggestedNextActions({
   return (
     <View style={styles.container} testID="suggested-next-actions">
       <Text style={styles.label}>{t("agentStream.suggestedNextActions.label")}</Text>
-      <View style={styles.card}>
-        {suggestions.map((suggestion, index) => (
-          <View key={suggestion} style={index > 0 && styles.rowDivider}>
-            <SuggestionRow text={suggestion} onSend={send} onEdit={onEdit} />
-          </View>
-        ))}
-      </View>
+      {suggestions.map((suggestion) => (
+        <SuggestionChip key={suggestion} text={suggestion} onSend={send} onEdit={onEdit} />
+      ))}
     </View>
   );
 });
 
-function SuggestionRow({
+function SuggestionChip({
   text,
   onSend,
   onEdit,
@@ -68,114 +76,77 @@ function SuggestionRow({
   onEdit: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const isCompact = useIsCompactFormFactor();
-  const [isHovered, setIsHovered] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const handleSend = useCallback(() => onSend(text), [onSend, text]);
   const handleEdit = useCallback(() => onEdit(text), [onEdit, text]);
-  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
-  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
-  const handleFocus = useCallback(() => setIsFocused(true), []);
-  const handleBlur = useCallback(() => setIsFocused(false), []);
-  const showActions = isHovered || isFocused || isNative || isCompact;
   return (
-    <View
-      style={styles.rowHoverTarget}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-    >
-      <View style={[styles.row, isCompact && styles.rowCompact, isHovered && styles.highlighted]}>
-        <Text
-          style={[styles.rowText, isCompact && styles.rowTextCompact]}
-          numberOfLines={isCompact ? undefined : 1}
-        >
+    <View style={styles.chip}>
+      <Pressable
+        style={chipSendStyle}
+        onPress={handleSend}
+        accessibilityRole="button"
+        accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
+      >
+        <ThemedArrowUp size={14} uniProps={mutedColorMapping} />
+        <Text style={styles.chipText} numberOfLines={1}>
           {text}
         </Text>
-        <View
-          style={[styles.rowActions, !showActions && styles.hidden]}
-          pointerEvents={showActions ? "auto" : "none"}
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={Pencil}
-            onPress={handleEdit}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            accessibilityLabel={t("agentStream.suggestedNextActions.edit", { text })}
-          >
-            {t("agentStream.suggestedNextActions.editButton")}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={ArrowUp}
-            onPress={handleSend}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            accessibilityLabel={t("agentStream.suggestedNextActions.send", { text })}
-          >
-            {t("agentStream.suggestedNextActions.sendButton")}
-          </Button>
-        </View>
-      </View>
+      </Pressable>
+      <View style={styles.chipSeparator} />
+      <Pressable
+        style={chipEditStyle}
+        onPress={handleEdit}
+        accessibilityRole="button"
+        accessibilityLabel={t("agentStream.suggestedNextActions.edit", { text })}
+      >
+        <ThemedPencil size={14} uniProps={mutedColorMapping} />
+      </Pressable>
     </View>
   );
 }
 
-const ROW_MIN_HEIGHT = 44;
+const CHIP_HEIGHT = 32;
 
 const styles = StyleSheet.create((theme) => ({
   container: {
     marginTop: theme.spacing[4],
     gap: theme.spacing[2],
+    alignItems: "flex-start",
   },
   label: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
   },
-  card: {
+  chip: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    maxWidth: "100%",
+    minHeight: CHIP_HEIGHT,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
-    borderRadius: theme.borderRadius.xl,
+    borderRadius: theme.borderRadius["2xl"],
     overflow: "hidden",
   },
-  rowHoverTarget: {
-    position: "relative",
-  },
-  rowDivider: {
-    borderTopWidth: theme.borderWidth[1],
-    borderTopColor: theme.colors.borderAccent,
-  },
-  row: {
+  chipSend: {
+    flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    minHeight: ROW_MIN_HEIGHT,
-    paddingVertical: theme.spacing[1],
     paddingLeft: theme.spacing[3],
-    paddingRight: theme.spacing[1],
+    paddingRight: theme.spacing[2],
   },
-  rowCompact: {
-    flexWrap: "wrap",
-    paddingVertical: theme.spacing[2],
-  },
-  rowText: {
-    flex: 1,
-    minWidth: 0,
+  chipText: {
+    flexShrink: 1,
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
   },
-  rowTextCompact: {
-    flexBasis: "100%",
+  chipSeparator: {
+    width: theme.borderWidth[1],
+    backgroundColor: theme.colors.borderAccent,
   },
-  rowActions: {
-    flexDirection: "row",
-    gap: theme.spacing[1],
-    marginLeft: "auto",
-  },
-  hidden: {
-    opacity: 0,
+  chipEdit: {
+    width: CHIP_HEIGHT + 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   highlighted: {
     backgroundColor: theme.colors.interactionHighlight,
