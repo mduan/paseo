@@ -16,8 +16,10 @@ import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ExternalLink } from "@/components/ui/external-link";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Switch } from "@/components/ui/switch";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
+import { useHostFeature } from "@/runtime/host-features";
 import { buildSelectableProviderSelectorProviders } from "@/provider-selection/provider-selection";
 import {
   resolveDefaultModel,
@@ -28,7 +30,6 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { settingsStyles } from "@/styles/settings";
 
 const METADATA_GENERATION_DOCS_URL = "https://paseo.sh/docs/metadata-generation";
-type SelectionMode = "automatic" | "preferred";
 type MetadataGenerationProvider = MutableDaemonConfig["metadataGeneration"]["providers"][number];
 // oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
 type MetadataEffortOptionProps = {
@@ -53,9 +54,16 @@ type MetadataEffortRowProps = {
   entries?: ProviderSnapshotEntry[];
   disabled: boolean;
   onSelect: (thinkingOptionId: string) => void;
+  testID: string;
 };
 
-function MetadataEffortRow({ provider, entries, disabled, onSelect }: MetadataEffortRowProps) {
+function MetadataEffortRow({
+  provider,
+  entries,
+  disabled,
+  onSelect,
+  testID,
+}: MetadataEffortRowProps) {
   const { t } = useTranslation();
   const models = entries?.find((entry) => entry.provider === provider.provider)?.models ?? [];
   const model = provider.model
@@ -75,7 +83,7 @@ function MetadataEffortRow({ provider, entries, disabled, onSelect }: MetadataEf
           accessibilityRole="button"
           accessibilityLabel={t("agentControls.thinking.select")}
           disabled={disabled}
-          testID="metadata-generation-effort"
+          testID={testID}
         >
           {selectedOption
             ? formatThinkingOptionLabel(selectedOption)
@@ -97,69 +105,59 @@ function MetadataEffortRow({ provider, entries, disabled, onSelect }: MetadataEf
   );
 }
 
-export function MetadataGenerationPage({ serverId }: { serverId: string }) {
-  const { t } = useTranslation();
-  const { config, isLoading: isConfigLoading, patchConfig } = useDaemonConfig(serverId);
-  const snapshot = useProvidersSnapshot(serverId);
-  const providers = useMemo(
-    () => buildSelectableProviderSelectorProviders(snapshot.entries),
-    [snapshot.entries],
-  );
-  const configuredProviders = config?.metadataGeneration.providers;
+type ModelProviders = MutableDaemonConfig["metadataGeneration"]["providers"];
+type ProvidersSnapshot = ReturnType<typeof useProvidersSnapshot>;
+
+/**
+ * Selection state for an ordered provider list where an empty list means "use the default".
+ * Both the metadata model and the suggestion model are saved this way.
+ */
+function useModelPreference({
+  configuredProviders,
+  snapshot,
+  save,
+}: {
+  configuredProviders: ModelProviders | undefined;
+  snapshot: ProvidersSnapshot;
+  save: (providers: ModelProviders) => Promise<unknown>;
+}) {
   const configuredProvider = configuredProviders?.[0];
-  const savedMode: SelectionMode = configuredProvider ? "preferred" : "automatic";
-  const [draftMode, setDraftMode] = useState<SelectionMode | null>(null);
+  const [draftManual, setDraftManual] = useState<boolean>();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
-  const mode = draftMode ?? savedMode;
+  const isManual = draftManual ?? Boolean(configuredProvider);
 
   useEffect(() => {
-    setDraftMode(null);
+    setDraftManual(undefined);
   }, [configuredProvider?.model, configuredProvider?.provider]);
 
-  const modeOptions = useMemo(
-    () => [
-      {
-        value: "automatic" as const,
-        label: t("settings.metadataGeneration.automatic"),
-        disabled: isSaving,
-      },
-      {
-        value: "preferred" as const,
-        label: t("settings.metadataGeneration.preferred"),
-        disabled: isSaving,
-      },
-    ],
-    [isSaving, t],
-  );
+  const run = useCallback(async (task: () => Promise<unknown>) => {
+    setIsSaving(true);
+    setSaveError(undefined);
+    try {
+      await task();
+    } catch (error) {
+      setDraftManual(undefined);
+      setSaveError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
 
   const saveProviders = useCallback(
-    async (providersPatch: MutableDaemonConfig["metadataGeneration"]["providers"]) => {
-      setIsSaving(true);
-      setSaveError(undefined);
-      try {
-        await patchConfig({ metadataGeneration: { providers: providersPatch } });
-      } catch (error) {
-        setDraftMode(null);
-        setSaveError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [patchConfig],
+    (providers: ModelProviders) => run(() => save(providers)),
+    [run, save],
   );
 
-  const handleModeChange = useCallback(
-    (next: SelectionMode) => {
-      setDraftMode(next);
-      if (next === "automatic") {
-        void saveProviders([]);
-      }
+  const setManual = useCallback(
+    (next: boolean) => {
+      setDraftManual(next);
+      if (!next) void saveProviders([]);
     },
     [saveProviders],
   );
 
-  const handleModelSelect = useCallback(
+  const selectModel = useCallback(
     (provider: AgentProvider, model: string) => {
       const models = snapshot.entries?.find((entry) => entry.provider === provider)?.models ?? [];
       const isSameModel =
@@ -169,7 +167,7 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
         modelId: model,
         requestedThinkingOptionId: isSameModel ? (configuredProvider.thinkingOptionId ?? "") : "",
       });
-      setDraftMode("preferred");
+      setDraftManual(true);
       void saveProviders([
         {
           provider,
@@ -182,7 +180,7 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
     [configuredProvider, configuredProviders, saveProviders, snapshot.entries],
   );
 
-  const handleThinkingSelect = useCallback(
+  const selectThinking = useCallback(
     (thinkingOptionId: string) => {
       if (!configuredProvider) return;
       void saveProviders([
@@ -193,12 +191,190 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
     [configuredProvider, configuredProviders, saveProviders],
   );
 
+  return {
+    configuredProvider,
+    isManual,
+    isSaving,
+    saveError,
+    run,
+    setManual,
+    selectModel,
+    selectThinking,
+  };
+}
+
+type ModelPreference = ReturnType<typeof useModelPreference>;
+
+/** The selection, model, and effort rows of a model preference card. */
+function ModelPreferenceRows({
+  serverId,
+  snapshot,
+  preference,
+  labels,
+  bordered,
+  testID,
+}: {
+  serverId: string;
+  snapshot: ProvidersSnapshot;
+  preference: ModelPreference;
+  labels: {
+    defaultMode: string;
+    defaultHint: string;
+    manualHint: string;
+    fallbackHint: string;
+  };
+  bordered: boolean;
+  testID: string;
+}) {
+  const { t } = useTranslation();
+  const { configuredProvider, isManual, isSaving, setManual, selectModel, selectThinking } =
+    preference;
+  const selectorProviders = useMemo(
+    () => buildSelectableProviderSelectorProviders(snapshot.entries),
+    [snapshot.entries],
+  );
+  const modeOptions = useMemo(
+    () => [
+      { value: "default" as const, label: labels.defaultMode, disabled: isSaving },
+      {
+        value: "manual" as const,
+        label: t("settings.metadataGeneration.preferred"),
+        disabled: isSaving,
+      },
+    ],
+    [isSaving, labels.defaultMode, t],
+  );
+  const handleModeChange = useCallback(
+    (next: "default" | "manual") => setManual(next === "manual"),
+    [setManual],
+  );
   const handleSelectorOpen = useCallback(() => {
     snapshot.refetchIfStale(configuredProvider?.provider);
   }, [configuredProvider?.provider, snapshot]);
   const handleRetryProvider = useCallback(
     (provider: AgentProvider) => snapshot.refresh([provider]),
     [snapshot],
+  );
+
+  return (
+    <>
+      <View style={bordered ? [settingsStyles.row, settingsStyles.rowBorder] : settingsStyles.row}>
+        <View style={settingsStyles.rowContent}>
+          <Text style={settingsStyles.rowTitle}>{t("settings.metadataGeneration.selection")}</Text>
+          <Text style={settingsStyles.rowHint}>
+            {isManual ? labels.manualHint : labels.defaultHint}
+          </Text>
+        </View>
+        <SegmentedControl
+          options={modeOptions}
+          value={isManual ? "manual" : "default"}
+          onValueChange={handleModeChange}
+          size="sm"
+          testID={`${testID}-mode`}
+        />
+      </View>
+      {isManual ? (
+        <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+          <View style={settingsStyles.rowContent}>
+            <Text style={settingsStyles.rowTitle}>{t("settings.metadataGeneration.model")}</Text>
+            <Text style={settingsStyles.rowHint}>{labels.fallbackHint}</Text>
+          </View>
+          <CombinedModelSelector
+            providers={selectorProviders}
+            selectedProvider={configuredProvider?.provider ?? ""}
+            selectedModel={configuredProvider?.model ?? ""}
+            onSelect={selectModel}
+            isLoading={snapshot.isLoading || snapshot.isFetching}
+            onOpen={handleSelectorOpen}
+            onRetryProvider={handleRetryProvider}
+            isRetryingProvider={snapshot.isRefreshing}
+            disabled={isSaving}
+            serverId={serverId}
+            desktopPlacement="bottom-start"
+            desktopMinWidth={360}
+          />
+        </View>
+      ) : null}
+      {isManual && configuredProvider ? (
+        <MetadataEffortRow
+          provider={configuredProvider}
+          entries={snapshot.entries}
+          disabled={isSaving}
+          onSelect={selectThinking}
+          testID={`${testID}-effort`}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function SaveErrorAlert({ error }: { error: string | undefined }) {
+  const { t } = useTranslation();
+  if (!error) return null;
+  return (
+    <Alert variant="error" title={t("settings.metadataGeneration.saveError")} description={error} />
+  );
+}
+
+export function MetadataGenerationPage({ serverId }: { serverId: string }) {
+  const { config, isLoading: isConfigLoading, patchConfig } = useDaemonConfig(serverId);
+  const snapshot = useProvidersSnapshot(serverId);
+  const supportsSuggestions = useHostFeature(serverId, "suggestedNextActions");
+
+  if (isConfigLoading || !config) {
+    return (
+      <View style={styles.loading}>
+        <LoadingSpinner size="large" color={styles.spinnerColor.color} />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <MetadataGenerationSection
+        serverId={serverId}
+        config={config}
+        patchConfig={patchConfig}
+        snapshot={snapshot}
+      />
+      {supportsSuggestions ? (
+        <SuggestedNextActionsSection
+          serverId={serverId}
+          config={config}
+          patchConfig={patchConfig}
+          snapshot={snapshot}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+interface SectionProps {
+  serverId: string;
+  config: MutableDaemonConfig;
+  patchConfig: ReturnType<typeof useDaemonConfig>["patchConfig"];
+  snapshot: ProvidersSnapshot;
+}
+
+function MetadataGenerationSection({ serverId, config, patchConfig, snapshot }: SectionProps) {
+  const { t } = useTranslation();
+  const save = useCallback(
+    (providers: ModelProviders) => patchConfig({ metadataGeneration: { providers } }),
+    [patchConfig],
+  );
+  const preference = useModelPreference({
+    configuredProviders: config.metadataGeneration.providers,
+    snapshot,
+    save,
+  });
+  const labels = useMemo(
+    () => ({
+      defaultMode: t("settings.metadataGeneration.automatic"),
+      defaultHint: t("settings.metadataGeneration.automaticHint"),
+      manualHint: t("settings.metadataGeneration.preferredHint"),
+      fallbackHint: t("settings.metadataGeneration.fallbackHint"),
+    }),
+    [t],
   );
   const docsLink = useMemo(
     () => (
@@ -210,14 +386,6 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
     [t],
   );
 
-  if (isConfigLoading || !config) {
-    return (
-      <View style={styles.loading}>
-        <LoadingSpinner size="large" color={styles.spinnerColor.color} />
-      </View>
-    );
-  }
-
   return (
     <SettingsSection
       title={t("settings.metadataGeneration.title")}
@@ -225,63 +393,84 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
       trailing={docsLink}
       testID="metadata-generation-settings"
     >
-      {saveError ? (
-        <Alert
-          variant="error"
-          title={t("settings.metadataGeneration.saveError")}
-          description={saveError}
+      <SaveErrorAlert error={preference.saveError} />
+      <View style={settingsStyles.card}>
+        <ModelPreferenceRows
+          serverId={serverId}
+          snapshot={snapshot}
+          preference={preference}
+          labels={labels}
+          bordered={false}
+          testID="metadata-generation"
         />
-      ) : null}
+      </View>
+    </SettingsSection>
+  );
+}
+
+function SuggestedNextActionsSection({ serverId, config, patchConfig, snapshot }: SectionProps) {
+  const { t } = useTranslation();
+  const suggested = config.metadataGeneration.suggestedNextActions;
+  const enabled = suggested?.enabled === true;
+  const save = useCallback(
+    (providers: ModelProviders) =>
+      patchConfig({ metadataGeneration: { suggestedNextActions: { providers } } }),
+    [patchConfig],
+  );
+  const preference = useModelPreference({
+    configuredProviders: suggested?.providers,
+    snapshot,
+    save,
+  });
+  const { run } = preference;
+  const handleEnabledChange = useCallback(
+    (next: boolean) =>
+      void run(() =>
+        patchConfig({ metadataGeneration: { suggestedNextActions: { enabled: next } } }),
+      ),
+    [patchConfig, run],
+  );
+  const labels = useMemo(
+    () => ({
+      defaultMode: t("settings.suggestedNextActions.sameAsMetadata"),
+      defaultHint: t("settings.suggestedNextActions.sameAsMetadataHint"),
+      manualHint: t("settings.suggestedNextActions.manualHint"),
+      fallbackHint: t("settings.suggestedNextActions.fallbackHint"),
+    }),
+    [t],
+  );
+
+  return (
+    <SettingsSection
+      title={t("settings.suggestedNextActions.title")}
+      info={t("settings.suggestedNextActions.description")}
+      testID="suggested-next-actions-settings"
+    >
+      <SaveErrorAlert error={preference.saveError} />
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
-              {t("settings.metadataGeneration.selection")}
-            </Text>
+            <Text style={settingsStyles.rowTitle}>{t("settings.suggestedNextActions.enable")}</Text>
             <Text style={settingsStyles.rowHint}>
-              {mode === "automatic"
-                ? t("settings.metadataGeneration.automaticHint")
-                : t("settings.metadataGeneration.preferredHint")}
+              {t("settings.suggestedNextActions.enableHint")}
             </Text>
           </View>
-          <SegmentedControl
-            options={modeOptions}
-            value={mode}
-            onValueChange={handleModeChange}
-            size="sm"
-            testID="metadata-generation-mode"
+          <Switch
+            value={enabled}
+            onValueChange={handleEnabledChange}
+            disabled={preference.isSaving}
+            accessibilityLabel={t("settings.suggestedNextActions.enable")}
+            testID="suggested-next-actions-switch"
           />
         </View>
-        {mode === "preferred" ? (
-          <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
-            <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{t("settings.metadataGeneration.model")}</Text>
-              <Text style={settingsStyles.rowHint}>
-                {t("settings.metadataGeneration.fallbackHint")}
-              </Text>
-            </View>
-            <CombinedModelSelector
-              providers={providers}
-              selectedProvider={configuredProvider?.provider ?? ""}
-              selectedModel={configuredProvider?.model ?? ""}
-              onSelect={handleModelSelect}
-              isLoading={snapshot.isLoading || snapshot.isFetching}
-              onOpen={handleSelectorOpen}
-              onRetryProvider={handleRetryProvider}
-              isRetryingProvider={snapshot.isRefreshing}
-              disabled={isSaving}
-              serverId={serverId}
-              desktopPlacement="bottom-start"
-              desktopMinWidth={360}
-            />
-          </View>
-        ) : null}
-        {mode === "preferred" && configuredProvider ? (
-          <MetadataEffortRow
-            provider={configuredProvider}
-            entries={snapshot.entries}
-            disabled={isSaving}
-            onSelect={handleThinkingSelect}
+        {enabled ? (
+          <ModelPreferenceRows
+            serverId={serverId}
+            snapshot={snapshot}
+            preference={preference}
+            labels={labels}
+            bordered
+            testID="suggested-next-actions"
           />
         ) : null}
       </View>

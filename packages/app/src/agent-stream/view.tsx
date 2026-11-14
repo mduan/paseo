@@ -332,6 +332,8 @@ export interface AgentStreamViewProps {
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
   onOpenTurnDiff?: (input: OpenTurnDiffInput) => void;
   readOnly?: boolean;
+  /** Rendered under the last turn's footer while no turn is running. */
+  tailAccessory?: ReactNode;
   historyPagination?: {
     hasOlder: boolean;
     isLoadingOlder: boolean;
@@ -393,6 +395,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       onOpenWorkspaceFile,
       onOpenTurnDiff,
       readOnly = false,
+      tailAccessory,
       historyPagination,
     },
     ref,
@@ -1032,13 +1035,14 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         }),
       [client, pendingPermissionItems, resolvedServerId, context],
     );
-    const turnFooterNode = useMemo(
-      () =>
-        isTurnActive || bottomTurnFooterHost ? (
-          <>
-            {!isTurnActive && bottomTurnFooterHost ? (
-              <TurnDiffCardSlot itemId={bottomTurnFooterHost.itemId} />
-            ) : null}
+    const turnFooterNode = useMemo(() => {
+      const visibleTailAccessory = isTurnActive ? null : tailAccessory;
+      return isTurnActive || bottomTurnFooterHost || visibleTailAccessory ? (
+        <>
+          {!isTurnActive && bottomTurnFooterHost ? (
+            <TurnDiffCardSlot itemId={bottomTurnFooterHost.itemId} />
+          ) : null}
+          {isTurnActive || bottomTurnFooterHost ? (
             <TurnFooter
               isRunning={isTurnActive}
               inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
@@ -1048,19 +1052,25 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
               onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
             />
-          </>
-        ) : null,
-      [
-        handleForkAssistantTurn,
-        handleForkInFlightTurn,
-        readOnly,
-        isTurnActive,
-        baseRenderModel.turnTiming.runningStartedAt,
-        bottomTurnFooterHost,
-        streamRenderStrategy,
-        supportsAgentForkContextCursor,
-      ],
-    );
+          ) : null}
+          {visibleTailAccessory ? (
+            <View style={stylesheet.contentWrapper}>
+              <View style={stylesheet.listHeaderContent}>{visibleTailAccessory}</View>
+            </View>
+          ) : null}
+        </>
+      ) : null;
+    }, [
+      tailAccessory,
+      handleForkAssistantTurn,
+      handleForkInFlightTurn,
+      readOnly,
+      isTurnActive,
+      baseRenderModel.turnTiming.runningStartedAt,
+      bottomTurnFooterHost,
+      streamRenderStrategy,
+      supportsAgentForkContextCursor,
+    ]);
     const renderModel = useMemo<AgentStreamRenderModel>(() => {
       return {
         ...baseRenderModel,
@@ -1391,6 +1401,7 @@ function agentStreamViewPropsEqual(
   if (left.onOpenWorkspaceFile !== right.onOpenWorkspaceFile) reasons.push("onOpenWorkspaceFile");
   if (left.onOpenTurnDiff !== right.onOpenTurnDiff) reasons.push("onOpenTurnDiff");
   if (left.readOnly !== right.readOnly) reasons.push("readOnly");
+  if (left.tailAccessory !== right.tailAccessory) reasons.push("tailAccessory");
   if (!historyPaginationPropsEqual(left.historyPagination, right.historyPagination)) {
     reasons.push("historyPagination");
   }

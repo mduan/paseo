@@ -242,6 +242,15 @@ export const fr: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "Suite suggérée",
+      options: "Options des suggestions",
+      turnOff: "Désactiver les suggestions",
+      settings: "Paramètres des suggestions…",
+      turnedOff: "Les suggestions sont désactivées pour cet hôte",
+      send: "Envoyer : {{text}}",
+      edit: "Modifier : {{text}}",
+    },
     empty: "Commencez à discuter avec cet agent...",
     scrollToBottom: "Faire défiler vers le bas",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
@@ -2319,6 +2328,18 @@ export const fr: TranslationResources = {
       fallbackHint: "S’il est indisponible, Paseo utilise un autre modèle disponible",
       docs: "Documentation",
       saveError: "Impossible de mettre à jour la génération de métadonnées",
+    },
+    suggestedNextActions: {
+      title: "Actions suivantes suggérées",
+      description: "Affiche des messages de suivi suggérés sous la dernière réponse de l'agent",
+      enable: "Suggérer les actions suivantes",
+      enableHint:
+        "Quand un agent termine un tour, suggère jusqu'à 3 messages de suivi. Utilise un appel de modèle supplémentaire par tour sur cet hôte.",
+      sameAsMetadata: "Comme les métadonnées",
+      sameAsMetadataHint: "Utilise le modèle de génération des métadonnées",
+      manualHint: "Choisissez le modèle utilisé uniquement pour les suggestions",
+      fallbackHint:
+        "S'il n'est pas disponible, Paseo utilise le modèle de génération des métadonnées",
     },
     general: {
       title: "Général",

@@ -238,6 +238,15 @@ export const ko: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "추천 다음 단계",
+      options: "추천 옵션",
+      turnOff: "추천 끄기",
+      settings: "추천 설정…",
+      turnedOff: "이 호스트에서 추천이 꺼져 있습니다",
+      send: "보내기: {{text}}",
+      edit: "편집: {{text}}",
+    },
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
@@ -2274,6 +2283,17 @@ export const ko: TranslationResources = {
       fallbackHint: "사용할 수 없으면 Paseo가 다른 사용 가능한 모델을 사용합니다",
       docs: "문서",
       saveError: "메타데이터 생성을 업데이트할 수 없습니다",
+    },
+    suggestedNextActions: {
+      title: "추천 다음 작업",
+      description: "에이전트의 마지막 답변 아래에 추천 후속 메시지를 표시합니다",
+      enable: "다음 작업 추천",
+      enableHint:
+        "에이전트가 턴을 마치면 후속 메시지를 최대 3개 추천합니다. 이 호스트에서 턴마다 모델 호출이 한 번 더 발생합니다.",
+      sameAsMetadata: "메타데이터와 동일",
+      sameAsMetadataHint: "메타데이터 생성 모델을 사용합니다",
+      manualHint: "추천에만 사용할 모델을 선택합니다",
+      fallbackHint: "사용할 수 없으면 Paseo가 메타데이터 생성 모델을 사용합니다",
     },
     general: {
       title: "일반",

@@ -234,6 +234,15 @@ export const en = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "Suggested next",
+      options: "Suggestion options",
+      turnOff: "Turn off suggestions",
+      settings: "Suggestion settings…",
+      turnedOff: "Suggestions are off for this host",
+      send: "Send: {{text}}",
+      edit: "Edit: {{text}}",
+    },
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
     historyLoadFailed: "Couldn't load agent history",
@@ -2432,6 +2441,17 @@ export const en = {
       fallbackHint: "If it is unavailable, Paseo falls back to another available model",
       docs: "Docs",
       saveError: "Unable to update metadata generation",
+    },
+    suggestedNextActions: {
+      title: "Suggested next actions",
+      description: "Show suggested follow-up messages under the agent's last reply",
+      enable: "Suggest next actions",
+      enableHint:
+        "After an agent finishes a turn, suggest up to 3 follow-up messages. Uses one extra model call per turn on this host.",
+      sameAsMetadata: "Same as metadata",
+      sameAsMetadataHint: "Uses the Metadata generation model",
+      manualHint: "Choose the model for suggestions only",
+      fallbackHint: "If it is unavailable, Paseo uses the Metadata generation model",
     },
     general: {
       title: "General",

@@ -240,6 +240,15 @@ export const ja: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "次の候補",
+      options: "候補のオプション",
+      turnOff: "候補をオフにする",
+      settings: "候補の設定…",
+      turnedOff: "このホストでは候補がオフになっています",
+      send: "送信: {{text}}",
+      edit: "編集: {{text}}",
+    },
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
@@ -2285,6 +2294,17 @@ export const ja: TranslationResources = {
       fallbackHint: "利用できない場合、Paseo は別の利用可能なモデルを使用します",
       docs: "ドキュメント",
       saveError: "メタデータ生成を更新できません",
+    },
+    suggestedNextActions: {
+      title: "次のアクションの候補",
+      description: "エージェントの最後の返信の下に、フォローアップメッセージの候補を表示します",
+      enable: "次のアクションを提案",
+      enableHint:
+        "エージェントがターンを終えると、フォローアップメッセージを最大3件提案します。このホストでターンごとにモデル呼び出しが1回増えます。",
+      sameAsMetadata: "メタデータと同じ",
+      sameAsMetadataHint: "メタデータ生成のモデルを使用します",
+      manualHint: "候補専用のモデルを選択します",
+      fallbackHint: "利用できない場合、Paseo はメタデータ生成のモデルを使用します",
     },
     general: {
       title: "一般",

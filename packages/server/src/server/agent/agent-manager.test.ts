@@ -7924,6 +7924,26 @@ test("runAgent assembles finalText from trailing assistant chunks", async () => 
   );
 });
 
+test("suggested next actions show while idle and clear when the next turn ends", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-suggestions-"));
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000141",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  await manager.runAgent(snapshot.id, "say hello");
+  manager.setSuggestedNextActions(snapshot.id, ["Commit these changes"]);
+  expect(manager.getAgent(snapshot.id)?.suggestedNextActions).toEqual(["Commit these changes"]);
+
+  await manager.runAgent(snapshot.id, "say hello again");
+  expect(manager.getAgent(snapshot.id)?.suggestedNextActions).toBeUndefined();
+});
+
 test("listAgents excludes internal agents", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");

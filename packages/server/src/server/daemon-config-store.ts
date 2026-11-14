@@ -15,6 +15,8 @@ export type { MutableDaemonConfig, MutableDaemonConfigPatch } from "@getpaseo/pr
 type MutableDaemonConfig = import("@getpaseo/protocol/messages").MutableDaemonConfig;
 type MutableDaemonConfigPatch = import("@getpaseo/protocol/messages").MutableDaemonConfigPatch;
 type ProviderOverride = import("./agent/provider-launch-config.js").ProviderOverride;
+type StructuredGenerationProviders = MutableDaemonConfig["metadataGeneration"]["providers"];
+type PersistedMetadataGeneration = NonNullable<PersistedConfig["agents"]>["metadataGeneration"];
 
 interface SupportedMutableConfigPatch {
   relay?: { enabled?: boolean };
@@ -22,7 +24,10 @@ interface SupportedMutableConfigPatch {
   browserTools?: { enabled?: boolean };
   providers?: MutableDaemonConfig["providers"];
   removeProviders?: string[];
-  metadataGeneration?: MutableDaemonConfig["metadataGeneration"];
+  metadataGeneration?: {
+    providers?: StructuredGenerationProviders;
+    suggestedNextActions?: { enabled?: boolean; providers?: StructuredGenerationProviders };
+  };
   autoArchiveAfterMerge?: boolean;
   enableTerminalAgentHooks?: boolean;
   appendSystemPrompt?: string;
@@ -118,28 +123,30 @@ function omitProvidersFromConfig<T extends { providers?: Record<string, unknown>
   return changed ? ({ ...config, providers: nextProviders } as T) : config;
 }
 
-function omitMetadataGenerationProvidersFromConfig<
-  T extends { metadataGeneration?: { providers?: Array<{ provider?: unknown }> } },
->(config: T, providers: readonly string[]): T {
-  if (providers.length === 0 || !config.metadataGeneration?.providers) {
-    return config;
-  }
-
+function omitMetadataGenerationProvidersFromConfig(
+  config: MutableDaemonConfig,
+  providers: readonly string[],
+): MutableDaemonConfig {
+  if (providers.length === 0) return config;
   const removedProviderIds = new Set(providers);
-  const nextProviders = config.metadataGeneration.providers.filter((entry) => {
-    return typeof entry.provider !== "string" || !removedProviderIds.has(entry.provider);
-  });
-  if (nextProviders.length === config.metadataGeneration.providers.length) {
-    return config;
-  }
-
+  const keep = (entries: StructuredGenerationProviders) =>
+    entries.filter((entry) => !removedProviderIds.has(entry.provider));
+  const { providers: metadataProviders, suggestedNextActions } = config.metadataGeneration;
   return {
     ...config,
     metadataGeneration: {
       ...config.metadataGeneration,
-      providers: nextProviders,
+      providers: keep(metadataProviders),
+      ...(suggestedNextActions?.providers
+        ? {
+            suggestedNextActions: {
+              ...suggestedNextActions,
+              providers: keep(suggestedNextActions.providers),
+            },
+          }
+        : {}),
     },
-  } as T;
+  };
 }
 
 function omitProvidersFromOverrides(
@@ -260,9 +267,7 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
       : {}),
     ...(patch.providers !== undefined ? { providers: patch.providers } : {}),
     ...(patch.removeProviders !== undefined ? { removeProviders: patch.removeProviders } : {}),
-    ...(patch.metadataGeneration?.providers !== undefined
-      ? { metadataGeneration: { providers: patch.metadataGeneration.providers } }
-      : {}),
+    ...(patch.metadataGeneration ? pickMetadataGenerationPatch(patch.metadataGeneration) : {}),
     ...(patch.autoArchiveAfterMerge !== undefined
       ? { autoArchiveAfterMerge: patch.autoArchiveAfterMerge }
       : {}),
@@ -593,6 +598,47 @@ function mergeMutablePatchIntoPersistedConfig(params: {
   } as PersistedConfig;
 }
 
+function pickMetadataGenerationPatch(
+  patch: NonNullable<MutableDaemonConfigPatch["metadataGeneration"]>,
+): Pick<SupportedMutableConfigPatch, "metadataGeneration"> {
+  const suggested = patch.suggestedNextActions;
+  const metadataGeneration = withoutUndefined({
+    providers: patch.providers,
+    suggestedNextActions: suggested
+      ? withoutUndefined({ enabled: suggested.enabled, providers: suggested.providers })
+      : undefined,
+  });
+  return Object.keys(metadataGeneration).length > 0 ? { metadataGeneration } : {};
+}
+
+/** Applies a patch field by field so saving one setting never resets its siblings. */
+function mergePersistedMetadataGeneration(
+  persisted: PersistedMetadataGeneration,
+  patch: SupportedMutableConfigPatch["metadataGeneration"],
+  removeProviders: readonly string[],
+): PersistedMetadataGeneration {
+  const removed = new Set(removeProviders);
+  const keep = (entries: StructuredGenerationProviders | undefined) =>
+    entries?.filter((entry) => !removed.has(entry.provider));
+  const persistedSuggested = persisted?.suggestedNextActions;
+  const suggestedNextActions = withoutUndefined({
+    enabled: patch?.suggestedNextActions?.enabled ?? persistedSuggested?.enabled,
+    providers: patch?.suggestedNextActions?.providers ?? keep(persistedSuggested?.providers),
+  });
+  const next = withoutUndefined({
+    providers: patch?.providers ?? keep(persisted?.providers),
+    suggestedNextActions:
+      Object.keys(suggestedNextActions).length > 0 ? suggestedNextActions : undefined,
+  });
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function withoutUndefined<T extends Record<string, unknown>>(record: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
 function mergeMutableAgentPatch(
   persistedAgents: PersistedConfig["agents"],
   patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
@@ -619,15 +665,14 @@ function mergeMutableAgentPatch(
   if (providerOverrides) next["providers"] = providerOverrides;
   else delete next["providers"];
 
-  if (patch.metadataGeneration?.providers !== undefined) {
-    next["metadataGeneration"] = { providers: patch.metadataGeneration.providers };
-  } else if (removeProviders.length > 0 && persistedAgents?.metadataGeneration?.providers) {
-    const removed = new Set(removeProviders);
-    next["metadataGeneration"] = {
-      providers: persistedAgents.metadataGeneration.providers.filter(
-        (entry) => !removed.has(entry.provider),
-      ),
-    };
+  if (patch.metadataGeneration !== undefined || removeProviders.length > 0) {
+    const metadataGeneration = mergePersistedMetadataGeneration(
+      persistedAgents?.metadataGeneration,
+      patch.metadataGeneration,
+      removeProviders,
+    );
+    if (metadataGeneration) next["metadataGeneration"] = metadataGeneration;
+    else delete next["metadataGeneration"];
   }
 
   if (patch.skills?.selection !== undefined) {

@@ -120,6 +120,36 @@ describe("DaemonConfigStore", () => {
     expect(loadPersistedConfig(paseoHome).daemon?.relay?.enabled).toBe(true);
   });
 
+  test("patching one metadata generation setting keeps the others", () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    const store = new DaemonConfigStore(paseoHome, {
+      relay: { enabled: false },
+      mcp: { injectIntoAgents: false },
+      browserTools: { enabled: false },
+      providers: {},
+      metadataGeneration: { providers: [] },
+      autoArchiveAfterMerge: false,
+      enableTerminalAgentHooks: false,
+      appendSystemPrompt: "",
+    });
+    const sonnet = { provider: "claude", model: "sonnet" };
+    const haiku = { provider: "claude", model: "haiku" };
+
+    store.patch({
+      metadataGeneration: { suggestedNextActions: { enabled: true, providers: [sonnet] } },
+    });
+    store.patch({ metadataGeneration: { suggestedNextActions: { enabled: false } } });
+    store.patch({ metadataGeneration: { providers: [haiku] } });
+
+    const expected = {
+      providers: [haiku],
+      suggestedNextActions: { enabled: false, providers: [sonnet] },
+    };
+    expect(store.get().metadataGeneration).toEqual(expected);
+    expect(loadPersistedConfig(paseoHome).agents?.metadataGeneration).toEqual(expected);
+  });
+
   test("patch round-trips agent profiles through the strictly-parsed persisted config", () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);
