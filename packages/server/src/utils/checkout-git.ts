@@ -2340,7 +2340,12 @@ async function inspectUntrackedFile(
 
 function buildPlaceholderParsedDiffFile(
   change: CheckoutFileChange,
-  options: { status: "too_large" | "binary"; stat?: FileStat; deferred?: DeferredDiff },
+  options: {
+    status: "too_large" | "binary";
+    stat?: FileStat;
+    deferred?: DiffDeferral;
+    targetRef?: string;
+  },
 ): ParsedDiffFile {
   return {
     path: change.path,
@@ -2351,8 +2356,8 @@ function buildPlaceholderParsedDiffFile(
     deletions: options.stat?.deletions ?? 0,
     hunks: [],
     status: options.status,
-    ...(options.deferred?.targetRef ? { targetRef: options.deferred.targetRef } : {}),
-    ...(options.deferred ? { deferred: options.deferred.deferral } : {}),
+    ...(options.deferred && options.targetRef ? { targetRef: options.targetRef } : {}),
+    ...(options.deferred ? { deferred: options.deferred } : {}),
   };
 }
 
@@ -3478,7 +3483,10 @@ async function appendStructuredTrackedDiffs(
     for (const change of changes) {
       const placeholder = trackedPlaceholderByPath.get(change.path);
       if (placeholder) {
-        const file = buildPlaceholderParsedDiffFile(change, placeholder);
+        const file = buildPlaceholderParsedDiffFile(change, {
+          ...placeholder,
+          targetRef: refsForDiff.targetRef,
+        });
         if (!appendStructuredFile(structured, file)) {
           return false;
         }
@@ -3621,12 +3629,7 @@ interface ProcessTrackedChangesResult {
 interface TrackedPlaceholder {
   status: "binary" | "too_large";
   stat: FileStat;
-  deferred?: DeferredDiff;
-}
-
-interface DeferredDiff {
-  deferral: DiffDeferral;
-  targetRef?: string;
+  deferred?: DiffDeferral;
 }
 
 // Matches the per-file diff budget: larger files cost more to read and highlight than to defer.
@@ -3640,7 +3643,7 @@ async function findDeferredTrackedDiffs(input: {
   cwd: string;
   changes: CheckoutFileChange[];
   refs: CheckoutDiffRefs;
-}): Promise<Map<string, DeferredDiff>> {
+}): Promise<Map<string, DiffDeferral>> {
   const { cwd, refs } = input;
   // Batch input is newline-delimited, so such paths cannot be named; they load normally.
   const changes = input.changes.filter(
@@ -3668,7 +3671,7 @@ async function findDeferredTrackedDiffs(input: {
       });
   }
 
-  const deferred = new Map<string, DeferredDiff>();
+  const deferred = new Map<string, DiffDeferral>();
   for (const change of changes) {
     const oldObject = change.isNew
       ? undefined
@@ -3682,12 +3685,9 @@ async function findDeferredTrackedDiffs(input: {
     const size = Math.max(oldObject?.size ?? 0, newSide?.size ?? 0);
     if (size <= DEFER_DIFF_ABOVE_BYTES) continue;
     deferred.set(change.path, {
-      deferral: {
-        baseRef: refs.baseRef,
-        size,
-        version: `${oldObject?.id ?? "none"}:${newSide?.id ?? "none"}`,
-      },
-      ...(refs.targetRef ? { targetRef: refs.targetRef } : {}),
+      baseRef: refs.baseRef,
+      size,
+      version: `${oldObject?.id ?? "none"}:${newSide?.id ?? "none"}`,
     });
   }
   return deferred;
@@ -3714,7 +3714,7 @@ async function processTrackedChanges(
   const trackedPlaceholderByPath = new Map<string, TrackedPlaceholder>();
   const deferredByPath = deferLargeFiles
     ? await findDeferredTrackedDiffs({ cwd, changes: trackedChanges, refs: refsForDiff })
-    : new Map<string, DeferredDiff>();
+    : new Map<string, DiffDeferral>();
 
   for (const change of trackedChanges) {
     const stat = trackedNumstatByPath.get(change.path) ?? null;
