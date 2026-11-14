@@ -155,9 +155,28 @@ const MutableStructuredGenerationProviderSchema = z
   })
   .passthrough();
 
+// Both fields are optional so a patch can change one without resetting the other.
+const MutableSuggestedNextActionsConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    providers: z.array(MutableStructuredGenerationProviderSchema).optional(),
+  })
+  .passthrough();
+
 const MutableMetadataGenerationConfigSchema = z
   .object({
     providers: z.array(MutableStructuredGenerationProviderSchema).default([]),
+    // COMPAT(suggestedNextActions): added in v0.11.0-fork.41, remove optional after 2027-05-13.
+    suggestedNextActions: MutableSuggestedNextActionsConfigSchema.optional(),
+  })
+  .passthrough();
+
+// No defaults: Zod applies `.default()` even under `.partial()`, so a patch to one field
+// would reset the others.
+const MutableMetadataGenerationPatchSchema = z
+  .object({
+    providers: z.array(MutableStructuredGenerationProviderSchema).optional(),
+    suggestedNextActions: MutableSuggestedNextActionsConfigSchema.optional(),
   })
   .passthrough();
 
@@ -221,7 +240,7 @@ export const MutableDaemonConfigPatchSchema = z
       .record(z.string(), MutableDaemonProviderConfigSchema.partial().passthrough())
       .optional(),
     removeProviders: z.array(z.string().min(1)).optional(),
-    metadataGeneration: MutableMetadataGenerationConfigSchema.partial().optional(),
+    metadataGeneration: MutableMetadataGenerationPatchSchema.optional(),
     autoArchiveAfterMerge: z.boolean().optional(),
     enableTerminalAgentHooks: z.boolean().optional(),
     appendSystemPrompt: z.string().optional(),
@@ -857,6 +876,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   latestTurnDiffAt: z.string().optional(),
   // Start of the last assistant message as plain text, refreshed at each turn end.
   lastAssistantPreview: z.string().optional(),
+  // Follow-up messages suggested after the last completed turn; absent while a turn runs.
+  suggestedNextActions: z.array(z.string()).optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -3911,6 +3932,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceMetadataRefresh: z.boolean().optional(),
         // COMPAT(workspaceSortTimes): added in v0.11.0-fork.35, remove gate after 2027-05-11.
         workspaceSortTimes: z.boolean().optional(),
+        // COMPAT(suggestedNextActions): added in v0.11.0-fork.41, remove gate after 2027-05-13.
+        suggestedNextActions: z.boolean().optional(),
         // COMPAT(linearIntegration): added in v0.11.0-fork.28, remove gate after 2027-04-21.
         linearIntegration: z.boolean().optional(),
         // COMPAT(workspaceSetupRun): added in v0.8.0, remove gate after 2027-09-02.

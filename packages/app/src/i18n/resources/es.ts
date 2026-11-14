@@ -240,6 +240,11 @@ export const es: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "Siguiente paso sugerido",
+      send: "Enviar: {{text}}",
+      edit: "Editar: {{text}}",
+    },
     empty: "Comience a chatear con este agente...",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
@@ -2317,6 +2322,17 @@ export const es: TranslationResources = {
       fallbackHint: "Si no está disponible, Paseo usa otro modelo disponible",
       docs: "Documentación",
       saveError: "No se pudo actualizar la generación de metadatos",
+    },
+    suggestedNextActions: {
+      title: "Siguientes acciones sugeridas",
+      description: "Muestra mensajes de seguimiento sugeridos bajo la última respuesta del agente",
+      enable: "Sugerir siguientes acciones",
+      enableHint:
+        "Cuando un agente termina un turno, sugiere hasta 3 mensajes de seguimiento. Usa una llamada adicional al modelo por turno en este host.",
+      sameAsMetadata: "Igual que metadatos",
+      sameAsMetadataHint: "Usa el modelo de generación de metadatos",
+      manualHint: "Elige el modelo solo para las sugerencias",
+      fallbackHint: "Si no está disponible, Paseo usa el modelo de generación de metadatos",
     },
     general: {
       title: "General",

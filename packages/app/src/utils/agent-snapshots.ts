@@ -88,6 +88,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     archivedAt: agent.archivedAt?.toISOString() ?? null,
     ...(agent.latestTurnDiffAt ? { latestTurnDiffAt: agent.latestTurnDiffAt } : {}),
     ...(agent.lastAssistantPreview ? { lastAssistantPreview: agent.lastAssistantPreview } : {}),
+    ...(agent.suggestedNextActions ? { suggestedNextActions: agent.suggestedNextActions } : {}),
   };
 }
 
@@ -140,5 +141,6 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     labels: snapshot.labels,
     latestTurnDiffAt: snapshot.latestTurnDiffAt,
     lastAssistantPreview: snapshot.lastAssistantPreview,
+    suggestedNextActions: snapshot.suggestedNextActions,
   };
 }

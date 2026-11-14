@@ -435,6 +435,8 @@ interface ManagedAgentBase {
   lastError?: string;
   /** The start of the last assistant message as plain text, saved at each turn end. */
   lastAssistantPreview?: string;
+  /** Follow-up messages suggested for the last completed turn. Never persisted. */
+  suggestedNextActions?: string[];
   turnCount?: number;
   attention: AttentionState;
   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
@@ -2949,6 +2951,7 @@ export class AgentManager {
 
   private openActiveTurn(agent: ActiveManagedAgent, turnId: string, startedAt: Date): void {
     if (agent.activeTurnId !== turnId && agent.turnCount !== undefined) agent.turnCount += 1;
+    agent.suggestedNextActions = undefined;
     agent.activeTurnId = turnId;
     agent.activeTurnStartedAt = startedAt;
   }
@@ -3448,6 +3451,14 @@ export class AgentManager {
     }
   }
 
+  /** Shows suggestions only while the agent is idle; a turn that already started wins. */
+  setSuggestedNextActions(agentId: string, suggestions: string[]): void {
+    const agent = this.agents.get(agentId);
+    if (!agent || agent.lifecycle !== "idle") return;
+    agent.suggestedNextActions = suggestions.length > 0 ? suggestions : undefined;
+    this.emitState(agent);
+  }
+
   /** Returns whether the preview changed. */
   private refreshLastAssistantPreview(agent: ManagedAgent): boolean {
     const text = this.getLastAssistantMessageFromTimeline(this.timelineStore.getItems(agent.id));
@@ -3484,6 +3495,7 @@ export class AgentManager {
       );
       await invokeRewindCapability(agent.session, { messageId: providerMessageId, mode });
       if (mode !== "files") {
+        agent.suggestedNextActions = undefined;
         await this.hydrateTimelineFromProvider(agentId, {
           force: true,
           broadcast: true,
@@ -4540,6 +4552,7 @@ export class AgentManager {
     // Set before the terminal handlers emit state, so the idle snapshot carries it.
     if (isTurnTerminalEvent(event) && !options?.fromHistory) {
       this.refreshLastAssistantPreview(agent);
+      agent.suggestedNextActions = undefined;
     }
 
     const dispatchPromise = this.dispatchStreamEventByType({

@@ -238,6 +238,11 @@ export const zhCN: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "建议的下一步",
+      send: "发送：{{text}}",
+      edit: "编辑：{{text}}",
+    },
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",
@@ -2245,6 +2250,16 @@ export const zhCN: TranslationResources = {
       fallbackHint: "如果不可用，Paseo 会改用其他可用模型",
       docs: "文档",
       saveError: "无法更新元数据生成设置",
+    },
+    suggestedNextActions: {
+      title: "建议的后续操作",
+      description: "在智能体最后一条回复下方显示建议的后续消息",
+      enable: "建议后续操作",
+      enableHint: "智能体完成一轮后，最多建议 3 条后续消息。此主机每轮会额外调用一次模型。",
+      sameAsMetadata: "与元数据相同",
+      sameAsMetadataHint: "使用元数据生成模型",
+      manualHint: "仅为建议选择模型",
+      fallbackHint: "如果不可用，Paseo 将使用元数据生成模型",
     },
     general: {
       title: "通用",

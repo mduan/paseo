@@ -238,6 +238,11 @@ export const ar: TranslationResources = {
     },
   },
   agentStream: {
+    suggestedNextActions: {
+      label: "الخطوة التالية المقترحة",
+      send: "إرسال: {{text}}",
+      edit: "تعديل: {{text}}",
+    },
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
@@ -2268,6 +2273,17 @@ export const ar: TranslationResources = {
       fallbackHint: "إذا لم يكن متاحًا، يستخدم Paseo نموذجًا آخر متاحًا",
       docs: "الوثائق",
       saveError: "تعذر تحديث إنشاء البيانات الوصفية",
+    },
+    suggestedNextActions: {
+      title: "الإجراءات التالية المقترحة",
+      description: "عرض رسائل متابعة مقترحة أسفل آخر رد من الوكيل",
+      enable: "اقتراح الإجراءات التالية",
+      enableHint:
+        "بعد أن ينهي الوكيل دوره، يقترح ما يصل إلى 3 رسائل متابعة. يستخدم استدعاءً إضافيًا واحدًا للنموذج في كل دور على هذا المضيف.",
+      sameAsMetadata: "مثل البيانات الوصفية",
+      sameAsMetadataHint: "يستخدم نموذج توليد البيانات الوصفية",
+      manualHint: "اختر النموذج للاقتراحات فقط",
+      fallbackHint: "إذا لم يكن متاحًا، يستخدم Paseo نموذج توليد البيانات الوصفية",
     },
     general: {
       title: "عام",

@@ -135,6 +135,7 @@ import { AgentStorage } from "./agent/agent-storage.js";
 import { TurnDiffStore } from "./agent/turn-diffs/store.js";
 import { attachAgentStoragePersistence } from "./persistence-hooks.js";
 import { attachWorkspaceResponseRecorder } from "./workspace-response-recorder.js";
+import { attachSuggestedNextActions, createSuggestionGenerator } from "./suggested-next-actions.js";
 import { createAgentMcpServer } from "./agent/mcp-server.js";
 import {
   createPaseoToolCatalog,
@@ -444,13 +445,7 @@ export interface PaseoDaemonConfig {
   downloadTokenTtlMs?: number;
   agentProviderSettings?: AgentProviderRuntimeSettingsMap;
   providerCatalogRefreshTimeoutMs?: number;
-  metadataGeneration?: {
-    providers?: Array<{
-      provider: string;
-      model?: string;
-      thinkingOptionId?: string;
-    }>;
-  };
+  metadataGeneration?: NonNullable<PersistedConfig["agents"]>["metadataGeneration"];
   providerOverrides?: Record<string, ProviderOverride>;
   log?: PersistedConfig["log"];
   onLifecycleIntent?: (intent: DaemonLifecycleIntent) => void;
@@ -536,6 +531,18 @@ function resolveExpressTrustProxySetting(config: PaseoDaemonConfig): true | stri
   return config.trustedProxies ?? ["loopback"];
 }
 
+function resolveMetadataGenerationConfig(
+  persisted: PaseoDaemonConfig["metadataGeneration"],
+): MutableDaemonConfig["metadataGeneration"] {
+  return {
+    providers: persisted?.providers ?? [],
+    suggestedNextActions: {
+      enabled: persisted?.suggestedNextActions?.enabled ?? false,
+      providers: persisted?.suggestedNextActions?.providers ?? [],
+    },
+  };
+}
+
 function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
@@ -555,9 +562,7 @@ function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDae
       : {}),
     browserTools: { enabled: config.browserToolsEnabled ?? false },
     providers,
-    metadataGeneration: {
-      providers: config.metadataGeneration?.providers ?? [],
-    },
+    metadataGeneration: resolveMetadataGenerationConfig(config.metadataGeneration),
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     appendSystemPrompt: config.appendSystemPrompt ?? "",
@@ -973,6 +978,18 @@ export async function createPaseoDaemon(
     logger,
     agentManager,
     workspaceRegistry,
+  });
+  const detachSuggestedNextActions = attachSuggestedNextActions({
+    logger,
+    agentManager,
+    isEnabled: () =>
+      daemonConfigStore.get().metadataGeneration.suggestedNextActions?.enabled === true,
+    generateSuggestions: createSuggestionGenerator({
+      logger,
+      agentManager,
+      providerSnapshotManager,
+      readMetadataGeneration: () => daemonConfigStore.get().metadataGeneration,
+    }),
   });
   await agentStorage.initialize();
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
@@ -1839,6 +1856,7 @@ export async function createPaseoDaemon(
     await agentManager.flushForShutdown().catch(() => undefined);
     detachAgentStoragePersistence();
     detachWorkspaceResponseRecorder();
+    detachSuggestedNextActions();
     await agentStorage.flush().catch(() => undefined);
     await agentProviderRuntime.shutdown();
     await pluginRuntime.stopAllPlugins();

@@ -161,6 +161,10 @@ export function toAgentPayload(
     payload.lastAssistantPreview = agent.lastAssistantPreview;
   }
 
+  if (agent.suggestedNextActions) {
+    payload.suggestedNextActions = agent.suggestedNextActions;
+  }
+
   // Handle attention state
   payload.requiresAttention = agent.attention.requiresAttention;
   if (agent.attention.requiresAttention) {

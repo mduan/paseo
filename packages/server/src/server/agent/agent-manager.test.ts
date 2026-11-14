@@ -7924,6 +7924,49 @@ test("runAgent assembles finalText from trailing assistant chunks", async () => 
   );
 });
 
+test("suggested next actions show while idle and clear when the next turn ends", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-suggestions-"));
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000141",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  await manager.runAgent(snapshot.id, "say hello");
+  manager.setSuggestedNextActions(snapshot.id, ["Commit these changes"]);
+  expect(manager.getAgent(snapshot.id)?.suggestedNextActions).toEqual(["Commit these changes"]);
+
+  await manager.runAgent(snapshot.id, "say hello again");
+  expect(manager.getAgent(snapshot.id)?.suggestedNextActions).toBeUndefined();
+});
+
+test("rewinding the conversation clears suggested next actions", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-suggestions-rewind-"));
+  class RewindSession extends TestAgentSession {
+    override readonly capabilities = { ...TEST_CAPABILITIES, supportsRewindConversation: true };
+    override async revertConversation(): Promise<void> {}
+  }
+  const client = new (class extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      return new RewindSession(config);
+    }
+  })();
+  const manager = new AgentManager({ clients: { codex: client }, logger });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  await manager.runAgent(snapshot.id, "say hello");
+  manager.setSuggestedNextActions(snapshot.id, ["Commit these changes"]);
+  await manager.rewind(snapshot.id, "message-1", "conversation");
+
+  expect(manager.getAgent(snapshot.id)?.suggestedNextActions).toBeUndefined();
+});
+
 test("listAgents excludes internal agents", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storagePath = join(workdir, "agents");

@@ -34,6 +34,8 @@ import {
 } from "@/composer/pill-styles";
 import { getActiveMessageSubmissions } from "@/composer/submission/model";
 import { RewindComposerRestoreProvider } from "@/components/rewind/composer-restore";
+import { SuggestedNextActions } from "@/agent-stream/suggested-next-actions";
+import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import { useToastHost, type ToastApi, type ToastState } from "@/components/toast-host";
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
 import { useWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
@@ -1107,6 +1109,14 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
       composerState,
     ],
   );
+  const keyboardActionDispatcher = useKeyboardActionDispatcher();
+  const handleEditSuggestion = useCallback(
+    (text: string) => {
+      replaceText(text);
+      keyboardActionDispatcher.dispatch({ id: "message-input.focus", scope: "message-input" });
+    },
+    [keyboardActionDispatcher, replaceText],
+  );
   const composerSection = (
     <RenderProfile id={`AgentComposerSection:${agentId}`}>
       <AgentComposerSection
@@ -1140,6 +1150,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           hasVisibleAgentTracks={hasVisibleAgentTracks}
           toast={toastApi}
           onOpenWorkspaceFile={onOpenWorkspaceFile}
+          onEditSuggestion={handleEditSuggestion}
         />
       </RenderProfile>
       {hasActiveComposer ? (
@@ -1266,6 +1277,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   hasVisibleAgentTracks,
   toast,
   onOpenWorkspaceFile,
+  onEditSuggestion,
 }: {
   streamViewRef: React.RefObject<AgentStreamViewHandle | null>;
   serverId: string;
@@ -1278,6 +1290,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   hasVisibleAgentTracks: boolean;
   toast: ReturnType<typeof useToastHost>["api"];
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
+  onEditSuggestion: (text: string) => void;
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
   const turnDiffOpenLocation = useSettings((settings) => settings.turnDiffOpenLocation);
@@ -1318,6 +1331,23 @@ const AgentStreamSection = memo(function AgentStreamSection({
     : 0;
   const streamItemsRaw = useSessionStore((state) =>
     agentId ? state.sessions[serverId]?.agentStreamTail?.get(agentId) : undefined,
+  );
+  const suggestedNextActions = useSessionStore((state) => {
+    const storedAgent = agentId ? state.sessions[serverId]?.agents?.get(agentId) : undefined;
+    return storedAgent?.archivedAt ? undefined : storedAgent?.suggestedNextActions;
+  });
+  const suggestionsNode = useMemo(
+    () =>
+      agentId && agent.status === "idle" && suggestedNextActions?.length ? (
+        <SuggestedNextActions
+          serverId={serverId}
+          agentId={agentId}
+          suggestions={suggestedNextActions}
+          onEdit={onEditSuggestion}
+          toast={toast}
+        />
+      ) : null,
+    [agent.status, agentId, onEditSuggestion, serverId, suggestedNextActions, toast],
   );
   const pendingMessageSubmissions = useSessionStore(
     useShallow((state) =>
@@ -1378,6 +1408,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
       turnPresentation={turnPresentation}
       onOpenWorkspaceFile={onOpenWorkspaceFile}
       onOpenTurnDiff={handleOpenTurnDiff}
+      tailAccessory={suggestionsNode}
     />
   );
 });
