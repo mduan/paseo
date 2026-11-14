@@ -573,9 +573,9 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
 function ChangesHeader({ compact, repository, comparison, sidebarSurface }: ChangesHeaderProps) {
   if (comparison.mode.kind === "diff") {
     return (
-      <ChangesDiffOnlyToolbar
+      <ChangesComparisonToolbar
         compact={compact}
-        mode={comparison.mode}
+        model={comparison}
         sidebarSurface={sidebarSurface}
       />
     );
@@ -593,30 +593,6 @@ function ChangesHeader({ compact, repository, comparison, sidebarSurface }: Chan
         sidebarSurface={sidebarSurface}
       />
     </View>
-  );
-}
-
-function ChangesDiffOnlyToolbar({
-  compact,
-  mode,
-  sidebarSurface,
-}: {
-  compact: boolean;
-  mode: Extract<ChangesToolbarMode, { kind: "diff" }>;
-  sidebarSurface: boolean;
-}) {
-  return (
-    <ChangesToolbarRow
-      compact={compact}
-      sidebarSurface={sidebarSurface}
-      testID="changes-header"
-      trailing="glyph"
-    >
-      <ChangesToolbarLeading />
-      <ChangesToolbarTrailing>
-        <ChangesToolbarActions mode={mode} compact={compact} />
-      </ChangesToolbarTrailing>
-    </ChangesToolbarRow>
   );
 }
 
@@ -747,8 +723,8 @@ function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; co
   if (mode.kind === "diff") {
     return (
       <>
-        {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
         <ChangesDiffToolbar options={mode.options} compact={compact} />
+        {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
       </>
     );
   }
@@ -761,8 +737,8 @@ function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; co
           onToggle={mode.treeToggle.onToggle}
         />
       ) : null}
-      {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
       <ChangesOptionsMenu options={mode.options} compact={compact} />
+      {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
     </>
   );
 }

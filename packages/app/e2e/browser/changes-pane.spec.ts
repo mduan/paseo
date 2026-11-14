@@ -905,8 +905,8 @@ test("Changes keeps review navigation and controls inside its workspace tab", as
   await expect(visiblePanel).toBeVisible();
   await expect(visiblePanel.getByTestId("changes-repository-header")).toHaveCount(0);
   await expect(visiblePanel.getByTestId("changes-branch-switcher")).toHaveCount(0);
-  await expect(visiblePanel.getByTestId("changes-diff-status-trigger")).toHaveCount(0);
-  await expect(visiblePanel.getByTestId("changes-selected-diff-stat")).toHaveCount(0);
+  await expect(visiblePanel.getByTestId("changes-diff-status-trigger")).toHaveText("Uncommitted");
+  await expect(visiblePanel.getByTestId("changes-selected-diff-stat")).toHaveText("+37-2");
   await expect(visiblePanel.getByTestId("changes-header")).toHaveCount(1);
   await expect(diffHeaderForPath(visiblePanel, "src/use-mounted-tab-set.ts")).toHaveAccessibleName(
     "src/use-mounted-tab-set.ts, +37, -1",
