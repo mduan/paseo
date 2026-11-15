@@ -9,6 +9,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SidebarPopoverRoot, SidebarPopoverSurface } from "@/components/sidebar/sidebar-popover";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { builtinSidebarNavLabelKey } from "@/sidebar-nav/model";
@@ -27,16 +28,22 @@ import {
   resolvePinnedUsage,
   type PinnedUsageLayout,
   type PinnedUsageSource,
+  type PinnedUsageWindow,
 } from "./pinned";
+import { formatResetTooltip } from "./format";
 import type { UsageHost } from "./model";
 import { UsageOptions } from "./options";
 import { UsageBody } from "./usage-section";
 
 /** Each summary window with data on the usage host, under its source; empty while none has. */
 function useUsageSummary(): readonly PinnedUsageSource[] {
+  const { i18n } = useTranslation();
   const { preferences } = useUsagePreferences();
   const reports = useUsageHostReports(useUsageHostId());
-  return useMemo(() => resolvePinnedUsage(reports, preferences), [preferences, reports]);
+  return useMemo(
+    () => resolvePinnedUsage(reports, preferences, { locale: i18n.language }),
+    [preferences, reports, i18n.language],
+  );
 }
 
 /** Whether the sidebar Usage item has anything to show. */
@@ -225,10 +232,6 @@ function PinnedUsageTrigger({
   );
 }
 
-/**
- * The line's items as direct children of one row, so every meter shares the leftover width
- * equally.
- */
 function PinnedUsageLine({
   sources,
   layout,
@@ -249,32 +252,52 @@ function PinnedUsageLine({
       {source.windows.map((window, windowIndex) => {
         const leadStyle = windowIndex === 0 ? styles.iconGap : styles.windowGap;
         return (
-          <Fragment key={window.key}>
-            {layout === "meters" ? (
-              <View style={[styles.meterSlot, leadStyle]}>
-                <UsageMeter
-                  percent={window.percent}
-                  tone={window.tone}
-                  quiet
-                  style={styles.meter}
-                />
+          <Tooltip key={window.key} delayDuration={300} enabledOnDesktop={!measuring}>
+            <TooltipTrigger asChild>
+              <View
+                style={[
+                  styles.window,
+                  leadStyle,
+                  layout === "meters" ? styles.windowWithMeter : null,
+                ]}
+              >
+                {layout === "meters" ? (
+                  <View style={styles.meterSlot}>
+                    <UsageMeter
+                      percent={window.percent}
+                      tone={window.tone}
+                      quiet
+                      style={styles.meter}
+                    />
+                  </View>
+                ) : null}
+                <Text
+                  style={styles.percent}
+                  numberOfLines={1}
+                  testID={measuring ? undefined : "sidebar-usage-pinned-window"}
+                >
+                  {window.percentText}
+                  {layout === "percents" || window.shortLabel === "" ? null : (
+                    <Text style={styles.windowLabel}>{` ${window.shortLabel}`}</Text>
+                  )}
+                </Text>
               </View>
-            ) : null}
-            <Text
-              style={[styles.percent, layout === "meters" ? null : leadStyle]}
-              numberOfLines={1}
-              testID={measuring ? undefined : "sidebar-usage-pinned-window"}
-            >
-              {window.percentText}
-              {layout === "percents" || window.shortLabel === "" ? null : (
-                <Text style={styles.windowLabel}>{` ${window.shortLabel}`}</Text>
-              )}
-            </Text>
-          </Fragment>
+            </TooltipTrigger>
+            <TooltipContent side="top" testID="sidebar-usage-tooltip" maxWidth={480}>
+              <PinnedUsageTooltipText window={window} />
+            </TooltipContent>
+          </Tooltip>
         );
       })}
     </Fragment>
   ));
+}
+
+function PinnedUsageTooltipText({ window }: { window: PinnedUsageWindow }) {
+  const reset = formatResetTooltip(window.resetsAt);
+  return (
+    <Text style={styles.tooltipText}>{[window.tooltip, reset].filter(Boolean).join(" · ")}</Text>
+  );
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -321,6 +344,17 @@ const styles = StyleSheet.create((theme) => ({
   windowGap: {
     marginLeft: theme.spacing[2],
   },
+  window: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  windowWithMeter: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "auto",
+    minWidth: 0,
+  },
   // Every slot takes an equal share of the leftover width, so the line fills the row.
   meterSlot: {
     flexGrow: 1,
@@ -341,6 +375,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   windowLabel: {
     color: theme.colors.foregroundMuted,
+  },
+  tooltipText: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
   },
   sheetBody: {
     padding: theme.spacing[3],

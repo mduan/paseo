@@ -25,6 +25,8 @@ Work out of the box once the underlying CLI is installed and authenticated.
 
 Install the Antigravity CLI (`agy`) on your daemon host, then run `agy` once to sign in. Pick
 **Antigravity** in Paseo. The provider ships with Paseo; no separate plugin install is required.
+Your signed-in CLI account's quota percentages and reset times appear in **Usage**, even without
+an open Antigravity chat. Keep `agy` on your daemon's `PATH` for usage queries.
 
 Three permission modes are available:
 

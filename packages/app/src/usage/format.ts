@@ -34,6 +34,19 @@ export function formatResetLabel(iso: string | null | undefined): string | null 
   return rel === "now" ? "resetting now" : `resets ${rel}`;
 }
 
+export function formatResetTooltip(iso: string | null | undefined): string | null {
+  const label = formatResetLabel(iso);
+  if (!label) return null;
+  if (label === "resetting now") return "Resetting now";
+  const units: Record<string, string> = { d: "day", h: "hour", m: "minute" };
+  return label
+    .replace("resets ", "Resets in ")
+    .replace(
+      /(\d+)([dhm])$/,
+      (_, amount: string, unit: string) => `${amount} ${units[unit]}${amount === "1" ? "" : "s"}`,
+    );
+}
+
 /** A balance amount as the app's language writes it: "$1,234.50", "12,345". */
 export function formatAmount(value: number, unit: UsageBalanceUnit, locale: string): string {
   switch (unit) {
