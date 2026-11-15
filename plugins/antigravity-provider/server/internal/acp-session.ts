@@ -69,6 +69,14 @@ export class AcpSession {
       acpOptions: { waitForInitialCommands: true, supportsSteering: true },
       transformers: [
         {
+          configure: async (change, context) => {
+            if (change.target === "mode" && !context.modeIds.some((id) => id === change.value))
+              throw new AntigravityError(
+                `Antigravity mode ${this.options.config.mode} is unavailable for this account or host`,
+                "UNSUPPORTED_MODE",
+              );
+            return "pass";
+          },
           toolCall: (tool) => {
             if (tool.status === "in_progress")
               this.backgroundTools.set(tool.id, this.backgroundTools.get(tool.id));
@@ -94,7 +102,6 @@ export class AcpSession {
     });
     this.connection = connection;
     connection.onEvent((event) => {
-      if (event.type === "catalog") return;
       if (event.type === "session.opened" || event.type === "session.persistence") {
         const persistence = event.persistence;
         if (persistence) {
@@ -121,16 +128,6 @@ export class AcpSession {
       }
       this.emit(event);
     });
-    const catalog = await this.request({
-      type: "catalog",
-      requestId: randomUUID(),
-      cwd: this.options.config.cwd,
-    });
-    if (catalog.type !== "catalog" || !catalog.catalog.modes.some((entry) => entry.id === mode))
-      throw new AntigravityError(
-        `Antigravity mode ${this.options.config.mode} is unavailable for this account or host`,
-        "UNSUPPORTED_MODE",
-      );
     let persistence: ProviderPersistence | undefined;
     if (this.options.persistence) {
       const data = this.options.persistence.data;
@@ -388,11 +385,10 @@ export class AcpSession {
         if (!matchesRequest && !matchesPrompt) return;
         if (event.type === "request.failed") {
           unsubscribe();
-          reject(new AntigravityError(event.error.message));
+          reject(new AntigravityError(event.error.message, event.error.code));
         } else if (
           event.type === "request.completed" ||
           event.type === "session.ready" ||
-          event.type === "catalog" ||
           event.type === "session.prompt_result"
         ) {
           unsubscribe();

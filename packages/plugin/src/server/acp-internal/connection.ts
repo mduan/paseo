@@ -176,7 +176,7 @@ function emitOperationFailure(
   emit: (event: ProviderEvent) => void,
   error: unknown,
 ): void {
-  const failure = { message: describeError(error) };
+  const failure = { message: describeError(error), code: errorCode(error) };
   if (input.type === "session.prompt") {
     emit({
       type: "session.prompt_result",
@@ -784,6 +784,7 @@ class AcpRuntime {
         (await transformer.configure?.(change, {
           sessionId: this.options.boundarySessionId,
           config: access,
+          modeIds: this.modes?.availableModes.map((mode) => mode.id) ?? [],
         })) === "handled"
       ) {
         return;
@@ -1446,6 +1447,11 @@ function jsonRecord(value: unknown): Record<string, ReturnType<typeof jsonValue>
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error) || !("code" in error)) return undefined;
+  return typeof error.code === "string" ? error.code : undefined;
 }
 
 function withTimeout<Value>(

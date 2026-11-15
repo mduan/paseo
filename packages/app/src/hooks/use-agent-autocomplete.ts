@@ -435,7 +435,8 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const commandsQuery = useAgentCommandsQuery({
     serverId,
     agentId,
-    enabled: mode === "command" && canLoadCommands && canListCommands,
+    // Load before the user types "/" so slow provider startup overlaps typing.
+    enabled: canLoadCommands && canListCommands,
     draftConfig: queryDraftConfig,
   });
   const { commands, isError, error } = commandsQuery;

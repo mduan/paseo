@@ -344,6 +344,10 @@ describe("ACP permission modes", () => {
       sessionId: "s",
       commands: [{ name: "project-skill", description: "Project skill", argumentHint: "task" }],
     });
+    // Skills come from the one native session; opening must not start a discovery session.
+    expect(
+      (await h.records()).filter((record) => record.acp?.method === "session/new"),
+    ).toHaveLength(1);
     await h.connection.send({
       type: "session.prompt",
       sessionId: "s",

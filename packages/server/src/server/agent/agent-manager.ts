@@ -1163,13 +1163,6 @@ export class AgentManager {
     if (!normalizedConfig.model) {
       return [];
     }
-    const available = await client.isAvailable();
-    if (!available) {
-      throw new Error(
-        `Provider '${normalizedConfig.provider}' is not available. Please ensure the CLI is installed.`,
-      );
-    }
-
     if (client.listCommands) {
       return await client.listCommands(normalizedConfig);
     }
@@ -1183,14 +1176,13 @@ export class AgentManager {
       }
       return await session.listCommands();
     } finally {
-      try {
-        await session.close();
-      } catch (error) {
+      // Respond without waiting for the provider process to exit.
+      void session.close().catch((error: unknown) => {
         this.logger.warn(
           { err: error, provider: normalizedConfig.provider },
           "Failed to close draft command listing session",
         );
-      }
+      });
     }
   }
 
