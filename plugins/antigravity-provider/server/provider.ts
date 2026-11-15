@@ -18,6 +18,7 @@ import { AntigravityError } from "./internal/errors.js";
 
 const capabilities = [
   "prompt.message",
+  "prompt.command",
   "prompt.image",
   "session.configure",
   "session.persistence",

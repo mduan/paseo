@@ -164,6 +164,44 @@ async function harness(env: Record<string, string> = {}) {
 }
 
 describe("ACP permission modes", () => {
+  it("exposes ACP skills and forwards their invocations", async () => {
+    const h = await harness();
+    await h.open();
+    expect(h.events).toContainEqual({
+      type: "session.commands",
+      sessionId: "s",
+      commands: [{ name: "project-skill", description: "Project skill", argumentHint: "task" }],
+    });
+    await h.connection.send({
+      type: "session.prompt",
+      sessionId: "s",
+      prompt: {
+        clientMessageId: "skill-prompt",
+        delivery: "auto",
+        input: { type: "command", name: "project-skill", arguments: "review changes" },
+      },
+    });
+    await h.wait(
+      (event) => event.type === "session.prompt_result" && event.clientMessageId === "skill-prompt",
+    );
+    await h.completed("skill-prompt");
+    const records = await h.records();
+    const prompt = records.find((record) => record.acp?.method === "session/prompt");
+    expect(prompt.acp.params.prompt).toEqual([
+      { type: "text", text: "SYSTEM PREFIX" },
+      { type: "text", text: "/project-skill review changes" },
+    ]);
+    expect(h.events).toContainEqual(
+      expect.objectContaining({
+        type: "timeline.item",
+        item: expect.objectContaining({
+          type: "user_message",
+          text: "/project-skill review changes",
+        }),
+      }),
+    );
+  });
+
   it("runs Full access through ACP with native permission bypass and preserves launch configuration", async () => {
     const h = await harness();
     await h.open();

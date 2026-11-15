@@ -88,6 +88,18 @@ lines.on("line", (line) => {
   } else if (input.method === "session/new" || input.method === "session/load") {
     sessionId = input.params.sessionId ?? "0c19650f-b73a-4dd2-985c-8b9256199fe0";
     send({ id: input.id, result: session() });
+    send({
+      method: "session/update",
+      params: {
+        sessionId,
+        update: {
+          sessionUpdate: "available_commands_update",
+          availableCommands: [
+            { name: "project-skill", description: "Project skill", input: { hint: "task" } },
+          ],
+        },
+      },
+    });
   } else if (input.method === "session/set_mode") {
     mode = input.params.modeId;
     send({ id: input.id, result: {} });

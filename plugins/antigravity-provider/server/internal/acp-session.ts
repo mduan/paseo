@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { runAcpProvider } from "@getpaseo/plugin/server/acp";
 import type {
   ProviderConnection,
+  ProviderContent,
   ProviderEvent,
   ProviderInput,
   ProviderLaunch,
@@ -62,7 +63,7 @@ export class AcpSession {
     });
     this.connection = connection;
     connection.onEvent((event) => {
-      if (event.type === "catalog" || event.type === "session.commands") return;
+      if (event.type === "catalog") return;
       if (event.type === "session.opened" || event.type === "session.persistence") {
         const persistence = event.persistence;
         if (persistence) {
@@ -136,29 +137,29 @@ export class AcpSession {
   }
 
   async prompt(prompt: ProviderPrompt): Promise<void> {
-    if (
-      prompt.input.type !== "message" ||
-      prompt.delivery === "steer" ||
-      prompt.outputSchema !== undefined
-    )
-      throw new AntigravityError("Antigravity supports messages only");
-    let nativePrompt = prompt;
+    if (prompt.delivery === "steer" || prompt.outputSchema !== undefined)
+      throw new AntigravityError("Antigravity does not support steering or structured output");
+    let content: ProviderContent[];
+    if (prompt.input.type === "command") {
+      const suffix = prompt.input.arguments ? ` ${prompt.input.arguments}` : "";
+      content = [{ type: "text", text: `/${prompt.input.name}${suffix}` }];
+    } else {
+      content = prompt.input.content;
+    }
+    let nativePrompt: ProviderPrompt = { ...prompt, input: { type: "message", content } };
     if (this.firstMessage && this.options.config.systemPrompt) {
       this.userText.set(
         prompt.clientMessageId,
-        prompt.input.content
+        content
           .filter((part) => part.type === "text")
           .map((part) => part.text)
           .join("\n"),
       );
       nativePrompt = {
-        ...prompt,
+        ...nativePrompt,
         input: {
-          ...prompt.input,
-          content: [
-            { type: "text", text: this.options.config.systemPrompt },
-            ...prompt.input.content,
-          ],
+          type: "message",
+          content: [{ type: "text", text: this.options.config.systemPrompt }, ...content],
         },
       };
     }
