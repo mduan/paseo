@@ -6,7 +6,7 @@ import type {
   ProviderStatus,
 } from "@getpaseo/plugin/server/provider";
 import { probe } from "./process.js";
-import { AntigravityError } from "./wire.js";
+import { AntigravityError } from "./errors.js";
 
 const modes: readonly ProviderMode[] = [
   {
@@ -42,12 +42,9 @@ export async function getCatalog(launch: ProviderLaunch, cwd?: string): Promise<
       throw new AntigravityError(`Duplicate Antigravity model: ${id}`, "INVALID_CATALOG");
     models.push({ id, label });
   }
-  const version = (await probe({ launch, args: ["--version"], cwd })).trim();
-  const [major, minor] = version.split(".").map(Number);
-  const supportsAcp = major > 1 || (major === 1 && minor >= 5);
   return {
     models,
-    modes: supportsAcp ? modes : modes.filter((mode) => mode.id === "full-access"),
+    modes,
     thinkingOptions: [],
     defaultMode: "full-access",
   };
@@ -60,14 +57,14 @@ export async function getStatus(launch: ProviderLaunch): Promise<ProviderStatus>
     if (!match)
       return {
         available: false,
-        diagnostic: "Could not read the Antigravity version. Update `agy` to 1.1.15 or later.",
+        diagnostic: "Could not read the Antigravity version. Update `agy` to 1.5.0 or later.",
       };
-    const [, major, minor, patch] = match.map(Number);
-    const supported = major > 1 || (major === 1 && (minor > 1 || (minor === 1 && patch >= 15)));
+    const [, major, minor] = match.map(Number);
+    const supported = major > 1 || (major === 1 && minor >= 5);
     if (!supported)
       return {
         available: false,
-        diagnostic: `Antigravity ${version} is unsupported. Update \`agy\` to 1.1.15 or later.`,
+        diagnostic: `Antigravity ${version} is unsupported. Update \`agy\` to 1.5.0 or later.`,
       };
     await getCatalog(launch);
     return { available: true };

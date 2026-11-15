@@ -78,7 +78,7 @@ lines.on("line", (line) => {
       .filter((part) => part.type === "text")
       .map((part) => part.text)
       .join("\n");
-    if (text.includes("APPROVAL")) {
+    if (text.includes("APPROVAL") && !process.argv.includes("--dangerously-skip-permissions")) {
       send({
         id: "approval",
         method: "session/request_permission",

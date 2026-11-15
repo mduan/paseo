@@ -23,18 +23,18 @@ Work out of the box once the underlying CLI is installed and authenticated.
 
 ### Antigravity
 
-Install the Antigravity CLI (`agy`) on your daemon host, then run `agy` once to sign in. Pick
+Install Antigravity CLI (`agy`) 1.5.0 or later on your daemon host, then run `agy` once to sign in. Pick
 **Antigravity** in Paseo. The provider ships with Paseo; no separate plugin install is required.
 Your signed-in CLI account's quota percentages and reset times appear in **Usage**, even without
 an open Antigravity chat. Keep `agy` on your daemon's `PATH` for usage queries.
 
-Three permission modes are available:
+All three permission modes use `agy acp`:
 
 - **Accept File Edits** requires `agy` 1.5.0 or later and native support for `accept-edits`.
   Antigravity approves file edits automatically. Paseo shows approval requests when other actions require your decision.
 - **Auto** requires `agy` 1.5.0 or later and an account and host that support Antigravity Auto mode.
   Antigravity approves workspace edits and safe commands. Paseo shows approval requests for actions that require your decision.
-  Auto and Accept File Edits use `agy acp`; Paseo does not automatically accept approval requests.
+  Paseo does not automatically accept approval requests in Auto or Accept File Edits.
 - **Full access** remains the default. Every tool call runs without asking because Paseo passes `--dangerously-skip-permissions`.
   Each session starts with a warning. Antigravity's own policy can still deny an action.
 
@@ -46,8 +46,7 @@ fresh because `agy` does not replay its history.
 This integration uses your installed CLI and sign-in. It is not endorsed by Google.
 
 Steering is unavailable. Your own `agy` MCP servers still work.
-Full access passes attached images as file references and does not expose Paseo MCP tools.
-Auto and Accept File Edits send images through ACP and support injected MCP servers.
+Attached images and Paseo MCP servers pass through ACP in every permission mode.
 
 If `agy` is outside your daemon's PATH, override its command in `~/.paseo/config.json`. Use `env`
 for provider-specific environment variables:
