@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PROVIDER_CAPABILITIES,
   ProviderEventSchema,
@@ -33,6 +33,7 @@ it("publishes a monochrome, theme-aware provider icon", async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(connections.splice(0).map((connection) => connection.close()));
   await Promise.all(
     temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
@@ -163,7 +164,178 @@ async function harness(env: Record<string, string> = {}) {
   };
 }
 
+function accelerateBackgroundChecks() {
+  const schedule = globalThis.setTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation((callback, delay, ...args) =>
+    schedule(callback, delay === 10000 ? 1 : delay, ...args),
+  );
+}
+
 describe("ACP permission modes", () => {
+  it("checks unfinished background tools, hides synthetic messages, and preserves the completion", async () => {
+    const h = await harness();
+    await h.open();
+    const promptId = await h.prompt("BACKGROUND");
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "assistant_message" &&
+        event.item.text === "Background task started",
+    );
+    expect(h.events.filter((event) => event.type === "session.turn")).toHaveLength(1);
+    async function promptCount() {
+      return (await h.records()).filter((record) => record.acp?.method === "session/prompt").length;
+    }
+    await expect.poll(promptCount, { timeout: 25000, interval: 20 }).toBe(3);
+    expect(await h.completed(promptId)).toMatchObject({ state: "completed" });
+    const messages = h.events.filter(
+      (event) =>
+        event.type === "timeline.item" &&
+        (event.item.type === "user_message" || event.item.type === "assistant_message"),
+    );
+    expect(
+      messages.map((event) =>
+        event.type === "timeline.item" && "text" in event.item ? event.item.text : undefined,
+      ),
+    ).toEqual(["BACKGROUND", "Background task started", "Genuine completion result"]);
+    expect(h.events.filter((event) => event.type === "session.prompt_result")).toHaveLength(1);
+    expect(
+      h.events
+        .filter((event) => event.type === "session.turn")
+        .map((event) => (event.type === "session.turn" ? event.state : undefined)),
+    ).toEqual(["started", "completed"]);
+  }, 30000);
+
+  it("stops waiting for background work when interrupted", async () => {
+    const h = await harness();
+    await h.open();
+    const promptId = await h.prompt("BACKGROUND");
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "assistant_message" &&
+        event.item.text === "Background task started",
+    );
+    await h.request({ type: "session.interrupt", requestId: "stop-background", sessionId: "s" });
+    expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+    expect(
+      h.events.findLast(
+        (event) => event.type === "timeline.item" && event.item.type === "tool_call",
+      ),
+    ).toMatchObject({ item: { status: "canceled" } });
+    expect(await h.completed(await h.prompt("HELLO"))).toMatchObject({ state: "completed" });
+  });
+
+  it("accepts user steering between background checks", async () => {
+    const h = await harness();
+    await h.open();
+    const promptId = await h.prompt("BACKGROUND");
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "assistant_message" &&
+        event.item.text === "Background task started",
+    );
+    await h.connection.send({
+      type: "session.prompt",
+      sessionId: "s",
+      prompt: {
+        clientMessageId: "background-steer",
+        delivery: "steer",
+        input: { type: "message", content: [{ type: "text", text: "change course" }] },
+      },
+    });
+    expect(
+      await h.wait(
+        (event) =>
+          event.type === "session.prompt_result" && event.clientMessageId === "background-steer",
+      ),
+    ).toMatchObject({ result: { type: "steer" } });
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "assistant_message" &&
+        event.item.text === "ACP HELLO",
+    );
+    await h.request({
+      type: "session.interrupt",
+      requestId: "stop-steered-background",
+      sessionId: "s",
+    });
+    expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+  });
+
+  it("preserves user steering during an automatic check without exposing its prompt", async () => {
+    const h = await harness({ AGY_TEST_CHECK_HOLD: "yes" });
+    await h.open();
+    accelerateBackgroundChecks();
+    const promptId = await h.prompt("BACKGROUND");
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "reasoning" &&
+        event.item.text === "Checking background task",
+    );
+    await h.connection.send({
+      type: "session.prompt",
+      sessionId: "s",
+      prompt: {
+        clientMessageId: "during-check",
+        delivery: "steer",
+        input: { type: "message", content: [{ type: "text", text: "change course" }] },
+      },
+    });
+    expect(
+      await h.wait(
+        (event) =>
+          event.type === "session.prompt_result" && event.clientMessageId === "during-check",
+      ),
+    ).toMatchObject({ result: { type: "steer" } });
+    await h.request({ type: "session.interrupt", requestId: "stop-check", sessionId: "s" });
+    expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+    const userMessages = h.events.filter(
+      (event) => event.type === "timeline.item" && event.item.type === "user_message",
+    );
+    expect(
+      userMessages.map((event) =>
+        event.type === "timeline.item" && "text" in event.item ? event.item.text : undefined,
+      ),
+    ).toEqual(["BACKGROUND", "change course"]);
+    expect(h.events).toContainEqual(
+      expect.objectContaining({
+        type: "timeline.item",
+        item: expect.objectContaining({ type: "assistant_message", text: "STEERED" }),
+      }),
+    );
+  });
+
+  it.each([
+    {
+      env: { AGY_TEST_BACKGROUND_NEVER: "yes" },
+      expectedChecks: 30,
+      error: "Background checks stopped after 30 attempts",
+    },
+    { env: { AGY_TEST_CHECK_FAIL: "yes" }, expectedChecks: 1, error: "Background check failed" },
+  ])(
+    "ends the turn when background checks fail or reach their bound ($expectedChecks)",
+    async ({ env, expectedChecks, error }) => {
+      const h = await harness(env);
+      await h.open();
+      accelerateBackgroundChecks();
+      const promptId = await h.prompt("BACKGROUND");
+      const ended = await h.completed(promptId);
+      expect(ended).toMatchObject({
+        state: "failed",
+        error: { message: expect.stringContaining(error) },
+      });
+      const records = await h.records();
+      expect(records.filter((record) => record.acp?.method === "session/prompt")).toHaveLength(
+        expectedChecks + 1,
+      );
+      expect(h.events.filter((event) => event.type === "session.prompt_result")).toHaveLength(1);
+    },
+  );
+
   it("exposes ACP skills and forwards their invocations", async () => {
     const h = await harness();
     await h.open();

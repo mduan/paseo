@@ -10,6 +10,7 @@ import type {
   ProviderPersistence,
   ProviderPrompt,
   ProviderSessionConfig,
+  ProviderTimelineItem,
 } from "@getpaseo/plugin/server/provider";
 import { AntigravityError } from "./errors.js";
 
@@ -22,9 +23,27 @@ interface AcpSessionOptions {
   emit(event: ProviderEvent): void;
 }
 
+const backgroundCheckReply = "PASEO_BACKGROUND_PENDING";
+const backgroundCheckIntervalMs = 10_000;
+const backgroundCheckLimit = 30;
+
 export class AcpSession {
   private connection?: ProviderConnection;
   private firstMessage: boolean;
+  private readonly backgroundTools = new Map<
+    string,
+    Extract<ProviderTimelineItem, { type: "tool_call" }> | undefined
+  >();
+  private readonly checkMessages = new Map<
+    string,
+    Extract<ProviderTimelineItem, { type: "assistant_message" }>
+  >();
+  private checkTimer?: ReturnType<typeof setTimeout>;
+  private checkMessageId?: string;
+  private checkAttempts = 0;
+  private turnId?: string;
+  private nativeTurnActive = false;
+  private closed = false;
   private readonly userText = new Map<string, string>();
 
   constructor(private readonly options: AcpSessionOptions) {
@@ -48,6 +67,17 @@ export class AcpSession {
       label: "Antigravity",
       command: ["agy", "acp"],
       acpOptions: { waitForInitialCommands: true, supportsSteering: true },
+      transformers: [
+        {
+          toolCall: (tool) => {
+            if (tool.status === "in_progress")
+              this.backgroundTools.set(tool.id, this.backgroundTools.get(tool.id));
+            if (tool.status === "completed" || tool.status === "failed")
+              this.backgroundTools.delete(tool.id);
+            return tool;
+          },
+        },
+      ],
     });
     const connection = await provider.connect({
       versions: [1],
@@ -89,7 +119,7 @@ export class AcpSession {
           event = { ...event, item: { ...event.item, text } };
         }
       }
-      this.options.emit(event);
+      this.emit(event);
     });
     const catalog = await this.request({
       type: "catalog",
@@ -140,6 +170,10 @@ export class AcpSession {
   async prompt(prompt: ProviderPrompt): Promise<void> {
     if (prompt.outputSchema !== undefined)
       throw new AntigravityError("Antigravity does not support structured output");
+    clearTimeout(this.checkTimer);
+    this.checkAttempts = 0;
+    if (prompt.delivery === "steer" && !this.nativeTurnActive)
+      prompt = { ...prompt, delivery: "auto" };
     let content: ProviderContent[];
     if (prompt.input.type === "command") {
       const suffix = prompt.input.arguments ? ` ${prompt.input.arguments}` : "";
@@ -173,6 +207,16 @@ export class AcpSession {
   }
 
   async interrupt(): Promise<void> {
+    clearTimeout(this.checkTimer);
+    if (!this.nativeTurnActive && this.turnId) {
+      this.finishTurn({
+        type: "session.turn",
+        sessionId: this.options.id,
+        turnId: this.turnId,
+        state: "canceled",
+      });
+      return;
+    }
     await this.request({
       type: "session.interrupt",
       requestId: randomUUID(),
@@ -194,8 +238,140 @@ export class AcpSession {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
+    clearTimeout(this.checkTimer);
+    this.backgroundTools.clear();
+    this.checkMessages.clear();
     await this.connection?.close();
     this.userText.clear();
+  }
+
+  private emit(event: ProviderEvent): void {
+    if (this.closed) return;
+    if (event.type === "timeline.item") {
+      if (event.item.type === "user_message" && event.item.id === this.checkMessageId) return;
+      if (event.item.type === "tool_call" && this.backgroundTools.has(event.item.callId)) {
+        if (event.item.status === "running")
+          this.backgroundTools.set(event.item.callId, event.item);
+        // ACP terminalizes tools at end_turn even when agy still has background work.
+        if (event.item.status === "completed") return;
+      }
+      if (this.checkMessageId && event.item.type === "assistant_message") {
+        this.checkMessages.set(event.item.id, event.item);
+        return;
+      }
+    }
+    if (event.type === "session.prompt_result") {
+      if (event.clientMessageId === this.checkMessageId) return;
+      if (this.turnId && event.result.type === "turn")
+        event = { ...event, result: { type: "steer", turnId: this.turnId } };
+    }
+    if (event.type === "session.usage" && this.turnId) event = { ...event, turnId: this.turnId };
+    if (event.type === "session.runtime_failed") {
+      clearTimeout(this.checkTimer);
+      this.backgroundTools.clear();
+      this.flushCheckMessages();
+      this.turnId = undefined;
+      this.nativeTurnActive = false;
+    }
+    if (event.type === "session.turn") {
+      this.handleTurn(event);
+      return;
+    }
+    this.options.emit(event);
+  }
+
+  private handleTurn(event: Extract<ProviderEvent, { type: "session.turn" }>): void {
+    this.nativeTurnActive = event.state === "started";
+    if (event.state === "started") {
+      if (this.turnId) return;
+      this.turnId = event.turnId;
+    } else {
+      this.flushCheckMessages();
+      this.checkMessageId = undefined;
+      if (event.state === "completed" && this.backgroundTools.size) {
+        if (this.checkAttempts < backgroundCheckLimit) {
+          this.checkTimer = setTimeout(
+            () => void this.checkBackground(),
+            backgroundCheckIntervalMs,
+          );
+          return;
+        }
+        event = {
+          ...event,
+          state: "failed",
+          error: {
+            message:
+              "Background checks stopped after 30 attempts. Send a message to check the task again.",
+          },
+        };
+      }
+      this.finishTurn(event);
+      return;
+    }
+    this.options.emit(event);
+  }
+
+  private flushCheckMessages(): void {
+    for (const item of this.checkMessages.values()) {
+      if (item.text.trim() !== backgroundCheckReply)
+        this.options.emit({ type: "timeline.item", sessionId: this.options.id, item });
+    }
+    this.checkMessages.clear();
+  }
+
+  private finishTurn(event: Extract<ProviderEvent, { type: "session.turn" }>): void {
+    for (const item of this.backgroundTools.values()) {
+      if (!item) continue;
+      const terminalItem: Extract<ProviderTimelineItem, { type: "tool_call" }> =
+        event.state === "canceled"
+          ? { ...item, status: "canceled", error: null }
+          : {
+              ...item,
+              status: "failed",
+              error: { message: event.error?.message ?? "Background task status is unknown" },
+            };
+      this.options.emit({ type: "timeline.item", sessionId: this.options.id, item: terminalItem });
+    }
+    this.options.emit({ ...event, turnId: this.turnId ?? event.turnId });
+    this.turnId = undefined;
+    this.backgroundTools.clear();
+  }
+
+  private async checkBackground(): Promise<void> {
+    if (this.closed || this.nativeTurnActive || !this.backgroundTools.size) return;
+    this.checkAttempts++;
+    this.checkMessageId = randomUUID();
+    try {
+      await this.request({
+        type: "session.prompt",
+        sessionId: this.options.id,
+        prompt: {
+          clientMessageId: this.checkMessageId,
+          delivery: "auto",
+          input: {
+            type: "message",
+            content: [
+              {
+                type: "text",
+                text: `Automatic check for the existing background task. Do not start or repeat work or call tools. Preserve any pending background completion report, but do not repeat it. Reply only ${backgroundCheckReply}.`,
+              },
+            ],
+          },
+        },
+      });
+    } catch (error) {
+      this.flushCheckMessages();
+      this.checkMessageId = undefined;
+      if (!this.closed && this.turnId)
+        this.finishTurn({
+          type: "session.turn",
+          sessionId: this.options.id,
+          turnId: this.turnId,
+          state: "failed",
+          error: { message: error instanceof Error ? error.message : String(error) },
+        });
+    }
   }
 
   private async request(input: ProviderInput): Promise<ProviderEvent> {

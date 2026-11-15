@@ -7,6 +7,8 @@ let model = "gemini-3.8-flash";
 let effort = "low";
 let mode = "default";
 let pendingPrompt;
+let backgroundChecks = 0;
+let background = false;
 function send(message) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 }
@@ -73,6 +75,93 @@ function configure(input) {
   }
   send({ id: input.id, result: { configOptions: options() } });
 }
+function backgroundPrompt(text) {
+  if (text.endsWith("BACKGROUND")) {
+    background = true;
+    send({
+      method: "session/update",
+      params: {
+        sessionId,
+        update: {
+          sessionUpdate: "tool_call",
+          toolCallId: "background-command",
+          title: "Background command",
+          kind: "execute",
+          status: "in_progress",
+          rawInput: { CommandLine: "sleep 30", WaitMsBeforeAsync: 500 },
+        },
+      },
+    });
+    complete("Background task started");
+  } else {
+    backgroundChecks++;
+    if (process.env.AGY_TEST_CHECK_HOLD === "yes") {
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "agent_thought_chunk",
+            content: { type: "text", text: "Checking background task" },
+          },
+        },
+      });
+      return;
+    }
+    if (process.env.AGY_TEST_CHECK_FAIL === "yes") {
+      send({ id: pendingPrompt, error: { code: -32603, message: "Background check failed" } });
+      pendingPrompt = undefined;
+      return;
+    }
+    if (background && backgroundChecks === 2 && process.env.AGY_TEST_BACKGROUND_NEVER !== "yes") {
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "background-command",
+            status: "completed",
+            rawOutput: { output: "BACKGROUND RESULT" },
+          },
+        },
+      });
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "Genuine completion result" },
+          },
+        },
+      });
+      // The echoed user message separates buffered background output from the new reply.
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "user_message_chunk",
+            content: { type: "text", text },
+          },
+        },
+      });
+      background = false;
+    }
+    send({
+      method: "session/update",
+      params: {
+        sessionId,
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "PASEO_BACKGROUND_" },
+        },
+      },
+    });
+    complete("PENDING");
+  }
+}
 lines.on("line", (line) => {
   const input = JSON.parse(line);
   if (process.env.AGY_TEST_LOG)
@@ -130,7 +219,9 @@ lines.on("line", (line) => {
       .filter((part) => part.type === "text")
       .map((part) => part.text)
       .join("\n");
-    if (text.includes("HOLD")) {
+    if (text.includes("BACKGROUND")) {
+      backgroundPrompt(text);
+    } else if (text.includes("HOLD")) {
       send({
         method: "session/update",
         params: {
