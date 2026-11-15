@@ -10,6 +10,12 @@ import { AntigravityError } from "./wire.js";
 
 const modes: readonly ProviderMode[] = [
   {
+    id: "accept-edits",
+    icon: "ShieldCheck",
+    label: "Accept File Edits",
+    description: "Approve file edits automatically; ask when other actions require approval.",
+  },
+  {
     id: "auto",
     icon: "ShieldCheck",
     label: "Auto",
@@ -41,7 +47,7 @@ export async function getCatalog(launch: ProviderLaunch, cwd?: string): Promise<
   const supportsAcp = major > 1 || (major === 1 && minor >= 5);
   return {
     models,
-    modes: supportsAcp ? modes : modes.filter((mode) => mode.id !== "auto"),
+    modes: supportsAcp ? modes : modes.filter((mode) => mode.id === "full-access"),
     thinkingOptions: [],
     defaultMode: "full-access",
   };

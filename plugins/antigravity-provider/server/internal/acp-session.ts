@@ -12,7 +12,7 @@ import type {
 } from "@getpaseo/plugin/server/provider";
 import { AntigravityError } from "./wire.js";
 
-interface AutoSessionOptions {
+interface AcpSessionOptions {
   id: string;
   config: ProviderSessionConfig;
   launch: ProviderLaunch;
@@ -21,21 +21,21 @@ interface AutoSessionOptions {
   emit(event: ProviderEvent): void;
 }
 
-export class AutoSession {
+export class AcpSession {
   private connection?: ProviderConnection;
   private firstMessage: boolean;
   private readonly userText = new Map<string, string>();
 
-  constructor(private readonly options: AutoSessionOptions) {
+  constructor(private readonly options: AcpSessionOptions) {
     this.firstMessage = options.firstMessage;
   }
 
   async open(requestId: string, capabilities: readonly string[]): Promise<void> {
     if (!capabilities.includes("permission"))
-      throw new AntigravityError("Antigravity Auto mode requires permission-response support");
+      throw new AntigravityError("Antigravity approval modes require permission-response support");
     if (this.options.launch.args.some((arg) => arg.startsWith("--dangerously-skip-permissions")))
       throw new AntigravityError(
-        "Remove --dangerously-skip-permissions from the Antigravity command to use Auto mode",
+        "Remove --dangerously-skip-permissions from the Antigravity command to use an approval mode",
       );
     const provider = runAcpProvider({
       id: "antigravity",
@@ -84,9 +84,12 @@ export class AutoSession {
       requestId: randomUUID(),
       cwd: this.options.config.cwd,
     });
-    if (catalog.type !== "catalog" || !catalog.catalog.modes.some((mode) => mode.id === "auto"))
+    if (
+      catalog.type !== "catalog" ||
+      !catalog.catalog.modes.some((mode) => mode.id === this.options.config.mode)
+    )
       throw new AntigravityError(
-        "Antigravity Auto mode is unavailable for this account or host",
+        `Antigravity mode ${this.options.config.mode} is unavailable for this account or host`,
         "UNSUPPORTED_MODE",
       );
     let persistence: ProviderPersistence | undefined;
@@ -108,7 +111,7 @@ export class AutoSession {
       requestId,
       sessionId: this.options.id,
       history: "skip",
-      config: { ...this.options.config, mode: "auto" },
+      config: this.options.config,
       persistence,
     });
     this.options.emit({

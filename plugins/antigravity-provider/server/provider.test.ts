@@ -204,7 +204,7 @@ it("streams complete text snapshots, prefixes the system prompt only once and pr
   ).toEqual(["SYSTEM PREFIX\n\nHELLO", "HELLO AGAIN"]);
 });
 
-describe("Auto mode", () => {
+describe("ACP approval modes", () => {
   it("keeps the combined catalog model ID when ACP reports separate model and effort values", async () => {
     const model = "gemini-3.8-flash-low";
     const h = await harness({
@@ -223,10 +223,15 @@ describe("Auto mode", () => {
     expect(config.config.thinkingOption).toBeUndefined();
     expect(config.config.models.some((entry) => entry.id === model)).toBe(true);
   });
-  it.each(["allow", "deny"] as const)(
-    "returns %s to the native ACP permission request",
-    async (behavior) => {
-      const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: "auto" });
+  it.each([
+    { mode: "auto", behavior: "allow" },
+    { mode: "auto", behavior: "deny" },
+    { mode: "accept-edits", behavior: "allow" },
+    { mode: "accept-edits", behavior: "deny" },
+  ] as const)(
+    "returns $behavior to the native $mode permission request",
+    async ({ mode, behavior }) => {
+      const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: mode });
       await h.open();
       expect(
         h.events.some((event) => event.type === "session.notice" && !event.notice.dismissed),
@@ -267,7 +272,7 @@ describe("Auto mode", () => {
       ).toBe(true);
       expect(
         records.find((record) => record.acp?.method === "session/set_mode").acp.params.modeId,
-      ).toBe("auto");
+      ).toBe(mode);
       expect(
         records.find((record) => record.acp?.method === "session/prompt").acp.params.prompt,
       ).toEqual([
@@ -287,30 +292,41 @@ describe("Auto mode", () => {
     expect(await h.completed(await h.prompt("HELLO"))).toMatchObject({ state: "completed" });
   });
 
-  it("rejects Auto when the native session does not offer it", async () => {
-    const h = await harness({
-      AGY_TEST_VERSION: "1.5.9",
-      AGY_TEST_MODE: "auto",
-      AGY_TEST_AUTO_UNAVAILABLE: "yes",
-    });
-    await h.open();
-    expect(h.events).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: "request.failed",
-          error: expect.objectContaining({ code: "UNSUPPORTED_MODE" }),
-        }),
-      ]),
-    );
-    expect((await h.records()).some((record) => record.acp?.method === "session/prompt")).toBe(
-      false,
-    );
-  });
+  it.each(["auto", "accept-edits"])(
+    "rejects %s when the native session does not offer it",
+    async (mode) => {
+      const h = await harness({
+        AGY_TEST_VERSION: "1.5.9",
+        AGY_TEST_MODE: mode,
+        [mode === "auto" ? "AGY_TEST_AUTO_UNAVAILABLE" : "AGY_TEST_ACCEPT_EDITS_UNAVAILABLE"]:
+          "yes",
+      });
+      await h.open();
+      expect(h.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "request.failed",
+            error: expect.objectContaining({ code: "UNSUPPORTED_MODE" }),
+          }),
+        ]),
+      );
+      expect((await h.records()).some((record) => record.acp?.method === "session/prompt")).toBe(
+        false,
+      );
+    },
+  );
 
-  it("switches between Full access and Auto while preserving the conversation", async () => {
+  it("switches between all modes while preserving the conversation", async () => {
     const h = await harness({ AGY_TEST_VERSION: "1.5.9" });
     await h.open();
     const persistence = h.persistence();
+    await h.request({
+      type: "session.configure",
+      requestId: "accept-edits",
+      sessionId: "s",
+      changes: { mode: "accept-edits" },
+    });
+    await h.completed(await h.prompt("HELLO ACCEPT EDITS"));
     await h.request({
       type: "session.configure",
       requestId: "auto",
@@ -332,6 +348,11 @@ describe("Auto mode", () => {
     expect(
       records.find((record) => record.acp?.method === "session/prompt").acp.params.prompt[0],
     ).toEqual({ type: "text", text: "SYSTEM PREFIX" });
+    expect(
+      records
+        .filter((record) => record.acp?.method === "session/set_mode")
+        .map((record) => record.acp.params.modeId),
+    ).toEqual(["accept-edits", "auto"]);
     const launches = records.filter((record) => record.args?.includes("--conversation"));
     expect(launches.at(-1).args).toContain(persistence.data.conversationId);
     expect(h.events.filter((event) => event.type === "session.opened")).toHaveLength(1);
@@ -782,6 +803,23 @@ describe("discovery", () => {
   it.each(["1.1.15", "1.2.12", "1.2.13"])("accepts driver-capable version %s", async (version) => {
     const h = await harness({ AGY_TEST_VERSION: version });
     expect(await provider.status?.({ launch: h.launch })).toEqual({ available: true });
+  });
+
+  it("exposes Accept File Edits alongside Auto and Full access on ACP-capable versions", async () => {
+    const h = await harness({ AGY_TEST_VERSION: "1.5.9" });
+    await h.request({ type: "catalog", requestId: "catalog" });
+    const event = h.events[0];
+    expect(event).toMatchObject({
+      type: "catalog",
+      catalog: {
+        defaultMode: "full-access",
+        modes: [
+          expect.objectContaining({ id: "accept-edits", label: "Accept File Edits" }),
+          expect.objectContaining({ id: "auto", label: "Auto" }),
+          expect.objectContaining({ id: "full-access", label: "Full access" }),
+        ],
+      },
+    });
   });
 
   it("parses tab-separated catalog and exposes only full access without thinking options", async () => {

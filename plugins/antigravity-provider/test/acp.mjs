@@ -36,6 +36,8 @@ function session() {
   const availableModes = [{ id: "default", name: "Default" }];
   if (process.env.AGY_TEST_AUTO_UNAVAILABLE !== "yes")
     availableModes.push({ id: "auto", name: "Auto" });
+  if (process.env.AGY_TEST_ACCEPT_EDITS_UNAVAILABLE !== "yes")
+    availableModes.push({ id: "accept-edits", name: "Accept Edits" });
   return { sessionId, modes: { currentModeId: mode, availableModes }, configOptions: options() };
 }
 function complete(text) {

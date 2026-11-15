@@ -12,7 +12,7 @@ import {
   type ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
 import { getCatalog, getStatus, validateSelection } from "./internal/catalog.js";
-import { AutoSession } from "./internal/auto-session.js";
+import { AcpSession } from "./internal/acp-session.js";
 import { Session } from "./internal/session.js";
 import { selection } from "./internal/process.js";
 import { AntigravityError } from "./internal/wire.js";
@@ -26,7 +26,7 @@ const capabilities = [
 ] as const;
 
 interface OpenSession {
-  backend?: Session | AutoSession;
+  backend?: Session | AcpSession;
   config: ProviderSessionConfig;
   persistence?: ProviderPersistence;
   active: boolean;
@@ -125,7 +125,7 @@ function createConnection(
     restoring = false,
   ): Promise<void> {
     await opened.backend?.close();
-    const Backend = opened.config.mode === "auto" ? AutoSession : Session;
+    const Backend = opened.config.mode === "full-access" ? Session : AcpSession;
     const backend = new Backend({
       id,
       config: opened.config,
@@ -239,7 +239,7 @@ function createConnection(
         break;
       case "session.permission": {
         const backend = session(input.sessionId).backend;
-        if (!(backend instanceof AutoSession))
+        if (!(backend instanceof AcpSession))
           throw new AntigravityError("Full access has no pending approvals");
         await backend.respondToPermission(input.permissionId, input.response);
         return;
