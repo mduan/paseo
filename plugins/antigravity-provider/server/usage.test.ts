@@ -136,6 +136,7 @@ test("registers quota windows for the existing usage cards and sidebar", async (
   });
   const sidebar = resolvePinnedUsage(reports, DEFAULT_USAGE_PREFERENCES);
   expect(sidebar[0]?.windows.map((window) => window.percent)).toEqual([25, 100, 0, 75]);
+  expect(sidebar[0]?.windows.map((window) => window.shortLabel)).toEqual(["wk", "5h", "wk", "wk"]);
   expect(probe).toHaveBeenCalledWith({
     launch: { command: "agy", args: [], env: expect.any(Object) },
     args: ["-p", "/usage", "--output-format", "json"],

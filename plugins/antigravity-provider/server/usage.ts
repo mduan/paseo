@@ -60,7 +60,7 @@ export async function fetchUsage(): Promise<UsageReport> {
       return windowFromUsedPct({
         id: bucket.id,
         label: `${group.name} · ${bucket.name.replace(/ Remaining$/, "")}`,
-        shortLabel: `${group.name} ${bucket.window}`,
+        shortLabel: bucket.window === "weekly" ? "wk" : bucket.window,
         summary: true,
         utilizationPct: usedPct,
         resetsAt: bucket.reset_time,
