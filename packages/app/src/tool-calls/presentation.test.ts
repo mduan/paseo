@@ -91,4 +91,38 @@ describe("tool-call presentation", () => {
     expect(presentation.isPlan).toBe(true);
     expect(presentation.icon).toBe(fakeIcons.brain);
   });
+
+  it("builds a normalized single-line preview summary for thinking calls", () => {
+    const presentation = buildToolCallPresentation({
+      toolName: "thinking",
+      status: "completed",
+      error: null,
+      detail: {
+        type: "unknown",
+        input: "  Checking\n\n  workspace   ports\tbefore editing  ",
+        output: null,
+      },
+      resolveIcon: fakeResolveIcon,
+    });
+
+    expect(presentation.displayName).toBe("Thinking");
+    expect(presentation.summary).toBe("Checking workspace ports before editing");
+  });
+
+  it("omits thinking preview summary when input is blank", () => {
+    const presentation = buildToolCallPresentation({
+      toolName: "thinking",
+      status: "executing",
+      error: null,
+      detail: {
+        type: "unknown",
+        input: "   \n  ",
+        output: null,
+      },
+      resolveIcon: fakeResolveIcon,
+    });
+
+    expect(presentation.displayName).toBe("Thinking");
+    expect(presentation.summary).toBeUndefined();
+  });
 });

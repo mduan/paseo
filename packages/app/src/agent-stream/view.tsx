@@ -603,7 +603,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           head: effectiveStreamHead ?? EMPTY_STREAM_HEAD,
           transform: transformTimelineItem,
           level: toolCallDetailLevel,
-          includeThoughts: context.provider === "antigravity",
           isTurnActive,
         }),
       [
@@ -612,7 +611,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         effectiveStreamHead,
         transformTimelineItem,
         toolCallDetailLevel,
-        context.provider,
         isTurnActive,
       ],
     );
@@ -911,22 +909,10 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       presentation.groupsByHostId.get(hostId),
     );
     const renderToolCallItem = useCallback(
-      (
-        layoutItem: StreamLayoutItem,
-        item: Extract<StreamItem, { kind: "tool_call" | "thought" }>,
-      ) => {
+      (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "tool_call" }>) => {
         const group = getToolCallGroup(item.id);
         if (!group) {
-          return item.kind === "thought"
-            ? renderThoughtItem(layoutItem, item)
-            : renderSingleToolCallItem(item);
-        }
-        if (group.run.calls.length === 0) {
-          return group.run.items.map((thought) => (
-            <React.Fragment key={thought.id}>
-              {thought.kind === "thought" ? renderThoughtItem(layoutItem, thought) : null}
-            </React.Fragment>
-          ));
+          return renderSingleToolCallItem(item);
         }
         const expanded = expandedToolCallGroupIds.has(group.run.id);
         return (
@@ -936,11 +922,9 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             onExpandedChange={setToolCallGroupExpanded}
           >
             {expanded
-              ? group.run.items.map((call) => (
+              ? group.run.calls.map((call) => (
                   <React.Fragment key={call.id}>
-                    {call.kind === "thought"
-                      ? renderThoughtItem(layoutItem, call)
-                      : renderSingleToolCallItem(call, GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT)}
+                    {renderSingleToolCallItem(call, GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT)}
                   </React.Fragment>
                 ))
               : null}
@@ -951,7 +935,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         expandedToolCallGroupIds,
         getToolCallGroup,
         renderSingleToolCallItem,
-        renderThoughtItem,
         setToolCallGroupExpanded,
       ],
     );
@@ -967,6 +950,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             return renderAssistantMessageItem(layoutItem, item);
 
           case "thought":
+            return renderThoughtItem(layoutItem, item);
+
           case "tool_call":
             return renderToolCallItem(layoutItem, item);
 
@@ -1007,6 +992,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         agentId,
         renderUserMessageItem,
         renderAssistantMessageItem,
+        renderThoughtItem,
         renderToolCallItem,
         resolvedServerId,
       ],

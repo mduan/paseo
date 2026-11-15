@@ -61,7 +61,7 @@ import { MarkdownRenderer, type MarkdownStyles } from "@/components/markdown/ren
 import type { TaskActivity, TodoEntry, UserMessageImageAttachment } from "@/types/stream";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
-import { buildToolCallPresentation } from "@/tool-calls/presentation";
+import { buildToolCallPresentation, isThinkingToolName } from "@/tool-calls/presentation";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
 import { markdownNodeContainsType } from "@/utils/markdown-ast";
@@ -3205,13 +3205,17 @@ export const ToolCall = memo(function ToolCall({
     );
   }
 
+  const isInlineExpanded = shouldRenderInline && isExpanded;
+  const secondaryLabel =
+    isInlineExpanded && isThinkingToolName(toolName) ? undefined : presentation.summary;
+
   return (
     <ExpandableBadge
       testID="tool-call-badge"
       label={presentation.displayName}
-      secondaryLabel={presentation.summary}
+      secondaryLabel={secondaryLabel}
       icon={presentation.icon}
-      isExpanded={shouldRenderInline && isExpanded}
+      isExpanded={isInlineExpanded}
       onToggle={presentation.canOpenDetails ? handleToggle : undefined}
       onOpenFile={handleOpenFile}
       renderDetails={presentation.canOpenDetails && shouldRenderInline ? renderDetails : undefined}
