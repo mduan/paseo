@@ -11,7 +11,7 @@ import {
   type ProviderPersistence,
   type ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
-import { getCatalog, getStatus, validateSelection } from "./internal/catalog.js";
+import { getCatalog, getStatus, resolveSelection } from "./internal/catalog.js";
 import { AcpSession } from "./internal/acp-session.js";
 import { selection } from "./internal/process.js";
 import { AntigravityError } from "./internal/errors.js";
@@ -97,20 +97,20 @@ function createConnection(
           if (!event.notice.dismissed && opened.fullAccessNoticeShown) return;
           opened.fullAccessNoticeShown = !event.notice.dismissed;
         }
-        if (event.type === "session.config")
+        if (event.type === "session.config") {
+          opened.config.model = event.config.model;
+          opened.config.thinkingOption = event.config.thinkingOption;
           event = {
             ...event,
             config: {
               ...event.config,
-              model: opened.config.model,
               mode: opened.config.mode,
-              thinkingOption: undefined,
               models: catalog().models,
               modes: catalog().modes,
-              thinkingOptions: [],
               settings: [],
             },
           };
+        }
       }
     }
     for (const listener of listeners) listener(event);
@@ -170,7 +170,19 @@ function createConnection(
           ? undefined
           : (input.changes.thinkingOption ?? opened.config.thinkingOption),
     };
-    validateSelection(config, catalog());
+    const modelChanged =
+      input.changes.model !== undefined && input.changes.model !== opened.config.model;
+    if (modelChanged && input.changes.thinkingOption === undefined) {
+      const model = catalog().models.find(
+        (entry) => entry.id === config.model || entry.aliases?.includes(config.model ?? ""),
+      );
+      if (
+        model?.id !== config.model ||
+        !model?.thinkingOptions?.some((option) => option.id === config.thinkingOption)
+      )
+        config.thinkingOption = undefined;
+    }
+    Object.assign(config, resolveSelection(config, catalog()));
     if (input.changes.settings && Object.keys(input.changes.settings).length)
       throw new AntigravityError("Antigravity has no configurable settings");
     opened.config = config;
@@ -179,11 +191,13 @@ function createConnection(
       sessionId: input.sessionId,
       config: {
         model: config.model,
+        thinkingOption: config.thinkingOption,
         mode: config.mode,
         modes: catalog().modes,
         models: catalog().models,
         settings: [],
-        thinkingOptions: [],
+        thinkingOptions:
+          catalog().models.find((model) => model.id === config.model)?.thinkingOptions ?? [],
       },
     });
   }
@@ -202,7 +216,7 @@ function createConnection(
           throw new AntigravityError(`Session already exists: ${input.sessionId}`);
         if (discovered === null) discovered = await getCatalog(launch, input.config.cwd);
         const config = { ...input.config, mode: input.config.mode ?? "full-access" };
-        validateSelection(config, catalog());
+        Object.assign(config, resolveSelection(config, catalog()));
         const opened: OpenSession = {
           config,
           persistence: input.persistence,

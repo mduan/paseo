@@ -93,6 +93,7 @@ async function harness(env: Record<string, string> = {}) {
         cwd,
         mode: env.AGY_TEST_MODE,
         model: env.AGY_TEST_MODEL,
+        thinkingOption: env.AGY_TEST_EFFORT,
         env: { AGY_SESSION_VALUE: "session-overlay" },
         settings: {},
         mcpServers: {},
@@ -228,24 +229,109 @@ describe("ACP permission modes", () => {
     });
   });
 
-  it("keeps the combined catalog model ID when ACP reports separate model and effort values", async () => {
-    const model = "gemini-3.8-flash-low";
+  it("restores a combined model ID as separate model and effort values", async () => {
+    const h = await harness({ AGY_TEST_MODEL: "gemini-3.8-flash-high" });
+    await h.open();
+    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
+      type: "session.config",
+      config: { model: "gemini-3.8-flash", thinkingOption: "high" },
+    });
+    const records = await h.records();
+    expect(
+      records
+        .filter((record) => record.acp?.method === "session/set_config_option")
+        .map((record) => record.acp.params),
+    ).toEqual([
+      expect.objectContaining({ configId: "model", value: "gemini-3.8-flash" }),
+      expect.objectContaining({ configId: "thought_level", value: "high" }),
+    ]);
+    await h.request({
+      type: "session.configure",
+      requestId: "legacy-low",
+      sessionId: "s",
+      changes: { model: "gemini-3.8-flash-low" },
+    });
+    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
+      config: { model: "gemini-3.8-flash", thinkingOption: "low" },
+    });
+  });
+
+  it.each(["full-access", "auto", "accept-edits"])(
+    "changes effort separately in %s without losing the conversation",
+    async (mode) => {
+      const h = await harness({
+        AGY_TEST_MODE: mode,
+        AGY_TEST_MODEL: "gemini-3.8-flash",
+        AGY_TEST_EFFORT: "high",
+      });
+      await h.open();
+      await h.completed(await h.prompt("FIRST"));
+      const persistence = h.persistence();
+      await h.request({
+        type: "session.configure",
+        requestId: "effort",
+        sessionId: "s",
+        changes: { thinkingOption: "low" },
+      });
+      expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
+        config: { model: "gemini-3.8-flash", thinkingOption: "low" },
+      });
+      await h.completed(await h.prompt("SECOND"));
+      const records = await h.records();
+      expect(
+        records
+          .filter(
+            (record) =>
+              record.acp?.method === "session/set_config_option" &&
+              record.acp.params.configId === "thought_level",
+          )
+          .map((record) => record.acp.params.value),
+      ).toEqual(["high", "low"]);
+      expect(
+        records.find((record) => record.acp?.method === "session/load").acp.params.sessionId,
+      ).toBe(persistence.data.conversationId);
+    },
+  );
+
+  it("rejects unsupported effort and keeps the previous selection", async () => {
+    const h = await harness({ AGY_TEST_MODEL: "gemini-3.1-pro", AGY_TEST_EFFORT: "high" });
+    await h.open();
+    await h.request({
+      type: "session.configure",
+      requestId: "invalid-effort",
+      sessionId: "s",
+      changes: { thinkingOption: "medium" },
+    });
+    expect(h.events.find((event) => event.type === "request.failed")).toMatchObject({
+      requestId: "invalid-effort",
+      error: { code: "INVALID_THINKING" },
+    });
+    await h.completed(await h.prompt("FIRST"));
+    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
+      config: { model: "gemini-3.1-pro", thinkingOption: "high" },
+    });
+  });
+
+  it("clears effort when switching to a fixed-effort model", async () => {
     const h = await harness({
-      AGY_TEST_VERSION: "1.5.9",
-      AGY_TEST_MODE: "auto",
-      AGY_TEST_MODEL: model,
-      AGY_TEST_NORMALIZE_MODEL: "yes",
+      AGY_TEST_CATALOG:
+        "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
+      AGY_TEST_MODEL: "gemini-3.8-flash",
+      AGY_TEST_EFFORT: "high",
     });
     await h.open();
-    const config = h.events.findLast((event) => event.type === "session.config");
-    expect(config).toMatchObject({
-      type: "session.config",
-      config: { model, thinkingOptions: [] },
+    await h.request({
+      type: "session.configure",
+      requestId: "fixed",
+      sessionId: "s",
+      changes: { model: "gpt-oss-120b-medium" },
     });
-    if (config?.type !== "session.config") throw new Error("Missing config");
-    expect(config.config.thinkingOption).toBeUndefined();
-    expect(config.config.models.some((entry) => entry.id === model)).toBe(true);
+    await h.completed(await h.prompt("FIRST"));
+    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
+      config: { model: "gpt-oss-120b-medium", thinkingOption: undefined, thinkingOptions: [] },
+    });
   });
+
   it.each([
     { mode: "auto", behavior: "allow" },
     { mode: "auto", behavior: "deny" },
@@ -490,7 +576,7 @@ describe("discovery", () => {
     });
   });
 
-  it("parses the tab-separated catalog without thinking options", async () => {
+  it("groups model families and exposes only their supported efforts", async () => {
     const h = await harness();
     await h.request({ type: "catalog", requestId: "catalog" });
     const event = h.events[0];
@@ -498,20 +584,57 @@ describe("discovery", () => {
       type: "catalog",
       catalog: {
         models: expect.arrayContaining([
-          { id: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)" },
+          expect.objectContaining({
+            id: "gemini-3.8-flash",
+            label: "Gemini 3.8 Flash",
+            thinkingOptions: [
+              { id: "low", label: "Low" },
+              { id: "medium", label: "Medium" },
+              { id: "high", label: "High" },
+            ],
+          }),
         ]),
-        thinkingOptions: [],
         defaultMode: "full-access",
       },
     });
     if (event.type !== "catalog") throw new Error("Missing catalog");
-    expect(event.catalog.models).toHaveLength(11);
+    expect(event.catalog.models).toHaveLength(4);
+    expect(
+      event.catalog.models.find((model) => model.id === "gemini-3.1-pro")?.thinkingOptions,
+    ).toEqual([
+      { id: "low", label: "Low" },
+      { id: "high", label: "High" },
+    ]);
     expect(event.catalog.modes.map((mode) => mode.id)).toEqual([
       "accept-edits",
       "auto",
       "full-access",
     ]);
   });
+  it("keeps fixed-effort IDs literal and exposes Extra with the native xhigh value", async () => {
+    const h = await harness({
+      AGY_TEST_CATALOG:
+        "gemini-4-hydrogen-high\tGemini 4 Hydrogen (High)\ngemini-4-hydrogen-xhigh\tGemini 4 Hydrogen (XHigh)\ngpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
+    });
+    await h.request({ type: "catalog", requestId: "catalog" });
+    expect(h.events[0]).toMatchObject({
+      type: "catalog",
+      catalog: {
+        models: [
+          {
+            id: "gemini-4-hydrogen",
+            label: "Gemini 4 Hydrogen",
+            thinkingOptions: [
+              { id: "high", label: "High" },
+              { id: "xhigh", label: "Extra" },
+            ],
+          },
+          { id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)", thinkingOptions: [] },
+        ],
+      },
+    });
+  });
+
   it("reports missing, old, unauthenticated and available launches", async () => {
     expect(await provider.status?.({})).toMatchObject({
       available: false,

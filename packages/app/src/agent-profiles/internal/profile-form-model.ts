@@ -8,7 +8,10 @@ import type {
 import type { AgentProfile } from "@getpaseo/protocol/messages";
 import { formatAgentModeLabel, formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { applyFeatureValues, pruneFeatureValues } from "@/hooks/feature-preferences";
-import { filterSelectableModels } from "@/provider-selection/model-catalog";
+import {
+  filterSelectableModels,
+  resolveAntigravityModelAlias,
+} from "@/provider-selection/model-catalog";
 
 /**
  * The persisted profile minus the id; the list owns identity.
@@ -430,7 +433,15 @@ export function openAgentProfileForm(snapshot: AgentProfileFormSnapshot): AgentP
   function derive(incoming: AgentProfileFormState): AgentProfileFormState {
     const models = resolveModels(entries, incoming.provider);
     const modes = resolveModes(entries, incoming.provider);
-    const next = seedSelections(incoming, {
+    const alias = resolveAntigravityModelAlias(models, incoming.modelId);
+    const normalized = alias
+      ? {
+          ...incoming,
+          modelId: alias.modelId,
+          thinkingOptionId: incoming.thinkingOptionId || alias.thinkingOptionId,
+        }
+      : incoming;
+    const next = seedSelections(normalized, {
       entry: findEntry(entries, incoming.provider),
       models,
       modes,

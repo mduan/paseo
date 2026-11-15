@@ -476,3 +476,39 @@ describe("buildFeatureRequestKey", () => {
     );
   });
 });
+
+it("splits an existing Antigravity profile's combined model without changing its effort", () => {
+  const model = openAgentProfileForm({
+    mode: "edit",
+    profile: {
+      id: "legacy",
+      name: "Argon High",
+      provider: "antigravity",
+      model: "gemini-4-argon-high",
+    },
+  });
+  model.applyProviderCatalog([
+    {
+      provider: "antigravity",
+      status: "ready",
+      enabled: true,
+      models: [
+        {
+          provider: "antigravity",
+          id: "gemini-4-argon",
+          label: "Gemini 4 Argon",
+          aliases: ["gemini-4-argon-high"],
+          defaultThinkingOptionId: "medium",
+          thinkingOptions: [
+            { id: "medium", label: "Medium" },
+            { id: "high", label: "High" },
+          ],
+        },
+      ],
+    },
+  ]);
+  expect(model.getState().submitValue).toMatchObject({
+    model: "gemini-4-argon",
+    thinkingOptionId: "high",
+  });
+});

@@ -3,33 +3,38 @@ import { createInterface } from "node:readline";
 
 const lines = createInterface({ input: process.stdin });
 let sessionId;
-let model = "gemini-3.8-flash-low";
+let model = "gemini-3.8-flash";
+let effort = "low";
 let mode = "default";
 let pendingPrompt;
 function send(message) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 }
 function options() {
-  const selectedModel = process.env.AGY_TEST_NORMALIZE_MODEL
-    ? model.replace(/-(high|low)$/, "")
-    : model;
   return [
     {
       id: "model",
       name: "Model",
       category: "model",
       type: "select",
-      currentValue: selectedModel,
-      options: [{ value: selectedModel, name: selectedModel }],
+      currentValue: model,
+      options: [{ value: model, name: model }],
     },
-    {
-      id: "effort",
-      name: "Effort",
-      category: "thought_level",
-      type: "select",
-      currentValue: "low",
-      options: [{ value: "low", name: "Low" }],
-    },
+    ...(model === "gpt-oss-120b-medium"
+      ? []
+      : [
+          {
+            id: "thought_level",
+            name: "Thinking Level",
+            category: "thought_level",
+            type: "select",
+            currentValue: effort,
+            options: (model === "gemini-3.1-pro"
+              ? ["low", "high"]
+              : ["low", "medium", "high", ...(model === "gemini-4-hydrogen" ? ["xhigh"] : [])]
+            ).map((value) => ({ value, name: value })),
+          },
+        ]),
   ];
 }
 function session() {
@@ -51,6 +56,27 @@ function complete(text) {
   send({ id: pendingPrompt, result: { stopReason: "end_turn" } });
   pendingPrompt = undefined;
 }
+function configure(input) {
+  if (input.params.configId === "model") {
+    const variant = /^(.*)-(low|medium|high|xhigh|max)$/.exec(input.params.value);
+    if (variant && input.params.value !== "gpt-oss-120b-medium") {
+      model = variant[1];
+      effort = variant[2];
+    } else model = input.params.value;
+    if (model === "gemini-3.1-pro" && effort === "medium") effort = "low";
+  } else if (input.params.configId === "thought_level") {
+    if (
+      !options()
+        .find((option) => option.category === "thought_level")
+        ?.options.some((option) => option.value === input.params.value)
+    ) {
+      send({ id: input.id, error: { code: -32602, message: "Unsupported effort" } });
+      return;
+    }
+    effort = input.params.value;
+  }
+  send({ id: input.id, result: { configOptions: options() } });
+}
 lines.on("line", (line) => {
   const input = JSON.parse(line);
   if (process.env.AGY_TEST_LOG)
@@ -70,8 +96,7 @@ lines.on("line", (line) => {
     mode = input.params.modeId;
     send({ id: input.id, result: {} });
   } else if (input.method === "session/set_config_option") {
-    model = input.params.value;
-    send({ id: input.id, result: { configOptions: options() } });
+    configure(input);
   } else if (input.method === "session/prompt") {
     pendingPrompt = input.id;
     const text = input.params.prompt

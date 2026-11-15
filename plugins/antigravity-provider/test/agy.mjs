@@ -22,7 +22,9 @@ if (args.includes("models")) {
     process.stderr.write(fixture("models-unauthenticated", "stderr").join("\n"));
     process.exit(1);
   }
-  process.stdout.write(fixture("models-api-key").join("\n") + "\n");
+  process.stdout.write(
+    (process.env.AGY_TEST_CATALOG ?? fixture("models-api-key").join("\n")) + "\n",
+  );
   process.exit(0);
 }
 if (args.includes("acp")) {

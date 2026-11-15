@@ -4,7 +4,7 @@ import type { ProviderLaunch, ProviderSessionConfig } from "@getpaseo/plugin/ser
 import { AntigravityError, diagnostic } from "./errors.js";
 
 export function selection(config: ProviderSessionConfig): string {
-  return JSON.stringify([config.model, config.mode]);
+  return JSON.stringify([config.model, config.mode, config.thinkingOption]);
 }
 
 function signalGroup(
