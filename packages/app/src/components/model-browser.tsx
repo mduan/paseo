@@ -46,7 +46,6 @@ import {
   buildProviderQualifiedDescription,
   buildSelectedTriggerLabel,
   filterAndRankModelRows,
-  getAllProviderModelRows,
   getProviderModelRows,
   resolveSelectedModelLabel,
   type ProviderSelectionModelRow,
@@ -62,10 +61,12 @@ import {
   type ModelBrowserView,
 } from "@/components/model-browser-view";
 
-const DESKTOP_PROVIDER_VIEW_MIN_HEIGHT = 220;
+const DESKTOP_PROVIDER_VIEW_MIN_HEIGHT = 140;
 const DESKTOP_PROVIDER_VIEW_MAX_HEIGHT = 400;
-const DESKTOP_PROVIDER_VIEW_BASE_HEIGHT = 80;
-const DESKTOP_MODEL_ROW_HEIGHT = 40;
+const DESKTOP_ALL_VIEW_BASE_HEIGHT = 60;
+const DESKTOP_PROVIDER_VIEW_BASE_HEIGHT = 92;
+const DESKTOP_SECTION_HEADING_HEIGHT = 28;
+const DESKTOP_MODEL_ROW_HEIGHT = 36;
 
 const ThemedAlertTriangle = withUnistyles(AlertTriangle);
 const ThemedCheck = withUnistyles(Check);
@@ -242,24 +243,34 @@ function iconButtonStyle({ hovered, pressed }: PressableStateCallbackType & { ho
   ];
 }
 
-function countModelsInView(view: ModelBrowserView, providers: ProviderSelectorProvider[]): number {
-  if (view.kind === "all") {
-    return getAllProviderModelRows(providers).length;
-  }
-  const provider = providers.find((entry) => entry.id === view.providerId);
-  return provider?.modelSelection.kind === "models" ? getProviderModelRows(provider).length : 0;
-}
-
 function resolveDesktopFixedHeight(
   view: ModelBrowserView,
   providers: ProviderSelectorProvider[],
+  profiles: AgentProfilePicker | null,
 ): number {
-  const modelCount = countModelsInView(view, providers);
+  let contentHeight: number;
+  if (view.kind === "all") {
+    const profileCount = profiles?.rows.length ?? 0;
+    const headingsHeight = profiles ? DESKTOP_SECTION_HEADING_HEIGHT * 2 : 0;
+    contentHeight =
+      DESKTOP_ALL_VIEW_BASE_HEIGHT +
+      headingsHeight +
+      (providers.length + profileCount) * DESKTOP_MODEL_ROW_HEIGHT;
+  } else {
+    const provider = providers.find((entry) => entry.id === view.providerId);
+    const modelCount =
+      provider?.modelSelection.kind === "models" ? getProviderModelRows(provider).length : 0;
+    const profileCount = profiles
+      ? profiles.rows.filter((row) => row.provider === view.providerId).length
+      : 0;
+    const profileHeadingHeight = profileCount > 0 ? DESKTOP_SECTION_HEADING_HEIGHT : 0;
+    contentHeight =
+      DESKTOP_PROVIDER_VIEW_BASE_HEIGHT +
+      profileHeadingHeight +
+      (modelCount + profileCount) * DESKTOP_MODEL_ROW_HEIGHT;
+  }
   return Math.min(
-    Math.max(
-      DESKTOP_PROVIDER_VIEW_MIN_HEIGHT,
-      DESKTOP_PROVIDER_VIEW_BASE_HEIGHT + modelCount * DESKTOP_MODEL_ROW_HEIGHT,
-    ),
+    Math.max(DESKTOP_PROVIDER_VIEW_MIN_HEIGHT, contentHeight),
     DESKTOP_PROVIDER_VIEW_MAX_HEIGHT,
   );
 }
@@ -396,8 +407,8 @@ export function useModelBrowser({
   }, [selectedModelLabel, t]);
 
   const desktopFixedHeight = useMemo(
-    () => resolveDesktopFixedHeight(view, providers),
-    [providers, view],
+    () => resolveDesktopFixedHeight(view, providers, profiles),
+    [profiles, providers, view],
   );
 
   return {
@@ -1709,7 +1720,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   virtualizedModelListContent: {
     paddingTop: theme.spacing[1],
-    paddingBottom: theme.spacing[8],
+    paddingBottom: isWeb ? theme.spacing[1] : theme.spacing[8],
   },
   virtualizedProviderListContent: {
     paddingTop: 0,

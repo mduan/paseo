@@ -1456,7 +1456,7 @@ function ThoughtSlot({
   status,
   defaultExpanded,
 }: ThoughtSlotProps) {
-  const revealedText = useRevealedText(text, status === "ready" ? "complete" : "streaming");
+  const revealedText = useRevealedText(text, status === "ready" ? "complete" : "streaming").trim();
   return (
     <ToolCallSlot
       itemId={itemId}
