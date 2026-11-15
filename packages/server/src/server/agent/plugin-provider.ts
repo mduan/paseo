@@ -45,6 +45,7 @@ import type {
   AgentSlashCommand,
   AgentStreamEvent,
   AgentTimelineItem,
+  AgentUsage,
   FetchCatalogOptions,
   ImportableProviderSession,
   ImportedProviderSession,
@@ -67,6 +68,12 @@ import type { RegisteredProviderDefinition } from "./provider-registry.js";
 import { createExternalProcessEnv } from "../paseo-env.js";
 import { runProviderTurn } from "./providers/provider-runner.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
+import {
+  getSharedCodexPriceList,
+  type CodexPriceList,
+  type CodexPrices,
+  type GeminiRequestUsage,
+} from "./providers/codex/pricing.js";
 
 interface Deferred<Value> {
   promise: Promise<Value>;
@@ -841,16 +848,13 @@ export class PluginAgentClientRegistry {
 
     for (const [id, registration] of incoming) {
       if (this.providers.has(id)) continue;
-      const client = new PluginAgentClient(registration);
+      const client = new PluginAgentClient({ registration, logger: this.logger });
       const clients = new Set([client]);
-      const definition = createPluginProviderDefinition(
-        registration,
-        (_logger, runtimeSettings) => {
-          const configuredClient = new PluginAgentClient(registration, runtimeSettings);
-          clients.add(configuredClient);
-          return configuredClient;
-        },
-      );
+      const definition = createPluginProviderDefinition(registration, (logger, runtimeSettings) => {
+        const configuredClient = new PluginAgentClient({ registration, runtimeSettings, logger });
+        clients.add(configuredClient);
+        return configuredClient;
+      });
       this.providers.set(id, { registration, client, definition, clients });
     }
   }
@@ -899,15 +903,28 @@ interface PendingChild {
   opened: Extract<ProviderEvent, { type: "session.opened" }>;
 }
 
+interface PluginAgentClientOptions {
+  registration: ProviderRegistration;
+  runtimeSettings?: ProviderRuntimeSettings;
+  logger: Logger;
+}
+
+interface PluginAgentSessionOptions {
+  onClose: () => void;
+  geminiCost?: { priceList: CodexPriceList; priorTotalCostUsd: number };
+}
+
 class PluginAgentClient implements AgentClient {
   readonly provider: string;
   private readonly runtime: ProviderRuntime;
   private readonly rootsBySession = new Map<string, PluginAgentSession>();
   private readonly pendingChildren: PendingChild[] = [];
+  private readonly logger: Logger;
 
   readonly getCatalogCacheKey?: AgentClient["getCatalogCacheKey"];
 
-  constructor(registration: ProviderRegistration, runtimeSettings?: ProviderRuntimeSettings) {
+  constructor({ registration, runtimeSettings, logger }: PluginAgentClientOptions) {
+    this.logger = logger;
     this.provider = registration.id;
     this.runtime = new ProviderRuntime(registration, runtimeSettings);
     if (registration.getCatalogCacheKey)
@@ -1048,8 +1065,16 @@ class PluginAgentClient implements AgentClient {
       persistence: input.persistence,
       history: input.history,
     });
-    const session = new PluginAgentSession(this.provider, bridge, () => {
-      this.rootsBySession.delete(bridge.id);
+    const session = new PluginAgentSession(this.provider, bridge, {
+      onClose: () => this.rootsBySession.delete(bridge.id),
+      geminiCost:
+        this.provider === "antigravity"
+          ? {
+              priceList: getSharedCodexPriceList(this.logger),
+              // shortcut: older unpriced turns need transcript backfill before historical estimates can be shown.
+              priorTotalCostUsd: input.launchContext?.priorTotalCostUsd ?? 0,
+            }
+          : undefined,
     });
     this.rootsBySession.set(bridge.id, session);
     this.attachPendingChildren();
@@ -1105,11 +1130,14 @@ class PluginAgentSession implements AgentSession {
   private unsubscribe: (() => void) | null = null;
   private currentTurnId: string | null = null;
   private closed = false;
+  private prices?: CodexPrices;
+  private costModel?: string;
+  private readonly costRequests = new Map<string, GeminiRequestUsage>();
 
   constructor(
     readonly provider: string,
     private readonly bridge: ProviderRuntimeSession,
-    private readonly onClose: () => void,
+    private readonly options: PluginAgentSessionOptions,
   ) {
     this.subagentIdsBySession.set(bridge.id, null);
     for (const event of bridge.history) this.accept(event, false);
@@ -1154,6 +1182,7 @@ class PluginAgentSession implements AgentSession {
     prompt: AgentPromptInput,
     options: AgentRunOptions = {},
   ): Promise<{ turnId: string }> {
+    if (this.options.geminiCost) this.prices = await this.options.geminiCost.priceList.get();
     const clientMessageId = options.clientMessageId ?? randomUUID();
     const result = await this.bridge.prompt({
       clientMessageId,
@@ -1260,7 +1289,7 @@ class PluginAgentSession implements AgentSession {
     this.childUnsubscribes.clear();
     this.subagentIdsBySession.clear();
     this.listeners.clear();
-    this.onClose();
+    this.options.onClose();
     await this.bridge.close();
   }
 
@@ -1363,7 +1392,7 @@ class PluginAgentSession implements AgentSession {
           {
             type: "usage_updated",
             provider: this.provider,
-            usage: { ...event.usage },
+            usage: this.estimateGeminiCost(event),
             turnId: event.turnId,
           },
         ];
@@ -1388,6 +1417,7 @@ class PluginAgentSession implements AgentSession {
 
   private translateTurn(event: Extract<ProviderEvent, { type: "session.turn" }>): AgentStreamEvent {
     if (event.state === "started") {
+      this.costModel = this.bridge.config.model;
       this.currentTurnId = event.turnId;
       return { type: "turn_started", provider: this.provider, turnId: event.turnId };
     }
@@ -1411,6 +1441,34 @@ class PluginAgentSession implements AgentSession {
       code: event.error?.code,
       diagnostic: event.error?.diagnostic,
     };
+  }
+
+  private estimateGeminiCost(event: Extract<ProviderEvent, { type: "session.usage" }>): AgentUsage {
+    const { usage, turnId } = event;
+    const cost = this.options.geminiCost;
+    if (!cost || !turnId || usage.inputTokens === undefined || usage.outputTokens === undefined) {
+      return { ...usage };
+    }
+    this.costRequests.set(turnId, {
+      model: this.costModel,
+      inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens ?? 0,
+      outputTokens: usage.outputTokens,
+    });
+    let totalCostUsd = cost.priorTotalCostUsd;
+    for (const request of this.costRequests.values()) {
+      const requestCost = this.prices?.geminiRequestCostUsd(request);
+      if (requestCost === undefined) {
+        return {
+          ...usage,
+          totalCostUsd: undefined,
+          totalCostEstimated: undefined,
+          totalCostUnavailable: true,
+        };
+      }
+      totalCostUsd += requestCost;
+    }
+    return { ...usage, totalCostUsd, totalCostEstimated: true, totalCostUnavailable: false };
   }
 
   private translateTimeline(
