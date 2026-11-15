@@ -41,7 +41,6 @@ function visibleToolCallItems(items: StreamItem[]): StreamItem[] {
 export function prepareToolCallHistory(
   level: ToolCallDetailLevel,
   tail: StreamItem[],
-  includeThoughts = false,
 ): PreparedToolCallHistory | null {
   if (level === "detailed") {
     return null;
@@ -50,7 +49,6 @@ export function prepareToolCallHistory(
     mode: "overview",
     grouped: prepareGroupedHistory({
       tail: visibleToolCallItems(tail),
-      includeThoughts,
       buildGroup: buildOverviewGroup,
     }),
   };
@@ -62,7 +60,6 @@ export function projectToolCallDetailLevel(input: {
   head: StreamItem[];
   preparedHistory: PreparedToolCallHistory | null;
   isTurnActive: boolean;
-  includeThoughts?: boolean;
 }): ToolCallDetailProjection {
   if (input.level === "detailed") {
     return {
@@ -77,7 +74,6 @@ export function projectToolCallDetailLevel(input: {
   }
   return groupLiveToolCalls({
     history: input.preparedHistory.grouped,
-    includeThoughts: input.includeThoughts,
     head: visibleToolCallItems(input.head),
     isTurnActive: input.isTurnActive,
     buildGroup: buildOverviewGroup,

@@ -48,6 +48,22 @@ function displayDetail(detail: ToolCallDetail | undefined): ToolCallDetail {
   return detail ?? { type: "unknown", input: null, output: null };
 }
 
+const THINKING_PREVIEW_MAX_LENGTH = 200;
+
+export function isThinkingToolName(toolName: string): boolean {
+  return toolName.trim().toLowerCase() === "thinking";
+}
+
+function resolveThinkingPreview(input: BuildToolCallPresentationInput): string | undefined {
+  if (!isThinkingToolName(input.toolName)) return undefined;
+  if (input.detail?.type !== "unknown" || typeof input.detail.input !== "string") {
+    return undefined;
+  }
+  const normalized = input.detail.input.replace(/\s+/g, " ").trim();
+  if (!normalized) return undefined;
+  return normalized.slice(0, THINKING_PREVIEW_MAX_LENGTH);
+}
+
 export function buildToolCallPresentation(
   input: BuildToolCallPresentationInput,
 ): ToolCallPresentation {
@@ -69,7 +85,7 @@ export function buildToolCallPresentation(
 
   return {
     displayName: displayModel.displayName,
-    summary: displayModel.summary,
+    summary: resolveThinkingPreview(input) ?? displayModel.summary,
     errorText: displayModel.errorText,
     icon: input.resolveIcon(input.toolName, input.detail),
     isLoadingDetails,

@@ -33,8 +33,7 @@ export function buildOverviewGroup(run: ToolCallRun): OverviewToolCallGroup {
   return {
     mode: "overview",
     run,
-    isLoading: run.items.some((call) => {
-      if (call.kind === "thought") return call.status === "loading";
+    isLoading: run.calls.some((call) => {
       const { status } = describeToolCall(call);
       return status === "running" || status === "executing";
     }),

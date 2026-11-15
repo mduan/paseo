@@ -50,7 +50,6 @@ function project(input: {
   tail?: StreamItem[];
   head?: StreamItem[];
   isTurnActive?: boolean;
-  includeThoughts?: boolean;
   preparedHistory?: PreparedToolCallHistory | null;
 }) {
   const tail = input.tail ?? [];
@@ -58,10 +57,8 @@ function project(input: {
     level: input.level,
     tail,
     head: input.head ?? [],
-    preparedHistory:
-      input.preparedHistory ?? prepareToolCallHistory(input.level, tail, input.includeThoughts),
+    preparedHistory: input.preparedHistory ?? prepareToolCallHistory(input.level, tail),
     isTurnActive: input.isTurnActive ?? false,
-    includeThoughts: input.includeThoughts,
   });
 }
 
@@ -101,7 +98,7 @@ describe("tool call detail-level projection", () => {
     expect(result.groupsByHostId.size).toBe(0);
   });
 
-  it("keeps Gemini thinking and tools in order across live updates and history reloads", () => {
+  it("keeps thoughts outside overview groups and collapses tool runs between them", () => {
     const thought = {
       kind: "thought",
       id: "thinking",
@@ -110,65 +107,23 @@ describe("tool call detail-level projection", () => {
       timestamp: new Date(0),
     } satisfies StreamItem;
     const first = toolCall("1", { type: "shell", command: "git status" });
+    const second = toolCall("2", { type: "read", filePath: "/repo/a.ts" });
     const nextThought = { ...thought, id: "thinking-2", status: "loading" } satisfies StreamItem;
-    const second = toolCall("2", { type: "unknown", input: {}, output: {} });
-    const tail = [thought, first];
-    const head = [nextThought, second];
+    const third = toolCall("3", { type: "unknown", input: {}, output: {} });
+
     const live = project({
       level: "overview",
-      tail,
-      head,
-      includeThoughts: true,
+      tail: [thought, first, second],
+      head: [nextThought, third],
       isTurnActive: true,
     });
-    expect(live.tail).toHaveLength(1);
-    expect(live.head).toEqual([]);
-    const group = live.groupsByHostId.get(thought.id)!;
-    expect(group.run.items).toEqual([...tail, ...head]);
-    expect(group.run.calls).toEqual([first, second]);
-    expect(group.summary.commandCount).toBe(1);
-    expect(group.summary.otherToolCount).toBe(1);
-    expect(group.isLoading).toBe(true);
 
-    const completed = { ...nextThought, status: "ready" } satisfies StreamItem;
-    const history = project({
-      level: "overview",
-      tail: [thought, first, completed, second, assistant("answer")],
-      includeThoughts: true,
-    });
-    expect(history.tail.map((item) => item.id)).toEqual([thought.id, "answer"]);
-    expect(history.groupsByHostId.get(thought.id)?.run.items).toEqual([
-      thought,
-      first,
-      completed,
-      second,
-    ]);
-    expect(history.groupsByHostId.get(thought.id)?.isLoading).toBe(false);
-
-    const otherProvider = project({ level: "overview", tail: [...tail, ...head] });
-    expect(otherProvider.tail.map((item) => item.id)).toEqual(["thinking", "1", "thinking-2", "2"]);
-    expect(project({ level: "detailed", tail, head, includeThoughts: true }).tail).toBe(tail);
-  });
-
-  it("keeps assistant messages and plan tools as boundaries when grouping thinking", () => {
-    const thought = {
-      kind: "thought",
-      id: "thinking",
-      text: "Plan",
-      status: "ready",
-      timestamp: new Date(0),
-    } satisfies StreamItem;
-    const first = toolCall("1", { type: "shell", command: "one" });
-    const plan = toolCall("2", { type: "plan", text: "Review this plan" });
-    const last = toolCall("3", { type: "shell", command: "two" });
-    const result = project({
-      level: "overview",
-      includeThoughts: true,
-      tail: [first, thought, assistant("message"), plan, last],
-    });
-    expect(result.tail.map((item) => item.id)).toEqual(["1", "message", "2", "3"]);
-    expect(result.groupsByHostId.get("1")?.run.items).toEqual([first, thought]);
-    expect(result.groupsByHostId.has(plan.id)).toBe(false);
+    expect(live.tail.map((item) => item.id)).toEqual(["thinking", "1"]);
+    expect(live.head.map((item) => item.id)).toEqual(["thinking-2", "3"]);
+    expect(live.groupsByHostId.get("1")?.run.calls).toEqual([first, second]);
+    expect(live.groupsByHostId.get("3")?.run.calls).toEqual([third]);
+    expect(live.groupsByHostId.has("thinking")).toBe(false);
+    expect(live.groupsByHostId.has("thinking-2")).toBe(false);
   });
 
   it("keeps one stable overview host as a run grows", () => {

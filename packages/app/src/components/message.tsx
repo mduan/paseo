@@ -61,7 +61,7 @@ import { MarkdownRenderer, type MarkdownStyles } from "@/components/markdown/ren
 import type { TaskActivity, TodoEntry, UserMessageImageAttachment } from "@/types/stream";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
-import { buildToolCallPresentation } from "@/tool-calls/presentation";
+import { buildToolCallPresentation, isThinkingToolName } from "@/tool-calls/presentation";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { getMarkdownListMarker, getMarkdownListSpacing } from "@/utils/markdown-list";
 import { markdownNodeContainsType } from "@/utils/markdown-ast";
@@ -1220,6 +1220,19 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   secondaryLabelActive: {
     color: theme.colors.foreground,
   },
+  secondaryLabelMuted: {
+    color: theme.colors.foregroundExtraMuted,
+  },
+  secondaryLabelSeparator: {
+    flexShrink: 0,
+    color: theme.colors.foregroundExtraMuted,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.normal,
+    marginLeft: theme.spacing[1.5],
+  },
+  secondaryLabelWithSeparator: {
+    marginLeft: theme.spacing[1.5],
+  },
   shimmerText: {
     color: "transparent",
     fontSize: theme.fontSize.base,
@@ -1300,6 +1313,7 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
 interface NativeExpandableBadgeShimmerProps {
   label: string;
   secondaryLabel?: string;
+  secondaryLabelSeparator?: string;
   rowWidth: number;
   rowHeight: number;
   peakWidth: number;
@@ -1310,6 +1324,7 @@ interface NativeExpandableBadgeShimmerProps {
 const NativeExpandableBadgeShimmer = memo(function NativeExpandableBadgeShimmer({
   label,
   secondaryLabel,
+  secondaryLabelSeparator,
   rowWidth,
   rowHeight,
   peakWidth,
@@ -1359,9 +1374,18 @@ const NativeExpandableBadgeShimmer = memo(function NativeExpandableBadgeShimmer(
     [],
   );
 
-  const nativeSecondaryMaskStyle = useMemo(
-    () => [expandableBadgeStylesheet.secondaryLabel, { color: "#000000", opacity: 1 }],
+  const nativeSeparatorMaskStyle = useMemo(
+    () => [expandableBadgeStylesheet.secondaryLabelSeparator, { color: "#000000", opacity: 1 }],
     [],
+  );
+
+  const nativeSecondaryMaskStyle = useMemo(
+    () => [
+      expandableBadgeStylesheet.secondaryLabel,
+      secondaryLabelSeparator ? expandableBadgeStylesheet.secondaryLabelWithSeparator : undefined,
+      { color: "#000000", opacity: 1 },
+    ],
+    [secondaryLabelSeparator],
   );
 
   const nativeShimmerPeakCombinedStyle = useMemo(
@@ -1380,15 +1404,30 @@ const NativeExpandableBadgeShimmer = memo(function NativeExpandableBadgeShimmer(
           {label}
         </Text>
         {secondaryLabel ? (
-          <Text style={nativeSecondaryMaskStyle} numberOfLines={1}>
-            {secondaryLabel}
-          </Text>
+          <>
+            {secondaryLabelSeparator ? (
+              <Text style={nativeSeparatorMaskStyle} numberOfLines={1}>
+                {secondaryLabelSeparator}
+              </Text>
+            ) : null}
+            <Text style={nativeSecondaryMaskStyle} numberOfLines={1}>
+              {secondaryLabel}
+            </Text>
+          </>
         ) : (
           <View style={expandableBadgeStylesheet.spacer} />
         )}
       </View>
     ),
-    [nativeShimmerMaskStyle, nativeLabelMaskStyle, nativeSecondaryMaskStyle, label, secondaryLabel],
+    [
+      nativeShimmerMaskStyle,
+      nativeLabelMaskStyle,
+      nativeSeparatorMaskStyle,
+      nativeSecondaryMaskStyle,
+      label,
+      secondaryLabel,
+      secondaryLabelSeparator,
+    ],
   );
 
   return (
@@ -2357,6 +2396,8 @@ export const TodoListCard = memo(function TodoListCard({ items, activity }: Todo
 interface ExpandableBadgeProps {
   label: string;
   secondaryLabel?: string;
+  secondaryLabelSeparator?: string;
+  isSecondaryLabelMuted?: boolean;
   icon?: ComponentType<{ size?: number; color?: string }>;
   isExpanded: boolean;
   style?: StyleProp<ViewStyle>;
@@ -2372,6 +2413,7 @@ interface ExpandableBadgeProps {
 
 interface ExpandableBadgeSecondaryLabelProps {
   secondaryLabel?: string;
+  secondaryLabelSeparator?: string;
   secondaryLabelStyle: StyleProp<TextStyle>;
   shouldMeasureWebShimmer: boolean;
   onSecondaryLayout: (event: LayoutChangeEvent) => void;
@@ -2379,6 +2421,7 @@ interface ExpandableBadgeSecondaryLabelProps {
 
 function ExpandableBadgeSecondaryLabel({
   secondaryLabel,
+  secondaryLabelSeparator,
   secondaryLabelStyle,
   shouldMeasureWebShimmer,
   onSecondaryLayout,
@@ -2387,20 +2430,29 @@ function ExpandableBadgeSecondaryLabel({
     return null;
   }
   return (
-    <Text
-      style={secondaryLabelStyle}
-      numberOfLines={1}
-      onLayout={shouldMeasureWebShimmer ? onSecondaryLayout : undefined}
-    >
-      {secondaryLabel}
-    </Text>
+    <>
+      {secondaryLabelSeparator ? (
+        <Text style={expandableBadgeStylesheet.secondaryLabelSeparator} numberOfLines={1}>
+          {secondaryLabelSeparator}
+        </Text>
+      ) : null}
+      <Text
+        style={secondaryLabelStyle}
+        numberOfLines={1}
+        onLayout={shouldMeasureWebShimmer ? onSecondaryLayout : undefined}
+      >
+        {secondaryLabel}
+      </Text>
+    </>
   );
 }
 
 interface ExpandableBadgeWebShimmerOverlayProps {
   label: string;
   secondaryLabel?: string;
+  secondaryLabelSeparator?: string;
   shimmerLabelTextStyle: StyleProp<TextStyle>;
+  shimmerSeparatorTextStyle: StyleProp<TextStyle>;
   shimmerSecondaryTextStyle: StyleProp<TextStyle>;
   showOpenFileButton: boolean;
 }
@@ -2408,7 +2460,9 @@ interface ExpandableBadgeWebShimmerOverlayProps {
 function ExpandableBadgeWebShimmerOverlay({
   label,
   secondaryLabel,
+  secondaryLabelSeparator,
   shimmerLabelTextStyle,
+  shimmerSeparatorTextStyle,
   shimmerSecondaryTextStyle,
   showOpenFileButton,
 }: ExpandableBadgeWebShimmerOverlayProps) {
@@ -2418,9 +2472,16 @@ function ExpandableBadgeWebShimmerOverlay({
         {label}
       </Text>
       {secondaryLabel ? (
-        <Text style={shimmerSecondaryTextStyle} numberOfLines={1}>
-          {secondaryLabel}
-        </Text>
+        <>
+          {secondaryLabelSeparator ? (
+            <Text style={shimmerSeparatorTextStyle} numberOfLines={1}>
+              {secondaryLabelSeparator}
+            </Text>
+          ) : null}
+          <Text style={shimmerSecondaryTextStyle} numberOfLines={1}>
+            {secondaryLabel}
+          </Text>
+        </>
       ) : null}
       {showOpenFileButton ? (
         <View style={expandableBadgeStylesheet.openFileButton}>
@@ -2438,12 +2499,14 @@ interface ExpandableBadgeLabelRowProps {
   label: string;
   labelStyle: StyleProp<TextStyle>;
   secondaryLabel?: string;
+  secondaryLabelSeparator?: string;
   secondaryLabelStyle: StyleProp<TextStyle>;
   shouldMeasureWebShimmer: boolean;
   shouldMeasureNativeShimmer: boolean;
   isWebShimmer: boolean;
   isNativeShimmer: boolean;
   shimmerLabelTextStyle: StyleProp<TextStyle>;
+  shimmerSeparatorTextStyle: StyleProp<TextStyle>;
   shimmerSecondaryTextStyle: StyleProp<TextStyle>;
   labelRowWidth: number;
   labelRowHeight: number;
@@ -2464,12 +2527,14 @@ function ExpandableBadgeLabelRow({
   label,
   labelStyle,
   secondaryLabel,
+  secondaryLabelSeparator,
   secondaryLabelStyle,
   shouldMeasureWebShimmer,
   shouldMeasureNativeShimmer,
   isWebShimmer,
   isNativeShimmer,
   shimmerLabelTextStyle,
+  shimmerSeparatorTextStyle,
   shimmerSecondaryTextStyle,
   labelRowWidth,
   labelRowHeight,
@@ -2500,6 +2565,7 @@ function ExpandableBadgeLabelRow({
       </Text>
       <ExpandableBadgeSecondaryLabel
         secondaryLabel={secondaryLabel}
+        secondaryLabelSeparator={secondaryLabelSeparator}
         secondaryLabelStyle={secondaryLabelStyle}
         shouldMeasureWebShimmer={shouldMeasureWebShimmer}
         onSecondaryLayout={onSecondaryLayout}
@@ -2525,7 +2591,9 @@ function ExpandableBadgeLabelRow({
         <ExpandableBadgeWebShimmerOverlay
           label={label}
           secondaryLabel={secondaryLabel}
+          secondaryLabelSeparator={secondaryLabelSeparator}
           shimmerLabelTextStyle={shimmerLabelTextStyle}
+          shimmerSeparatorTextStyle={shimmerSeparatorTextStyle}
           shimmerSecondaryTextStyle={shimmerSecondaryTextStyle}
           showOpenFileButton={showOpenFileButton}
         />
@@ -2534,6 +2602,7 @@ function ExpandableBadgeLabelRow({
         <NativeExpandableBadgeShimmer
           label={label}
           secondaryLabel={secondaryLabel}
+          secondaryLabelSeparator={secondaryLabelSeparator}
           rowWidth={labelRowWidth}
           rowHeight={labelRowHeight}
           peakWidth={nativeShimmerPeakWidth}
@@ -2719,6 +2788,8 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   label,
   style,
   secondaryLabel,
+  secondaryLabelSeparator,
+  isSecondaryLabelMuted = false,
   icon,
   isExpanded,
   onToggle,
@@ -2919,9 +2990,12 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   const secondaryLabelStyle = useMemo(
     () => [
       expandableBadgeStylesheet.secondaryLabel,
-      isActive && expandableBadgeStylesheet.secondaryLabelActive,
+      secondaryLabelSeparator ? expandableBadgeStylesheet.secondaryLabelWithSeparator : undefined,
+      isSecondaryLabelMuted
+        ? expandableBadgeStylesheet.secondaryLabelMuted
+        : isActive && expandableBadgeStylesheet.secondaryLabelActive,
     ],
-    [isActive],
+    [isActive, isSecondaryLabelMuted, secondaryLabelSeparator],
   );
 
   const shimmerLabelTextStyle = useMemo(
@@ -2934,13 +3008,23 @@ export const ExpandableBadge = memo(function ExpandableBadge({
     [isLoading, shimmerLabelStyle],
   );
 
-  const shimmerSecondaryTextStyle = useMemo(
+  const shimmerSeparatorTextStyle = useMemo(
     () => [
-      expandableBadgeStylesheet.secondaryLabel,
+      expandableBadgeStylesheet.secondaryLabelSeparator,
       expandableBadgeStylesheet.shimmerText,
       shimmerSecondaryStyle,
     ],
     [shimmerSecondaryStyle],
+  );
+
+  const shimmerSecondaryTextStyle = useMemo(
+    () => [
+      expandableBadgeStylesheet.secondaryLabel,
+      secondaryLabelSeparator ? expandableBadgeStylesheet.secondaryLabelWithSeparator : undefined,
+      expandableBadgeStylesheet.shimmerText,
+      shimmerSecondaryStyle,
+    ],
+    [secondaryLabelSeparator, shimmerSecondaryStyle],
   );
 
   const chevronStyle = useMemo(
@@ -2990,12 +3074,14 @@ export const ExpandableBadge = memo(function ExpandableBadge({
             label={label}
             labelStyle={labelStyle}
             secondaryLabel={secondaryLabel}
+            secondaryLabelSeparator={secondaryLabelSeparator}
             secondaryLabelStyle={secondaryLabelStyle}
             shouldMeasureWebShimmer={shouldMeasureWebShimmer}
             shouldMeasureNativeShimmer={shouldMeasureNativeShimmer}
             isWebShimmer={isWebShimmer}
             isNativeShimmer={isNativeShimmer}
             shimmerLabelTextStyle={shimmerLabelTextStyle}
+            shimmerSeparatorTextStyle={shimmerSeparatorTextStyle}
             shimmerSecondaryTextStyle={shimmerSecondaryTextStyle}
             labelRowWidth={labelRowWidth}
             labelRowHeight={labelRowHeight}
@@ -3030,6 +3116,8 @@ export const ExpandableBadge = memo(function ExpandableBadge({
 function areExpandableBadgePropsEqual(previous: ExpandableBadgeProps, next: ExpandableBadgeProps) {
   if (previous.label !== next.label) return false;
   if (previous.secondaryLabel !== next.secondaryLabel) return false;
+  if (previous.secondaryLabelSeparator !== next.secondaryLabelSeparator) return false;
+  if (previous.isSecondaryLabelMuted !== next.isSecondaryLabelMuted) return false;
   if (previous.icon !== next.icon) return false;
   if (previous.isExpanded !== next.isExpanded) return false;
   if (previous.style !== next.style) return false;
@@ -3205,13 +3293,19 @@ export const ToolCall = memo(function ToolCall({
     );
   }
 
+  const isThinking = isThinkingToolName(toolName);
+  const isInlineExpanded = shouldRenderInline && isExpanded;
+  const secondaryLabel = isInlineExpanded && isThinking ? undefined : presentation.summary;
+
   return (
     <ExpandableBadge
       testID="tool-call-badge"
       label={presentation.displayName}
-      secondaryLabel={presentation.summary}
+      secondaryLabel={secondaryLabel}
+      secondaryLabelSeparator={isThinking ? "·" : undefined}
+      isSecondaryLabelMuted={isThinking}
       icon={presentation.icon}
-      isExpanded={shouldRenderInline && isExpanded}
+      isExpanded={isInlineExpanded}
       onToggle={presentation.canOpenDetails ? handleToggle : undefined}
       onOpenFile={handleOpenFile}
       renderDetails={presentation.canOpenDetails && shouldRenderInline ? renderDetails : undefined}
