@@ -54,6 +54,19 @@ function commandsPayload(commands: ListCommandsResult["commands"]): ListCommands
 }
 
 describe("fetchAgentCommands", () => {
+  it("reports command discovery failures instead of returning an empty skill list", async () => {
+    const error = "Antigravity mode auto is unavailable for this account or host";
+    const client = createClient({ ...commandsPayload([]), error });
+
+    await expect(
+      fetchAgentCommands({
+        client,
+        agentId: "",
+        draftConfig: { provider: "antigravity", cwd: "/repo", modeId: "auto" },
+      }),
+    ).rejects.toThrow(error);
+  });
+
   it("loads commands for a draft composer without an agent id", async () => {
     const client = createClient(
       commandsPayload([{ name: "compact", description: "Compact context", argumentHint: "" }]),

@@ -40,6 +40,9 @@ export async function fetchAgentCommands(input: {
     agentId: input.agentId,
     draftConfig: input.draftConfig,
   });
+  if (response.error) {
+    throw new Error(response.error);
+  }
   return response.commands as AgentSlashCommand[];
 }
 
