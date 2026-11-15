@@ -47,6 +47,7 @@ export class AcpSession {
       id: "antigravity",
       label: "Antigravity",
       command: ["agy", "acp"],
+      acpOptions: { waitForInitialCommands: true },
     });
     const connection = await provider.connect({
       versions: [1],
