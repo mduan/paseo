@@ -93,7 +93,16 @@ function createConnection(
         if (event.type === "session.config")
           event = {
             ...event,
-            config: { ...event.config, mode: opened.config.mode, modes: catalog().modes },
+            config: {
+              ...event.config,
+              model: opened.config.model,
+              mode: opened.config.mode,
+              thinkingOption: undefined,
+              models: catalog().models,
+              modes: catalog().modes,
+              thinkingOptions: [],
+              settings: [],
+            },
           };
       }
     }

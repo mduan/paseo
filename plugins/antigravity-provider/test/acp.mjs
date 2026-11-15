@@ -10,14 +10,25 @@ function send(message) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 }
 function options() {
+  const selectedModel = process.env.AGY_TEST_NORMALIZE_MODEL
+    ? model.replace(/-(high|low)$/, "")
+    : model;
   return [
     {
       id: "model",
       name: "Model",
       category: "model",
       type: "select",
-      currentValue: model,
-      options: [{ value: model, name: model }],
+      currentValue: selectedModel,
+      options: [{ value: selectedModel, name: selectedModel }],
+    },
+    {
+      id: "effort",
+      name: "Effort",
+      category: "thought_level",
+      type: "select",
+      currentValue: "low",
+      options: [{ value: "low", name: "Low" }],
     },
   ];
 }

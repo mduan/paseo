@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { runAcpProvider } from "@getpaseo/plugin/server/acp";
 import type {
-  ProviderCatalog,
   ProviderConnection,
   ProviderEvent,
   ProviderInput,
@@ -19,7 +18,6 @@ interface AutoSessionOptions {
   launch: ProviderLaunch;
   persistence?: ProviderPersistence;
   firstMessage: boolean;
-  catalog(): ProviderCatalog;
   emit(event: ProviderEvent): void;
 }
 
@@ -71,18 +69,6 @@ export class AutoSession {
             persistence: { version: 1, data: { conversationId: data.sessionId } },
           };
         }
-      }
-      if (event.type === "session.config") {
-        event = {
-          ...event,
-          config: {
-            ...event.config,
-            mode: "auto",
-            modes: this.options.catalog().modes,
-            thinkingOptions: [],
-            settings: [],
-          },
-        };
       }
       if (event.type === "timeline.item" && event.item.type === "user_message") {
         const text = this.userText.get(event.item.id);

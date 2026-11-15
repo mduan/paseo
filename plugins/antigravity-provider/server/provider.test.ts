@@ -92,6 +92,7 @@ async function harness(env: Record<string, string> = {}) {
       config: {
         cwd,
         mode: env.AGY_TEST_MODE,
+        model: env.AGY_TEST_MODEL,
         env: { AGY_SESSION_VALUE: "session-overlay" },
         settings: {},
         mcpServers: {},
@@ -204,6 +205,24 @@ it("streams complete text snapshots, prefixes the system prompt only once and pr
 });
 
 describe("Auto mode", () => {
+  it("keeps the combined catalog model ID when ACP reports separate model and effort values", async () => {
+    const model = "gemini-3.8-flash-low";
+    const h = await harness({
+      AGY_TEST_VERSION: "1.5.9",
+      AGY_TEST_MODE: "auto",
+      AGY_TEST_MODEL: model,
+      AGY_TEST_NORMALIZE_MODEL: "yes",
+    });
+    await h.open();
+    const config = h.events.findLast((event) => event.type === "session.config");
+    expect(config).toMatchObject({
+      type: "session.config",
+      config: { model, thinkingOptions: [] },
+    });
+    if (config?.type !== "session.config") throw new Error("Missing config");
+    expect(config.config.thinkingOption).toBeUndefined();
+    expect(config.config.models.some((entry) => entry.id === model)).toBe(true);
+  });
   it.each(["allow", "deny"] as const)(
     "returns %s to the native ACP permission request",
     async (behavior) => {
