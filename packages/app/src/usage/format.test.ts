@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatAmount, formatResetTooltip } from "./format";
+import { formatAmount, formatResetLabel, formatResetTooltip } from "./format";
 
 describe("formatAmount", () => {
   it("groups thousands in the app's language", () => {
@@ -14,15 +14,36 @@ describe("formatAmount", () => {
   });
 });
 
+describe("formatResetLabel", () => {
+  afterEach(() => vi.useRealTimers());
+  it.each([
+    [undefined, null],
+    ["invalid", null],
+    ["2026-11-14T11:00:00Z", "resetting now"],
+    ["2026-11-14T12:45:00Z", "resets 45m"],
+    ["2026-11-14T13:00:00Z", "resets 1h"],
+    ["2026-11-14T13:40:00Z", "resets 1h 40m"],
+    ["2026-11-19T14:00:00Z", "resets 5d 2h"],
+    ["2026-11-20T12:00:00Z", "resets 6d"],
+  ])("formats %s as %s", (iso, expected) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-14T12:00:00Z"));
+    expect(formatResetLabel(iso)).toBe(expected);
+  });
+});
+
 describe("formatResetTooltip", () => {
   afterEach(() => vi.useRealTimers());
   it.each([
     [undefined, null],
     ["invalid", null],
     ["2026-11-14T11:00:00Z", "Resetting now"],
-    ["2026-11-14T12:45:00Z", "Resets in 45 minutes"],
-    ["2026-11-14T13:00:00Z", "Resets in 1 hour"],
-    ["2026-11-20T12:00:00Z", "Resets in 6 days"],
+    ["2026-11-14T12:45:00Z", "Resets in 45m"],
+    ["2026-11-14T13:00:00Z", "Resets in 1h"],
+    ["2026-11-14T13:40:00Z", "Resets in 1h 40m"],
+    ["2026-11-15T13:00:00Z", "Resets in 1d 1h"],
+    ["2026-11-19T14:00:00Z", "Resets in 5d 2h"],
+    ["2026-11-20T12:00:00Z", "Resets in 6d"],
   ])("formats %s as %s", (iso, expected) => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-14T12:00:00Z"));

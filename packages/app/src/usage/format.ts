@@ -22,8 +22,14 @@ function relativeDuration(iso: string): string | null {
   const diffMinutes = Math.floor(diffMs / 60_000);
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays > 0) return `${diffDays}d`;
-  if (diffHours > 0) return `${diffHours}h`;
+  if (diffDays > 0) {
+    const remHours = diffHours % 24;
+    return remHours > 0 ? `${diffDays}d ${remHours}h` : `${diffDays}d`;
+  }
+  if (diffHours > 0) {
+    const remMinutes = diffMinutes % 60;
+    return remMinutes > 0 ? `${diffHours}h ${remMinutes}m` : `${diffHours}h`;
+  }
   return `${diffMinutes}m`;
 }
 
@@ -38,13 +44,7 @@ export function formatResetTooltip(iso: string | null | undefined): string | nul
   const label = formatResetLabel(iso);
   if (!label) return null;
   if (label === "resetting now") return "Resetting now";
-  const units: Record<string, string> = { d: "day", h: "hour", m: "minute" };
-  return label
-    .replace("resets ", "Resets in ")
-    .replace(
-      /(\d+)([dhm])$/,
-      (_, amount: string, unit: string) => `${amount} ${units[unit]}${amount === "1" ? "" : "s"}`,
-    );
+  return label.replace("resets ", "Resets in ");
 }
 
 /** A balance amount as the app's language writes it: "$1,234.50", "12,345". */
