@@ -278,3 +278,34 @@ test("keeps overview tool calls inline on desktop", async ({ page }) => {
     await agent.cleanup();
   }
 });
+
+test("keeps an expanded desktop tool entry in view inside a long group", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const agent = await createOverviewAgent(page, "Desktop tool expansion scroll");
+  try {
+    const gate = await holdStreamAfterFirstCompletedToolCall(page, agent.agentId);
+    await openOverviewAgent(page, agent);
+    await agent.client.sendAgentMessage(agent.agentId, "Exercise desktop overview tool calls.");
+    await gate.waitForFirstCompleted();
+    gate.release(85);
+    await agent.client.waitForFinish(agent.agentId, 20_000);
+    const work = page.getByTestId("work-toggle").first();
+    await work.click();
+    const group = page.getByTestId("tool-call-group").first();
+    await group.click();
+    const entry = group.getByTestId("tool-call-badge").first();
+    const header = entry.locator(":scope > *").first();
+    await header.scrollIntoViewIfNeeded();
+    await header.click();
+    await expect(entry).toContainText("export function ConversationList");
+    await expect(header).toBeInViewport();
+  } finally {
+    await testInfo.attach("desktop-expanded-tool", {
+      body: await page.screenshot({ path: testInfo.outputPath("desktop-expanded-tool.png") }),
+      contentType: "image/png",
+    });
+    await agent.cleanup();
+  }
+});

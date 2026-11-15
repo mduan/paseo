@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef, type ReactNode } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Wrench } from "lucide-react-native";
@@ -66,6 +66,11 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
   const scrollToLatest = useCallback(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, []);
+  useEffect(() => {
+    if (!expanded || isCompact) return;
+    const frame = requestAnimationFrame(scrollToLatest);
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, group.run.calls.length, isCompact, scrollToLatest]);
   const toggle = useCallback(() => {
     onExpandedChange(group.run.id, !expanded);
   }, [expanded, group.run.id, onExpandedChange]);
@@ -80,12 +85,11 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
         contentContainerStyle={styles.content}
         nestedScrollEnabled
         showsVerticalScrollIndicator
-        onContentSizeChange={scrollToLatest}
       >
         {children}
       </ScrollView>
     ),
-    [children, scrollToLatest],
+    [children],
   );
 
   if (isCompact) {
