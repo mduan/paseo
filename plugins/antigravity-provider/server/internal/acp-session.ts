@@ -10,7 +10,7 @@ import type {
   ProviderPrompt,
   ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
-import { AntigravityError } from "./wire.js";
+import { AntigravityError } from "./errors.js";
 
 interface AcpSessionOptions {
   id: string;
@@ -31,9 +31,14 @@ export class AcpSession {
   }
 
   async open(requestId: string, capabilities: readonly string[]): Promise<void> {
-    if (!capabilities.includes("permission"))
+    const fullAccess = this.options.config.mode === "full-access";
+    const mode = fullAccess ? "default" : this.options.config.mode;
+    if (!fullAccess && !capabilities.includes("permission"))
       throw new AntigravityError("Antigravity approval modes require permission-response support");
-    if (this.options.launch.args.some((arg) => arg.startsWith("--dangerously-skip-permissions")))
+    if (
+      !fullAccess &&
+      this.options.launch.args.some((arg) => arg.startsWith("--dangerously-skip-permissions"))
+    )
       throw new AntigravityError(
         "Remove --dangerously-skip-permissions from the Antigravity command to use an approval mode",
       );
@@ -47,7 +52,12 @@ export class AcpSession {
       capabilities,
       launch: {
         ...this.options.launch,
-        args: [...this.options.launch.args, "acp", "--process-per-session"],
+        args: [
+          ...this.options.launch.args,
+          "acp",
+          "--process-per-session",
+          ...(fullAccess ? ["--dangerously-skip-permissions"] : []),
+        ],
       },
     });
     this.connection = connection;
@@ -84,10 +94,7 @@ export class AcpSession {
       requestId: randomUUID(),
       cwd: this.options.config.cwd,
     });
-    if (
-      catalog.type !== "catalog" ||
-      !catalog.catalog.modes.some((mode) => mode.id === this.options.config.mode)
-    )
+    if (catalog.type !== "catalog" || !catalog.catalog.modes.some((entry) => entry.id === mode))
       throw new AntigravityError(
         `Antigravity mode ${this.options.config.mode} is unavailable for this account or host`,
         "UNSUPPORTED_MODE",
@@ -111,7 +118,7 @@ export class AcpSession {
       requestId,
       sessionId: this.options.id,
       history: "skip",
-      config: this.options.config,
+      config: { ...this.options.config, mode },
       persistence,
     });
     this.options.emit({
@@ -121,7 +128,9 @@ export class AcpSession {
         id: `${this.options.id}:full-access`,
         severity: "warning",
         title: "Antigravity is running with full access",
-        dismissed: true,
+        description:
+          "Full access starts Antigravity with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+        dismissed: fullAccess ? undefined : true,
       },
     });
   }

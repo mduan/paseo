@@ -11,11 +11,10 @@ import {
   type ProviderPersistence,
   type ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
-import { getCatalog, getStatus, validateSelection } from "./internal/catalog.js";
+import { getCatalog, getStatus, resolveSelection } from "./internal/catalog.js";
 import { AcpSession } from "./internal/acp-session.js";
-import { Session } from "./internal/session.js";
 import { selection } from "./internal/process.js";
-import { AntigravityError } from "./internal/wire.js";
+import { AntigravityError } from "./internal/errors.js";
 
 const capabilities = [
   "prompt.message",
@@ -26,12 +25,13 @@ const capabilities = [
 ] as const;
 
 interface OpenSession {
-  backend?: Session | AcpSession;
+  backend?: AcpSession;
   config: ProviderSessionConfig;
   persistence?: ProviderPersistence;
   active: boolean;
   firstMessage: boolean;
   backendSelection?: string;
+  fullAccessNoticeShown?: boolean;
 }
 
 export function createAntigravityProvider(): ProviderRegistration {
@@ -90,20 +90,27 @@ function createConnection(
           if (event.type === "session.persistence") return;
           if (event.type === "session.opened") event = { ...event, persistence: undefined };
         }
-        if (event.type === "session.config")
+        if (
+          event.type === "session.notice" &&
+          event.notice.id === `${event.sessionId}:full-access`
+        ) {
+          if (!event.notice.dismissed && opened.fullAccessNoticeShown) return;
+          opened.fullAccessNoticeShown = !event.notice.dismissed;
+        }
+        if (event.type === "session.config") {
+          opened.config.model = event.config.model;
+          opened.config.thinkingOption = event.config.thinkingOption;
           event = {
             ...event,
             config: {
               ...event.config,
-              model: opened.config.model,
               mode: opened.config.mode,
-              thinkingOption: undefined,
               models: catalog().models,
               modes: catalog().modes,
-              thinkingOptions: [],
               settings: [],
             },
           };
+        }
       }
     }
     for (const listener of listeners) listener(event);
@@ -125,13 +132,11 @@ function createConnection(
     restoring = false,
   ): Promise<void> {
     await opened.backend?.close();
-    const Backend = opened.config.mode === "full-access" ? Session : AcpSession;
-    const backend = new Backend({
+    const backend = new AcpSession({
       id,
       config: opened.config,
       persistence: opened.persistence,
       firstMessage: opened.firstMessage,
-      catalog,
       launch,
       emit(event) {
         if (restoring && (event.type === "session.opened" || event.type === "session.ready")) {
@@ -165,24 +170,34 @@ function createConnection(
           ? undefined
           : (input.changes.thinkingOption ?? opened.config.thinkingOption),
     };
-    validateSelection(config, catalog());
+    const modelChanged =
+      input.changes.model !== undefined && input.changes.model !== opened.config.model;
+    if (modelChanged && input.changes.thinkingOption === undefined) {
+      const model = catalog().models.find(
+        (entry) => entry.id === config.model || entry.aliases?.includes(config.model ?? ""),
+      );
+      if (
+        model?.id !== config.model ||
+        !model?.thinkingOptions?.some((option) => option.id === config.thinkingOption)
+      )
+        config.thinkingOption = undefined;
+    }
+    Object.assign(config, resolveSelection(config, catalog()));
     if (input.changes.settings && Object.keys(input.changes.settings).length)
       throw new AntigravityError("Antigravity has no configurable settings");
-    if (opened.backend instanceof Session && config.mode === "full-access") {
-      opened.backend.configure({ model: config.model ?? null, mode: config.mode });
-      opened.backendSelection = selection(config);
-    }
     opened.config = config;
     emit({
       type: "session.config",
       sessionId: input.sessionId,
       config: {
         model: config.model,
+        thinkingOption: config.thinkingOption,
         mode: config.mode,
         modes: catalog().modes,
         models: catalog().models,
         settings: [],
-        thinkingOptions: [],
+        thinkingOptions:
+          catalog().models.find((model) => model.id === config.model)?.thinkingOptions ?? [],
       },
     });
   }
@@ -201,7 +216,7 @@ function createConnection(
           throw new AntigravityError(`Session already exists: ${input.sessionId}`);
         if (discovered === null) discovered = await getCatalog(launch, input.config.cwd);
         const config = { ...input.config, mode: input.config.mode ?? "full-access" };
-        validateSelection(config, catalog());
+        Object.assign(config, resolveSelection(config, catalog()));
         const opened: OpenSession = {
           config,
           persistence: input.persistence,
@@ -239,8 +254,7 @@ function createConnection(
         break;
       case "session.permission": {
         const backend = session(input.sessionId).backend;
-        if (!(backend instanceof AcpSession))
-          throw new AntigravityError("Full access has no pending approvals");
+        if (!backend) throw new AntigravityError("Antigravity session is not ready");
         await backend.respondToPermission(input.permissionId, input.response);
         return;
       }
