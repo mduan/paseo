@@ -324,6 +324,58 @@ lines.on("line", (line) => {
     await connection.close();
   });
 
+  it.each([
+    { rawOutput: undefined, error: "Tool call failed" },
+    { rawOutput: null, error: "Tool call failed" },
+    { rawOutput: { message: "File not found" }, error: { message: "File not found" } },
+  ])("keeps failed tools valid when rawOutput is $rawOutput", async ({ rawOutput, error }) => {
+    const harness = connectorHarness({
+      promptUpdates: () => [
+        {
+          sessionUpdate: "tool_call",
+          toolCallId: "read-file",
+          title: "Read file",
+          kind: "read",
+          status: "failed",
+          rawOutput,
+        },
+      ],
+    });
+    const registration = runAcpProvider({
+      id: "sdk-acp",
+      label: "SDK ACP",
+      connector: harness.connector,
+    });
+    const connection = await registration.connect({
+      versions: [1],
+      capabilities: ["prompt.message"],
+    });
+    const events: ProviderEvent[] = [];
+    connection.onEvent((event) => events.push(event));
+    try {
+      await connection.send(openInput());
+      await waitForEvent(events, (event) => event.type === "session.ready");
+      await connection.send({
+        type: "session.prompt",
+        sessionId: "session-1",
+        prompt: {
+          clientMessageId: "prompt-1",
+          delivery: "auto",
+          input: { type: "message", content: [{ type: "text", text: "Read file" }] },
+        },
+      });
+      const timelineEvent = await waitForEvent(
+        events,
+        (event) => event.type === "timeline.item" && event.item.type === "tool_call",
+      );
+      expect(timelineEvent).toMatchObject({
+        item: { type: "tool_call", callId: "read-file", status: "failed", error },
+      });
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("maps permission behavior to the first matching ACP option", async () => {
     const harness = connectorHarness();
     const registration = runAcpProvider({
