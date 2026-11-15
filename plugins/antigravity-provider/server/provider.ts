@@ -8,9 +8,13 @@ import {
   type ProviderInput,
   type ProviderLaunch,
   type ProviderRegistration,
+  type ProviderPersistence,
+  type ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
-import { getCatalog, getStatus } from "./internal/catalog.js";
+import { getCatalog, getStatus, validateSelection } from "./internal/catalog.js";
+import { AutoSession } from "./internal/auto-session.js";
 import { Session } from "./internal/session.js";
+import { selection } from "./internal/process.js";
 import { AntigravityError } from "./internal/wire.js";
 
 const capabilities = [
@@ -18,7 +22,17 @@ const capabilities = [
   "prompt.image",
   "session.configure",
   "session.persistence",
+  "permission",
 ] as const;
+
+interface OpenSession {
+  backend?: Session | AutoSession;
+  config: ProviderSessionConfig;
+  persistence?: ProviderPersistence;
+  active: boolean;
+  firstMessage: boolean;
+  backendSelection?: string;
+}
 
 export function createAntigravityProvider(): ProviderRegistration {
   return {
@@ -57,7 +71,7 @@ function createConnection(
   launch: ProviderLaunch,
   negotiated: readonly string[],
 ): ProviderConnection {
-  const sessions = new Map<string, Session>();
+  const sessions = new Map<string, OpenSession>();
   const listeners = new Set<(event: ProviderEvent) => void>();
   let discovered: ProviderCatalog | null = null;
   let closed = false;
@@ -65,6 +79,24 @@ function createConnection(
 
   function emit(event: ProviderEvent): void {
     if (closed) return;
+    if ("sessionId" in event) {
+      const opened = sessions.get(event.sessionId);
+      if (opened) {
+        if (event.type === "session.opened" || event.type === "session.persistence")
+          opened.persistence = event.persistence;
+        if (event.type === "session.turn") opened.active = event.state === "started";
+        if (event.type === "session.runtime_failed") opened.active = false;
+        if (!opened.config.persist) {
+          if (event.type === "session.persistence") return;
+          if (event.type === "session.opened") event = { ...event, persistence: undefined };
+        }
+        if (event.type === "session.config")
+          event = {
+            ...event,
+            config: { ...event.config, mode: opened.config.mode, modes: catalog().modes },
+          };
+      }
+    }
     for (const listener of listeners) listener(event);
   }
   function catalog(): ProviderCatalog {
@@ -72,10 +104,78 @@ function createConnection(
       throw new AntigravityError("Antigravity catalog has not been discovered");
     return discovered;
   }
-  function session(id: string): Session {
+  function session(id: string): OpenSession {
     const found = sessions.get(id);
     if (!found) throw new AntigravityError(`Unknown Antigravity session: ${id}`);
     return found;
+  }
+  async function startSession(
+    id: string,
+    opened: OpenSession,
+    requestId: string,
+    restoring = false,
+  ): Promise<void> {
+    await opened.backend?.close();
+    const Backend = opened.config.mode === "auto" ? AutoSession : Session;
+    const backend = new Backend({
+      id,
+      config: opened.config,
+      persistence: opened.persistence,
+      firstMessage: opened.firstMessage,
+      catalog,
+      launch,
+      emit(event) {
+        if (restoring && (event.type === "session.opened" || event.type === "session.ready")) {
+          if (event.type === "session.opened") opened.persistence = event.persistence;
+          return;
+        }
+        emit(event);
+      },
+    });
+    opened.backend = backend;
+    opened.backendSelection = undefined;
+    try {
+      await backend.open(requestId, negotiated);
+      opened.backendSelection = selection(opened.config);
+    } catch (error) {
+      await backend.close();
+      opened.backend = undefined;
+      throw error;
+    }
+  }
+  function configureSession(input: Extract<ProviderInput, { type: "session.configure" }>): void {
+    const opened = session(input.sessionId);
+    const config = {
+      ...opened.config,
+      model:
+        input.changes.model === null ? undefined : (input.changes.model ?? opened.config.model),
+      mode:
+        input.changes.mode === null ? "full-access" : (input.changes.mode ?? opened.config.mode),
+      thinkingOption:
+        input.changes.thinkingOption === null
+          ? undefined
+          : (input.changes.thinkingOption ?? opened.config.thinkingOption),
+    };
+    validateSelection(config, catalog());
+    if (input.changes.settings && Object.keys(input.changes.settings).length)
+      throw new AntigravityError("Antigravity has no configurable settings");
+    if (opened.backend instanceof Session && config.mode === "full-access") {
+      opened.backend.configure({ model: config.model ?? null, mode: config.mode });
+      opened.backendSelection = selection(config);
+    }
+    opened.config = config;
+    emit({
+      type: "session.config",
+      sessionId: input.sessionId,
+      config: {
+        model: config.model,
+        mode: config.mode,
+        modes: catalog().modes,
+        models: catalog().models,
+        settings: [],
+        thinkingOptions: [],
+      },
+    });
   }
   async function dispatch(input: ProviderInput): Promise<void> {
     switch (input.type) {
@@ -91,35 +191,55 @@ function createConnection(
         if (sessions.has(input.sessionId))
           throw new AntigravityError(`Session already exists: ${input.sessionId}`);
         if (discovered === null) discovered = await getCatalog(launch, input.config.cwd);
-        const opened = new Session({
-          id: input.sessionId,
-          config: input.config,
+        const config = { ...input.config, mode: input.config.mode ?? "full-access" };
+        validateSelection(config, catalog());
+        const opened: OpenSession = {
+          config,
           persistence: input.persistence,
-          catalog,
-          launch,
-          emit,
-        });
+          active: false,
+          firstMessage: !input.persistence,
+        };
         sessions.set(input.sessionId, opened);
         try {
-          await opened.open(input.requestId, negotiated);
+          await startSession(input.sessionId, opened, input.requestId);
         } catch (error) {
           sessions.delete(input.sessionId);
-          await opened.close();
+          await opened.backend?.close();
           throw error;
         }
         return;
       }
-      case "session.prompt":
-        await session(input.sessionId).prompt(input.prompt);
+      case "session.prompt": {
+        const opened = session(input.sessionId);
+        if (opened.active)
+          throw new AntigravityError("Antigravity already has an active turn", "TURN_ACTIVE");
+        if (opened.backendSelection !== selection(opened.config))
+          await startSession(
+            input.sessionId,
+            opened,
+            `restore-${input.prompt.clientMessageId}`,
+            true,
+          );
+        if (!opened.backend) throw new AntigravityError("Antigravity session is not ready");
+        await opened.backend.prompt(input.prompt);
+        opened.firstMessage = false;
         return;
+      }
       case "session.configure":
-        session(input.sessionId).configure(input.changes);
+        configureSession(input);
         break;
+      case "session.permission": {
+        const backend = session(input.sessionId).backend;
+        if (!(backend instanceof AutoSession))
+          throw new AntigravityError("Full access has no pending approvals");
+        await backend.respondToPermission(input.permissionId, input.response);
+        return;
+      }
       case "session.interrupt":
-        await session(input.sessionId).interrupt();
+        await session(input.sessionId).backend?.interrupt();
         break;
       case "session.close": {
-        await session(input.sessionId).close();
+        await session(input.sessionId).backend?.close();
         sessions.delete(input.sessionId);
         emit({ type: "session.closed", sessionId: input.sessionId });
         break;
@@ -163,7 +283,7 @@ function createConnection(
       if (closed) return;
       closed = true;
       await pending;
-      await Promise.all([...sessions.values()].map((opened) => opened.close()));
+      await Promise.all([...sessions.values()].map((opened) => opened.backend?.close()));
       sessions.clear();
       listeners.clear();
     },

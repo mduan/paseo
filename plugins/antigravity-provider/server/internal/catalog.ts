@@ -10,12 +10,17 @@ import { AntigravityError } from "./wire.js";
 
 const modes: readonly ProviderMode[] = [
   {
+    id: "auto",
+    icon: "ShieldCheck",
+    label: "Auto",
+    description: "Approve edits and safe commands automatically; ask before irreversible actions.",
+  },
+  {
     id: "full-access",
     icon: "ShieldOff",
     colorTier: "dangerous",
     label: "Full access",
-    description:
-      "Antigravity cannot ask for permission when another app drives it. Paseo starts it with --dangerously-skip-permissions.",
+    description: "Run tools without approval using --dangerously-skip-permissions.",
     isUnattended: true,
   },
 ];
@@ -31,7 +36,15 @@ export async function getCatalog(launch: ProviderLaunch, cwd?: string): Promise<
       throw new AntigravityError(`Duplicate Antigravity model: ${id}`, "INVALID_CATALOG");
     models.push({ id, label });
   }
-  return { models, modes, thinkingOptions: [], defaultMode: "full-access" };
+  const version = (await probe({ launch, args: ["--version"], cwd })).trim();
+  const [major, minor] = version.split(".").map(Number);
+  const supportsAcp = major > 1 || (major === 1 && minor >= 5);
+  return {
+    models,
+    modes: supportsAcp ? modes : modes.filter((mode) => mode.id !== "auto"),
+    thinkingOptions: [],
+    defaultMode: "full-access",
+  };
 }
 
 export async function getStatus(launch: ProviderLaunch): Promise<ProviderStatus> {

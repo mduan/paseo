@@ -45,7 +45,11 @@ async function harness(env: Record<string, string> = {}) {
   const log = path.join(cwd, "argv.ndjson");
   const launch: ProviderLaunch = {
     command: process.execPath,
-    args: [fake, "--launch-prefix"],
+    args: [
+      fake,
+      "--launch-prefix",
+      ...(env.AGY_TEST_SKIP ? ["--dangerously-skip-permissions"] : []),
+    ],
     env: { AGY_TEST_LOG: log, ...env },
   };
   const connection = await provider.connect({
@@ -87,10 +91,11 @@ async function harness(env: Record<string, string> = {}) {
       history: "replay",
       config: {
         cwd,
+        mode: env.AGY_TEST_MODE,
         env: { AGY_SESSION_VALUE: "session-overlay" },
         settings: {},
         mcpServers: {},
-        persist: true,
+        persist: env.AGY_TEST_NO_PERSIST !== "yes",
         systemPrompt: "SYSTEM PREFIX",
       },
     });
@@ -163,6 +168,7 @@ it("streams complete text snapshots, prefixes the system prompt only once and pr
     "prompt.image",
     "session.configure",
     "session.persistence",
+    "permission",
   ]);
   await h.open();
   await h.completed(await h.prompt("HELLO"));
@@ -195,6 +201,174 @@ it("streams complete text snapshots, prefixes the system prompt only once and pr
   expect(
     records.filter((entry) => entry.input).map((entry) => entry.input.message.content),
   ).toEqual(["SYSTEM PREFIX\n\nHELLO", "HELLO AGAIN"]);
+});
+
+describe("Auto mode", () => {
+  it.each(["allow", "deny"] as const)(
+    "returns %s to the native ACP permission request",
+    async (behavior) => {
+      const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: "auto" });
+      await h.open();
+      expect(
+        h.events.some((event) => event.type === "session.notice" && !event.notice.dismissed),
+      ).toBe(false);
+      const promptId = await h.prompt("APPROVAL");
+      const permission = await h.wait((event) => event.type === "session.permission");
+      if (permission.type !== "session.permission") throw new Error("Missing permission");
+      expect(
+        h.events.some((event) => event.type === "session.turn" && event.state === "completed"),
+      ).toBe(false);
+      await h.connection.send({
+        type: "session.permission",
+        sessionId: "s",
+        permissionId: permission.request.id,
+        response: { behavior, selectedActionId: behavior },
+      });
+      await h.completed(promptId);
+      expect(h.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "timeline.item",
+            item: expect.objectContaining({
+              type: "assistant_message",
+              text: behavior === "allow" ? "ALLOWED" : "DENIED",
+            }),
+          }),
+          expect.objectContaining({
+            type: "timeline.item",
+            item: expect.objectContaining({ type: "user_message", text: "APPROVAL" }),
+          }),
+        ]),
+      );
+      const records = await h.records();
+      expect(
+        records
+          .filter((record) => record.args?.includes("acp"))
+          .every((record) => !record.args.includes("--dangerously-skip-permissions")),
+      ).toBe(true);
+      expect(
+        records.find((record) => record.acp?.method === "session/set_mode").acp.params.modeId,
+      ).toBe("auto");
+      expect(
+        records.find((record) => record.acp?.method === "session/prompt").acp.params.prompt,
+      ).toEqual([
+        { type: "text", text: "SYSTEM PREFIX" },
+        { type: "text", text: "APPROVAL" },
+      ]);
+    },
+  );
+
+  it("cancels a pending approval and admits the next turn", async () => {
+    const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: "auto" });
+    await h.open();
+    const promptId = await h.prompt("APPROVAL");
+    await h.wait((event) => event.type === "session.permission");
+    await h.request({ type: "session.interrupt", requestId: "stop", sessionId: "s" });
+    expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+    expect(await h.completed(await h.prompt("HELLO"))).toMatchObject({ state: "completed" });
+  });
+
+  it("rejects Auto when the native session does not offer it", async () => {
+    const h = await harness({
+      AGY_TEST_VERSION: "1.5.9",
+      AGY_TEST_MODE: "auto",
+      AGY_TEST_AUTO_UNAVAILABLE: "yes",
+    });
+    await h.open();
+    expect(h.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "request.failed",
+          error: expect.objectContaining({ code: "UNSUPPORTED_MODE" }),
+        }),
+      ]),
+    );
+    expect((await h.records()).some((record) => record.acp?.method === "session/prompt")).toBe(
+      false,
+    );
+  });
+
+  it("switches between Full access and Auto while preserving the conversation", async () => {
+    const h = await harness({ AGY_TEST_VERSION: "1.5.9" });
+    await h.open();
+    const persistence = h.persistence();
+    await h.request({
+      type: "session.configure",
+      requestId: "auto",
+      sessionId: "s",
+      changes: { mode: "auto" },
+    });
+    await h.completed(await h.prompt("HELLO AUTO"));
+    await h.request({
+      type: "session.configure",
+      requestId: "full",
+      sessionId: "s",
+      changes: { mode: "full-access" },
+    });
+    await h.completed(await h.prompt("HELLO FULL"));
+    const records = await h.records();
+    expect(
+      records.find((record) => record.acp?.method === "session/load").acp.params.sessionId,
+    ).toBe(persistence.data.conversationId);
+    expect(
+      records.find((record) => record.acp?.method === "session/prompt").acp.params.prompt[0],
+    ).toEqual({ type: "text", text: "SYSTEM PREFIX" });
+    const launches = records.filter((record) => record.args?.includes("--conversation"));
+    expect(launches.at(-1).args).toContain(persistence.data.conversationId);
+    expect(h.events.filter((event) => event.type === "session.opened")).toHaveLength(1);
+  });
+
+  it("resumes Auto conversations and passes images through ACP without repeating the system prompt", async () => {
+    const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: "auto" });
+    await h.open();
+    await h.completed(await h.prompt("FIRST"));
+    const persistence = h.persistence();
+    await h.request({ type: "session.close", requestId: "close", sessionId: "s" });
+    await h.open(persistence);
+    const image: ProviderContent = { type: "image", mimeType: "image/png", data: "aW1hZ2U=" };
+    await h.completed(await h.message([{ type: "text", text: "SECOND" }, image]));
+    const prompts = (await h.records()).filter((record) => record.acp?.method === "session/prompt");
+    expect(prompts.at(-1).acp.params.prompt).toEqual([{ type: "text", text: "SECOND" }, image]);
+  });
+
+  it("does not expose persistence when disabled, including after a mode change", async () => {
+    const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_NO_PERSIST: "yes" });
+    await h.open();
+    await h.request({
+      type: "session.configure",
+      requestId: "auto",
+      sessionId: "s",
+      changes: { mode: "auto" },
+    });
+    await h.completed(await h.prompt("HELLO"));
+    expect(
+      h.events
+        .filter((event) => event.type === "session.opened")
+        .every((event) => event.type === "session.opened" && event.persistence === undefined),
+    ).toBe(true);
+    expect(h.events.some((event) => event.type === "session.persistence")).toBe(false);
+    expect((await h.records()).some((record) => record.acp?.method === "session/load")).toBe(true);
+  });
+
+  it("rejects a command configured to bypass permissions in Auto mode", async () => {
+    const h = await harness({
+      AGY_TEST_VERSION: "1.5.9",
+      AGY_TEST_MODE: "auto",
+      AGY_TEST_SKIP: "yes",
+    });
+    await h.open();
+    expect(h.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "request.failed",
+          error: expect.objectContaining({
+            message: expect.stringContaining("Remove --dangerously-skip-permissions"),
+          }),
+        }),
+      ]),
+    );
+    expect((await h.records()).some((record) => record.args?.includes("acp"))).toBe(false);
+  });
 });
 
 it("maps tools and emits one denial notice for a SUCCESS result", async () => {
@@ -441,7 +615,7 @@ it("emits one full-access warning per open, none on respawn, and one again on re
       severity: "warning",
       title: "Antigravity is running with full access",
       description:
-        "Antigravity's CLI cannot ask for permission when another app drives it, so Paseo starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+        "Full access starts Antigravity with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
     },
   };
   const opened = h.events.findIndex((event) => event.type === "session.opened");
@@ -614,8 +788,7 @@ describe("discovery", () => {
         icon: "ShieldOff",
         colorTier: "dangerous",
         isUnattended: true,
-        description:
-          "Antigravity cannot ask for permission when another app drives it. Paseo starts it with --dangerously-skip-permissions.",
+        description: "Run tools without approval using --dangerously-skip-permissions.",
       },
     ]);
   });

@@ -40,6 +40,7 @@ interface SessionOptions {
   launch: ProviderLaunch;
   catalog(): ProviderCatalog;
   persistence?: ProviderPersistence;
+  firstMessage: boolean;
   emit(event: ProviderEvent): void;
 }
 
@@ -56,7 +57,7 @@ export class Session {
     this.conversationId = options.persistence
       ? persistenceSchema.parse(options.persistence).data.conversationId
       : null;
-    this.firstMessage = this.conversationId === null;
+    this.firstMessage = options.firstMessage;
     validateSelection(this.config, options.catalog());
   }
 
@@ -68,7 +69,7 @@ export class Session {
       sessionId: this.options.id,
       capabilities,
       restoration: "core",
-      persistence: this.config.persist ? this.persistence() : undefined,
+      persistence: this.persistence(),
       cwd: this.config.cwd,
       title: this.config.title,
     });
@@ -188,7 +189,7 @@ export class Session {
         severity: "warning",
         title: "Antigravity is running with full access",
         description:
-          "Antigravity's CLI cannot ask for permission when another app drives it, so Paseo starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+          "Full access starts Antigravity with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
       },
     });
   }
@@ -224,12 +225,11 @@ export class Session {
         );
       this.conversationId = init.conversation_id;
       this.state = { type: "idle", driver };
-      if (this.config.persist)
-        this.emit({
-          type: "session.persistence",
-          sessionId: this.options.id,
-          persistence: this.persistence(),
-        });
+      this.emit({
+        type: "session.persistence",
+        sessionId: this.options.id,
+        persistence: this.persistence(),
+      });
     } catch (error) {
       this.state = { type: "dormant" };
       await driver.stop("interrupt");

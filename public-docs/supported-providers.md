@@ -26,19 +26,24 @@ Work out of the box once the underlying CLI is installed and authenticated.
 Install the Antigravity CLI (`agy`) on your daemon host, then run `agy` once to sign in. Pick
 **Antigravity** in Paseo. The provider ships with Paseo; no separate plugin install is required.
 
-**Full access** is the only permission mode. Antigravity cannot ask for permission when another
-app drives it, so Paseo starts `agy` with `--dangerously-skip-permissions`. Every tool call,
-including shell commands, runs without asking. Each session starts with a warning explaining
-this, including when you reopen a chat. Antigravity's own policy can still deny
-an action.
+Two permission modes are available:
+
+- **Auto** requires `agy` 1.5.0 or later and an account and host that support Antigravity Auto mode.
+  Antigravity approves workspace edits and safe commands. Paseo shows approval requests for actions that require your decision.
+  Auto uses `agy acp`; it does not automatically accept those requests.
+- **Full access** remains the default. Every tool call runs without asking because Paseo passes `--dangerously-skip-permissions`.
+  Each session starts with a warning. Antigravity's own policy can still deny an action.
+
+Mode changes apply to the next prompt and preserve the conversation. Auto fails explicitly if Antigravity does not offer it.
 
 After a daemon restart, Antigravity remembers the conversation, but Paseo's transcript starts
 fresh because `agy` does not replay its history.
 
 This integration uses your installed CLI and sign-in. It is not endorsed by Google.
 
-Paseo MCP tools and steering are unavailable. Your own `agy` MCP servers still work. Attached
-images are passed as file references for the agent to read.
+Steering is unavailable. Your own `agy` MCP servers still work.
+Full access passes attached images as file references and does not expose Paseo MCP tools.
+Auto sends images through ACP and supports injected MCP servers.
 
 If `agy` is outside your daemon's PATH, override its command in `~/.paseo/config.json`. Use `env`
 for provider-specific environment variables:
