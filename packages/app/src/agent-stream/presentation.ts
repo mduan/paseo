@@ -15,6 +15,7 @@ interface PresentationInput {
   transform: TimelineItemTransform | undefined;
   level: ToolCallDetailLevel;
   isTurnActive: boolean;
+  includeThoughts?: boolean;
 }
 
 function retainItems(previous: StreamItem[], next: StreamItem[]): StreamItem[] {
@@ -77,6 +78,7 @@ export function createStreamPresentation() {
   let promotedRows: StreamItem[] = [];
   let preparedTail: StreamItem[] | undefined;
   let preparedLevel: ToolCallDetailLevel | undefined;
+  let preparedIncludeThoughts: boolean | undefined;
   let preparedHistory: PreparedToolCallHistory | null = null;
 
   /**
@@ -168,10 +170,15 @@ export function createStreamPresentation() {
       displayHistory = historyRows;
       promotedRows = nextPromoted;
     }
-    if (preparedTail !== displayTail || preparedLevel !== input.level) {
-      preparedHistory = prepareToolCallHistory(input.level, displayTail);
+    if (
+      preparedTail !== displayTail ||
+      preparedLevel !== input.level ||
+      preparedIncludeThoughts !== input.includeThoughts
+    ) {
+      preparedHistory = prepareToolCallHistory(input.level, displayTail, input.includeThoughts);
       preparedTail = displayTail;
       preparedLevel = input.level;
+      preparedIncludeThoughts = input.includeThoughts;
     }
     return projectToolCallDetailLevel({
       level: input.level,
@@ -179,6 +186,7 @@ export function createStreamPresentation() {
       head,
       preparedHistory,
       isTurnActive: input.isTurnActive,
+      includeThoughts: input.includeThoughts,
     });
   };
 }
