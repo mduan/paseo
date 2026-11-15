@@ -442,7 +442,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
       const remainingDistance = instance.getTotalSize() - (scrollOffset + viewportHeight);
       return shouldAdjustScrollForVirtualRowResize({
         isHistoryStartPrependActive: historyStartPrependAnchorActiveRef.current,
-        rowStart: item.start,
+        rowEnd: item.end,
         scrollOffset,
         remainingDistanceFromBottom: remainingDistance,
         bottomThreshold: AUTO_SCROLL_BOTTOM_THRESHOLD_PX,

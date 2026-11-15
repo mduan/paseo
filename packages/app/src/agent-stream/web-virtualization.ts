@@ -12,7 +12,7 @@ const COLLAPSED_TOOL_SEQUENCE_ROW_HEIGHT_ESTIMATE = 40;
 
 export function shouldAdjustScrollForVirtualRowResize(input: {
   isHistoryStartPrependActive: boolean;
-  rowStart: number;
+  rowEnd: number;
   scrollOffset: number;
   remainingDistanceFromBottom: number;
   bottomThreshold: number;
@@ -21,7 +21,7 @@ export function shouldAdjustScrollForVirtualRowResize(input: {
     return false;
   }
   return (
-    input.remainingDistanceFromBottom > input.bottomThreshold && input.rowStart < input.scrollOffset
+    input.remainingDistanceFromBottom > input.bottomThreshold && input.rowEnd <= input.scrollOffset
   );
 }
 

@@ -175,7 +175,19 @@ describe("virtual row resize anchoring", () => {
     expect(
       shouldAdjustScrollForVirtualRowResize({
         isHistoryStartPrependActive: false,
-        rowStart: 1200,
+        rowEnd: 1400,
+        scrollOffset: 1000,
+        remainingDistanceFromBottom: 5000,
+        bottomThreshold: 64,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not jump to the end of a tool group that starts above the viewport", () => {
+    expect(
+      shouldAdjustScrollForVirtualRowResize({
+        isHistoryStartPrependActive: false,
+        rowEnd: 4000,
         scrollOffset: 1000,
         remainingDistanceFromBottom: 5000,
         bottomThreshold: 64,
@@ -187,7 +199,7 @@ describe("virtual row resize anchoring", () => {
     expect(
       shouldAdjustScrollForVirtualRowResize({
         isHistoryStartPrependActive: false,
-        rowStart: 800,
+        rowEnd: 900,
         scrollOffset: 1000,
         remainingDistanceFromBottom: 5000,
         bottomThreshold: 64,
@@ -197,7 +209,7 @@ describe("virtual row resize anchoring", () => {
 
   it("leaves history prepend and bottom following to their existing anchors", () => {
     const baseInput = {
-      rowStart: 800,
+      rowEnd: 900,
       scrollOffset: 1000,
       remainingDistanceFromBottom: 5000,
       bottomThreshold: 64,
