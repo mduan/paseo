@@ -1163,8 +1163,6 @@ export class AgentManager {
     if (!normalizedConfig.model) {
       return [];
     }
-    // No availability preflight: opening the session reports a missing provider, and some
-    // providers' availability checks spawn slow CLI probes.
     if (client.listCommands) {
       return await client.listCommands(normalizedConfig);
     }
