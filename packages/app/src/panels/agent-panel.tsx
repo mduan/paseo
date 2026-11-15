@@ -1693,7 +1693,7 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     alignItems: "center",
     paddingHorizontal: theme.spacing[4],
-    paddingTop: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
   },
   timelineSyncCalloutContent: {
     width: "100%",
