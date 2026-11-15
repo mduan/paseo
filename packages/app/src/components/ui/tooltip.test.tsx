@@ -153,4 +153,36 @@ describe("TooltipTrigger", () => {
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it("closes an open interactive tooltip immediately when another tooltip opens", () => {
+    const onFirstOpenChange = vi.fn();
+    const onSecondOpenChange = vi.fn();
+
+    act(() => {
+      root?.render(
+        <>
+          <Tooltip interactive defaultOpen onOpenChange={onFirstOpenChange}>
+            <TooltipTrigger testID="first">
+              <Text>First</Text>
+            </TooltipTrigger>
+          </Tooltip>
+          <Tooltip interactive onOpenChange={onSecondOpenChange}>
+            <TooltipTrigger testID="second">
+              <Text>Second</Text>
+            </TooltipTrigger>
+          </Tooltip>
+        </>,
+      );
+    });
+
+    const second = container?.querySelector('[data-testid="second"]');
+    expect(second).not.toBeNull();
+    act(() => {
+      second?.dispatchEvent(new window.MouseEvent("mouseover", { bubbles: true }));
+      second?.dispatchEvent(new window.MouseEvent("mouseenter", { bubbles: false }));
+    });
+
+    expect(onSecondOpenChange).toHaveBeenCalledWith(true);
+    expect(onFirstOpenChange).toHaveBeenCalledWith(false);
+  });
 });

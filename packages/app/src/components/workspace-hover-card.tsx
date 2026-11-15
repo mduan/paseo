@@ -53,6 +53,10 @@ import { CheckIndicator } from "@/components/sidebar/workspace-meta-row/check-in
 import { selectCheckSummary } from "@/components/sidebar/workspace-meta-row/check-summary";
 import type { WorkspacePort } from "@getpaseo/protocol/messages";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
+import {
+  HoverOverlayParentProvider,
+  useExclusiveHoverOverlay,
+} from "@/hooks/use-exclusive-hover-overlay";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { FloatingSurface } from "@/components/ui/floating";
 import { isWeb } from "@/constants/platform";
@@ -186,10 +190,21 @@ function WorkspaceHoverCardDesktop({
     onClose: () => setOpen(false),
   });
 
+  const closeNow = useCallback(() => {
+    cancelClose();
+    setOpen(false);
+  }, [cancelClose]);
+
+  const { overlayId, claim } = useExclusiveHoverOverlay({
+    open,
+    onClose: closeNow,
+  });
+
   const handleTriggerEnter = useCallback(() => {
     triggerHoveredRef.current = true;
     cancelClose();
     if (!isDragging && !disabled) {
+      claim();
       setOpen(true);
       const client = getHostRuntimeStore().getClient(workspace.serverId);
       // COMPAT(workspaceMetadataRefresh): added in v0.11.0-fork.30, remove gate after 2027-04-21.
@@ -206,7 +221,7 @@ function WorkspaceHoverCardDesktop({
           });
       }
     }
-  }, [cancelClose, disabled, isDragging, workspace.serverId, workspace.workspaceId]);
+  }, [cancelClose, claim, disabled, isDragging, workspace.serverId, workspace.workspaceId]);
 
   const handleTriggerLeave = useCallback(() => {
     triggerHoveredRef.current = false;
@@ -230,13 +245,15 @@ function WorkspaceHoverCardDesktop({
     >
       {children}
       {open ? (
-        <WorkspaceHoverCardContent
-          workspace={workspace}
-          prHint={prHint}
-          project={project}
-          triggerRef={triggerRef}
-          contentRef={contentRef}
-        />
+        <HoverOverlayParentProvider value={overlayId}>
+          <WorkspaceHoverCardContent
+            workspace={workspace}
+            prHint={prHint}
+            project={project}
+            triggerRef={triggerRef}
+            contentRef={contentRef}
+          />
+        </HoverOverlayParentProvider>
       ) : null}
     </View>
   );

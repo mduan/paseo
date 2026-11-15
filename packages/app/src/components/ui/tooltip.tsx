@@ -36,6 +36,10 @@ import {
   OVERLAY_Z,
 } from "@/lib/overlay-root";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
+import {
+  HoverOverlayParentProvider,
+  useExclusiveHoverOverlay,
+} from "@/hooks/use-exclusive-hover-overlay";
 import { useKeepSidebarRevealed } from "@/components/sidebar/hover-context";
 
 type Side = "top" | "bottom" | "left" | "right";
@@ -51,6 +55,7 @@ interface Rect {
 interface TooltipContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
+  overlayId: string;
   triggerRef: React.RefObject<View | null>;
   contentRef: React.RefObject<View | null>;
   enabled: boolean;
@@ -267,12 +272,24 @@ export function Tooltip({
   const enabled = opensOnPress ? enabledOnMobile : enabledOnDesktop;
   const interactive = interactiveProp && isWeb && !opensOnPress;
   useKeepSidebarRevealed(enabled && interactive && isOpen);
+  const cancelCloseRef = useRef<() => void>(() => {});
+  const forceClose = useCallback(() => {
+    cancelCloseRef.current();
+    setIsOpen(false);
+  }, [setIsOpen]);
+  const { overlayId, claim } = useExclusiveHoverOverlay({
+    open: enabled && isOpen,
+    onClose: forceClose,
+  });
   const requestOpen = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen && interactive && hasWebOverlayAbove(OVERLAY_Z.tooltip)) return;
+      if (nextOpen) {
+        claim();
+      }
       setIsOpen(nextOpen);
     },
-    [interactive, setIsOpen],
+    [claim, interactive, setIsOpen],
   );
 
   const { scheduleClose, cancelClose } = useHoverSafeZone({
@@ -281,11 +298,13 @@ export function Tooltip({
     contentRef,
     onClose: () => requestOpen(false),
   });
+  cancelCloseRef.current = cancelClose;
 
   const value = useMemo<TooltipContextValue>(
     () => ({
       open: isOpen,
       setOpen: requestOpen,
+      overlayId,
       triggerRef,
       contentRef,
       enabled,
@@ -298,6 +317,7 @@ export function Tooltip({
     [
       isOpen,
       requestOpen,
+      overlayId,
       enabled,
       interactive,
       scheduleClose,
@@ -579,7 +599,11 @@ export function TooltipContent({
           style={contentStyle}
           frameStyle={frameStyle}
         >
-          <OverlayLayerProvider layer={OVERLAY_Z.tooltip}>{children}</OverlayLayerProvider>
+          <OverlayLayerProvider layer={OVERLAY_Z.tooltip}>
+            <HoverOverlayParentProvider value={ctx.overlayId}>
+              {children}
+            </HoverOverlayParentProvider>
+          </OverlayLayerProvider>
         </FloatingSurface>
       </View>,
       getOverlayRoot(),
