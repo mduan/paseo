@@ -123,7 +123,7 @@ test("registers quota windows for the existing usage cards and sidebar", async (
     windows: [
       {
         id: "gemini-weekly",
-        label: "Gemini Models · Weekly Limit",
+        label: "Gemini Models · Weekly",
         usedPct: 25,
         remainingPct: 75,
         resetsAt: "2026-11-22T05:17:46Z",

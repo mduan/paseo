@@ -13,6 +13,7 @@ import {
 import { probe } from "./internal/process.js";
 
 export const inputSchema = z.object({}).strict();
+const periodLabels: Record<string, string> = { weekly: "Weekly", "5h": "5-hour" };
 
 const usageSchema = z.object({
   status: z.literal("SUCCESS"),
@@ -25,7 +26,6 @@ const usageSchema = z.object({
           buckets: z.array(
             z.object({
               id: z.string().min(1),
-              name: z.string().min(1),
               window: z.string().min(1),
               remaining_fraction: z.number().min(0).max(1),
               reset_time: z.iso.datetime({ offset: true }).optional(),
@@ -57,9 +57,10 @@ export async function fetchUsage(): Promise<UsageReport> {
   const windows = response.command.data.groups.flatMap((group) =>
     group.buckets.map((bucket) => {
       const usedPct = (1 - bucket.remaining_fraction) * 100;
+      const period = periodLabels[bucket.window] ?? bucket.window;
       return windowFromUsedPct({
         id: bucket.id,
-        label: `${group.name} · ${bucket.name.replace(/ Remaining$/, "")}`,
+        label: `${group.name} · ${period}`,
         shortLabel: bucket.window === "weekly" ? "wk" : bucket.window,
         summary: true,
         utilizationPct: usedPct,

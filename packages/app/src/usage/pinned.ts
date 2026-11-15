@@ -1,14 +1,16 @@
-import { formatPct } from "./format";
-import { displayPercent, summaryWindows } from "./model";
+import { formatAmount, formatPct } from "./format";
+import { balanceUsed, displayPercent, summaryWindows } from "./model";
 import { effectiveUsagePins, type UsagePreferences } from "./preferences";
 import { windowTone } from "./tone";
-import type { UsageReportEntry, UsageTone } from "./types";
+import type { UsageBalance, UsageReportEntry, UsageTone, UsageWindow } from "./types";
 
 /** One summary window of one account, as the sidebar Usage item shows it. */
 export interface PinnedUsageWindow {
   key: string;
   /** Accessible description, including the source, account, window and percent meaning. */
   label: string;
+  tooltip: string;
+  resetsAt?: string | null;
   /** The window's short name ("5h"), empty for none, or its label when the source sends none. */
   shortLabel: string;
   /** The share shown, under the user's used/remaining preference. */
@@ -55,6 +57,34 @@ function describe(entry: UsageReportEntry, windowLabel: string): string {
   return `${entry.sourceLabel}${account} ${windowLabel}`;
 }
 
+export function usageTooltip({
+  sourceId,
+  sourceLabel,
+  window,
+  balance,
+  locale,
+}: {
+  sourceId: string;
+  sourceLabel: string;
+  window: UsageWindow;
+  balance?: UsageBalance;
+  locale: string;
+}): string {
+  const parts = sourceId === "antigravity" ? [] : [sourceLabel];
+  const label = window.label === "Session" && window.shortLabel === "5h" ? "5-hour" : window.label;
+  const scope = label.split(" · ");
+  if (scope.length > 1 && scope[0] === "Weekly") parts.push(...scope.slice(1), "Weekly");
+  else parts.push(label);
+  if (balance) {
+    const used = balanceUsed(balance);
+    const format = (amount: number) => formatAmount(amount, balance.unit, locale);
+    if (used != null && balance.limit != null && balance.limit > 0)
+      parts.push(`${format(used)} of ${format(balance.limit)} used`);
+    else if (balance.remaining != null) parts.push(`${format(balance.remaining)} remaining`);
+  }
+  return parts.join(" · ");
+}
+
 /** Reports with every account of a source together, sources in the order they first appear. */
 function groupBySource(reports: readonly UsageReportEntry[]): UsageReportEntry[] {
   const sourceIds = [...new Set(reports.map((entry) => entry.sourceId))];
@@ -68,12 +98,14 @@ function groupBySource(reports: readonly UsageReportEntry[]): UsageReportEntry[]
 export function resolvePinnedUsage(
   reports: readonly UsageReportEntry[],
   preferences: UsagePreferences,
+  { locale = "en" }: { locale?: string } = {},
 ): PinnedUsageSource[] {
   const pins = effectiveUsagePins(preferences, reports);
   const meaning = preferences.displayAs === "remaining" ? "left" : "used";
   return groupBySource(reports).flatMap((entry) => {
-    if (entry.report.status !== "available") return [];
-    const windows = summaryWindows(entry.report)
+    const report = entry.report;
+    if (report.status !== "available") return [];
+    const windows = summaryWindows(report)
       .filter(
         (window) =>
           displayPercent(window, preferences.displayAs) !== null &&
@@ -85,6 +117,14 @@ export function resolvePinnedUsage(
         return {
           key: `${entry.id}/${window.id}`,
           label: `${describe(entry, window.label)} ${percentText} ${meaning}`,
+          tooltip: usageTooltip({
+            sourceId: entry.sourceId,
+            sourceLabel: entry.sourceLabel,
+            window,
+            balance: report.balances?.find((balance) => window.id === `balance:${balance.id}`),
+            locale,
+          }),
+          resetsAt: window.resetsAt,
           shortLabel: window.shortLabel ?? window.label,
           percent,
           percentText,

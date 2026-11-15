@@ -3,6 +3,7 @@ import type { UsagePreferences } from "./preferences";
 import {
   choosePinnedUsageLayout,
   resolvePinnedUsage,
+  usageTooltip,
   type PinnedUsageSource,
   type PinnedUsageWindow,
 } from "./pinned";
@@ -144,6 +145,8 @@ describe("resolvePinnedUsage", () => {
         {
           key: "claude:default/five-hour",
           label: "Claude Session 31% used",
+          tooltip: "Claude · 5-hour",
+          resetsAt: undefined,
           shortLabel: "5h",
           percent: 31,
           percentText: "31%",
@@ -152,6 +155,8 @@ describe("resolvePinnedUsage", () => {
         {
           key: "claude:default/weekly",
           label: "Claude Weekly 80% used",
+          tooltip: "Claude · Weekly",
+          resetsAt: undefined,
           shortLabel: "wk",
           percent: 80,
           percentText: "80%",
@@ -256,6 +261,64 @@ describe("resolvePinnedUsage", () => {
       ["Claude (work) 5-hour 90% used", "90%"],
     ]);
   });
+});
+
+describe("usageTooltip", () => {
+  it.each([
+    ["antigravity", "Antigravity", "Gemini Models · Weekly", "wk", "Gemini Models · Weekly"],
+    ["antigravity", "Antigravity", "Gemini Models · 5-hour", "5h", "Gemini Models · 5-hour"],
+    [
+      "antigravity",
+      "Antigravity",
+      "Claude and GPT models · Weekly",
+      "wk",
+      "Claude and GPT models · Weekly",
+    ],
+    ["antigravity", "Antigravity", "Gemini 4 Argon · Weekly", "wk", "Gemini 4 Argon · Weekly"],
+    ["codex", "Codex", "Weekly", "wk", "Codex · Weekly"],
+    ["codex", "Codex", "Code review · Weekly", "wk", "Codex · Code review · Weekly"],
+    ["claude", "Claude", "Session", "5h", "Claude · 5-hour"],
+    ["claude", "Claude", "Weekly · Opus", "wk Opus", "Claude · Opus · Weekly"],
+    ["other", "Provider", "2-hour", "2h", "Provider · 2-hour"],
+    ["other", "Provider", "Primary limit", "", "Provider · Primary limit"],
+  ])("describes %s %s %s", (sourceId, sourceLabel, label, shortLabel, expected) => {
+    expect(
+      usageTooltip({
+        sourceId,
+        sourceLabel,
+        locale: "en",
+        window: { id: "window", label, shortLabel },
+      }),
+    ).toBe(expected);
+  });
+
+  it.each([
+    [
+      { id: "budget", label: "Monthly budget", unit: "usd", used: 12, limit: 50 },
+      "Provider · Monthly budget · $12.00 of $50.00 used",
+    ],
+    [
+      { id: "credits", label: "Monthly credits", unit: "credits", used: 300, limit: 1000 },
+      "Provider · Monthly credits · 300 of 1,000 used",
+    ],
+    [
+      { id: "balance", label: "Balance", unit: "usd", remaining: 12 },
+      "Provider · Balance · $12.00 remaining",
+    ],
+  ] satisfies [UsageBalance, string][])(
+    "preserves the reported units for %j",
+    (balance, expected) => {
+      expect(
+        usageTooltip({
+          sourceId: "other",
+          sourceLabel: "Provider",
+          locale: "en",
+          balance,
+          window: { id: "balance", label: balance.label },
+        }),
+      ).toBe(expected);
+    },
+  );
 });
 
 it("keeps unavailable and error reports out of the sidebar summary", () => {
