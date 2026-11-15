@@ -280,6 +280,7 @@ export function useLiveAgentModeControl(
         mergeProviderPreferences({
           preferences: current,
           provider: slice.provider,
+          serverId,
           updates: { mode: modeId || undefined },
         }),
       ).catch((error) => {
@@ -293,7 +294,7 @@ export function useLiveAgentModeControl(
           toast.error(toErrorMessage(error));
         });
     },
-    [agentId, client, slice?.provider, toast, updatePreferences],
+    [agentId, client, serverId, slice?.provider, toast, updatePreferences],
   );
 
   return useMemo(() => {

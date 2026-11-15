@@ -5,6 +5,7 @@ import {
   mergeCreateAgentSelectionPreferences,
   mergeProviderPreferences,
   parseFormPreferences,
+  resolveSavedModeId,
 } from "./preferences";
 import { FakeCreateAgentPreferenceStorage } from "./test-utils/fake-preference-storage";
 
@@ -290,5 +291,52 @@ describe("create agent preferences", () => {
 
   it("rejects an unknown launch target kind as invalid stored preferences", () => {
     expect(parseFormPreferences({ launchTarget: { kind: "shell" } })).toEqual({});
+  });
+
+  it("persists and resolves mode independently per host", () => {
+    let prefs = mergeProviderPreferences({
+      preferences: {},
+      provider: "antigravity",
+      serverId: "host-a",
+      updates: { mode: "full-access" },
+    });
+    prefs = mergeProviderPreferences({
+      preferences: prefs,
+      provider: "antigravity",
+      serverId: "host-b",
+      updates: { mode: "auto" },
+    });
+
+    expect(resolveSavedModeId(prefs.providerPreferences?.antigravity, "host-a")).toBe(
+      "full-access",
+    );
+    expect(resolveSavedModeId(prefs.providerPreferences?.antigravity, "host-b")).toBe("auto");
+    expect(resolveSavedModeId(prefs.providerPreferences?.antigravity, "host-c")).toBeUndefined();
+    expect(parseFormPreferences(prefs)).toEqual(prefs);
+  });
+
+  it("falls back to legacy global mode when a host has no saved mode", () => {
+    const prefs = parseFormPreferences({
+      provider: "antigravity",
+      providerPreferences: {
+        antigravity: { mode: "full-access" },
+      },
+    });
+
+    expect(resolveSavedModeId(prefs.providerPreferences?.antigravity, "host-a")).toBe(
+      "full-access",
+    );
+
+    const updated = mergeProviderPreferences({
+      preferences: prefs,
+      provider: "antigravity",
+      serverId: "host-a",
+      updates: { mode: "auto" },
+    });
+
+    expect(resolveSavedModeId(updated.providerPreferences?.antigravity, "host-a")).toBe("auto");
+    expect(resolveSavedModeId(updated.providerPreferences?.antigravity, "host-b")).toBe(
+      "full-access",
+    );
   });
 });

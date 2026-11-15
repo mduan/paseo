@@ -1269,3 +1269,46 @@ it("owns input readiness, reopening and user edits in the reducer", () => {
   state = resolveAgentForm(state, { ...inputs, isPreferencesLoading: false, hasSnapshot: true });
   expect(state.form).toMatchObject({ provider: "codex", model: "astra" });
 });
+
+it("resolves saved mode per host when switching hosts", () => {
+  const providerDef = {
+    id: "antigravity",
+    name: "Antigravity",
+    defaultModeId: "auto",
+    modes: [
+      { id: "auto", label: "Auto", description: "Ask when needed" },
+      { id: "full-access", label: "Full access", description: "No prompts" },
+    ],
+  } as unknown as AgentProviderDefinition;
+  const preferences = {
+    provider: "antigravity",
+    providerPreferences: {
+      antigravity: {
+        modeByHost: {
+          "host-a": "full-access",
+          "host-b": "auto",
+        },
+      },
+    },
+  };
+  const baseInputs = {
+    type: "INPUTS_CHANGED" as const,
+    isVisible: true,
+    isCreateFlow: true,
+    isPreferencesLoading: false,
+    hasSnapshot: true,
+    initialValues: undefined,
+    preferences,
+    allowedProviderMap: new Map([["antigravity", providerDef]]),
+    providerModelsByProvider: new Map([["antigravity", null]]),
+  };
+
+  const stateA = resolveAgentForm(makeState(), { ...baseInputs, serverId: "host-a" });
+  expect(stateA.form.modeId).toBe("full-access");
+
+  const stateB = resolveAgentForm(stateA, { ...baseInputs, serverId: "host-b" });
+  expect(stateB.form.modeId).toBe("auto");
+
+  const stateC = resolveAgentForm(stateB, { ...baseInputs, serverId: "host-c" });
+  expect(stateC.form.modeId).toBe("auto");
+});

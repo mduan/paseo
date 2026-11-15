@@ -9,6 +9,7 @@ import {
   type FormPreferences,
   type ProviderPreferences,
 } from "@/hooks/use-form-preferences";
+import { resolveSavedModeId } from "@/create-agent-preferences/preferences";
 import { findModelByReference } from "./model-catalog";
 
 export interface FormInitialValues {
@@ -83,6 +84,7 @@ export type AgentFormAction =
   | { type: "REQUEST_RESOLUTION" }
   | {
       type: "COMPLETE_RESOLUTION";
+      serverId?: string | null;
       initialValues: FormInitialValues | undefined;
       preferences: FormPreferences | null;
       providerModelsByProvider: ProviderModelsByProvider;
@@ -90,6 +92,7 @@ export type AgentFormAction =
     }
   | {
       type: "SET_PROVIDER_AND_MODEL_FROM_USER";
+      serverId?: string | null;
       provider: AgentProvider;
       modelId: string;
       providerDef: AgentProviderDefinition | undefined;
@@ -98,6 +101,7 @@ export type AgentFormAction =
     }
   | {
       type: "APPLY_PROFILE_FROM_USER";
+      serverId?: string | null;
       provider: AgentProvider;
       modelId: string;
       modeId: string;
@@ -213,11 +217,13 @@ function resolvePreferredModeId(input: {
 export function mergeSelectedComposerPreferences(args: {
   preferences: FormPreferences;
   provider: AgentProvider;
+  serverId?: string | null;
   updates: Partial<ProviderPreferences>;
 }): FormPreferences {
   return mergeProviderPreferences({
     preferences: args.preferences,
     provider: args.provider,
+    serverId: args.serverId,
     updates: args.updates,
   });
 }
@@ -273,19 +279,27 @@ function resolveProvider(input: {
 
 function resolveModeId(input: {
   provider: AgentProvider | null;
+  serverId?: string | null;
   userModified: boolean;
   currentModeId: string;
   initialValues: FormInitialValues | undefined;
   providerDef: AgentProviderDefinition | undefined;
   providerPrefs: ProviderPrefs | undefined;
 }): string {
-  const { provider, userModified, currentModeId, initialValues, providerDef, providerPrefs } =
-    input;
+  const {
+    provider,
+    serverId,
+    userModified,
+    currentModeId,
+    initialValues,
+    providerDef,
+    providerPrefs,
+  } = input;
   if (userModified) return currentModeId;
   if (!provider) return "";
   return resolvePreferredModeId({
     initialModeId: initialValues?.modeId,
-    preferredModeId: providerPrefs?.mode,
+    preferredModeId: resolveSavedModeId(providerPrefs, serverId),
     providerDef,
   });
 }
@@ -364,6 +378,7 @@ export function resolveFormState(
   userModified: UserModifiedFields,
   currentState: FormState,
   allowedProviderMap: Map<AgentProvider, AgentProviderDefinition>,
+  serverId?: string | null,
 ): FormState {
   const result = { ...currentState };
 
@@ -381,6 +396,7 @@ export function resolveFormState(
 
   result.modeId = resolveModeId({
     provider: result.provider,
+    serverId,
     userModified: userModified.modeId,
     currentModeId: result.modeId,
     initialValues,
@@ -425,6 +441,7 @@ export function resolveFormStateFromProviderModels(
   userModified: UserModifiedFields,
   currentState: FormState,
   allowedProviderMap: Map<AgentProvider, AgentProviderDefinition>,
+  serverId?: string | null,
 ): FormState {
   const providerResolved = resolveFormState(
     initialValues,
@@ -433,6 +450,7 @@ export function resolveFormStateFromProviderModels(
     userModified,
     currentState,
     allowedProviderMap,
+    serverId,
   );
   const availableModels = providerResolved.provider
     ? (providerModelsByProvider.get(providerResolved.provider) ?? null)
@@ -445,16 +463,18 @@ export function resolveFormStateFromProviderModels(
     userModified,
     currentState,
     allowedProviderMap,
+    serverId,
   );
 }
 
 function pickNextModeForProvider(input: {
   providerDef: AgentProviderDefinition | undefined;
   providerPrefs: ProviderPrefs | undefined;
+  serverId?: string | null;
 }): string {
-  const { providerDef, providerPrefs } = input;
+  const { providerDef, providerPrefs, serverId } = input;
   return resolvePreferredModeId({
-    preferredModeId: providerPrefs?.mode,
+    preferredModeId: resolveSavedModeId(providerPrefs, serverId),
     providerDef,
   });
 }
@@ -465,12 +485,14 @@ function pickNextModeForProviderAndModel(input: {
   provider: AgentProvider;
   providerDef: AgentProviderDefinition | undefined;
   providerPrefs: ProviderPrefs | undefined;
+  serverId?: string | null;
 }): string {
   const currentModeId = normalizeSelectedModeId(input.currentModeId);
   if (input.currentProvider === input.provider && currentModeId) return currentModeId;
   return pickNextModeForProvider({
     providerDef: input.providerDef,
     providerPrefs: input.providerPrefs,
+    serverId: input.serverId,
   });
 }
 
@@ -530,6 +552,7 @@ function completeResolution(
     state.userModified,
     state.form,
     action.allowedProviderMap,
+    action.serverId ?? state.inputs?.serverId,
   );
   const nextState = { ...state, resolution: { status: "completed" } as const };
   if (!hasFormStateChanged(state.form, resolved)) return nextState;
@@ -541,7 +564,10 @@ function applyProfile(state: AgentFormReducerState, action: ApplyProfileAction) 
   const normalizedModelId = resolveCanonicalModelId(action.providerModels, preferredModelId);
   const nextModelId = normalizedModelId || resolveDefaultModelId(action.providerModels);
   const availableModeIds = new Set(action.providerDef?.modes.map((mode) => mode.id) ?? []);
-  const preferredModeId = action.modeId || action.providerPrefs?.mode || "";
+  const preferredModeId =
+    action.modeId ||
+    resolveSavedModeId(action.providerPrefs, action.serverId ?? state.inputs?.serverId) ||
+    "";
   const defaultModeId = action.providerDef?.defaultModeId ?? "";
   let nextModeId = "";
   if (availableModeIds.has(preferredModeId)) {
@@ -641,6 +667,7 @@ export function resolveAgentForm(
         provider: action.provider,
         providerDef: action.providerDef,
         providerPrefs: action.providerPrefs,
+        serverId: action.serverId ?? state.inputs?.serverId,
       });
       return {
         ...state,

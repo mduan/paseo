@@ -156,6 +156,7 @@ function buildSnapshot(input: {
 function updateSelectionPreferences(input: {
   preferences: FormPreferences;
   provider: AgentProvider;
+  serverId?: string | null;
   model: string;
   mode: string;
   thinkingOptionId: string;
@@ -168,6 +169,7 @@ function updateSelectionPreferences(input: {
     ...mergeProviderPreferences({
       preferences: input.preferences,
       provider: input.provider,
+      serverId: input.serverId,
       updates: {
         model: model || undefined,
         mode: mode || undefined,
@@ -299,6 +301,7 @@ function OpenScheduleFormSheet({
       updateSelectionPreferences({
         preferences: current,
         provider,
+        serverId: state.selectedServerId ?? serverId,
         model: state.selectedModel,
         mode: state.selectedMode,
         thinkingOptionId: state.selectedThinkingOptionId,
@@ -306,10 +309,12 @@ function OpenScheduleFormSheet({
       }),
     );
   }, [
+    serverId,
     state.isolation,
     state.selectedMode,
     state.selectedModel,
     state.selectedProvider,
+    state.selectedServerId,
     state.selectedThinkingOptionId,
     updatePreferences,
   ]);
