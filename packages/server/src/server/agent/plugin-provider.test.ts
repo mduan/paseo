@@ -350,7 +350,7 @@ describe("PluginAgentClientRegistry", () => {
         2 + 2144 * 1.5e-6 + 12929 * 7.5e-8 + 15 * 7.5e-6 + 2144 * 2e-6 + 12929 * 1e-7 + 15 * 1e-5;
       const latestUsage = eventsOfType(events, "usage_updated").at(-1)?.usage;
       expect(latestUsage).toMatchObject({ totalCostEstimated: true, totalCostUnavailable: false });
-      expect(latestUsage?.totalCostUsd).toBeCloseTo(totalCostUsd);
+      expect(latestUsage?.totalCostUsd).toBeCloseTo(totalCostUsd, 10);
       const opened = harness.inputs.find((input) => input.type === "session.open")!;
       harness.emit({
         type: "session.usage",

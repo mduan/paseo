@@ -48,7 +48,7 @@ describe("Gemini token pricing", () => {
         cachedInputTokens: 12929,
         outputTokens: 15,
       }),
-    ).toBeCloseTo(2144 * 1.5e-6 + 12929 * 7.5e-8 + 15 * 7.5e-6);
+    ).toBeCloseTo(2144 * 1.5e-6 + 12929 * 7.5e-8 + 15 * 7.5e-6, 10);
   });
 
   test.each([
