@@ -2173,6 +2173,11 @@ test("listDraftCommands uses explicit model config without default model fetchin
     override async listCommands(): Promise<AgentSlashCommand[]> {
       return [draftCommand];
     }
+
+    // The response must not wait for the temporary session to shut down.
+    override close(): Promise<void> {
+      return new Promise(() => undefined);
+    }
   }
   class DraftCommandClient extends TestAgentClient {
     fetchCatalogCalls = 0;
