@@ -35,9 +35,38 @@ export interface ClaudeRequestUsage {
   outputTokens: number;
 }
 
-/** List prices for one model request, keyed by Codex model slug or Claude model id. */
+export type GeminiRequestUsage = Omit<CodexRequestUsage, "serviceTier">;
+
+/** List prices for Codex, Claude, and Gemini requests. */
 export class CodexPrices {
   constructor(private readonly entries: Record<string, unknown>) {}
+
+  geminiRequestCostUsd({
+    model,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+  }: GeminiRequestUsage): number | undefined {
+    const modelId = model?.replace(/-(low|medium|high|xhigh|max)$/, "");
+    const entry = modelId ? toRecord(this.entries[`gemini/${modelId}`]) : undefined;
+    if (!entry) return undefined;
+    // Antigravity reports uncached input separately; reasoning is already included in output.
+    const tier: RateTier = {
+      isLongContext: inputTokens + cachedInputTokens > 200_000,
+      isPriority: false,
+      longContextSuffix: "_above_200k_tokens",
+    };
+    const inputRate = readRate(entry, "input_cost_per_token", tier);
+    const outputRate = readRate(entry, "output_cost_per_token", tier);
+    const cachedInputRate = readRate(entry, "cache_read_input_token_cost", tier);
+    if (inputRate === undefined || outputRate === undefined) return undefined;
+    if (cachedInputTokens > 0 && cachedInputRate === undefined) return undefined;
+    return (
+      inputTokens * inputRate +
+      cachedInputTokens * (cachedInputRate ?? 0) +
+      outputTokens * outputRate
+    );
+  }
 
   /** Returns undefined for a model missing from the price list. */
   requestCostUsd({
@@ -105,6 +134,7 @@ function readNumber(value: unknown): number | undefined {
 interface RateTier {
   isLongContext: boolean;
   isPriority: boolean;
+  longContextSuffix?: string;
 }
 
 // Prefer the most specific rate LiteLLM lists: a model without a long-context or priority variant
@@ -114,7 +144,9 @@ function readRate(
   field: string,
   tier: RateTier,
 ): number | undefined {
-  const longField = tier.isLongContext ? `${field}${LONG_CONTEXT_SUFFIX}` : field;
+  const longField = tier.isLongContext
+    ? `${field}${tier.longContextSuffix ?? LONG_CONTEXT_SUFFIX}`
+    : field;
   const candidates = [
     tier.isPriority ? `${longField}${PRIORITY_SUFFIX}` : undefined,
     longField,

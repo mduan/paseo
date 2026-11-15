@@ -225,6 +225,66 @@ lines.on("line", (line) => {
 });`;
 
 describe("runAcpProvider", () => {
+  it("emits completed-turn token usage before completion and preserves cost on context-only updates", async () => {
+    const usage = {
+      inputTokens: 2144,
+      cachedReadTokens: 12929,
+      outputTokens: 15,
+      thoughtTokens: 10,
+      totalTokens: 15088,
+    };
+    const harness = connectorHarness({
+      handleRequest(instance, request) {
+        if (request.method !== "session/prompt") return false;
+        instance.notify("session/update", {
+          sessionId: "connector-session",
+          update: { sessionUpdate: "usage_update", used: 15088, size: 1048576 },
+        });
+        instance.respond(request, { stopReason: "end_turn", usage });
+        return true;
+      },
+    });
+    const connection = await runAcpProvider({
+      id: "test",
+      label: "Test",
+      connector: harness.connector,
+    }).connect({ versions: [1], capabilities: ["prompt.message"] });
+    const events: ProviderEvent[] = [];
+    connection.onEvent((event) => events.push(event));
+    try {
+      await connection.send(openInput());
+      await waitForEvent(events, (event) => event.type === "session.ready");
+      await connection.send({
+        type: "session.prompt",
+        sessionId: "session-1",
+        prompt: {
+          clientMessageId: "cost",
+          delivery: "auto",
+          input: { type: "message", content: [{ type: "text", text: "OK" }] },
+        },
+      });
+      await waitForEvent(
+        events,
+        (event) => event.type === "session.turn" && event.state === "completed",
+      );
+      const tokenUsage = events.findIndex(
+        (event) => event.type === "session.usage" && !!event.turnId,
+      );
+      expect(events[tokenUsage]).toMatchObject({
+        usage: { inputTokens: 2144, cachedInputTokens: 12929, outputTokens: 15 },
+      });
+      expect(tokenUsage).toBeLessThan(
+        events.findIndex((event) => event.type === "session.turn" && event.state === "completed"),
+      );
+      expect(events.find((event) => event.type === "session.usage" && !event.turnId)).toEqual({
+        type: "session.usage",
+        sessionId: "session-1",
+        usage: { contextWindowUsedTokens: 15088, contextWindowMaxTokens: 1048576 },
+      });
+    } finally {
+      await connection.close();
+    }
+  });
   it("spawns the daemon-resolved launch for probes, catalogues, listing, and sessions", async () => {
     const executable = await fakeAcp(`
 if (process.env.LAUNCH_TOKEN !== "resolved" || process.env.CLAUDECODE || process.env.PASEO_NODE_ENV) process.exit(1);

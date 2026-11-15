@@ -7,7 +7,8 @@ import type {
   ProviderRegistration,
 } from "@getpaseo/plugin/server/provider";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import * as pricing from "./providers/codex/pricing.js";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentClient, AgentStreamEvent } from "./agent-sdk-types.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
@@ -287,6 +288,90 @@ function expectNestedChildren(events: AgentStreamEvent[]) {
 }
 
 describe("PluginAgentClientRegistry", () => {
+  test("estimates Gemini turns across model changes, retries pricing, and preserves prior session cost", async () => {
+    const logger = createTestLogger();
+    const prices = new pricing.CodexPrices({
+      "gemini/gemini-4-hydrogen": {
+        input_cost_per_token: 1.5e-6,
+        cache_read_input_token_cost: 7.5e-8,
+        output_cost_per_token: 7.5e-6,
+      },
+      "gemini/gemini-4-argon": {
+        input_cost_per_token: 2e-6,
+        cache_read_input_token_cost: 1e-7,
+        output_cost_per_token: 1e-5,
+      },
+    });
+    const priceList = new pricing.CodexPriceList({ logger });
+    vi.spyOn(priceList, "get").mockResolvedValue(prices).mockResolvedValueOnce(undefined);
+    const sharedPrices = vi.spyOn(pricing, "getSharedCodexPriceList").mockReturnValue(priceList);
+    let sequence = 0;
+    const harness = createProviderHarness({
+      handleInput: async (input, emit) => {
+        if (input.type !== "session.prompt") return false;
+        const turnId = `turn-${++sequence}`;
+        emit({
+          type: "session.prompt_result",
+          sessionId: input.sessionId,
+          clientMessageId: input.prompt.clientMessageId,
+          result: { type: "turn", turnId },
+        });
+        emit({ type: "session.turn", sessionId: input.sessionId, turnId, state: "started" });
+        emit({
+          type: "session.usage",
+          sessionId: input.sessionId,
+          turnId,
+          usage: { inputTokens: 2144, cachedInputTokens: 12929, outputTokens: 15 },
+        });
+        emit({ type: "session.turn", sessionId: input.sessionId, turnId, state: "completed" });
+        return true;
+      },
+    });
+    const plugins = new PluginAgentClientRegistry(logger);
+    plugins.replace([{ ...harness.registration, id: "antigravity" }]);
+    try {
+      const session = await plugins
+        .clients()
+        .antigravity.createSession(
+          { provider: "antigravity", cwd: "/tmp" },
+          { priorTotalCostUsd: 2 },
+        );
+      const events: AgentStreamEvent[] = [];
+      session.subscribe((event) => events.push(event));
+      await session.setModel?.("gemini-4-hydrogen");
+      await session.startTurn!("first");
+      expect(eventsOfType(events, "usage_updated").at(-1)?.usage).toMatchObject({
+        totalCostUnavailable: true,
+        totalCostUsd: undefined,
+      });
+      await session.setModel?.("gemini-4-argon");
+      await session.startTurn!("second");
+      const totalCostUsd =
+        2 + 2144 * 1.5e-6 + 12929 * 7.5e-8 + 15 * 7.5e-6 + 2144 * 2e-6 + 12929 * 1e-7 + 15 * 1e-5;
+      const latestUsage = eventsOfType(events, "usage_updated").at(-1)?.usage;
+      expect(latestUsage).toMatchObject({ totalCostEstimated: true, totalCostUnavailable: false });
+      expect(latestUsage?.totalCostUsd).toBeCloseTo(totalCostUsd, 10);
+      const opened = harness.inputs.find((input) => input.type === "session.open")!;
+      harness.emit({
+        type: "session.usage",
+        sessionId: opened.sessionId,
+        usage: { contextWindowUsedTokens: 15088 },
+      });
+      expect(eventsOfType(events, "usage_updated").at(-1)?.usage).toEqual({
+        contextWindowUsedTokens: 15088,
+      });
+      await session.setModel?.("gemini-unknown");
+      await session.startTurn!("unpriced");
+      expect(eventsOfType(events, "usage_updated").at(-1)?.usage).toMatchObject({
+        totalCostUnavailable: true,
+        totalCostUsd: undefined,
+      });
+      await session.close();
+    } finally {
+      await plugins.shutdown();
+      sharedPrices.mockRestore();
+    }
+  });
   test("stores only agent options while the plugin receives merged defaults", async () => {
     const logger = createTestLogger();
     const harness = createProviderHarness();

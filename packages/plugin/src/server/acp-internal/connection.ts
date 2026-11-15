@@ -598,6 +598,18 @@ class AcpRuntime {
       this.connection.prompt({ sessionId: this.nativeSessionId, prompt }),
     ).then(
       (response): void => {
+        if (response.usage) {
+          this.emit({
+            type: "session.usage",
+            sessionId: this.options.boundarySessionId,
+            turnId,
+            usage: {
+              inputTokens: response.usage.inputTokens,
+              cachedInputTokens: response.usage.cachedReadTokens ?? undefined,
+              outputTokens: response.usage.outputTokens,
+            },
+          });
+        }
         const state = response.stopReason === "cancelled" ? "canceled" : "completed";
         this.fallbackChunkIds.clear();
         this.terminalizeTransientItems(state);
@@ -995,7 +1007,7 @@ class AcpRuntime {
         usage: {
           contextWindowUsedTokens: update.used,
           contextWindowMaxTokens: update.size,
-          totalCostUsd: update.cost?.currency === "USD" ? update.cost.amount : undefined,
+          ...(update.cost?.currency === "USD" ? { totalCostUsd: update.cost.amount } : {}),
         },
       });
       return;

@@ -11,6 +11,19 @@ const HOUR_MS = 60 * 60 * 1000;
 
 // LiteLLM rates in USD per token.
 const PRICE_LIST = {
+  "gemini/gemini-4-hydrogen": {
+    input_cost_per_token: 1.5e-6,
+    cache_read_input_token_cost: 7.5e-8,
+    output_cost_per_token: 7.5e-6,
+  },
+  "gemini/gemini-2.5-pro": {
+    input_cost_per_token: 1.25e-6,
+    cache_read_input_token_cost: 1.25e-7,
+    output_cost_per_token: 1e-5,
+    input_cost_per_token_above_200k_tokens: 2.5e-6,
+    cache_read_input_token_cost_above_200k_tokens: 2.5e-7,
+    output_cost_per_token_above_200k_tokens: 1.5e-5,
+  },
   "gpt-6.1-sol": {
     input_cost_per_token: 2e-6,
     cache_read_input_token_cost: 1e-7,
@@ -23,6 +36,63 @@ const PRICE_LIST = {
     output_cost_per_token_above_272k_tokens: 1.5e-5,
   },
 };
+
+describe("Gemini token pricing", () => {
+  const prices = new CodexPrices(PRICE_LIST);
+
+  test("prices Antigravity's separate input and cached counts without counting reasoning twice", () => {
+    expect(
+      prices.geminiRequestCostUsd({
+        model: "gemini-4-hydrogen-high",
+        inputTokens: 2144,
+        cachedInputTokens: 12929,
+        outputTokens: 15,
+      }),
+    ).toBeCloseTo(2144 * 1.5e-6 + 12929 * 7.5e-8 + 15 * 7.5e-6, 10);
+  });
+
+  test.each([
+    { totalInputTokens: 200_000, expectedCostUsd: 0.1475 },
+    { totalInputTokens: 200_001, expectedCostUsd: 0.2900025 },
+  ])(
+    "selects Gemini's context tier using input plus cache: $totalInputTokens",
+    ({ totalInputTokens, expectedCostUsd }) => {
+      expect(
+        prices.geminiRequestCostUsd({
+          model: "gemini-2.5-pro",
+          inputTokens: totalInputTokens - 100_000,
+          cachedInputTokens: 100_000,
+          outputTokens: 1000,
+        }),
+      ).toBeCloseTo(expectedCostUsd, 8);
+    },
+  );
+
+  test("does not invent a price for cached reads when their rate is missing", () => {
+    const noCachePrices = new CodexPrices({
+      "gemini/gemini-4-hydrogen": { input_cost_per_token: 1.5e-6, output_cost_per_token: 7.5e-6 },
+    });
+    expect(
+      noCachePrices.geminiRequestCostUsd({
+        model: "gemini-4-hydrogen",
+        inputTokens: 100,
+        cachedInputTokens: 200,
+        outputTokens: 5,
+      }),
+    ).toBeUndefined();
+  });
+
+  test("leaves unknown model pricing unavailable", () => {
+    expect(
+      prices.geminiRequestCostUsd({
+        model: "unknown",
+        inputTokens: 1,
+        cachedInputTokens: 0,
+        outputTokens: 1,
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe("CodexPrices", () => {
   const prices = new CodexPrices(PRICE_LIST);
