@@ -1220,6 +1220,9 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   secondaryLabelActive: {
     color: theme.colors.foreground,
   },
+  secondaryLabelMuted: {
+    color: theme.colors.foregroundExtraMuted,
+  },
   shimmerText: {
     color: "transparent",
     fontSize: theme.fontSize.base,
@@ -2357,6 +2360,7 @@ export const TodoListCard = memo(function TodoListCard({ items, activity }: Todo
 interface ExpandableBadgeProps {
   label: string;
   secondaryLabel?: string;
+  isSecondaryLabelMuted?: boolean;
   icon?: ComponentType<{ size?: number; color?: string }>;
   isExpanded: boolean;
   style?: StyleProp<ViewStyle>;
@@ -2719,6 +2723,7 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   label,
   style,
   secondaryLabel,
+  isSecondaryLabelMuted = false,
   icon,
   isExpanded,
   onToggle,
@@ -2919,9 +2924,11 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   const secondaryLabelStyle = useMemo(
     () => [
       expandableBadgeStylesheet.secondaryLabel,
-      isActive && expandableBadgeStylesheet.secondaryLabelActive,
+      isSecondaryLabelMuted
+        ? expandableBadgeStylesheet.secondaryLabelMuted
+        : isActive && expandableBadgeStylesheet.secondaryLabelActive,
     ],
-    [isActive],
+    [isActive, isSecondaryLabelMuted],
   );
 
   const shimmerLabelTextStyle = useMemo(
@@ -3030,6 +3037,7 @@ export const ExpandableBadge = memo(function ExpandableBadge({
 function areExpandableBadgePropsEqual(previous: ExpandableBadgeProps, next: ExpandableBadgeProps) {
   if (previous.label !== next.label) return false;
   if (previous.secondaryLabel !== next.secondaryLabel) return false;
+  if (previous.isSecondaryLabelMuted !== next.isSecondaryLabelMuted) return false;
   if (previous.icon !== next.icon) return false;
   if (previous.isExpanded !== next.isExpanded) return false;
   if (previous.style !== next.style) return false;
@@ -3205,15 +3213,16 @@ export const ToolCall = memo(function ToolCall({
     );
   }
 
+  const isThinking = isThinkingToolName(toolName);
   const isInlineExpanded = shouldRenderInline && isExpanded;
-  const secondaryLabel =
-    isInlineExpanded && isThinkingToolName(toolName) ? undefined : presentation.summary;
+  const secondaryLabel = isInlineExpanded && isThinking ? undefined : presentation.summary;
 
   return (
     <ExpandableBadge
       testID="tool-call-badge"
       label={presentation.displayName}
       secondaryLabel={secondaryLabel}
+      isSecondaryLabelMuted={isThinking}
       icon={presentation.icon}
       isExpanded={isInlineExpanded}
       onToggle={presentation.canOpenDetails ? handleToggle : undefined}
