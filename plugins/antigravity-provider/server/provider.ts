@@ -131,6 +131,7 @@ function createConnection(
     id: string,
     opened: OpenSession,
     requestId: string,
+    history: "replay" | "skip",
     restoring = false,
   ): Promise<void> {
     await opened.backend?.close();
@@ -139,6 +140,7 @@ function createConnection(
       config: opened.config,
       persistence: opened.persistence,
       firstMessage: opened.firstMessage,
+      history,
       launch,
       emit(event) {
         if (restoring && (event.type === "session.opened" || event.type === "session.ready")) {
@@ -206,7 +208,13 @@ function createConnection(
     if (opened.active && !steering)
       throw new AntigravityError("Antigravity already has an active turn", "TURN_ACTIVE");
     if (!steering && opened.backendSelection !== selection(opened.config))
-      await startSession(input.sessionId, opened, `restore-${input.prompt.clientMessageId}`, true);
+      await startSession(
+        input.sessionId,
+        opened,
+        `restore-${input.prompt.clientMessageId}`,
+        "skip",
+        true,
+      );
     if (!opened.backend) throw new AntigravityError("Antigravity session is not ready");
     await opened.backend.prompt(input.prompt);
     opened.firstMessage = false;
@@ -235,7 +243,7 @@ function createConnection(
         };
         sessions.set(input.sessionId, opened);
         try {
-          await startSession(input.sessionId, opened, input.requestId);
+          await startSession(input.sessionId, opened, input.requestId, input.history);
         } catch (error) {
           sessions.delete(input.sessionId);
           await opened.backend?.close();

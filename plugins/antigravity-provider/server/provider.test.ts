@@ -780,6 +780,16 @@ describe("ACP permission modes", () => {
     expect(h.events.filter((event) => event.type === "session.opened")).toHaveLength(1);
   });
 
+  it("replays conversation history when a persisted session is reopened", async () => {
+    const h = await harness();
+    await h.open();
+    await h.completed(await h.prompt("FIRST"));
+    const persistence = h.persistence();
+    await h.request({ type: "session.close", requestId: "close", sessionId: "s" });
+    await h.open(persistence);
+    expect(JSON.stringify(h.events)).toContain("REPLAYED HISTORY");
+  });
+
   it.each(["full-access", "auto", "accept-edits"])(
     "resumes %s conversations and passes images through ACP without repeating the system prompt",
     async (mode) => {
