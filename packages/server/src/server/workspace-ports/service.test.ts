@@ -149,4 +149,32 @@ describe("WorkspacePortsService", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("passes listProcessOwners to scan", async () => {
+    const owners = new Map([[42, "app-b"]]);
+    const scan = vi.fn(
+      async (
+        details: Map<number, ProcessDetails>,
+        processOwners?: ReadonlyMap<number, string>,
+      ): Promise<ListeningPort[]> => {
+        details.set(42, { cwd: "/work/app", workspaceId: processOwners?.get(42) });
+        return [port];
+      },
+    );
+    const service = new WorkspacePortsService({
+      logger,
+      scan,
+      onChange: async () => {},
+      listProcessOwners: async () => owners,
+      listWorkspaces: async () => [
+        { workspaceId: "app-a", cwd: "/work/app" },
+        { workspaceId: "app-b", cwd: "/work/app" },
+      ],
+    });
+
+    await service.refresh();
+    expect(scan).toHaveBeenCalledWith(expect.any(Map), owners);
+    expect(service.getPorts("app-a")).toEqual([]);
+    expect(service.getPorts("app-b")).toEqual([{ ...port, workspaceId: "app-b" }]);
+  });
 });

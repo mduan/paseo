@@ -15,6 +15,7 @@ export interface WorkerTerminalInfo {
   name: string;
   cwd: string;
   workspaceId?: string;
+  pid?: number;
   title?: string;
   activity: TerminalActivity | null;
 }

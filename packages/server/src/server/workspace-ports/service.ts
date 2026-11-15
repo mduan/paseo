@@ -12,8 +12,12 @@ import { scanListeningPorts } from "./scan.js";
 type Options = {
   logger: Logger;
   listWorkspaces: () => Promise<PortWorkspace[]>;
+  listProcessOwners?: () => Promise<ReadonlyMap<number, string>>;
   onChange: (workspaceIds: string[]) => Promise<void>;
-  scan?: (details: Map<number, ProcessDetails>) => Promise<ListeningPort[]>;
+  scan?: (
+    details: Map<number, ProcessDetails>,
+    processOwners?: ReadonlyMap<number, string>,
+  ) => Promise<ListeningPort[]>;
 };
 
 export class WorkspacePortsService {
@@ -66,10 +70,14 @@ export class WorkspacePortsService {
 
   private async scan(): Promise<void> {
     try {
+      const processOwners = this.options.listProcessOwners
+        ? await this.options.listProcessOwners()
+        : undefined;
       const scan =
         this.options.scan ??
-        ((details) => scanListeningPorts({ details, logger: this.options.logger }));
-      const ports = await scan(this.details);
+        ((details, owners) =>
+          scanListeningPorts({ details, logger: this.options.logger, processOwners: owners }));
+      const ports = await scan(this.details, processOwners);
       const workspaces = await this.options.listWorkspaces();
       const next = assignWorkspacePorts({ ports, details: this.details, workspaces });
       if (JSON.stringify(next) !== JSON.stringify(this.ports)) {

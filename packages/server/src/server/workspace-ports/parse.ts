@@ -3,7 +3,7 @@ import { posix } from "node:path";
 import type { WorkspacePort } from "@getpaseo/protocol/messages";
 
 export type ListeningPort = Omit<WorkspacePort, "workspaceId"> & { pid: number };
-export type ProcessDetails = { cwd?: string; commandLine?: string };
+export type ProcessDetails = { cwd?: string; commandLine?: string; workspaceId?: string };
 export type PortWorkspace = { workspaceId: string; cwd: string };
 export type ProcSocket = { host: string; port: number; inode: string };
 
@@ -47,6 +47,46 @@ export function parseProcessCommands(output: string): Map<number, string> {
     if (match) commands.set(Number(match[1]), match[2]);
   }
   return commands;
+}
+
+export function parseProcessParents(output: string): Map<number, number> {
+  const parents = new Map<number, number>();
+  for (const line of output.split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
+    if (match) parents.set(Number(match[1]), Number(match[2]));
+  }
+  return parents;
+}
+
+export function parseProcessWorkspaceIds(output: string): Map<number, string> {
+  const workspaceIds = new Map<number, string>();
+  for (const line of output.split("\n")) {
+    const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+    if (!match) continue;
+    const envMatch = /(?:^|\s)PASEO_WORKSPACE_ID=([^\s=]+)(?=\s|$)/.exec(match[2]);
+    if (envMatch) workspaceIds.set(Number(match[1]), envMatch[1]);
+  }
+  return workspaceIds;
+}
+
+export function parseProcEnvironWorkspaceId(contents: string): string | undefined {
+  for (const entry of contents.split("\0")) {
+    if (!entry.startsWith("PASEO_WORKSPACE_ID=")) continue;
+    const value = entry.slice("PASEO_WORKSPACE_ID=".length);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+export function parseProcStatParent(contents: string): number | undefined {
+  const endComm = contents.lastIndexOf(")");
+  if (endComm === -1) return undefined;
+  const fields = contents
+    .slice(endComm + 1)
+    .trimStart()
+    .split(/\s+/);
+  const ppid = Number(fields[1]);
+  return Number.isInteger(ppid) && ppid > 0 ? ppid : undefined;
 }
 
 function decodeProcAddress(hex: string): string | undefined {
@@ -98,6 +138,20 @@ function commandContainsPath(command: string, root: string): boolean {
   return false;
 }
 
+type ResolvedPortWorkspace = { workspace: PortWorkspace; resolvedCwd: string };
+
+function matchingWorkspaces(
+  deepestFirst: ResolvedPortWorkspace[],
+  predicate: (entry: ResolvedPortWorkspace) => boolean,
+): PortWorkspace[] {
+  const matches = deepestFirst.filter(predicate);
+  if (!matches.length) return [];
+  const deepestLength = matches[0].resolvedCwd.length;
+  return matches
+    .filter((entry) => entry.resolvedCwd.length === deepestLength)
+    .map((entry) => entry.workspace);
+}
+
 export function assignWorkspacePorts({
   ports,
   details,
@@ -107,27 +161,45 @@ export function assignWorkspacePorts({
   details: ReadonlyMap<number, ProcessDetails>;
   workspaces: PortWorkspace[];
 }): WorkspacePort[] {
-  const deepestFirst = [...workspaces].sort(
-    (a, b) => b.cwd.length - a.cwd.length || a.workspaceId.localeCompare(b.workspaceId),
-  );
+  const workspacesById = new Map(workspaces.map((workspace) => [workspace.workspaceId, workspace]));
+  const deepestFirst = workspaces
+    .map((workspace) => ({ workspace, resolvedCwd: posix.resolve(workspace.cwd) }))
+    .sort(
+      (a, b) =>
+        b.resolvedCwd.length - a.resolvedCwd.length ||
+        a.workspace.workspaceId.localeCompare(b.workspace.workspaceId),
+    );
   const assigned = new Map<string, WorkspacePort>();
   for (const port of ports) {
     const metadata = details.get(port.pid);
-    const cwd = metadata?.cwd;
-    const byCwd = cwd
-      ? deepestFirst.find((workspace) => containsPath(workspace.cwd, cwd))
+    const explicitWorkspace = metadata?.workspaceId
+      ? workspacesById.get(metadata.workspaceId)
       : undefined;
-    const workspace =
-      byCwd ??
-      deepestFirst.find(
-        (candidate) =>
-          metadata?.commandLine && commandContainsPath(metadata.commandLine, candidate.cwd),
-      );
-    if (!workspace) continue;
-    assigned.set(`${port.host}:${port.port}:${port.pid}`, {
-      ...port,
-      workspaceId: workspace.workspaceId,
-    });
+    let targets: PortWorkspace[];
+    if (explicitWorkspace) {
+      targets = [explicitWorkspace];
+    } else {
+      const cwd = metadata?.cwd;
+      const byCwd = cwd
+        ? matchingWorkspaces(deepestFirst, ({ resolvedCwd }) => containsPath(resolvedCwd, cwd))
+        : [];
+      if (byCwd.length > 0) {
+        targets = byCwd;
+      } else {
+        const commandLine = metadata?.commandLine;
+        targets = commandLine
+          ? matchingWorkspaces(deepestFirst, ({ resolvedCwd }) =>
+              commandContainsPath(commandLine, resolvedCwd),
+            )
+          : [];
+      }
+    }
+    for (const workspace of targets) {
+      assigned.set(`${workspace.workspaceId}:${port.host}:${port.port}:${port.pid}`, {
+        ...port,
+        workspaceId: workspace.workspaceId,
+      });
+    }
   }
   return [...assigned.values()].sort(
     (a, b) =>

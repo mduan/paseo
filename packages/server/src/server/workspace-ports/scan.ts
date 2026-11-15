@@ -6,12 +6,17 @@ import {
   parseLsofListeners,
   parseLsofCwds,
   parseProcessCommands,
+  parseProcessParents,
+  parseProcessWorkspaceIds,
+  parseProcEnvironWorkspaceId,
   parseProcSockets,
+  parseProcStatParent,
   type ListeningPort,
   type ProcessDetails,
 } from "./parse.js";
 
 const COMMAND_OPTIONS = { timeout: 5000, maxBuffer: 8 * 1024 * 1024 };
+const MAX_ANCESTOR_HOPS = 16;
 
 function isMissingProcess(error: unknown): boolean {
   return (
@@ -31,7 +36,57 @@ async function readProcess<T>(read: () => Promise<T>): Promise<T | undefined> {
   }
 }
 
-async function scanMac(details: Map<number, ProcessDetails>): Promise<ListeningPort[]> {
+async function readOptionalCommandStdout(command: string, args: string[]): Promise<string> {
+  try {
+    const { stdout } = await execCommand(command, args, COMMAND_OPTIONS);
+    return stdout;
+  } catch {
+    return "";
+  }
+}
+
+function collectProcessChain({
+  pid,
+  parents,
+  selfPid,
+}: {
+  pid: number;
+  parents: ReadonlyMap<number, number>;
+  selfPid: number;
+}): number[] {
+  const chain: number[] = [];
+  const visited = new Set<number>();
+  let current: number | undefined = pid;
+  while (
+    current !== undefined &&
+    current > 1 &&
+    current !== selfPid &&
+    !visited.has(current) &&
+    chain.length < MAX_ANCESTOR_HOPS
+  ) {
+    visited.add(current);
+    chain.push(current);
+    current = parents.get(current);
+  }
+  return chain;
+}
+
+function resolveChainWorkspaceId(
+  chain: readonly number[],
+  processOwners?: ReadonlyMap<number, string>,
+  envWorkspaceIds?: ReadonlyMap<number, string>,
+): string | undefined {
+  for (const pid of chain) {
+    const owner = processOwners?.get(pid) ?? envWorkspaceIds?.get(pid);
+    if (owner) return owner;
+  }
+  return undefined;
+}
+
+async function scanMac(
+  details: Map<number, ProcessDetails>,
+  processOwners?: ReadonlyMap<number, string>,
+): Promise<ListeningPort[]> {
   const { stdout } = await execCommand(
     "lsof",
     ["-b", "-w", "-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"],
@@ -41,14 +96,44 @@ async function scanMac(details: Map<number, ProcessDetails>): Promise<ListeningP
   const newPids = [...new Set(ports.map((port) => port.pid))].filter((pid) => !details.has(pid));
   if (!newPids.length) return ports;
   const pids = newPids.join(",");
-  const [cwdOutput, commandOutput] = await Promise.all([
+  const [cwdOutput, commandOutput, parentsStdout] = await Promise.all([
     execCommand("lsof", ["-b", "-w", "-a", "-p", pids, "-d", "cwd", "-Fn"], COMMAND_OPTIONS),
     execCommand("ps", ["-p", pids, "-o", "pid=", "-o", "command="], COMMAND_OPTIONS),
+    readOptionalCommandStdout("ps", ["-e", "-o", "pid=,ppid="]),
   ]);
   const cwds = parseLsofCwds(cwdOutput.stdout);
   const commands = parseProcessCommands(commandOutput.stdout);
+  const parents = parseProcessParents(parentsStdout);
+  const chainsByPid = new Map<number, number[]>();
+  const envCandidatePids = new Set<number>();
   for (const pid of newPids) {
-    details.set(pid, { cwd: cwds.get(pid), commandLine: commands.get(pid) });
+    const chain = collectProcessChain({ pid, parents, selfPid: process.pid });
+    chainsByPid.set(pid, chain);
+    if (!resolveChainWorkspaceId(chain, processOwners)) {
+      for (const ancestorPid of chain) envCandidatePids.add(ancestorPid);
+    }
+  }
+  const envWorkspaceIds =
+    envCandidatePids.size > 0
+      ? parseProcessWorkspaceIds(
+          await readOptionalCommandStdout("ps", [
+            "-p",
+            [...envCandidatePids].join(","),
+            "-ww",
+            "-E",
+            "-o",
+            "pid=,command=",
+          ]),
+        )
+      : undefined;
+  for (const pid of newPids) {
+    const chain = chainsByPid.get(pid) ?? [pid];
+    const workspaceId = resolveChainWorkspaceId(chain, processOwners, envWorkspaceIds);
+    details.set(pid, {
+      cwd: cwds.get(pid),
+      commandLine: commands.get(pid),
+      ...(workspaceId ? { workspaceId } : {}),
+    });
   }
   return ports;
 }
@@ -57,7 +142,40 @@ async function readDescriptor(link: string): Promise<string | undefined> {
   return readProcess(() => readlink(link));
 }
 
-async function scanLinux(details: Map<number, ProcessDetails>): Promise<ListeningPort[]> {
+async function resolveLinuxWorkspaceId({
+  pid,
+  environ,
+  processOwners,
+}: {
+  pid: number;
+  environ?: string;
+  processOwners?: ReadonlyMap<number, string>;
+}): Promise<string | undefined> {
+  const direct = processOwners?.get(pid) ?? parseProcEnvironWorkspaceId(environ ?? "");
+  if (direct) return direct;
+  const visited = new Set<number>([pid]);
+  let current = pid;
+  for (let hop = 1; hop < MAX_ANCESTOR_HOPS; hop++) {
+    const stat = await readProcess(() => readFile(`/proc/${current}/stat`, "utf8"));
+    const parent = stat ? parseProcStatParent(stat) : undefined;
+    if (!parent || parent <= 1 || parent === process.pid || visited.has(parent)) {
+      return undefined;
+    }
+    visited.add(parent);
+    const owner = processOwners?.get(parent);
+    if (owner) return owner;
+    const parentEnv = await readProcess(() => readFile(`/proc/${parent}/environ`, "utf8"));
+    const envWorkspaceId = parentEnv ? parseProcEnvironWorkspaceId(parentEnv) : undefined;
+    if (envWorkspaceId) return envWorkspaceId;
+    current = parent;
+  }
+  return undefined;
+}
+
+async function scanLinux(
+  details: Map<number, ProcessDetails>,
+  processOwners?: ReadonlyMap<number, string>,
+): Promise<ListeningPort[]> {
   const [tcp, tcp6, entries] = await Promise.all([
     readFile("/proc/net/tcp", "utf8"),
     readProcess(() => readFile("/proc/net/tcp6", "utf8")),
@@ -83,11 +201,17 @@ async function scanLinux(details: Map<number, ProcessDetails>): Promise<Listenin
         const pid = Number(entry);
         const name = await readProcess(() => readFile(`${root}/comm`, "utf8"));
         if (!details.has(pid)) {
-          const [cwd, cmdline] = await Promise.all([
+          const [cwd, cmdline, environ] = await Promise.all([
             readProcess(() => readlink(`${root}/cwd`)),
             readProcess(() => readFile(`${root}/cmdline`, "utf8")),
+            readProcess(() => readFile(`${root}/environ`, "utf8")),
           ]);
-          details.set(pid, { cwd, commandLine: cmdline?.replaceAll("\0", " ") });
+          const workspaceId = await resolveLinuxWorkspaceId({ pid, environ, processOwners });
+          details.set(pid, {
+            cwd,
+            commandLine: cmdline?.replaceAll("\0", " "),
+            ...(workspaceId ? { workspaceId } : {}),
+          });
         }
         return owned.map(({ host, port }) => ({ host, port, pid, processName: name?.trim() }));
       }),
@@ -99,14 +223,16 @@ async function scanLinux(details: Map<number, ProcessDetails>): Promise<Listenin
 export async function scanListeningPorts({
   details,
   logger,
+  processOwners,
 }: {
   details: Map<number, ProcessDetails>;
   logger: Logger;
+  processOwners?: ReadonlyMap<number, string>;
 }): Promise<ListeningPort[]> {
   try {
     let ports: ListeningPort[] = [];
-    if (process.platform === "darwin") ports = await scanMac(details);
-    else if (process.platform === "linux") ports = await scanLinux(details);
+    if (process.platform === "darwin") ports = await scanMac(details, processOwners);
+    else if (process.platform === "linux") ports = await scanLinux(details, processOwners);
     const pids = new Set(ports.map((port) => port.pid));
     for (const pid of details.keys()) if (!pids.has(pid)) details.delete(pid);
     return ports;

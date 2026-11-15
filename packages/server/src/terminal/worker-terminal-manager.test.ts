@@ -202,6 +202,8 @@ it("creates a terminal through the worker and streams output", async () => {
 
   expect(messages.join("") + getVisibleText(session)).toContain("worker-output:hello");
   expect(snapshots).toBe(snapshotsBeforeOutput);
+  expect(session.pid).toBeTypeOf("number");
+  expect(session.pid).toBeGreaterThan(0);
 });
 
 it("delivers rapid small writes complete and in order through worker coalescing", async () => {

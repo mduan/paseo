@@ -104,6 +104,7 @@ export interface TerminalSession {
   name: string;
   cwd: string;
   workspaceId: string;
+  readonly pid?: number;
   send(msg: ClientMessage): void;
   subscribe(listener: (msg: ServerMessage) => void, options?: TerminalSubscribeOptions): () => void;
   onExit(listener: (info: TerminalExitInfo) => void): () => void;
@@ -1467,6 +1468,7 @@ export async function createTerminal(options: CreateTerminalOptions): Promise<Te
     name,
     cwd,
     workspaceId,
+    ...(ptyProcess.pid > 0 ? { pid: ptyProcess.pid } : {}),
     send,
     subscribe,
     onExit,

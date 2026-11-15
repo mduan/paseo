@@ -720,6 +720,22 @@ export class VoiceAssistantWebSocketServer {
       logger: this.logger,
       listWorkspaces: async () =>
         (await this.workspaceRegistry.list()).filter((workspace) => !workspace.archivedAt),
+      listProcessOwners: async () => {
+        const owners = new Map<number, string>();
+        if (!this.terminalManager) return owners;
+        const directories = this.terminalManager.listDirectories();
+        const groups = await Promise.all(
+          directories.map((directory) => this.terminalManager!.getTerminals(directory)),
+        );
+        for (const terminals of groups) {
+          for (const terminal of terminals) {
+            if (terminal.pid !== undefined && terminal.workspaceId) {
+              owners.set(terminal.pid, terminal.workspaceId);
+            }
+          }
+        }
+        return owners;
+      },
       onChange: async (workspaceIds) => {
         await Promise.all(
           this.listSessions().map((session) =>
