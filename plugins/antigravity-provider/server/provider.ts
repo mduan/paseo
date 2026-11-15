@@ -11,7 +11,7 @@ import {
   type ProviderPersistence,
   type ProviderSessionConfig,
 } from "@getpaseo/plugin/server/provider";
-import { getCatalog, getStatus, resolveSelection } from "./internal/catalog.js";
+import { getCatalog, getStatus, validateSelection } from "./internal/catalog.js";
 import { AcpSession } from "./internal/acp-session.js";
 import { selection } from "./internal/process.js";
 import { AntigravityError } from "./internal/errors.js";
@@ -173,16 +173,11 @@ function createConnection(
     const modelChanged =
       input.changes.model !== undefined && input.changes.model !== opened.config.model;
     if (modelChanged && input.changes.thinkingOption === undefined) {
-      const model = catalog().models.find(
-        (entry) => entry.id === config.model || entry.aliases?.includes(config.model ?? ""),
-      );
-      if (
-        model?.id !== config.model ||
-        !model?.thinkingOptions?.some((option) => option.id === config.thinkingOption)
-      )
+      const model = catalog().models.find((entry) => entry.id === config.model);
+      if (!model?.thinkingOptions?.some((option) => option.id === config.thinkingOption))
         config.thinkingOption = undefined;
     }
-    Object.assign(config, resolveSelection(config, catalog()));
+    validateSelection(config, catalog());
     if (input.changes.settings && Object.keys(input.changes.settings).length)
       throw new AntigravityError("Antigravity has no configurable settings");
     opened.config = config;
@@ -216,7 +211,7 @@ function createConnection(
           throw new AntigravityError(`Session already exists: ${input.sessionId}`);
         if (discovered === null) discovered = await getCatalog(launch, input.config.cwd);
         const config = { ...input.config, mode: input.config.mode ?? "full-access" };
-        Object.assign(config, resolveSelection(config, catalog()));
+        validateSelection(config, catalog());
         const opened: OpenSession = {
           config,
           persistence: input.persistence,

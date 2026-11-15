@@ -58,11 +58,7 @@ function complete(text) {
 }
 function configure(input) {
   if (input.params.configId === "model") {
-    const variant = /^(.*)-(low|medium|high|xhigh|max)$/.exec(input.params.value);
-    if (variant && input.params.value !== "gpt-oss-120b-medium") {
-      model = variant[1];
-      effort = variant[2];
-    } else model = input.params.value;
+    model = input.params.value;
     if (model === "gemini-3.1-pro" && effort === "medium") effort = "low";
   } else if (input.params.configId === "thought_level") {
     if (

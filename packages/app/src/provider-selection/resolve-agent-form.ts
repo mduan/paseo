@@ -9,7 +9,7 @@ import {
   type FormPreferences,
   type ProviderPreferences,
 } from "@/hooks/use-form-preferences";
-import { findModelByReference, resolveAntigravityModelAlias } from "./model-catalog";
+import { findModelByReference } from "./model-catalog";
 
 export interface FormInitialValues {
   provider?: AgentProvider;
@@ -354,17 +354,7 @@ function resolveThinkingOption(input: {
     modelId,
   });
   if (initialThinkingOptionId.length > 0) return initialThinkingOptionId;
-  const initialAlias = resolveAntigravityModelAlias(
-    availableModels,
-    initialValues?.model?.trim() ?? "",
-  );
-  if (initialAlias?.modelId === modelId) return initialAlias.thinkingOptionId;
-  if (preferredThinking.length > 0) return preferredThinking;
-  const preferredAlias = resolveAntigravityModelAlias(
-    availableModels,
-    providerPrefs?.model?.trim() ?? "",
-  );
-  return preferredAlias?.modelId === modelId ? preferredAlias.thinkingOptionId : "";
+  return preferredThinking;
 }
 
 export function resolveFormState(
@@ -561,7 +551,6 @@ function applyProfile(state: AgentFormReducerState, action: ApplyProfileAction) 
   }
   const nextThinkingOptionId =
     action.thinkingOptionId ||
-    resolveAntigravityModelAlias(action.providerModels, preferredModelId)?.thinkingOptionId ||
     pickNextThinkingOptionForProvider({
       providerModels: action.providerModels,
       providerPrefs: action.providerPrefs,

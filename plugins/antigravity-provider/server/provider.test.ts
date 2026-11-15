@@ -229,30 +229,26 @@ describe("ACP permission modes", () => {
     });
   });
 
-  it("restores a combined model ID as separate model and effort values", async () => {
+  it("rejects combined model IDs when opening a session", async () => {
     const h = await harness({ AGY_TEST_MODEL: "gemini-3.8-flash-high" });
     await h.open();
-    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
-      type: "session.config",
-      config: { model: "gemini-3.8-flash", thinkingOption: "high" },
+    expect(h.events.find((event) => event.type === "request.failed")).toMatchObject({
+      error: { code: "INVALID_MODEL" },
     });
-    const records = await h.records();
-    expect(
-      records
-        .filter((record) => record.acp?.method === "session/set_config_option")
-        .map((record) => record.acp.params),
-    ).toEqual([
-      expect.objectContaining({ configId: "model", value: "gemini-3.8-flash" }),
-      expect.objectContaining({ configId: "thought_level", value: "high" }),
-    ]);
+  });
+
+  it("rejects combined model IDs when configuring a session", async () => {
+    const h = await harness({ AGY_TEST_MODEL: "gemini-3.8-flash" });
+    await h.open();
     await h.request({
       type: "session.configure",
-      requestId: "legacy-low",
+      requestId: "combined-model",
       sessionId: "s",
       changes: { model: "gemini-3.8-flash-low" },
     });
-    expect(h.events.findLast((event) => event.type === "session.config")).toMatchObject({
-      config: { model: "gemini-3.8-flash", thinkingOption: "low" },
+    expect(h.events.find((event) => event.type === "request.failed")).toMatchObject({
+      requestId: "combined-model",
+      error: { code: "INVALID_MODEL" },
     });
   });
 

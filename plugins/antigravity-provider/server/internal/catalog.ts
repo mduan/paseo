@@ -90,7 +90,6 @@ function groupModels(variants: ProviderModel[]): ProviderModel[] {
     models.set(variant.id, {
       id: variant.id,
       label: variant.label,
-      aliases: family.map((entry) => entry.id),
       thinkingOptions,
       defaultThinkingOptionId: variant.effort,
     });
@@ -142,19 +141,13 @@ export async function getStatus(launch: ProviderLaunch): Promise<ProviderStatus>
 
 type Selection = Pick<ProviderSessionConfig, "model" | "mode" | "thinkingOption">;
 
-export function resolveSelection(config: Selection, catalog: ProviderCatalog): Selection {
-  const model = catalog.models.find(
-    (entry) => entry.id === config.model || entry.aliases?.includes(config.model ?? ""),
-  );
+export function validateSelection(config: Selection, catalog: ProviderCatalog): void {
+  const model = catalog.models.find((entry) => entry.id === config.model);
   if (config.model && !model)
     throw new AntigravityError(`Unknown Antigravity model: ${config.model}`, "INVALID_MODEL");
   if (config.mode && !catalog.modes.some((mode) => mode.id === config.mode))
     throw new AntigravityError(`Unknown Antigravity mode: ${config.mode}`, "INVALID_MODE");
-  let thinkingOption = config.thinkingOption;
-  // COMPAT(antigravity-model-effort): added in v0.11.0-fork.45, remove after 2027-02-15.
-  if (!thinkingOption && model && config.model !== model.id)
-    thinkingOption = config.model?.slice(model.id.length + 1);
+  const thinkingOption = config.thinkingOption;
   if (thinkingOption && !model?.thinkingOptions?.some((option) => option.id === thinkingOption))
     throw new AntigravityError(`Unknown Antigravity effort: ${thinkingOption}`, "INVALID_THINKING");
-  return { model: model?.id, mode: config.mode, thinkingOption };
 }
