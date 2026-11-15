@@ -939,7 +939,8 @@ lines.on("line", (line) => {
 
   it("refuses unsupported steering before sending an ACP prompt", async () => {
     const executable = await fakeAcp(basicAgent);
-    const { connection, events } = await connect(executable, ["prompt.message"]);
+    const { connection, events } = await connect(executable, ["prompt.message", "prompt.steer"]);
+    expect(connection.capabilities).not.toContain("prompt.steer");
     await connection.send(openInput());
     await waitForEvent(events, (event) => event.type === "session.ready");
 

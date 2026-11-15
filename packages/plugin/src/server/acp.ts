@@ -43,6 +43,8 @@ export type AcpConnector = () => AcpStream | Promise<AcpStream>;
 
 export interface AcpOptions {
   protocol?: "auto" | "v1";
+  /** ACP v1 has no steering capability flag; enable only for agents with concurrent-prompt support. */
+  supportsSteering?: boolean;
   startupTimeoutMs?: number;
   waitForInitialCommands?: boolean;
   initialCommandsTimeoutMs?: number;

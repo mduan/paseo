@@ -20,6 +20,7 @@ const capabilities = [
   "prompt.message",
   "prompt.command",
   "prompt.image",
+  "prompt.steer",
   "session.configure",
   "session.persistence",
   "permission",
@@ -197,6 +198,19 @@ function createConnection(
       },
     });
   }
+  async function promptSession(
+    input: Extract<ProviderInput, { type: "session.prompt" }>,
+  ): Promise<void> {
+    const opened = session(input.sessionId);
+    const steering = input.prompt.delivery === "steer";
+    if (opened.active && !steering)
+      throw new AntigravityError("Antigravity already has an active turn", "TURN_ACTIVE");
+    if (!steering && opened.backendSelection !== selection(opened.config))
+      await startSession(input.sessionId, opened, `restore-${input.prompt.clientMessageId}`, true);
+    if (!opened.backend) throw new AntigravityError("Antigravity session is not ready");
+    await opened.backend.prompt(input.prompt);
+    opened.firstMessage = false;
+  }
   async function dispatch(input: ProviderInput): Promise<void> {
     switch (input.type) {
       case "catalog":
@@ -230,19 +244,7 @@ function createConnection(
         return;
       }
       case "session.prompt": {
-        const opened = session(input.sessionId);
-        if (opened.active)
-          throw new AntigravityError("Antigravity already has an active turn", "TURN_ACTIVE");
-        if (opened.backendSelection !== selection(opened.config))
-          await startSession(
-            input.sessionId,
-            opened,
-            `restore-${input.prompt.clientMessageId}`,
-            true,
-          );
-        if (!opened.backend) throw new AntigravityError("Antigravity session is not ready");
-        await opened.backend.prompt(input.prompt);
-        opened.firstMessage = false;
+        await promptSession(input);
         return;
       }
       case "session.configure":

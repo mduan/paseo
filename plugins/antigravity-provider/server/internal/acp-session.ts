@@ -47,7 +47,7 @@ export class AcpSession {
       id: "antigravity",
       label: "Antigravity",
       command: ["agy", "acp"],
-      acpOptions: { waitForInitialCommands: true },
+      acpOptions: { waitForInitialCommands: true, supportsSteering: true },
     });
     const connection = await provider.connect({
       versions: [1],
@@ -138,8 +138,8 @@ export class AcpSession {
   }
 
   async prompt(prompt: ProviderPrompt): Promise<void> {
-    if (prompt.delivery === "steer" || prompt.outputSchema !== undefined)
-      throw new AntigravityError("Antigravity does not support steering or structured output");
+    if (prompt.outputSchema !== undefined)
+      throw new AntigravityError("Antigravity does not support structured output");
     let content: ProviderContent[];
     if (prompt.input.type === "command") {
       const suffix = prompt.input.arguments ? ` ${prompt.input.arguments}` : "";

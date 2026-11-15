@@ -435,6 +435,103 @@ describe("ACP permission modes", () => {
     expect(await h.completed(await h.prompt("HELLO"))).toMatchObject({ state: "completed" });
   });
 
+  it("steers the running ACP turn without cancelling it and still supports interrupt", async () => {
+    const h = await harness();
+    await h.open();
+    expect(h.connection.capabilities).toContain("prompt.steer");
+    const promptId = await h.prompt("HOLD");
+    await h.wait(
+      (event) => event.type === "timeline.item" && event.item.type === "assistant_message",
+    );
+    const admission = h.events.find(
+      (event) => event.type === "session.prompt_result" && event.clientMessageId === promptId,
+    );
+    if (admission?.type !== "session.prompt_result" || admission.result.type !== "turn")
+      throw new Error("Expected an active turn");
+    const turnId = admission.result.turnId;
+
+    await h.connection.send({
+      type: "session.prompt",
+      sessionId: "s",
+      prompt: {
+        clientMessageId: "steer-1",
+        delivery: "steer",
+        input: { type: "message", content: [{ type: "text", text: "change course" }] },
+      },
+    });
+    expect(
+      await h.wait(
+        (event) => event.type === "session.prompt_result" && event.clientMessageId === "steer-1",
+      ),
+    ).toMatchObject({ result: { type: "steer", turnId } });
+    await h.wait(
+      (event) =>
+        event.type === "timeline.item" &&
+        event.item.type === "assistant_message" &&
+        event.item.text === "WORKINGSTEERED",
+    );
+    const records = await h.records();
+    expect(records.filter((record) => record.acp?.method === "session/cancel")).toEqual([]);
+    expect(
+      records
+        .filter((record) => record.acp?.method === "session/prompt")
+        .map((record) => record.acp.params.prompt),
+    ).toEqual([
+      [
+        { type: "text", text: "SYSTEM PREFIX" },
+        { type: "text", text: "HOLD" },
+      ],
+      [{ type: "text", text: "change course" }],
+    ]);
+    expect(h.events.filter((event) => event.type === "session.turn")).toEqual([
+      { type: "session.turn", sessionId: "s", turnId, state: "started" },
+    ]);
+
+    await h.request({ type: "session.interrupt", requestId: "stop-steered", sessionId: "s" });
+    expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+    expect(await h.completed(await h.prompt("HELLO"))).toMatchObject({ state: "completed" });
+  });
+
+  it.each([false, true])(
+    "clears pending permissions only when a steer requests it (%s)",
+    async (clearPendingPermissions) => {
+      const h = await harness({ AGY_TEST_MODE: "auto" });
+      await h.open();
+      const promptId = await h.prompt("APPROVAL");
+      await h.wait((event) => event.type === "session.permission");
+      await h.connection.send({
+        type: "session.prompt",
+        sessionId: "s",
+        prompt: {
+          clientMessageId: "permission-steer",
+          delivery: "steer",
+          clearPendingPermissions,
+          input: { type: "message", content: [{ type: "text", text: "change course" }] },
+        },
+      });
+      await h.wait(
+        (event) =>
+          event.type === "timeline.item" &&
+          event.item.type === "assistant_message" &&
+          event.item.text.startsWith("STEERED"),
+      );
+      if (clearPendingPermissions) {
+        await h.wait((event) => event.type === "session.permission_resolved");
+        expect(await h.completed(promptId)).toMatchObject({ state: "completed" });
+      } else {
+        expect(h.events.filter((event) => event.type === "session.permission_resolved")).toEqual(
+          [],
+        );
+        await h.request({ type: "session.interrupt", requestId: "stop-blocked", sessionId: "s" });
+        expect(await h.completed(promptId)).toMatchObject({ state: "canceled" });
+      }
+      const methods = (await h.records())
+        .filter((record) => record.acp?.method)
+        .map((record) => record.acp.method);
+      expect(methods.filter((method) => method === "session/prompt")).toHaveLength(2);
+    },
+  );
+
   it.each(["auto", "accept-edits"])(
     "rejects %s when the native session does not offer it",
     async (mode) => {

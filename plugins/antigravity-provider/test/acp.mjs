@@ -110,12 +110,40 @@ lines.on("line", (line) => {
   } else if (input.method === "session/set_config_option") {
     configure(input);
   } else if (input.method === "session/prompt") {
+    if (pendingPrompt !== undefined) {
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "STEERED" },
+          },
+        },
+      });
+      send({ id: input.id, result: { stopReason: "end_turn" } });
+      return;
+    }
     pendingPrompt = input.id;
     const text = input.params.prompt
       .filter((part) => part.type === "text")
       .map((part) => part.text)
       .join("\n");
-    if (text.includes("APPROVAL") && !process.argv.includes("--dangerously-skip-permissions")) {
+    if (text.includes("HOLD")) {
+      send({
+        method: "session/update",
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "WORKING" },
+          },
+        },
+      });
+    } else if (
+      text.includes("APPROVAL") &&
+      !process.argv.includes("--dangerously-skip-permissions")
+    ) {
       send({
         id: "approval",
         method: "session/request_permission",

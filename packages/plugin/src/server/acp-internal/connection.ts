@@ -76,6 +76,7 @@ export async function createAcpProviderConnection(
     emit: () => undefined,
   });
   const supportedCapabilities: ProviderCapability[] = [...ADAPTER_CAPABILITIES];
+  if (options.acpOptions?.supportsSteering) supportedCapabilities.push("prompt.steer");
   if (probe.agentCapabilities.promptCapabilities?.image) {
     supportedCapabilities.push("prompt.image");
   }
@@ -562,13 +563,15 @@ class AcpRuntime {
     input: Extract<ProviderInput, { type: "session.prompt" }>,
   ): Promise<void> {
     const active = this.activePrompt;
-    if (active) {
+    const steering = input.prompt.delivery === "steer";
+    if (steering && !active) throw new Error("No active ACP turn to steer");
+    if (active && !steering) {
       await this.interrupt();
       await active.settled;
     }
     const prompt = toAcpPrompt(input.prompt);
-    const turnId = `acp:${input.prompt.clientMessageId}`;
-    this.fallbackChunkIds.clear();
+    const turnId = steering && active ? active.turnId : `acp:${input.prompt.clientMessageId}`;
+    if (!steering) this.fallbackChunkIds.clear();
     this.emit({
       type: "timeline.item",
       sessionId: this.options.boundarySessionId,
@@ -586,18 +589,20 @@ class AcpRuntime {
       type: "session.prompt_result",
       sessionId: this.options.boundarySessionId,
       clientMessageId: input.prompt.clientMessageId,
-      result: { type: "turn", turnId },
+      result: { type: steering ? "steer" : "turn", turnId },
     });
-    this.emit({
-      type: "session.turn",
-      sessionId: this.options.boundarySessionId,
-      turnId,
-      state: "started",
-    });
+    if (!steering)
+      this.emit({
+        type: "session.turn",
+        sessionId: this.options.boundarySessionId,
+        turnId,
+        state: "started",
+      });
     const settled = this.call(
       this.connection.prompt({ sessionId: this.nativeSessionId, prompt }),
     ).then(
       (response): void => {
+        if (steering) return;
         if (response.usage) {
           this.emit({
             type: "session.usage",
@@ -622,6 +627,15 @@ class AcpRuntime {
         return undefined;
       },
       (error): void => {
+        if (steering) {
+          if (this.activePrompt !== active) return;
+          this.emit({
+            type: "session.runtime_failed",
+            sessionId: this.options.boundarySessionId,
+            error: { message: describeError(error) },
+          });
+          return;
+        }
         this.fallbackChunkIds.clear();
         this.terminalizeTransientItems("failed");
         this.emit({
@@ -634,6 +648,14 @@ class AcpRuntime {
         return undefined;
       },
     );
+    if (steering) {
+      if (input.prompt.clearPendingPermissions) {
+        for (const permissionId of this.permissions.keys()) {
+          this.respondToPermission(permissionId, { behavior: "deny" });
+        }
+      }
+      return;
+    }
     this.activePrompt = { turnId, settled };
     void settled.finally(() => {
       if (this.activePrompt?.turnId === turnId) this.activePrompt = null;
