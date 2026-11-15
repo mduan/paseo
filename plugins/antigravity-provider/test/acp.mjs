@@ -111,6 +111,8 @@ lines.on("line", (line) => {
     configure(input);
   } else if (input.method === "session/prompt") {
     if (pendingPrompt !== undefined) {
+      send({ id: pendingPrompt, result: { stopReason: "end_turn" } });
+      pendingPrompt = input.id;
       send({
         method: "session/update",
         params: {
@@ -121,7 +123,6 @@ lines.on("line", (line) => {
           },
         },
       });
-      send({ id: input.id, result: { stopReason: "end_turn" } });
       return;
     }
     pendingPrompt = input.id;

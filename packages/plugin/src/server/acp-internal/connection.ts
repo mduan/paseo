@@ -602,7 +602,7 @@ class AcpRuntime {
       this.connection.prompt({ sessionId: this.nativeSessionId, prompt }),
     ).then(
       (response): void => {
-        if (steering) return;
+        if (this.activePrompt?.settled !== settled) return;
         if (response.usage) {
           this.emit({
             type: "session.usage",
@@ -627,15 +627,7 @@ class AcpRuntime {
         return undefined;
       },
       (error): void => {
-        if (steering) {
-          if (this.activePrompt !== active) return;
-          this.emit({
-            type: "session.runtime_failed",
-            sessionId: this.options.boundarySessionId,
-            error: { message: describeError(error) },
-          });
-          return;
-        }
+        if (this.activePrompt?.settled !== settled) return;
         this.fallbackChunkIds.clear();
         this.terminalizeTransientItems("failed");
         this.emit({
@@ -648,18 +640,16 @@ class AcpRuntime {
         return undefined;
       },
     );
-    if (steering) {
-      if (input.prompt.clearPendingPermissions) {
-        for (const permissionId of this.permissions.keys()) {
-          this.respondToPermission(permissionId, { behavior: "deny" });
-        }
-      }
-      return;
-    }
+    // A steer supersedes the earlier ACP request, but keeps the same Paseo turn.
     this.activePrompt = { turnId, settled };
     void settled.finally(() => {
-      if (this.activePrompt?.turnId === turnId) this.activePrompt = null;
+      if (this.activePrompt?.settled === settled) this.activePrompt = null;
     });
+    if (steering && input.prompt.clearPendingPermissions) {
+      for (const permissionId of this.permissions.keys()) {
+        this.respondToPermission(permissionId, { behavior: "deny" });
+      }
+    }
   }
 
   interrupt(): Promise<void> {
