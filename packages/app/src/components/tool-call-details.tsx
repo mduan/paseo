@@ -504,7 +504,7 @@ function ScrollablePlainTextSection({ text, ds }: { text: string; ds: DetailStyl
         showsVerticalScrollIndicator
       >
         <Text selectable style={styles.plainText}>
-          {text}
+          {text.trim()}
         </Text>
       </ScrollView>
     </View>
