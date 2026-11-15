@@ -784,7 +784,7 @@ class AcpRuntime {
         (await transformer.configure?.(change, {
           sessionId: this.options.boundarySessionId,
           config: access,
-          modes: this.modes?.availableModes.map((mode) => mode.id) ?? [],
+          modeIds: this.modes?.availableModes.map((mode) => mode.id) ?? [],
         })) === "handled"
       ) {
         return;

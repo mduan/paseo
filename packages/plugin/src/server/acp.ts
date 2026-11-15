@@ -66,7 +66,7 @@ export interface AcpDiscoveryContext extends AcpContext {
 export interface AcpConfigureContext extends AcpContext {
   config: AcpConfigAccess;
   /** Mode IDs the native session offers; empty when it exposes no modes. */
-  modes: readonly string[];
+  modeIds: readonly string[];
 }
 
 export type AcpConfigChange =

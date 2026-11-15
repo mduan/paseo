@@ -70,7 +70,7 @@ export class AcpSession {
       transformers: [
         {
           configure: async (change, context) => {
-            if (change.target === "mode" && !context.modes.some((id) => id === change.value))
+            if (change.target === "mode" && !context.modeIds.some((id) => id === change.value))
               throw new AntigravityError(
                 `Antigravity mode ${this.options.config.mode} is unavailable for this account or host`,
                 "UNSUPPORTED_MODE",
