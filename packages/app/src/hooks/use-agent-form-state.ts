@@ -120,19 +120,21 @@ function buildProviderModelsByProvider(
 
 async function persistProviderPreferences(input: {
   provider: AgentProvider;
+  serverId: string | null;
   formState: FormState;
   availableModels: AgentModelDefinition[] | null;
   updatePreferences: (
     updates: Partial<FormPreferences> | ((current: FormPreferences) => FormPreferences),
   ) => Promise<FormPreferences>;
 }): Promise<void> {
-  const { provider, formState, availableModels, updatePreferences } = input;
+  const { provider, serverId, formState, availableModels, updatePreferences } = input;
   const resolvedModel = resolveEffectiveModel(availableModels, formState.model);
   const modelId = resolvedModel?.id ?? formState.model;
   await updatePreferences((current) =>
     mergeProviderPreferences({
       preferences: current,
       provider,
+      serverId,
       updates: {
         model: modelId || undefined,
         mode: formState.modeId || undefined,
@@ -288,6 +290,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
 
       dispatch({
         type: "SET_PROVIDER_AND_MODEL_FROM_USER",
+        serverId,
         provider,
         modelId,
         providerDef,
@@ -298,13 +301,14 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
         mergeSelectedComposerPreferences({
           preferences: current,
           provider,
+          serverId,
           updates: {
             model: nextModelId || undefined,
           },
         }),
       );
     },
-    [allProviderModels, selectableProviderDefinitionMap, updateCurrentPreferences],
+    [allProviderModels, selectableProviderDefinitionMap, serverId, updateCurrentPreferences],
   );
 
   const clearProviderSelectionFromUser = useCallback(() => {
@@ -324,6 +328,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
       const providerPrefs = preferenceOverlayRef.current.current().providerPreferences?.[provider];
       const action = {
         type: "APPLY_PROFILE_FROM_USER" as const,
+        serverId,
         provider,
         modelId: profile.modelId,
         modeId: profile.modeId,
@@ -345,6 +350,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
           previousProvider,
           previousProviderModeIds,
           provider,
+          serverId,
           modelId: model,
           modeId,
           thinkingOptionId,
@@ -360,6 +366,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
       providerDefinitionMap,
       resolution,
       selectableProviderDefinitionMap,
+      serverId,
       updateCurrentPreferences,
       userModified,
     ],
@@ -374,6 +381,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
           mergeSelectedComposerPreferences({
             preferences: current,
             provider,
+            serverId,
             updates: {
               mode: modeId || undefined,
             },
@@ -381,7 +389,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
         );
       }
     },
-    [formState.provider, updateCurrentPreferences],
+    [formState.provider, serverId, updateCurrentPreferences],
   );
 
   const setModelFromUser = useCallback(
@@ -451,11 +459,12 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
     }
     await persistProviderPreferences({
       provider: formState.provider,
+      serverId,
       formState,
       availableModels,
       updatePreferences: updateCurrentPreferences,
     });
-  }, [availableModels, formState, updateCurrentPreferences]);
+  }, [availableModels, formState, serverId, updateCurrentPreferences]);
 
   const agentDefinition = formState.provider
     ? providerDefinitionMap.get(formState.provider)

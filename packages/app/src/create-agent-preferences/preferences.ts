@@ -6,6 +6,7 @@ const featureValuesSchema = z.record(z.string(), z.union([z.boolean(), z.string(
 export interface ProviderPreferences {
   model?: string;
   mode?: string;
+  modeByHost?: Record<string, string>;
   thinkingByModel?: Record<string, string>;
   featureValues?: Record<string, unknown>;
 }
@@ -24,6 +25,7 @@ export interface FormPreferences {
 const providerPreferencesSchema: z.ZodType<ProviderPreferences> = z.strictObject({
   model: z.string().optional(),
   mode: z.string().optional(),
+  modeByHost: z.record(z.string(), z.string()).optional(),
   thinkingByModel: z.record(z.string(), z.string()).optional(),
   featureValues: featureValuesSchema.optional(),
 });
@@ -112,21 +114,48 @@ function mergeDefinedRecord<T>(
   };
 }
 
+export function resolveSavedModeId(
+  providerPrefs: ProviderPreferences | undefined,
+  serverId?: string | null,
+): string | undefined {
+  const normalizedServerId = serverId?.trim();
+  if (normalizedServerId && providerPrefs?.modeByHost?.[normalizedServerId] !== undefined) {
+    return providerPrefs.modeByHost[normalizedServerId];
+  }
+  return providerPrefs?.mode;
+}
+
 function applyProviderPreferenceUpdates(
   existing: ProviderPreferences,
   updates: Omit<Partial<ProviderPreferences>, "mode"> & { mode?: string | null },
+  serverId?: string | null,
 ): ProviderPreferences {
   const next: ProviderPreferences = { ...existing };
   const nextThinkingByModel = mergeDefinedRecord(existing.thinkingByModel, updates.thinkingByModel);
   const nextFeatureValues = mergeDefinedRecord(existing.featureValues, updates.featureValues);
+  const normalizedServerId = serverId?.trim();
 
   if (updates.model !== undefined) {
     next.model = updates.model;
   }
-  if (updates.mode === null) {
-    delete next.mode;
-  } else if (updates.mode !== undefined) {
-    next.mode = updates.mode;
+  if (updates.mode !== undefined) {
+    if (normalizedServerId) {
+      const nextModeByHost = { ...existing.modeByHost };
+      if (updates.mode === null) {
+        delete nextModeByHost[normalizedServerId];
+      } else {
+        nextModeByHost[normalizedServerId] = updates.mode;
+      }
+      if (Object.keys(nextModeByHost).length > 0) {
+        next.modeByHost = nextModeByHost;
+      } else {
+        delete next.modeByHost;
+      }
+    } else if (updates.mode === null) {
+      delete next.mode;
+    } else {
+      next.mode = updates.mode;
+    }
   }
   if (nextThinkingByModel !== undefined) {
     next.thinkingByModel = nextThinkingByModel;
@@ -141,9 +170,10 @@ function applyProviderPreferenceUpdates(
 export function mergeProviderPreferences(args: {
   preferences: FormPreferences;
   provider: AgentProvider;
+  serverId?: string | null;
   updates: Omit<Partial<ProviderPreferences>, "mode"> & { mode?: string | null };
 }): FormPreferences {
-  const { preferences, provider, updates } = args;
+  const { preferences, provider, serverId, updates } = args;
   const existingProviderPreferences = preferences.providerPreferences ?? {};
   const existing = existingProviderPreferences[provider] ?? {};
 
@@ -152,7 +182,7 @@ export function mergeProviderPreferences(args: {
     provider,
     providerPreferences: {
       ...existingProviderPreferences,
-      [provider]: applyProviderPreferenceUpdates(existing, updates),
+      [provider]: applyProviderPreferenceUpdates(existing, updates, serverId),
     },
   };
 }
@@ -160,6 +190,7 @@ export function mergeProviderPreferences(args: {
 export function mergeCreateAgentSelectionPreferences(args: {
   preferences: FormPreferences;
   provider: AgentProvider | null;
+  serverId?: string | null;
   modelId?: string | null;
   modeId?: string | null;
   thinkingOptionId?: string | null;
@@ -177,6 +208,7 @@ export function mergeCreateAgentSelectionPreferences(args: {
   return mergeProviderPreferences({
     preferences: args.preferences,
     provider: args.provider,
+    serverId: args.serverId,
     updates: {
       model: modelId || undefined,
       mode: args.modeId === undefined ? undefined : modeId || null,
@@ -191,6 +223,7 @@ export function applyAgentProfilePreferences(args: {
   previousProvider: AgentProvider | null;
   previousProviderModeIds: readonly string[];
   provider: AgentProvider;
+  serverId?: string | null;
   modelId: string;
   modeId: string;
   thinkingOptionId: string;
@@ -198,11 +231,15 @@ export function applyAgentProfilePreferences(args: {
 }): FormPreferences {
   let next = args.preferences;
   if (args.previousProvider) {
-    const previousMode = next.providerPreferences?.[args.previousProvider]?.mode;
+    const previousMode = resolveSavedModeId(
+      next.providerPreferences?.[args.previousProvider],
+      args.serverId,
+    );
     if (previousMode && !args.previousProviderModeIds.includes(previousMode)) {
       next = mergeProviderPreferences({
         preferences: next,
         provider: args.previousProvider,
+        serverId: args.serverId,
         updates: { mode: null },
       });
     }
@@ -211,6 +248,7 @@ export function applyAgentProfilePreferences(args: {
   return mergeProviderPreferences({
     preferences: next,
     provider: args.provider,
+    serverId: args.serverId,
     updates: {
       model: args.modelId || undefined,
       mode: args.modeId || null,
