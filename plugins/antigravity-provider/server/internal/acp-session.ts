@@ -26,8 +26,11 @@ interface AcpSessionOptions {
 
 const backgroundCheckReply = "PASEO_BACKGROUND_PENDING";
 const backgroundCheckPrompt = `Automatic check for the existing background task. Do not start or repeat work or call tools. Preserve any pending background completion report, but do not repeat it. Reply only ${backgroundCheckReply}.`;
-const backgroundCheckIntervalMs = 10_000;
-const backgroundCheckLimit = 30;
+// Each check adds a prompt and reply to the conversation, so back off: 10s, 20s, 40s, then every 60s.
+const backgroundCheckFirstDelayMs = 10_000;
+const backgroundCheckMaxDelayMs = 60_000;
+// About 30 minutes of checks.
+const backgroundCheckLimit = 32;
 const backgroundTaskNotificationPattern =
   /FINISHED_BACKGROUND_TASK:[^\n]*\r?\n?<task_notification>[\s\S]*?<\/task_notification>(?:\s*<user_guidance>[\s\S]*?<\/user_guidance>)?\s*/g;
 const trailingIncompleteGuidancePattern =
@@ -35,16 +38,19 @@ const trailingIncompleteGuidancePattern =
 const trailingIncompleteTaskPattern = /FINISHED_BACKGROUND_TASK:[\s\S]*$/;
 const backgroundCheckPrefixPattern = new RegExp(`^\\s*${backgroundCheckReply}\\s*`);
 
-export function stripBackgroundArtifacts(text: string, stripCheckReply: boolean): string {
-  let cleaned = text
+export function stripBackgroundArtifacts(text: string): string {
+  const cleaned = text
     .replace(trailingIncompleteGuidancePattern, "")
     .replaceAll(backgroundTaskNotificationPattern, "")
     .replace(trailingIncompleteTaskPattern, "");
+  if (cleaned === text) return text;
+  return cleaned.replace(backgroundCheckPrefixPattern, "").trim();
+}
 
-  if (cleaned === text && !stripCheckReply) return text;
-  if (stripCheckReply || cleaned !== text)
-    cleaned = cleaned.replace(backgroundCheckPrefixPattern, "");
-  return cleaned.trim();
+// Text after a leading marker is model noise (repeated markers, echoed prompts, agy retry errors);
+// real background results arrive as a separate message before the check reply.
+export function cleanCheckReply(text: string): string {
+  return backgroundCheckPrefixPattern.test(text) ? "" : stripBackgroundArtifacts(text).trim();
 }
 
 export class AcpSession {
@@ -294,7 +300,7 @@ export class AcpSession {
         this.checkMessages.set(item.id, item);
         return undefined;
       }
-      const cleaned = stripBackgroundArtifacts(item.text, false);
+      const cleaned = stripBackgroundArtifacts(item.text);
       if (cleaned !== item.text) return cleaned ? { ...item, text: cleaned } : undefined;
     }
     return item;
@@ -312,7 +318,10 @@ export class AcpSession {
         if (this.checkAttempts < backgroundCheckLimit) {
           this.checkTimer = setTimeout(
             () => void this.checkBackground(),
-            backgroundCheckIntervalMs,
+            Math.min(
+              backgroundCheckFirstDelayMs * 2 ** this.checkAttempts,
+              backgroundCheckMaxDelayMs,
+            ),
           );
           return;
         }
@@ -321,7 +330,7 @@ export class AcpSession {
           state: "failed",
           error: {
             message:
-              "Background checks stopped after 30 attempts. Send a message to check the task again.",
+              "Background checks stopped after 30 minutes. Send a message to check the task again.",
           },
         };
       }
@@ -333,7 +342,7 @@ export class AcpSession {
 
   private flushCheckMessages(): void {
     for (const item of this.checkMessages.values()) {
-      const text = stripBackgroundArtifacts(item.text, true);
+      const text = cleanCheckReply(item.text);
       if (text)
         this.options.emit({
           type: "timeline.item",

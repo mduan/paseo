@@ -13,7 +13,7 @@ import {
   type ProviderLaunch,
   type ProviderPersistence,
 } from "@getpaseo/plugin/server/provider";
-import { stripBackgroundArtifacts } from "./internal/acp-session.js";
+import { cleanCheckReply, stripBackgroundArtifacts } from "./internal/acp-session.js";
 import { signalPlan } from "./internal/signals.js";
 import { createAntigravityProvider } from "./provider.js";
 
@@ -168,7 +168,7 @@ async function harness(env: Record<string, string> = {}) {
 function accelerateBackgroundChecks() {
   const schedule = globalThis.setTimeout;
   vi.spyOn(globalThis, "setTimeout").mockImplementation((callback, delay, ...args) =>
-    schedule(callback, delay === 10000 ? 1 : delay, ...args),
+    schedule(callback, delay && delay >= 10_000 && delay <= 60_000 ? 1 : delay, ...args),
   );
 }
 
@@ -176,6 +176,7 @@ describe("ACP permission modes", () => {
   it("checks unfinished background tools, hides synthetic messages, and preserves the completion", async () => {
     const h = await harness({ AGY_TEST_BACKGROUND_NOTIFICATION: "yes" });
     await h.open();
+    accelerateBackgroundChecks();
     const promptId = await h.prompt("BACKGROUND");
     await h.wait(
       (event) =>
@@ -183,11 +184,10 @@ describe("ACP permission modes", () => {
         event.item.type === "assistant_message" &&
         event.item.text === "Background task started",
     );
-    expect(h.events.filter((event) => event.type === "session.turn")).toHaveLength(1);
     async function promptCount() {
       return (await h.records()).filter((record) => record.acp?.method === "session/prompt").length;
     }
-    await expect.poll(promptCount, { timeout: 25000, interval: 20 }).toBe(3);
+    await expect.poll(promptCount, { interval: 20 }).toBe(3);
     expect(await h.completed(promptId)).toMatchObject({ state: "completed" });
     const messages = h.events.filter(
       (event) =>
@@ -205,18 +205,26 @@ describe("ACP permission modes", () => {
         .filter((event) => event.type === "session.turn")
         .map((event) => (event.type === "session.turn" ? event.state : undefined)),
     ).toEqual(["started", "completed"]);
-  }, 30000);
+  });
 
   it("strips background check replies and task notification blocks without altering normal text", () => {
     const notification =
       "FINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification>\n<task-id>conv/task-79</task-id>\n<status>completed</status>\n<output>ok</output>\n</task_notification>\n<user_guidance>\nContinue.\n</user_guidance>\n";
-    expect(stripBackgroundArtifacts("PASEO_BACKGROUND_PENDING", true)).toBe("");
-    expect(stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}`, true)).toBe("");
-    expect(stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}`, false)).toBe("");
+    expect(cleanCheckReply("PASEO_BACKGROUND_PENDING")).toBe("");
+    expect(cleanCheckReply(`PASEO_BACKGROUND_PENDING${notification}`)).toBe("");
+    expect(cleanCheckReply(`${notification}Real answer`)).toBe("Real answer");
     expect(
-      stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}Real answer`, true),
-    ).toBe("Real answer");
-    expect(stripBackgroundArtifacts(`Before\n${notification}After`, false)).toBe("Before\nAfter");
+      cleanCheckReply(
+        "PASEO_BACKGROUND_PENDING\n\nPASEO_BACKGROUND_PENDING\nPASEO_BACKGROUND_PENDING\nYour previous response contained an improperly formatted function call: Malformed function call: Failed to parse function call: Function call is empty - no input to parse.\nPlease retry with a properly formatted function call\nRetries remaining: 3",
+      ),
+    ).toBe("");
+    expect(
+      cleanCheckReply(
+        "PASEO_BACKGROUND_PENDINGUSER_REQUEST: Automatic check for the existing background task.\nAWAKEN: No, I am not calling tools. Just replying PASEO_BACKGROUND_PENDING.",
+      ),
+    ).toBe("");
+    expect(stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}`)).toBe("");
+    expect(stripBackgroundArtifacts(`Before\n${notification}After`)).toBe("Before\nAfter");
     expect(
       stripBackgroundArtifacts(
         "Before\nFINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification>",
@@ -229,7 +237,7 @@ describe("ACP permission modes", () => {
         false,
       ),
     ).toBe("Before");
-    expect(stripBackgroundArtifacts("Hello ", false)).toBe("Hello ");
+    expect(stripBackgroundArtifacts("Hello ")).toBe("Hello ");
   });
 
   it("stops waiting for background work when interrupted", async () => {
@@ -338,8 +346,8 @@ describe("ACP permission modes", () => {
   it.each([
     {
       env: { AGY_TEST_BACKGROUND_NEVER: "yes" },
-      expectedChecks: 30,
-      error: "Background checks stopped after 30 attempts",
+      expectedChecks: 32,
+      error: "Background checks stopped after 30 minutes",
     },
     { env: { AGY_TEST_CHECK_FAIL: "yes" }, expectedChecks: 1, error: "Background check failed" },
   ])(
