@@ -173,7 +173,11 @@ function backgroundPrompt(text) {
         },
       },
     });
-    complete("PENDING");
+    const notification =
+      process.env.AGY_TEST_BACKGROUND_NOTIFICATION === "yes" && backgroundChecks === 1
+        ? "FINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification>\n<task-id>conv/task-79</task-id>\n<status>completed</status>\n<summary>Command completed</summary>\n<output>ok</output>\n</task_notification>\n<user_guidance>\nRemember to check the task's output.\n</user_guidance>\n"
+        : "";
+    complete(`PENDING${notification}`);
   }
 }
 lines.on("line", (line) => {

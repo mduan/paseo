@@ -25,8 +25,27 @@ interface AcpSessionOptions {
 }
 
 const backgroundCheckReply = "PASEO_BACKGROUND_PENDING";
+const backgroundCheckPrompt = `Automatic check for the existing background task. Do not start or repeat work or call tools. Preserve any pending background completion report, but do not repeat it. Reply only ${backgroundCheckReply}.`;
 const backgroundCheckIntervalMs = 10_000;
 const backgroundCheckLimit = 30;
+const backgroundTaskNotificationPattern =
+  /FINISHED_BACKGROUND_TASK:[^\n]*\r?\n?<task_notification>[\s\S]*?<\/task_notification>(?:\s*<user_guidance>[\s\S]*?<\/user_guidance>)?\s*/g;
+const trailingIncompleteGuidancePattern =
+  /FINISHED_BACKGROUND_TASK:[^\n]*\r?\n?<task_notification>[\s\S]*?<\/task_notification>\s*<user_guidance>(?![\s\S]*<\/user_guidance>)[\s\S]*$/;
+const trailingIncompleteTaskPattern = /FINISHED_BACKGROUND_TASK:[\s\S]*$/;
+const backgroundCheckPrefixPattern = new RegExp(`^\\s*${backgroundCheckReply}\\s*`);
+
+export function stripBackgroundArtifacts(text: string, stripCheckReply: boolean): string {
+  let cleaned = text
+    .replace(trailingIncompleteGuidancePattern, "")
+    .replaceAll(backgroundTaskNotificationPattern, "")
+    .replace(trailingIncompleteTaskPattern, "");
+
+  if (cleaned === text && !stripCheckReply) return text;
+  if (stripCheckReply || cleaned !== text)
+    cleaned = cleaned.replace(backgroundCheckPrefixPattern, "");
+  return cleaned.trim();
+}
 
 export class AcpSession {
   private connection?: ProviderConnection;
@@ -235,17 +254,9 @@ export class AcpSession {
   private emit(event: ProviderEvent): void {
     if (this.closed) return;
     if (event.type === "timeline.item") {
-      if (event.item.type === "user_message" && event.item.id === this.checkMessageId) return;
-      if (event.item.type === "tool_call" && this.backgroundTools.has(event.item.callId)) {
-        if (event.item.status === "running")
-          this.backgroundTools.set(event.item.callId, event.item);
-        // ACP terminalizes tools at end_turn even when agy still has background work.
-        if (event.item.status === "completed") return;
-      }
-      if (this.checkMessageId && event.item.type === "assistant_message") {
-        this.checkMessages.set(event.item.id, event.item);
-        return;
-      }
+      const item = this.filterTimelineItem(event.item);
+      if (!item) return;
+      if (item !== event.item) event = { ...event, item };
     }
     if (event.type === "session.prompt_result") {
       if (event.clientMessageId === this.checkMessageId) return;
@@ -265,6 +276,28 @@ export class AcpSession {
       return;
     }
     this.options.emit(event);
+  }
+
+  private filterTimelineItem(item: ProviderTimelineItem): ProviderTimelineItem | undefined {
+    if (
+      item.type === "user_message" &&
+      (item.id === this.checkMessageId || item.text.trim() === backgroundCheckPrompt)
+    )
+      return undefined;
+    if (item.type === "tool_call" && this.backgroundTools.has(item.callId)) {
+      if (item.status === "running") this.backgroundTools.set(item.callId, item);
+      // ACP terminalizes tools at end_turn even when agy still has background work.
+      if (item.status === "completed") return undefined;
+    }
+    if (item.type === "assistant_message") {
+      if (this.checkMessageId) {
+        this.checkMessages.set(item.id, item);
+        return undefined;
+      }
+      const cleaned = stripBackgroundArtifacts(item.text, false);
+      if (cleaned !== item.text) return cleaned ? { ...item, text: cleaned } : undefined;
+    }
+    return item;
   }
 
   private handleTurn(event: Extract<ProviderEvent, { type: "session.turn" }>): void {
@@ -300,8 +333,13 @@ export class AcpSession {
 
   private flushCheckMessages(): void {
     for (const item of this.checkMessages.values()) {
-      if (item.text.trim() !== backgroundCheckReply)
-        this.options.emit({ type: "timeline.item", sessionId: this.options.id, item });
+      const text = stripBackgroundArtifacts(item.text, true);
+      if (text)
+        this.options.emit({
+          type: "timeline.item",
+          sessionId: this.options.id,
+          item: text === item.text ? item : { ...item, text },
+        });
     }
     this.checkMessages.clear();
   }
@@ -340,7 +378,7 @@ export class AcpSession {
             content: [
               {
                 type: "text",
-                text: `Automatic check for the existing background task. Do not start or repeat work or call tools. Preserve any pending background completion report, but do not repeat it. Reply only ${backgroundCheckReply}.`,
+                text: backgroundCheckPrompt,
               },
             ],
           },

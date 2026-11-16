@@ -13,6 +13,7 @@ import {
   type ProviderLaunch,
   type ProviderPersistence,
 } from "@getpaseo/plugin/server/provider";
+import { stripBackgroundArtifacts } from "./internal/acp-session.js";
 import { signalPlan } from "./internal/signals.js";
 import { createAntigravityProvider } from "./provider.js";
 
@@ -173,7 +174,7 @@ function accelerateBackgroundChecks() {
 
 describe("ACP permission modes", () => {
   it("checks unfinished background tools, hides synthetic messages, and preserves the completion", async () => {
-    const h = await harness();
+    const h = await harness({ AGY_TEST_BACKGROUND_NOTIFICATION: "yes" });
     await h.open();
     const promptId = await h.prompt("BACKGROUND");
     await h.wait(
@@ -205,6 +206,31 @@ describe("ACP permission modes", () => {
         .map((event) => (event.type === "session.turn" ? event.state : undefined)),
     ).toEqual(["started", "completed"]);
   }, 30000);
+
+  it("strips background check replies and task notification blocks without altering normal text", () => {
+    const notification =
+      "FINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification>\n<task-id>conv/task-79</task-id>\n<status>completed</status>\n<output>ok</output>\n</task_notification>\n<user_guidance>\nContinue.\n</user_guidance>\n";
+    expect(stripBackgroundArtifacts("PASEO_BACKGROUND_PENDING", true)).toBe("");
+    expect(stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}`, true)).toBe("");
+    expect(stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}`, false)).toBe("");
+    expect(
+      stripBackgroundArtifacts(`PASEO_BACKGROUND_PENDING${notification}Real answer`, true),
+    ).toBe("Real answer");
+    expect(stripBackgroundArtifacts(`Before\n${notification}After`, false)).toBe("Before\nAfter");
+    expect(
+      stripBackgroundArtifacts(
+        "Before\nFINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification>",
+        false,
+      ),
+    ).toBe("Before");
+    expect(
+      stripBackgroundArtifacts(
+        "Before\nFINISHED_BACKGROUND_TASK: conv/task-79\n<task_notification></task_notification>\n<user_guidance>Partial",
+        false,
+      ),
+    ).toBe("Before");
+    expect(stripBackgroundArtifacts("Hello ", false)).toBe("Hello ");
+  });
 
   it("stops waiting for background work when interrupted", async () => {
     const h = await harness();
