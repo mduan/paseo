@@ -199,7 +199,7 @@ export function FileActionsContextMenuContent({
         ? {
             key: "reveal",
             group: "reference",
-            label: t("workspace.fileActions.revealInFileManager"),
+            label: t("sidebar.project.actions.openFolder"),
             icon: FolderOpen,
             onSelect: onReveal,
           }

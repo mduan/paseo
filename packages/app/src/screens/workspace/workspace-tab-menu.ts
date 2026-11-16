@@ -309,7 +309,7 @@ export function buildWorkspaceTabMenuEntries(
       entries.push({
         kind: "item",
         key: "reveal-in-file-manager",
-        label: i18n.t("workspace.fileActions.revealInFileManager"),
+        label: i18n.t("sidebar.project.actions.openFolder"),
         icon: "folder-open",
         testID: `${menuTestIDBase}-reveal-in-file-manager`,
         onSelect: () => {

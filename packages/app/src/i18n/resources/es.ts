@@ -570,7 +570,6 @@ export const es: TranslationResources = {
       openToSide: "Abrir al lado",
       copyPath: "Copiar ruta",
       copyRelativePath: "Copiar ruta relativa",
-      revealInFileManager: "Mostrar en el administrador de archivos",
       download: "Descargar",
       addToChat: "Añadir al chat",
       moreActions: "Más acciones",

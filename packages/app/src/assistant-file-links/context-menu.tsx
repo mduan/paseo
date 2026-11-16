@@ -166,7 +166,7 @@ function FileLinkMenuContent({
           onSelect={revealInFileManager}
           testID="assistant-file-link-reveal-in-file-manager"
         >
-          {t("workspace.fileActions.revealInFileManager")}
+          {t("sidebar.project.actions.openFolder")}
         </ContextMenuItem>
       ) : null}
       {!target ? (

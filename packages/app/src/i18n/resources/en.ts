@@ -560,7 +560,6 @@ export const en = {
       openToSide: "Open to the side",
       copyPath: "Copy path",
       copyRelativePath: "Copy relative path",
-      revealInFileManager: "Reveal in file manager",
       download: "Download",
       addToChat: "Add to chat",
       moreActions: "More actions",

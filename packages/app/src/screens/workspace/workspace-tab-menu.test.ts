@@ -540,7 +540,7 @@ describe("buildWorkspaceTabMenuEntries", () => {
       expect(labels.slice(0, 3)).toEqual([
         "Copy file path",
         "Reveal in file explorer",
-        "Reveal in file manager",
+        "Open in file manager",
       ]);
       if (!fileManagerEntry || fileManagerEntry.kind !== "item") {
         throw new Error("Reveal in file manager entry missing");

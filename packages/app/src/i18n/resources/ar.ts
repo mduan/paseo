@@ -563,7 +563,6 @@ export const ar: TranslationResources = {
       openToSide: "فتح إلى الجانب",
       copyPath: "نسخ المسار",
       copyRelativePath: "نسخ المسار النسبي",
-      revealInFileManager: "إظهار في مدير الملفات",
       download: "تحميل",
       addToChat: "إضافة إلى الدردشة",
       moreActions: "المزيد من الإجراءات",
