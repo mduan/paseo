@@ -1872,7 +1872,7 @@ function cancelAgentStreamReducerFlush(id: number) {
   clearScheduledReducerFlush(handle);
 }
 
-function createCursorUpdate(
+function createCursorUpdater(
   nextCursor: TimelineCursor | null,
   events: readonly AgentStreamReducerEvent[],
 ): StreamStatePatch["updateCursor"] {
@@ -1923,7 +1923,7 @@ export function createSessionAgentStreamReducerQueue(
     },
     commit: (agentId, result, events) => {
       const updateCursor = result.cursorChanged
-        ? createCursorUpdate(result.cursor, events)
+        ? createCursorUpdater(result.cursor, events)
         : undefined;
       if (
         result.changedTail ||
