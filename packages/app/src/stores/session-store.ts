@@ -502,6 +502,10 @@ interface SessionStoreActions {
       head?: StreamItem[];
       acknowledgedClientMessageIds?: readonly string[];
       taskSnapshot?: TodoEntry[];
+      // Folded into the same update so a stream flush notifies subscribers once.
+      updateCursor?: (
+        current: AgentTimelineCursorState | undefined,
+      ) => AgentTimelineCursorState | undefined;
     },
   ) => void;
   beginAgentMessageSubmission: (
@@ -1046,7 +1050,24 @@ export const useSessionStore = create<SessionStore>()(
           const agentTasks = updateAgentTasks(session.agentTasks, agentId, state.taskSnapshot);
           const changedTasks = agentTasks !== session.agentTasks;
 
-          if (!changedTail && !changedHead && !changedSubmissions && !changedTasks) {
+          let nextCursor = session.agentTimelineCursor;
+          if (state.updateCursor) {
+            const currentCursor = session.agentTimelineCursor.get(agentId);
+            const updatedCursor = state.updateCursor(currentCursor);
+            if (updatedCursor && updatedCursor !== currentCursor) {
+              nextCursor = new Map(session.agentTimelineCursor);
+              nextCursor.set(agentId, updatedCursor);
+            }
+          }
+          const changedCursor = nextCursor !== session.agentTimelineCursor;
+
+          if (
+            !changedTail &&
+            !changedHead &&
+            !changedSubmissions &&
+            !changedTasks &&
+            !changedCursor
+          ) {
             return prev;
           }
 
@@ -1070,6 +1091,7 @@ export const useSessionStore = create<SessionStore>()(
                 agentStreamHead: nextHead,
                 agentTasks,
                 messageSubmissions,
+                agentTimelineCursor: nextCursor,
               },
             },
           };

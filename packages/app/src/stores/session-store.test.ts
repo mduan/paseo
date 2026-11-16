@@ -156,6 +156,30 @@ describe("agent task state", () => {
     expect(snapshots).toEqual([["Inspect"], ["Inspect"]]);
   });
 
+  it("applies a stream patch and its cursor update in one store update", () => {
+    initializeTestSession();
+    const cursor = { epoch: "e1", startSeq: 1, endSeq: 3 };
+    let updates = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      updates += 1;
+    });
+
+    useSessionStore.getState().setAgentStreamState("test-server", "agent-1", {
+      tail: [],
+      updateCursor: () => cursor,
+    });
+    const session = useSessionStore.getState().sessions["test-server"];
+    useSessionStore.getState().setAgentStreamState("test-server", "agent-1", {
+      updateCursor: (current) => current,
+    });
+    unsubscribe();
+
+    expect(updates).toBe(1);
+    expect(session?.agentStreamTail.get("agent-1")).toEqual([]);
+    expect(session?.agentTimelineCursor.get("agent-1")).toBe(cursor);
+    expect(useSessionStore.getState().sessions["test-server"]).toBe(session);
+  });
+
   it("restores the latest task snapshot from an authoritative timeline", () => {
     initializeTestSession();
     const todo: StreamItem = {
