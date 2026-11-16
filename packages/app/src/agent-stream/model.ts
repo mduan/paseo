@@ -53,10 +53,25 @@ const splitHistoryCache = new WeakMap<
   StreamItem[],
   Map<string, Pick<AgentStreamRenderModel, "history" | "segments">>
 >();
+// Holds only the latest start per tail; a new slice per call would miss every cache below.
+const renderedTailCache = new WeakMap<StreamItem[], { start: number; items: StreamItem[] }>();
 const turnTimingCache = new WeakMap<
   StreamItem[],
   WeakMap<StreamItem[], Map<string, StreamTurnTiming>>
 >();
+
+function getRenderedTail(tail: StreamItem[], start: number | undefined): StreamItem[] {
+  if (!start) {
+    return tail;
+  }
+  const cached = renderedTailCache.get(tail);
+  if (cached?.start === start) {
+    return cached.items;
+  }
+  const items = tail.slice(start);
+  renderedTailCache.set(tail, { start, items });
+  return items;
+}
 
 function getOrderedItems(params: {
   cache: WeakMap<StreamItem[], Map<string, StreamItem[]>>;
@@ -163,7 +178,7 @@ export function buildAgentStreamRenderModel(
     isMobileBreakpoint: input.isMobileBreakpoint,
   });
   const orderingCacheKey = `${input.platform}:${input.isMobileBreakpoint}`;
-  const renderedTail = input.historyStart ? input.tail.slice(input.historyStart) : input.tail;
+  const renderedTail = getRenderedTail(input.tail, input.historyStart);
   const orderedTail = getOrderedItems({
     cache: orderedTailCache,
     source: renderedTail,
