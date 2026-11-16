@@ -50,7 +50,6 @@ export interface FileHeaderProps {
   onCopyRelativePath?: (path: string) => void;
   onReveal?: (path: string) => void;
   onRevealInExplorer?: (path: string) => void;
-  revealTargetName?: string;
   onDownload?: (path: string) => void;
   onDuplicate?: (path: string) => void;
   onRevert?: (path: string, oldPath?: string) => void;
@@ -146,7 +145,6 @@ function FileHeaderMenu({
   onCopyRelativePath,
   onReveal,
   onRevealInExplorer,
-  revealTargetName,
   onDownload,
   onDuplicate,
   onRevert,
@@ -183,7 +181,6 @@ function FileHeaderMenu({
       onCopyRelativePath={onCopyRelativePath ? copyRelativePath : undefined}
       onReveal={onReveal ? reveal : undefined}
       onRevealInExplorer={onRevealInExplorer ? revealInExplorer : undefined}
-      revealTargetName={revealTargetName}
       onDownload={onDownload ? download : undefined}
       onAddToChat={onAddToChat ? addToChat : undefined}
       onDuplicate={!file.isDeleted && onDuplicate ? duplicate : undefined}

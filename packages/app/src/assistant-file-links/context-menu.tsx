@@ -69,7 +69,7 @@ function FileLinkMenuContent({
   const isCompact = useIsCompactFormFactor();
   const { configRef } = useAssistantFileLinkResolverContext();
   const workspaceRoot = configRef.current.workspaceRoot;
-  const fileManager = useRevealInFileManager({
+  const revealFileInFileManager = useRevealInFileManager({
     serverId: pane.serverId,
     workspaceRoot: workspaceRoot ?? "",
   });
@@ -115,7 +115,7 @@ function FileLinkMenuContent({
     if (path) pane.revealFileInExplorer(path);
   });
   const revealInFileManager = useStableEvent(() => {
-    if (path) void fileManager?.reveal(path);
+    if (path) void revealFileInFileManager?.(path);
   });
   return (
     <ContextMenuContent minWidth={230} testID="assistant-file-link-menu">
@@ -159,14 +159,14 @@ function FileLinkMenuContent({
       >
         {t("workspace.tabs.menu.revealInExplorer")}
       </ContextMenuItem>
-      {fileManager ? (
+      {revealFileInFileManager ? (
         <ContextMenuItem
           leading={fileManagerIcon}
           disabled={!path}
           onSelect={revealInFileManager}
           testID="assistant-file-link-reveal-in-file-manager"
         >
-          {t("workspace.fileActions.revealIn", { target: fileManager.targetName })}
+          {t("workspace.fileActions.revealInFileManager")}
         </ContextMenuItem>
       ) : null}
       {!target ? (

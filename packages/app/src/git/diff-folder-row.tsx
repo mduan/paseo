@@ -31,7 +31,6 @@ interface DiffFolderRowProps {
   onCopyPath?: (path: string) => void;
   onCopyRelativePath?: (path: string) => void;
   onReveal?: (path: string) => void;
-  revealTargetName?: string;
   onDuplicate?: (path: string) => void;
   onRevert?: (path: string) => void;
   testID?: string;
@@ -62,7 +61,6 @@ export function DiffFolderRow({
   onCopyPath,
   onCopyRelativePath,
   onReveal,
-  revealTargetName,
   onDuplicate,
   onRevert,
   testID,
@@ -180,7 +178,6 @@ export function DiffFolderRow({
           onCopyPath={onCopyPath ? handleCopyPath : undefined}
           onCopyRelativePath={onCopyRelativePath ? handleCopyRelativePath : undefined}
           onReveal={onReveal ? handleReveal : undefined}
-          revealTargetName={revealTargetName}
           onDuplicate={onDuplicate ? handleDuplicate : undefined}
           onRevert={onRevert ? handleRevert : undefined}
           testIDPrefix={testID}

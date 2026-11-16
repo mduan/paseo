@@ -1345,7 +1345,7 @@ export function ChangesSurface({
   const codeFontSize = appSettings.codeFontSize;
 
   const toast = useToast();
-  const fileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
+  const revealFileInFileManager = useRevealInFileManager({ serverId, workspaceRoot: cwd });
   const refreshSupported = useSessionStore(
     (s) => s.sessions[serverId]?.serverInfo?.features?.checkoutRefresh === true,
   );
@@ -1518,9 +1518,8 @@ export function ChangesSurface({
       onAddToChat,
       onCopyPath: handleCopyPath,
       onCopyRelativePath: handleCopyRelativePath,
-      onReveal: fileManager?.reveal,
+      onReveal: revealFileInFileManager,
       onRevealInExplorer,
-      revealTargetName: fileManager?.targetName,
       onDownload: handleDownloadPath,
       onDuplicate: fsEntryDuplicateEnabled ? handleDuplicatePath : undefined,
       onRevert: onRevertPath,
@@ -1539,7 +1538,7 @@ export function ChangesSurface({
       handleCopyRelativePath,
       handleDownloadPath,
       handleDuplicatePath,
-      fileManager,
+      revealFileInFileManager,
       fsEntryDuplicateEnabled,
       onRevertPath,
     ],

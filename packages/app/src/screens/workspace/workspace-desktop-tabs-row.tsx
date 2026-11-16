@@ -55,10 +55,7 @@ import {
 } from "@/screens/workspace/workspace-tab-menu";
 import { useWorkspaceTabMenuItemAdornments } from "@/screens/workspace/workspace-tab-menu-item";
 import { useWorkspace } from "@/stores/session-store-hooks";
-import {
-  useRevealInFileManager,
-  type RevealInFileManagerAction,
-} from "@/workspace/open-in-file-manager/reveal";
+import { useRevealInFileManager } from "@/workspace/open-in-file-manager/reveal";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import type { Theme } from "@/styles/theme";
@@ -1427,7 +1424,7 @@ function ResolvedDesktopTabChip({
   onCloseTab: (tabId: string) => Promise<void> | void;
   labels: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
-  fileManager?: RevealInFileManagerAction;
+  fileManager?: (path: string) => Promise<void>;
   dragHandleProps: DraggableListDragHandleProps | undefined;
   showDropIndicatorBefore: boolean;
   showDropIndicatorAfter: boolean;

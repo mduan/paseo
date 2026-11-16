@@ -88,7 +88,6 @@ export function ChangedFilesTree({
             onCopyPath={mode.onCopyPath}
             onCopyRelativePath={mode.onCopyRelativePath}
             onReveal={mode.onReveal}
-            revealTargetName={mode.revealTargetName}
             onDuplicate={mode.onDuplicate}
             onRevert={mode.onRevert}
             testID={`diff-folder-${item.dirPath}`}
@@ -112,7 +111,6 @@ export function ChangedFilesTree({
           onCopyPath={mode.onCopyPath}
           onCopyRelativePath={mode.onCopyRelativePath}
           onReveal={mode.onReveal}
-          revealTargetName={mode.revealTargetName}
           onDownload={mode.onDownload}
           onDuplicate={mode.onDuplicate}
           onRevert={mode.onRevert}

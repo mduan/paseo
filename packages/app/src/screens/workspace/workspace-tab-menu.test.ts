@@ -480,9 +480,9 @@ describe("buildWorkspaceTabMenuEntries", () => {
     expect(onRenameTab).toHaveBeenCalledWith(terminalTab);
   });
 
-  it.each([undefined, "Finder", "File Explorer"])("file actions with %s", (targetName) => {
+  it.each([false, true])("file actions with fileManager=%s", (hasFileManager) => {
     const reveal = vi.fn(async () => {});
-    const fileManager = targetName ? { targetName, reveal } : undefined;
+    const fileManager = hasFileManager ? reveal : undefined;
     const onCopyFilePath = vi.fn();
     const onRevealFileInExplorer = vi.fn();
     const fileTab: WorkspaceTabDescriptor = {
@@ -536,11 +536,11 @@ describe("buildWorkspaceTabMenuEntries", () => {
     const fileManagerEntry = entries.find(
       (entry) => entry.kind === "item" && entry.key === "reveal-in-file-manager",
     );
-    if (targetName) {
+    if (hasFileManager) {
       expect(labels.slice(0, 3)).toEqual([
         "Copy file path",
         "Reveal in file explorer",
-        `Reveal in ${targetName}`,
+        "Reveal in file manager",
       ]);
       if (!fileManagerEntry || fileManagerEntry.kind !== "item") {
         throw new Error("Reveal in file manager entry missing");

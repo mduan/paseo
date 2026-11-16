@@ -125,7 +125,6 @@ interface TreeRowItemProps {
   onOpenInEditor?: (entry: ExplorerEntry) => void;
   editorTargetName?: string;
   onRevealEntry?: (entry: ExplorerEntry) => void;
-  revealTargetName?: string;
   onDownloadEntry: (entry: ExplorerEntry) => void;
   onAddToChat?: (path: string) => void;
   onOpenFileToSide?: (path: string) => void;
@@ -252,7 +251,6 @@ function TreeRowItem({
   onOpenInEditor,
   editorTargetName,
   onRevealEntry,
-  revealTargetName,
   onDownloadEntry,
   onAddToChat,
   onOpenFileToSide,
@@ -394,7 +392,6 @@ function TreeRowItem({
         onCopyPath={handleCopy}
         onCopyRelativePath={handleCopyRelativePath}
         onReveal={onRevealEntry ? handleReveal : undefined}
-        revealTargetName={revealTargetName}
         onDownload={handleDownload}
         onAddToChat={onAddToChat ? handleAddToChat : undefined}
         onOpenToSide={!isDirectory && onOpenFileToSide ? handleOpenToSide : undefined}
@@ -461,7 +458,7 @@ export function FileExplorerPane({
     workspaceRoot: normalizedWorkspaceRoot,
   });
   const toast = useToast();
-  const fileManager = useRevealInFileManager({
+  const revealFileInFileManager = useRevealInFileManager({
     serverId,
     workspaceRoot: normalizedWorkspaceRoot,
   });
@@ -637,8 +634,8 @@ export function FileExplorerPane({
   }, []);
 
   const handleRevealEntry = useCallback(
-    (entry: ExplorerEntry) => fileManager?.reveal(entry.path),
-    [fileManager],
+    (entry: ExplorerEntry) => revealFileInFileManager?.(entry.path),
+    [revealFileInFileManager],
   );
 
   const handleOpenDirectoryInEditor = useCallback(
@@ -1088,8 +1085,7 @@ export function FileExplorerPane({
           onCopyRelativePath={handleCopyRelativePath}
           onOpenInEditor={openDirectoryInEditor ? handleOpenDirectoryInEditor : undefined}
           editorTargetName={openDirectoryInEditor?.targetName}
-          onRevealEntry={fileManager ? handleRevealEntry : undefined}
-          revealTargetName={fileManager?.targetName}
+          onRevealEntry={revealFileInFileManager ? handleRevealEntry : undefined}
           onDownloadEntry={handleDownloadEntry}
           onAddToChat={onAddToChat}
           onOpenFileToSide={onOpenFileToSide}
@@ -1123,7 +1119,7 @@ export function FileExplorerPane({
       handleRevealEntry,
       handleSelectEntry,
       isDirectoryLoading,
-      fileManager,
+      revealFileInFileManager,
       openDirectoryInEditor,
       selectedEntryPath,
       onAddToChat,
@@ -1606,7 +1602,6 @@ function TreeRowDispatcher({
   onOpenInEditor,
   editorTargetName,
   onRevealEntry,
-  revealTargetName,
   onDownloadEntry,
   onAddToChat,
   onOpenFileToSide,
@@ -1631,7 +1626,6 @@ function TreeRowDispatcher({
   onOpenInEditor?: (entry: ExplorerEntry) => void;
   editorTargetName?: string;
   onRevealEntry?: (entry: ExplorerEntry) => void;
-  revealTargetName?: string;
   onDownloadEntry: (entry: ExplorerEntry) => void;
   onAddToChat?: (path: string) => void;
   onOpenFileToSide?: (path: string) => void;
@@ -1665,7 +1659,6 @@ function TreeRowDispatcher({
       onOpenInEditor={onOpenInEditor}
       editorTargetName={editorTargetName}
       onRevealEntry={onRevealEntry}
-      revealTargetName={revealTargetName}
       onDownloadEntry={onDownloadEntry}
       onAddToChat={onAddToChat}
       onOpenFileToSide={onOpenFileToSide}

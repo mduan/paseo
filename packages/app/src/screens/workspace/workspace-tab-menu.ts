@@ -1,4 +1,3 @@
-import type { RevealInFileManagerAction } from "@/workspace/open-in-file-manager/reveal";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import { i18n } from "@/i18n/i18next";
 import { encodeFilePathForPathSegment, encodeWorkspaceIdForPathSegment } from "@/utils/host-routes";
@@ -122,7 +121,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
-  fileManager?: RevealInFileManagerAction;
+  fileManager?: (path: string) => Promise<void>;
 }
 
 interface BuildWorkspaceDesktopTabActionsInput {
@@ -145,7 +144,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
   paneMoves?: WorkspaceTabPaneMoves;
-  fileManager?: RevealInFileManagerAction;
+  fileManager?: (path: string) => Promise<void>;
 }
 
 export interface WorkspaceDesktopTabActions {
@@ -306,11 +305,11 @@ export function buildWorkspaceTabMenuEntries(
       },
     });
     if (input.fileManager) {
-      const { targetName, reveal } = input.fileManager;
+      const reveal = input.fileManager;
       entries.push({
         kind: "item",
         key: "reveal-in-file-manager",
-        label: i18n.t("workspace.fileActions.revealIn", { target: targetName }),
+        label: i18n.t("workspace.fileActions.revealInFileManager"),
         icon: "folder-open",
         testID: `${menuTestIDBase}-reveal-in-file-manager`,
         onSelect: () => {

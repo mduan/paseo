@@ -6,12 +6,6 @@ import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
 import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
 
 // oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
-export type RevealInFileManagerAction = {
-  targetName: string;
-  reveal: (path: string) => Promise<void>;
-};
-
-// oxlint-disable-next-line typescript/consistent-type-definitions -- AGENTS.md requires type aliases.
 type UseRevealInFileManagerInput = {
   serverId: string;
   workspaceRoot: string;
@@ -20,7 +14,7 @@ type UseRevealInFileManagerInput = {
 export function useRevealInFileManager({
   serverId,
   workspaceRoot,
-}: UseRevealInFileManagerInput): RevealInFileManagerAction | undefined {
+}: UseRevealInFileManagerInput): ((path: string) => Promise<void>) | undefined {
   const { t } = useTranslation();
   const toast = useToast();
   const isLocalDaemon = useIsLocalDaemon(serverId);
@@ -44,10 +38,7 @@ export function useRevealInFileManager({
     [fileManagerTarget, workspaceRoot, t, toast],
   );
   return useMemo(
-    () =>
-      fileManagerTarget && workspaceRoot
-        ? { targetName: fileManagerTarget.label, reveal }
-        : undefined,
+    () => (fileManagerTarget && workspaceRoot ? reveal : undefined),
     [fileManagerTarget, workspaceRoot, reveal],
   );
 }

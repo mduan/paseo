@@ -63,7 +63,6 @@ interface FileActionsContextMenuContentProps {
   onCopyRelativePath?: () => void;
   onReveal?: () => void;
   onRevealInExplorer?: () => void;
-  revealTargetName?: string;
   onDownload?: () => void;
   onAddToChat?: () => void;
   onNewFile?: () => void;
@@ -94,7 +93,6 @@ export function FileActionsContextMenuContent({
   onCopyRelativePath,
   onReveal,
   onRevealInExplorer,
-  revealTargetName,
   onDownload,
   onAddToChat,
   onNewFile,
@@ -197,11 +195,11 @@ export function FileActionsContextMenuContent({
             onSelect: onCopyRelativePath,
           }
         : null,
-      onReveal && revealTargetName
+      onReveal
         ? {
             key: "reveal",
             group: "reference",
-            label: t("workspace.fileActions.revealIn", { target: revealTargetName }),
+            label: t("workspace.fileActions.revealInFileManager"),
             icon: FolderOpen,
             onSelect: onReveal,
           }
@@ -299,7 +297,6 @@ export function FileActionsContextMenuContent({
     onReveal,
     onRevealInExplorer,
     onRevert,
-    revealTargetName,
     t,
     testIDPrefix,
   ]);

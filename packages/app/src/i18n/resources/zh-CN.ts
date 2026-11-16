@@ -563,7 +563,7 @@ export const zhCN: TranslationResources = {
       openToSide: "在侧边打开",
       copyPath: "复制路径",
       copyRelativePath: "复制相对路径",
-      revealIn: "在 {{target}} 中显示",
+      revealInFileManager: "在文件管理器中显示",
       download: "下载",
       addToChat: "添加到聊天",
       moreActions: "更多操作",
