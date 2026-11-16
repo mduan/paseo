@@ -20,6 +20,7 @@ interface AcpSessionOptions {
   launch: ProviderLaunch;
   persistence?: ProviderPersistence;
   firstMessage: boolean;
+  history: "replay" | "skip";
   emit(event: ProviderEvent): void;
 }
 
@@ -146,7 +147,7 @@ export class AcpSession {
       type: "session.open",
       requestId,
       sessionId: this.options.id,
-      history: "skip",
+      history: this.options.history,
       config: { ...this.options.config, mode },
       persistence,
     });

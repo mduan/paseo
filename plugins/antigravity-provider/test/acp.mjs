@@ -12,6 +12,20 @@ let background = false;
 function send(message) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 }
+
+function replayHistory(method) {
+  if (method !== "session/load") return;
+  send({
+    method: "session/update",
+    params: {
+      sessionId,
+      update: {
+        sessionUpdate: "user_message_chunk",
+        content: { type: "text", text: "REPLAYED HISTORY" },
+      },
+    },
+  });
+}
 function options() {
   return [
     {
@@ -176,6 +190,7 @@ lines.on("line", (line) => {
     });
   } else if (input.method === "session/new" || input.method === "session/load") {
     sessionId = input.params.sessionId ?? "0c19650f-b73a-4dd2-985c-8b9256199fe0";
+    replayHistory(input.method);
     send({ id: input.id, result: session() });
     setTimeout(
       () =>
