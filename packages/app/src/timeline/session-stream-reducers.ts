@@ -1793,7 +1793,7 @@ interface StreamStatePatch {
   head?: StreamItem[];
   acknowledgedClientMessageIds?: readonly string[];
   taskSnapshot?: TodoEntry[];
-  updateCursor?: (current: TimelineCursor | undefined) => TimelineCursor | undefined;
+  updateCursor?: (current: TimelineCursor | undefined) => TimelineCursor;
 }
 
 export function deriveAgentStreamTurnLiveness(

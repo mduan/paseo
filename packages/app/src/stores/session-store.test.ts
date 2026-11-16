@@ -170,7 +170,7 @@ describe("agent task state", () => {
     });
     const session = useSessionStore.getState().sessions["test-server"];
     useSessionStore.getState().setAgentStreamState("test-server", "agent-1", {
-      updateCursor: (current) => current,
+      updateCursor: (current) => current ?? cursor,
     });
     unsubscribe();
 
