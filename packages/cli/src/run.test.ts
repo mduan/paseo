@@ -25,9 +25,9 @@ describe("runCli", () => {
     expect(update.optsWithGlobals()).toMatchObject({ format: "json", color: false });
   });
 
-  it("defaults an empty CLI invocation to onboard", () => {
+  it("defaults an empty CLI invocation to onboard", async () => {
     expect(
-      createCliParseArgv({
+      await createCliParseArgv({
         argv: [],
         cwd: process.cwd(),
         nodeArgv: ["node", "paseo"],
@@ -35,16 +35,16 @@ describe("runCli", () => {
     ).toEqual(["node", "paseo", "onboard"]);
   });
 
-  it("routes explicit root relay flags to onboard", () => {
+  it("routes explicit root relay flags to onboard", async () => {
     expect(
-      createCliParseArgv({
+      await createCliParseArgv({
         argv: ["--relay"],
         cwd: process.cwd(),
         nodeArgv: ["node", "paseo"],
       }),
     ).toEqual(["node", "paseo", "onboard", "--relay"]);
     expect(
-      createCliParseArgv({
+      await createCliParseArgv({
         argv: ["--no-relay"],
         cwd: process.cwd(),
         nodeArgv: ["node", "paseo"],
@@ -52,9 +52,9 @@ describe("runCli", () => {
     ).toEqual(["node", "paseo", "onboard", "--no-relay"]);
   });
 
-  it("preserves known CLI command argv", () => {
+  it("preserves known CLI command argv", async () => {
     expect(
-      createCliParseArgv({
+      await createCliParseArgv({
         argv: ["daemon", "set-password"],
         cwd: process.cwd(),
         nodeArgv: ["node", "paseo"],
@@ -62,9 +62,9 @@ describe("runCli", () => {
     ).toEqual(["node", "paseo", "daemon", "set-password"]);
   });
 
-  it("preserves the hooks command argv", () => {
+  it("preserves the hooks command argv", async () => {
     expect(
-      createCliParseArgv({
+      await createCliParseArgv({
         argv: ["hooks", "claude", "UserPromptSubmit"],
         cwd: process.cwd(),
         nodeArgv: ["node", "paseo"],
@@ -72,14 +72,14 @@ describe("runCli", () => {
     ).toEqual(["node", "paseo", "hooks", "claude", "UserPromptSubmit"]);
   });
 
-  it("classifies existing unknown directories as open-project invocations", () => {
+  it("classifies existing unknown directories as open-project invocations", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "paseo-cli-run-"));
     const project = path.join(root, "repository");
     mkdirSync(project);
 
     try {
       expect(
-        createCliParseArgv({
+        await createCliParseArgv({
           argv: ["repository"],
           cwd: root,
           nodeArgv: ["node", "paseo"],
