@@ -141,8 +141,7 @@ interface UserMessageProps {
 
 const MessageOuterSpacingContext = createContext(false);
 
-// Parsers hold only configuration, so every message shares them; building one
-// per row recompiled linkify-it's regexes for each markdown block.
+// Shared across messages — parsers hold only config, and each construction recompiles linkify-it's regexes.
 const assistantMarkdownParser = createAssistantMarkdownParser();
 const streamingAssistantMarkdownParser = createAssistantMarkdownParser({ streaming: true });
 

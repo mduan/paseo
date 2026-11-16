@@ -29,7 +29,6 @@ export interface FoldedTail {
  */
 export function foldCompletedTurns(input: {
   tail: StreamItem[];
-  /** Whether the live head's first item continues the tail's last turn. */
   headContinuesTail: boolean;
   isTurnActive: boolean;
   activeTurnId: string | null;
@@ -151,8 +150,7 @@ export function useFoldedTail(input: {
     pendingAnchorRef.current = undefined;
     anchor.restore(anchor.top - top);
   }, []);
-  // `head` changes every streamed frame; folding on just this boolean keeps the folded tail's
-  // identity for downstream caches keyed on it.
+  // Key on this boolean, not `head` (new every frame), so downstream tail caches keep hitting.
   const headContinuesTail =
     head.length > 0 && continuesTurn(tail[tail.length - 1] ?? null, head[0]!);
   return useMemo(() => {

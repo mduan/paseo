@@ -4,9 +4,7 @@ import { resolveCliVersion } from "./version.js";
 
 const VERSION = resolveCliVersion();
 
-// Owns the root program, global options, and their propagation to commands.
-// Kept apart from cli.ts so the `hooks` fast path in run.ts builds the same
-// program without importing every command module.
+// No command imports — the `hooks` fast path in run.ts builds this program without loading every command.
 export function createCliProgram(registerCommands: (program: Command) => void): Command {
   const program = new Command();
 

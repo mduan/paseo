@@ -17,8 +17,7 @@ interface MermaidIframeRuntimeProps {
   onRenderFailed: (revision: number) => void;
 }
 
-// The runtime document is ~3.6 MB, so it loads as a separate chunk on first use
-// instead of being parsed with the entry bundle.
+// ~3.6 MB runtime document — loaded as a separate chunk on first use, not with the entry bundle.
 let runtimeHtml: string | undefined;
 let runtimeHtmlPromise: Promise<string> | undefined;
 
@@ -106,8 +105,7 @@ export function MermaidIframeRuntime({
     return () => window.removeEventListener("message", receiveMessage);
   }, [onRenderFailed, onRendered, sendRequest]);
 
-  // Until the runtime loads, the host keeps showing the fence source; requests
-  // queue in the driver and flush on the iframe's `bridgeReady`.
+  // Requests queue in the driver until the loaded iframe reports `bridgeReady`.
   if (!html) return null;
 
   // `inert` (not just tabIndex) because the Modal focus trap focuses descendants
