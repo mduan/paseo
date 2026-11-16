@@ -206,6 +206,7 @@ lines.on("line", (line) => {
               sessionUpdate: "available_commands_update",
               availableCommands: [
                 { name: "project-skill", description: "Project skill", input: { hint: "task" } },
+                { name: "compact", description: "Compact" },
               ],
             },
           },

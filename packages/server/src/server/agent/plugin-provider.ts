@@ -43,6 +43,7 @@ import type {
   AgentSession,
   AgentSessionConfig,
   AgentSlashCommand,
+  AgentSlashCommandKind,
   AgentStreamEvent,
   AgentTimelineItem,
   AgentUsage,
@@ -594,7 +595,12 @@ class ProviderRuntimeSession {
   private readonly activeTurnIds = new Set<string>();
   private terminal = false;
   config: ProviderConfigState = { models: [], modes: [], thinkingOptions: [], settings: [] };
-  commands: Array<{ name: string; description: string; argumentHint?: string }> = [];
+  commands: Array<{
+    name: string;
+    description: string;
+    argumentHint?: string;
+    kind?: AgentSlashCommandKind;
+  }> = [];
   persistence: ProviderPersistence | null = null;
 
   constructor(
@@ -1297,7 +1303,7 @@ class PluginAgentSession implements AgentSession {
     return this.bridge.commands.map((command) => ({
       ...command,
       argumentHint: command.argumentHint ?? "",
-      kind: "command",
+      kind: command.kind ?? "command",
     }));
   }
 

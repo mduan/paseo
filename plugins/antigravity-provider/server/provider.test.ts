@@ -368,7 +368,15 @@ describe("ACP permission modes", () => {
     expect(h.events).toContainEqual({
       type: "session.commands",
       sessionId: "s",
-      commands: [{ name: "project-skill", description: "Project skill", argumentHint: "task" }],
+      commands: [
+        {
+          name: "project-skill",
+          description: "Project skill",
+          argumentHint: "task",
+          kind: "skill",
+        },
+        { name: "compact", description: "Compact", kind: "command" },
+      ],
     });
     // Skills come from the one native session; opening must not start a discovery session.
     expect(

@@ -47,6 +47,18 @@ export function stripBackgroundArtifacts(text: string, stripCheckReply: boolean)
   return cleaned.trim();
 }
 
+// shortcut: agy lists built-ins and skills together with no marker, update when agy adds built-ins.
+const BUILTIN_COMMANDS = new Set([
+  "goal",
+  "compact",
+  "schedule",
+  "browser",
+  "plan",
+  "teamwork",
+  "learn",
+  "boost",
+]);
+
 export class AcpSession {
   private connection?: ProviderConnection;
   private firstMessage: boolean;
@@ -138,6 +150,15 @@ export class AcpSession {
             persistence: { version: 1, data: { conversationId: data.sessionId } },
           };
         }
+      }
+      if (event.type === "session.commands") {
+        event = {
+          ...event,
+          commands: event.commands.map((command) => ({
+            ...command,
+            kind: BUILTIN_COMMANDS.has(command.name) ? "command" : "skill",
+          })),
+        };
       }
       if (event.type === "timeline.item" && event.item.type === "user_message") {
         const text = this.userText.get(event.item.id);
