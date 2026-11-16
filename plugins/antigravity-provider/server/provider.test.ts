@@ -406,41 +406,8 @@ describe("ACP permission modes", () => {
           type: "session.config",
           config: expect.objectContaining({ mode: "full-access" }),
         }),
-        expect.objectContaining({
-          type: "session.notice",
-          notice: expect.objectContaining({
-            id: "s:full-access",
-            title: "Antigravity is running with full access",
-          }),
-        }),
       ]),
     );
-  });
-
-  it("preserves the Full access warning across model reloads and dismisses it when approval is enabled", async () => {
-    const h = await harness();
-    await h.open();
-    await h.completed(await h.prompt("FIRST"));
-    await h.request({
-      type: "session.configure",
-      requestId: "model",
-      sessionId: "s",
-      changes: { model: "gemini-3.8-flash-low" },
-    });
-    await h.completed(await h.prompt("SECOND"));
-    expect(
-      h.events.filter((event) => event.type === "session.notice" && !event.notice.dismissed),
-    ).toHaveLength(1);
-    await h.request({
-      type: "session.configure",
-      requestId: "auto",
-      sessionId: "s",
-      changes: { mode: "auto" },
-    });
-    await h.completed(await h.prompt("THIRD"));
-    expect(h.events.findLast((event) => event.type === "session.notice")).toMatchObject({
-      notice: { id: "s:full-access", dismissed: true },
-    });
   });
 
   it("rejects combined model IDs when opening a session", async () => {
@@ -552,9 +519,6 @@ describe("ACP permission modes", () => {
     async ({ mode, behavior }) => {
       const h = await harness({ AGY_TEST_VERSION: "1.5.9", AGY_TEST_MODE: mode });
       await h.open();
-      expect(
-        h.events.some((event) => event.type === "session.notice" && !event.notice.dismissed),
-      ).toBe(false);
       const promptId = await h.prompt("APPROVAL");
       const permission = await h.wait((event) => event.type === "session.permission");
       if (permission.type !== "session.permission") throw new Error("Missing permission");

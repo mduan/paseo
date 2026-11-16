@@ -151,18 +151,6 @@ export class AcpSession {
       config: { ...this.options.config, mode },
       persistence,
     });
-    this.options.emit({
-      type: "session.notice",
-      sessionId: this.options.id,
-      notice: {
-        id: `${this.options.id}:full-access`,
-        severity: "warning",
-        title: "Antigravity is running with full access",
-        description:
-          "Full access starts Antigravity with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
-        dismissed: fullAccess ? undefined : true,
-      },
-    });
   }
 
   async prompt(prompt: ProviderPrompt): Promise<void> {

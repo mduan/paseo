@@ -33,7 +33,6 @@ interface OpenSession {
   active: boolean;
   firstMessage: boolean;
   backendSelection?: string;
-  fullAccessNoticeShown?: boolean;
 }
 
 export function createAntigravityProvider(): ProviderRegistration {
@@ -91,13 +90,6 @@ function createConnection(
         if (!opened.config.persist) {
           if (event.type === "session.persistence") return;
           if (event.type === "session.opened") event = { ...event, persistence: undefined };
-        }
-        if (
-          event.type === "session.notice" &&
-          event.notice.id === `${event.sessionId}:full-access`
-        ) {
-          if (!event.notice.dismissed && opened.fullAccessNoticeShown) return;
-          opened.fullAccessNoticeShown = !event.notice.dismissed;
         }
         if (event.type === "session.config") {
           opened.config.model = event.config.model;
