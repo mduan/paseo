@@ -289,7 +289,7 @@ import {
   createProjectDirectory,
   ProjectDirectoryRequestError,
 } from "./project-directory-service.js";
-import { runGitCommand } from "../utils/run-git-command.js";
+import { runGitCommand, runWithGitCommandPriority } from "../utils/run-git-command.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 import { resolveWorktreeSourceCwd } from "./workspace-source.js";
 import type { SocketTransport } from "./socket-transport.js";
@@ -8373,14 +8373,17 @@ export class Session {
       return;
     }
     try {
-      const result = await getCheckoutDiff(range.repoRoot, {
-        mode: "range",
-        baseRef: range.fromTree,
-        targetRef: range.toTree,
-        ignoreWhitespace: msg.ignoreWhitespace === true,
-        includeStructured: true,
-        deferLargeFiles: msg.deferLargeFiles === true,
-      });
+      // The diff panel shows "Loading..." until this returns, so skip ahead of workspace refreshes.
+      const result = await runWithGitCommandPriority("high", () =>
+        getCheckoutDiff(range.repoRoot, {
+          mode: "range",
+          baseRef: range.fromTree,
+          targetRef: range.toTree,
+          ignoreWhitespace: msg.ignoreWhitespace === true,
+          includeStructured: true,
+          deferLargeFiles: msg.deferLargeFiles === true,
+        }),
+      );
       const files = [...(result.structured ?? [])].sort((a, b) => (a.path < b.path ? -1 : 1));
       this.emitForSource(
         {
