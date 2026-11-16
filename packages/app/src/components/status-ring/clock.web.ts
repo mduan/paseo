@@ -7,7 +7,8 @@ const STATUS_RING_KEYFRAMES: PropertyIndexedKeyframes = {
 };
 const STATUS_RING_TIMING: KeyframeAnimationOptions = {
   duration: STATUS_RING_PERIOD_MS,
-  easing: "linear",
+  // Stepped, not linear — the compositor skips unchanged frames (~40fps vs 120Hz on ProMotion).
+  easing: "steps(30)",
   iterations: Number.POSITIVE_INFINITY,
 };
 const STATUS_RING_TIMELINE_START_MS = 0;
