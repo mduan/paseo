@@ -88,7 +88,11 @@ import {
 import { isWeb } from "@/constants/platform";
 import { useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
-import { DiffTooLargeState } from "@/git/diff-too-large-state";
+import {
+  DiffTooLargeState,
+  LargeDiffGate,
+  type DiffComparisonRefs,
+} from "@/git/diff-too-large-state";
 import { useRevealInFileManager } from "@/workspace/open-in-file-manager/reveal";
 import {
   LiveDiffComparison,
@@ -105,6 +109,29 @@ export function resolveDiffLayout(
   canUseSplitLayout: boolean,
 ): "unified" | "split" {
   return canUseSplitLayout ? layout : "unified";
+}
+
+function resolveComparisonRefs(input: {
+  diffMode: WorkingDiffComparison;
+  commitRange?: CommitRange;
+  snapshot?: { fromTree: string; toTree: string };
+  branchName: string | null;
+  baseRefLabel: string | null;
+  files: ParsedDiffFile[];
+}): DiffComparisonRefs {
+  if (input.diffMode === "commit_range" && input.commitRange) {
+    return { from: { sha: input.commitRange.fromSha }, to: { sha: input.commitRange.toSha } };
+  }
+  if (input.snapshot) {
+    return { from: { sha: input.snapshot.fromTree }, to: { sha: input.snapshot.toTree } };
+  }
+  // Branch comparisons pin HEAD's commit as each file's targetRef; the working tree has none.
+  const to = {
+    name: input.branchName ?? undefined,
+    sha: input.files.find((file) => file.targetRef)?.targetRef,
+  };
+  if (input.diffMode === "uncommitted") return { from: { name: "HEAD" }, to };
+  return { from: { name: input.baseRefLabel ?? undefined }, to };
 }
 
 function computeSelectedDiffStat(
@@ -1394,6 +1421,7 @@ export function ChangesSurface({
     onExpandGap,
     deferredFileLoads,
     onLoadDeferredFile,
+    snapshot,
   } = useWorkingDiff({
     serverId,
     workspaceId: workspaceId ?? undefined,
@@ -1569,6 +1597,23 @@ export function ChangesSurface({
   const diffErrorMessage = diffPayloadError?.message ?? null;
   const prErrorMessage = computePrErrorMessage(githubFeaturesEnabled, prPayloadError);
   const baseRefLabel = selectBaseRefLabel(status);
+  // The large diff notice returns when the comparison changes, not when its files change.
+  const comparisonKey = useMemo(
+    () => JSON.stringify([diffMode, baseRefLabel, commitRange, snapshot?.fromTree]),
+    [baseRefLabel, commitRange, diffMode, snapshot],
+  );
+  const comparisonRefs = useMemo(
+    () =>
+      resolveComparisonRefs({
+        diffMode,
+        commitRange,
+        snapshot,
+        branchName: currentBranchName,
+        baseRefLabel,
+        files,
+      }),
+    [baseRefLabel, commitRange, currentBranchName, diffMode, files, snapshot],
+  );
   const { gitActions } = useGitActions({
     serverId,
     cwd,
@@ -1603,16 +1648,23 @@ export function ChangesSurface({
       checkingRepositoryLabel={t("workspace.git.diff.checkingRepository")}
       notRepositoryLabel={t("workspace.git.diff.notRepository")}
     >
-      <DiffDocument
+      <LargeDiffGate
         files={files}
-        contentInsetBottom={jumpToFileInset}
-        collapseState={collapseState}
-        displayPreferences={sharedDisplayPreferences}
-        mode={workingMode}
-        onExpandGap={onExpandGap}
-        deferredFileLoads={deferredFileLoads}
-        onLoadDeferredFile={onLoadDeferredFile}
-      />
+        comparisonKey={comparisonKey}
+        refs={comparisonRefs}
+        onShowDiff={handleCollapseAllFiles}
+      >
+        <DiffDocument
+          files={files}
+          contentInsetBottom={jumpToFileInset}
+          collapseState={collapseState}
+          displayPreferences={sharedDisplayPreferences}
+          mode={workingMode}
+          onExpandGap={onExpandGap}
+          deferredFileLoads={deferredFileLoads}
+          onLoadDeferredFile={onLoadDeferredFile}
+        />
+      </LargeDiffGate>
     </DiffBodyContent>
   );
   const bodyContent = (
