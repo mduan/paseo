@@ -833,8 +833,7 @@ function reconcileOverlappingProjectedAssistant(params: {
   };
 
   if (headMatch) {
-    // A painted prefix of this message can sit in the tail while pre-sync live chunks
-    // built a second copy in the head. The projection supersedes both.
+    // Reload can leave a painted prefix in the tail and a pre-sync copy in the head — replace both.
     const isSupersededPrefix = (item: StreamItem) => {
       const cursor = item.timelineCursor;
       return (
