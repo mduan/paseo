@@ -1689,11 +1689,11 @@ export const ko: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "분리된 HEAD",
+    title: "현재 브랜치",
     searchPlaceholder: "브랜치 필터...",
     empty: "브랜치를 찾을 수 없습니다.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "기준 브랜치 변경",
     currentBase: "기준 브랜치: {{baseRef}}. 눌러서 기준 브랜치를 변경합니다.",
     placeholder: "기준 브랜치 변경...",
     title: "기준 브랜치",

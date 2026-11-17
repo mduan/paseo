@@ -110,7 +110,7 @@ export function BaseRefSwitcher({
             />
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <Text style={styles.tooltipText}>{t("baseRefSwitcher.triggerTooltip")}</Text>
+            <BranchTooltipText title={t("baseRefSwitcher.title")} name={displayedBaseRefLabel} />
           </TooltipContent>
         </Tooltip>
         <Combobox
@@ -134,18 +134,32 @@ export function BaseRefSwitcher({
   );
 }
 
+export function BranchTooltipText({ title, name }: { title: string; name: string }) {
+  return (
+    <View>
+      <Text style={styles.tooltipTitle}>{title}</Text>
+      <Text style={styles.tooltipText}>{name}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    // Cap the base branch width to leave room for the current branch label.
-    flexShrink: 0,
-    maxWidth: "50%",
+    // Shrink with the current branch label instead of a percentage cap. In the
+    // Diff header the parent sizes to content, where a percentage leaves a gap.
+    flexShrink: 1,
+    minWidth: 0,
     gap: theme.spacing[1],
   },
   anchor: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  tooltipTitle: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   tooltipText: {
     color: theme.colors.popoverForeground,

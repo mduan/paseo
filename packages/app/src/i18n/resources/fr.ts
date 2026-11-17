@@ -1730,11 +1730,11 @@ export const fr: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "HEAD détaché",
+    title: "Branche actuelle",
     searchPlaceholder: "Filtrer les branches...",
     empty: "Aucune branche trouvée.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "Changer la branche de base",
     currentBase: "Branche de base : {{baseRef}}. Appuyez pour changer la branche de base.",
     placeholder: "Changer la branche de base...",
     title: "Branche de base",

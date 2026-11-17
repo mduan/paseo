@@ -1662,11 +1662,11 @@ export const zhCN: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "分离的 HEAD",
+    title: "当前分支",
     searchPlaceholder: "筛选分支...",
     empty: "没有找到分支。",
   },
   baseRefSwitcher: {
-    triggerTooltip: "更改基准分支",
     currentBase: "基准分支：{{baseRef}}。按下以更改基准分支。",
     placeholder: "更改基准分支...",
     title: "基准分支",

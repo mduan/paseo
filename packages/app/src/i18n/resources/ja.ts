@@ -1696,11 +1696,11 @@ export const ja: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "detached HEAD",
+    title: "現在のブランチ",
     searchPlaceholder: "ブランチをフィルタ...",
     empty: "ブランチが見つかりません。",
   },
   baseRefSwitcher: {
-    triggerTooltip: "ベースブランチを変更",
     currentBase: "ベースブランチ: {{baseRef}}。押すとベースブランチを変更します。",
     placeholder: "ベースブランチを変更...",
     title: "ベースブランチ",

@@ -1704,11 +1704,11 @@ export const en = {
   },
   branchSwitcher: {
     detachedHead: "Detached HEAD",
+    title: "Current branch",
     searchPlaceholder: "Filter branches...",
     empty: "No branches found.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "Change base branch",
     currentBase: "Base branch: {{baseRef}}. Press to change base branch.",
     placeholder: "Change base branch...",
     title: "Base branch",
