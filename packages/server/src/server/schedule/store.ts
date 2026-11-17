@@ -100,9 +100,8 @@ function parseStoredSchedule(
   return StoredScheduleSchema.safeParse(json);
 }
 
-// Loads the schedules directory once and serves reads from memory: the service ticks every
-// second. Every write goes through this store, so the cache stays exact. Files edited or added
-// by hand while the daemon runs are not seen until the next daemon start.
+// Loaded once, then served from memory — every write must go through this store; hand edits
+// are seen only after a daemon restart.
 export class ScheduleStore {
   private readonly scheduleMutations = new Map<string, Promise<unknown>>();
   private readonly identityMutations = new Map<string, Promise<unknown>>();

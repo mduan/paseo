@@ -549,8 +549,7 @@ export class ScheduleService {
   async tick(): Promise<void> {
     const now = this.now();
     for (const { id } of await this.store.list()) {
-      // An earlier run in this tick can take minutes, so read the schedule's current state:
-      // another tick may have run, paused, or deleted it in the meantime.
+      // Re-read — an earlier run in this tick can take minutes while other ticks change it.
       const schedule = await this.store.get(id);
       if (!schedule || schedule.status !== "active" || !schedule.nextRunAt) {
         continue;
