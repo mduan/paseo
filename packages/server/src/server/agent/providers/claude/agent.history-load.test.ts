@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import type { AgentTimelineItem } from "../../agent-sdk-types.js";
 import { ClaudeAgentClient } from "./agent.js";
 import { claudeProjectDirSync } from "./project-dir.js";
 
@@ -29,6 +30,11 @@ describe("ClaudeAgentSession persisted history load", () => {
   let records: LogRecord[];
 
   async function resume(): Promise<void> {
+    const session = await resumeSession();
+    await session.close();
+  }
+
+  async function resumeSession() {
     const client = new ClaudeAgentClient({
       logger: pino({ level: "info" }, { write: (line: string) => records.push(JSON.parse(line)) }),
       queryFactory: vi.fn(() => {
@@ -36,11 +42,7 @@ describe("ClaudeAgentSession persisted history load", () => {
       }),
       resolveVersion: async () => "2.1.220",
     });
-    const session = await client.resumeSession(
-      { provider: "claude", sessionId: SESSION_ID },
-      { cwd },
-    );
-    await session.close();
+    return client.resumeSession({ provider: "claude", sessionId: SESSION_ID }, { cwd });
   }
 
   function transcriptPath(): string {
@@ -89,5 +91,54 @@ describe("ClaudeAgentSession persisted history load", () => {
         err: expect.objectContaining({ message: expect.stringContaining("EISDIR") }),
       }),
     );
+  });
+
+  test("skips API request copies that Claude Code records in the transcript", async () => {
+    // `api-request-blob` entries copy API request bodies, including injected context.
+    const transcript = [
+      { type: "user", uuid: "u1", message: { role: "user", content: "Write util.ts" } },
+      {
+        type: "api-request-blob",
+        hash: "h1",
+        message: {
+          role: "system",
+          content: [
+            { type: "text", text: "The following tools just became available" },
+            { type: "tool_addition", name: "mcp__docs__read" },
+          ],
+        },
+      },
+      {
+        type: "api-request-blob",
+        hash: "h2",
+        message: {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_1", content: "ok" },
+            { type: "text", text: "<system-reminder>MCP server instructions</system-reminder>" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "Done." }] },
+      },
+    ];
+    mkdirSync(path.dirname(transcriptPath()), { recursive: true });
+    writeFileSync(transcriptPath(), transcript.map((entry) => JSON.stringify(entry)).join("\n"));
+
+    const session = await resumeSession();
+    const items: AgentTimelineItem[] = [];
+    try {
+      for await (const event of session.streamHistory()) {
+        if (event.type === "timeline") items.push(event.item);
+      }
+    } finally {
+      await session.close();
+    }
+
+    expect(items.map((item) => item.type)).toEqual(["user_message", "assistant_message"]);
+    expect(items[1]).toMatchObject({ type: "assistant_message", text: "Done." });
   });
 });

@@ -20,9 +20,11 @@ interface HighlightedLinesProps {
 }
 
 function ContentLine({ line }: { line: KeyedLine }) {
+  // The highlighter emits one empty token for a blank line.
+  const isBlank = line.tokens.every(({ token }) => token.text === "");
   return (
     <Text selectable style={styles.lineText}>
-      {line.tokens.length === 0
+      {isBlank
         ? ZERO_WIDTH
         : line.tokens.map(({ key, token }: KeyedToken) => (
             <Text key={key} style={token.style ? syntaxTokenStyleFor(token.style) : undefined}>

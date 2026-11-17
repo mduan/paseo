@@ -6260,7 +6260,8 @@ function convertClaudeHistoryEntryPreamble(
     return { shortCircuit: [taskNotificationItem] };
   }
 
-  if (entry.isCompactSummary) {
+  // Only user/assistant entries are conversation — e.g. `api-request-blob` holds injected context.
+  if ((entry.type !== "user" && entry.type !== "assistant") || entry.isCompactSummary) {
     return { shortCircuit: [] };
   }
   if (entry.type === "user" && isSyntheticHistoryUserEntry(entry)) {
@@ -6273,10 +6274,7 @@ function convertClaudeHistoryEntryPreamble(
   }
 
   const content = message.content;
-  if (
-    (entry.type === "user" || entry.type === "assistant") &&
-    isClaudeTranscriptNoiseContent(content)
-  ) {
+  if (isClaudeTranscriptNoiseContent(content)) {
     return { shortCircuit: [] };
   }
 
