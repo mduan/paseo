@@ -105,7 +105,7 @@ function parseStoredSchedule(
 export class ScheduleStore {
   private readonly scheduleMutations = new Map<string, Promise<unknown>>();
   private readonly identityMutations = new Map<string, Promise<unknown>>();
-  private schedules: Promise<Map<string, StoredSchedule>> | undefined;
+  private cache: Promise<Map<string, StoredSchedule>> | undefined;
 
   constructor(
     private readonly dir: string,
@@ -117,11 +117,11 @@ export class ScheduleStore {
   }
 
   private load(): Promise<Map<string, StoredSchedule>> {
-    this.schedules ??= this.readAll().catch((error) => {
-      this.schedules = undefined;
+    this.cache ??= this.readAll().catch((error) => {
+      this.cache = undefined;
       throw error;
     });
-    return this.schedules;
+    return this.cache;
   }
 
   private async readAll(): Promise<Map<string, StoredSchedule>> {
