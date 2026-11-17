@@ -750,24 +750,22 @@ function ChangesComparisonToolbar({
       trailing="glyph"
     >
       <ChangesToolbarLeading>
-        {repository ? (
-          // Branch names truncate first so the mode menu keeps its label.
-          <>
-            <View style={styles.changesToolbarBranches}>
-              <ChangesBranchLabels model={repository} />
-            </View>
-            <View style={styles.changesToolbarDivider} />
-            <View style={styles.changesToolbarModeMenu}>{modeMenu}</View>
-          </>
-        ) : (
-          modeMenu
-        )}
+        {/* Branch names truncate first so the mode menu keeps its label. */}
+        {repository ? <View style={styles.changesToolbarModeMenu}>{modeMenu}</View> : modeMenu}
         {model.selectedDiffStat ? (
           <DiffStat
             additions={model.selectedDiffStat.additions}
             deletions={model.selectedDiffStat.deletions}
             testID="changes-selected-diff-stat"
           />
+        ) : null}
+        {repository ? (
+          <>
+            <View style={styles.changesToolbarDivider} />
+            <View style={styles.changesToolbarBranches}>
+              <ChangesBranchLabels model={repository} />
+            </View>
+          </>
         ) : null}
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
