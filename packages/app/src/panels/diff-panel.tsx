@@ -18,6 +18,7 @@ import { useInlineReviewController } from "@/review";
 import { buildDiffReviewContext } from "@/review/context";
 import type { ReviewLineRange } from "@/review/range";
 import { DiffDocument } from "@/git/diff-document";
+import { LargeDiffGate } from "@/git/diff-too-large-state";
 import { shouldCollapseDiffFile } from "@/utils/diff-layout";
 import {
   ChangesDiffToolbar,
@@ -320,13 +321,17 @@ function TurnDiffPanel() {
     [collapsedFilePaths],
   );
 
+  const handleCollapseAllFiles = useCallback(
+    () => setCollapsedFilePaths(files.map((file) => file.path)),
+    [files],
+  );
   const diffOptions = useMemo<ChangesToolbarDiffOptions>(
     () => ({
       collapse:
         files.length > 0
           ? {
               allFilesCollapsed: files.every((file) => collapsedFilePaths.includes(file.path)),
-              onCollapseAll: () => setCollapsedFilePaths(files.map((file) => file.path)),
+              onCollapseAll: handleCollapseAllFiles,
               onExpandAll: () => setCollapsedFilePaths([]),
             }
           : null,
@@ -341,7 +346,7 @@ function TurnDiffPanel() {
       onToggleHideWhitespace: panelPreferences.toggleHideWhitespace,
       onToggleWrapLines: panelPreferences.toggleWrapLines,
     }),
-    [collapsedFilePaths, files, panelPreferences],
+    [collapsedFilePaths, files, handleCollapseAllFiles, panelPreferences],
   );
   const expansion = useDiffContextExpansion({
     serverId,
@@ -381,6 +386,10 @@ function TurnDiffPanel() {
       target.focusRequestId,
     ],
   );
+  const comparisonRefs = useMemo(
+    () => ({ from: { sha: payload?.snapshot?.fromTree }, to: { sha: payload?.snapshot?.toTree } }),
+    [payload],
+  );
   let body: ReactNode;
   if (query.error) {
     body = <PanelState message={t("panels.diff.loadError")} tone="error" />;
@@ -394,13 +403,20 @@ function TurnDiffPanel() {
     body = <PanelState message={t("panels.diff.empty")} />;
   } else {
     body = (
-      <DiffDocument
-        files={expansion.files}
-        displayPreferences={panelPreferences.displayPreferences}
-        mode={mode}
-        collapseState={collapseState}
-        onExpandGap={expansion.onExpandGap}
-      />
+      <LargeDiffGate
+        files={files}
+        comparisonKey={target.turnId}
+        refs={comparisonRefs}
+        onShowDiff={handleCollapseAllFiles}
+      >
+        <DiffDocument
+          files={expansion.files}
+          displayPreferences={panelPreferences.displayPreferences}
+          mode={mode}
+          collapseState={collapseState}
+          onExpandGap={expansion.onExpandGap}
+        />
+      </LargeDiffGate>
     );
   }
 

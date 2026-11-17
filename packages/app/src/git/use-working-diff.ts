@@ -154,6 +154,7 @@ function selectDiffState<ReviewActions>(input: {
   const { snapshotDiff, checkoutDiff, reviewActions } = input;
   if (snapshotDiff) {
     return {
+      snapshot: snapshotDiff.snapshot,
       commentsCapabilityMissing: snapshotDiff.commentsCapabilityMissing,
       isTurnSnapshotMissing: snapshotDiff.isSnapshotMissing,
       diffPayloadError: snapshotDiff.payloadError,
@@ -165,6 +166,7 @@ function selectDiffState<ReviewActions>(input: {
     };
   }
   return {
+    snapshot: undefined,
     commentsCapabilityMissing: false,
     isTurnSnapshotMissing: false,
     diffPayloadError: checkoutDiff.payloadError,
