@@ -7808,6 +7808,20 @@ export class Session {
   private async handleArchiveWorkspaceRequest(
     request: Extract<SessionInboundMessage, { type: "archive_workspace_request" }>,
   ): Promise<void> {
+    let responded = false;
+    const respondArchived = async () => {
+      responded = true;
+      const archivedWorkspace = await this.workspaceRegistry.get(request.workspaceId);
+      this.emit({
+        type: "archive_workspace_response",
+        payload: {
+          requestId: request.requestId,
+          workspaceId: request.workspaceId,
+          archivedAt: archivedWorkspace?.archivedAt ?? new Date().toISOString(),
+          error: null,
+        },
+      });
+    };
     try {
       const existing = await this.workspaceRegistry.get(request.workspaceId);
       if (!existing) {
@@ -7841,26 +7855,26 @@ export class Session {
         {
           scope: { kind: "workspace", workspaceId: existing.workspaceId },
           requestId: request.requestId,
+          // Respond before worktree removal so the client isn't blocked on disk cleanup.
+          onRecordsArchived: () => {
+            respondArchived().catch((error) => {
+              this.sessionLogger.error(
+                { err: error, workspaceId: request.workspaceId },
+                "Failed to send archive response",
+              );
+            });
+          },
         },
       );
-
-      const archivedWorkspace = await this.workspaceRegistry.get(request.workspaceId);
-      const archivedAt = archivedWorkspace?.archivedAt ?? new Date().toISOString();
-      this.emit({
-        type: "archive_workspace_response",
-        payload: {
-          requestId: request.requestId,
-          workspaceId: request.workspaceId,
-          archivedAt,
-          error: null,
-        },
-      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to archive workspace";
       this.sessionLogger.error(
         { err: error, workspaceId: request.workspaceId },
         "Failed to archive workspace",
       );
+      if (responded) {
+        return;
+      }
       this.emit({
         type: "archive_workspace_response",
         payload: {

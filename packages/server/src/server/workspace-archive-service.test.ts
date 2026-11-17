@@ -252,6 +252,7 @@ describe("archiveByScope", () => {
     const paseoHome = path.join(tempDir, ".paseo");
     const worktree = await createPaseoOwnedWorktree(repoDir, paseoHome, "last-ref-workspace");
     const workspaceId = "ws-last-ref";
+    let worktreeExistedWhenRecordsArchived = false;
 
     const result = await archiveByScope(
       createArchiveDeps({
@@ -267,6 +268,9 @@ describe("archiveByScope", () => {
       {
         scope: { kind: "workspace", workspaceId },
         requestId: "req-last-ref-workspace",
+        onRecordsArchived: () => {
+          worktreeExistedWhenRecordsArchived = existsSync(worktree.worktreePath);
+        },
       },
     );
 
@@ -274,6 +278,7 @@ describe("archiveByScope", () => {
       archivedWorkspaceIds: [workspaceId],
       removedDirectory: true,
     });
+    expect(worktreeExistedWhenRecordsArchived).toBe(true);
     expect(existsSync(worktree.worktreePath)).toBe(false);
   });
 
