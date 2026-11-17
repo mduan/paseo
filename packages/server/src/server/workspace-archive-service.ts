@@ -539,7 +539,8 @@ export async function killTerminalsForWorkspace(
     return;
   }
 
-  const terminalIds: string[] = [];
+  // Nested terminal directories return the same terminal more than once.
+  const terminalIds = new Set<string>();
   const terminalLists = await Promise.all(
     terminalManager.listDirectories().map(async (terminalCwd) => {
       try {
@@ -556,17 +557,17 @@ export async function killTerminalsForWorkspace(
   for (const terminals of terminalLists) {
     for (const terminal of terminals) {
       if (terminal.workspaceId === workspaceId) {
-        terminalIds.push(terminal.id);
+        terminalIds.add(terminal.id);
       }
     }
   }
 
-  if (terminalIds.length === 0) {
+  if (terminalIds.size === 0) {
     return;
   }
 
   await Promise.allSettled(
-    terminalIds.map(async (terminalId) => {
+    Array.from(terminalIds, async (terminalId) => {
       try {
         dependencies.detachTerminalStream?.(terminalId, { emitExit: true });
         await terminalManager.killTerminalAndWait(terminalId, {

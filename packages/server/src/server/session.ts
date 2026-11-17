@@ -42,9 +42,10 @@ import {
   type WorkspaceSetupSnapshot,
   type WorkspaceDescriptorPayload,
 } from "./messages.js";
-import type {
-  TerminalManager,
-  TerminalWorkspaceContributionChangedEvent,
+import {
+  listAllTerminals,
+  type TerminalManager,
+  type TerminalWorkspaceContributionChangedEvent,
 } from "../terminal/terminal-manager.js";
 import { TerminalSessionController } from "../terminal/terminal-session-controller.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
@@ -251,10 +252,12 @@ import {
   type LinearIntegrationService,
 } from "../services/linear-integration.js";
 import {
+  agentIdsForWorkspaces,
   resolveWorkspaceRootAgent,
   summarizeFetchWorkspacesEntries,
   workspaceIdsOnCheckout,
   WorkspaceDirectory,
+  type WorkspaceScope,
   type WorkspaceUpdatesFilter,
 } from "./workspace-directory.js";
 import { shouldEmitPendingBootstrapUpdate } from "./workspace-bootstrap-dedupe.js";
@@ -1225,9 +1228,9 @@ export class Session {
       logger: this.sessionLogger,
       projectRegistry: this.projectRegistry,
       workspaceRegistry: this.workspaceRegistry,
-      listAgentPayloads: () => this.listAgentPayloads(),
+      listAgentPayloads: (scope) => this.listAgentPayloads(scope),
       listProviderSubagentActivity: async () => this.agentManager.listProviderSubagentActivity(),
-      listTerminalActivityContributions: () => this.listTerminalActivityContributions(),
+      listTerminalActivityContributions: (scope) => this.listTerminalActivityContributions(scope),
       isProviderVisibleToClient: (provider) => this.isProviderVisibleToClient(provider),
       buildWorkspaceDescriptor: (input) => this.buildWorkspaceDescriptor(input),
     });
@@ -2002,7 +2005,9 @@ export class Session {
             },
             "agent.session.forward_update",
           );
-          void this.agentUpdates.forwardLiveAgent(event.agent);
+          void this.agentUpdates.forwardLiveAgent(event.agent, {
+            skipUnchangedWorkspaceStatus: true,
+          });
           return;
         }
 
@@ -5517,18 +5522,19 @@ export class Session {
     );
   }
 
-  private async listTerminalActivityContributions(): Promise<
-    Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
-  > {
+  private async listTerminalActivityContributions(
+    scope?: WorkspaceScope,
+  ): Promise<Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>> {
     const terminalManager = this.terminalManager;
     if (!terminalManager) {
       return [];
     }
-    const directories = terminalManager.listDirectories();
-    const terminalsByDirectory = await Promise.all(
-      directories.map((cwd) => terminalManager.getTerminals(cwd)),
+    const workspaceIds = scope?.workspaceIds;
+    const sessions = (await listAllTerminals(terminalManager)).filter(
+      (session) =>
+        !workspaceIds || (!!session.workspaceId && workspaceIds.has(session.workspaceId)),
     );
-    return terminalsByDirectory.flat().map((session) => {
+    return sessions.map((session) => {
       const contribution: { cwd: string; workspaceId?: string; activity: TerminalActivity | null } =
         {
           cwd: session.cwd,
@@ -5548,23 +5554,32 @@ export class Session {
     labels?: Record<string, string>;
     includeArchived?: boolean;
     includeUnavailablePersisted?: boolean;
+    workspaceIds?: ReadonlySet<string>;
   }): Promise<AgentSnapshotPayload[]> {
     const includeArchived = filter?.includeArchived === true;
     const labelEntries = filter?.labels ? Object.entries(filter.labels) : [];
 
-    // Get live agents with session modes
-    const agentSnapshots = this.agentManager.listAgents();
+    let agentSnapshots = this.agentManager.listAgents();
+    const liveIds = new Set(agentSnapshots.map((a) => a.id));
+    // Persisted agents that have not been lazily initialized yet
+    // (excluding internal agents which are for ephemeral system tasks)
+    let registryRecords = (await this.agentStorage.list()).filter(
+      (record) => !liveIds.has(record.id) && !record.internal,
+    );
+    if (filter?.workspaceIds) {
+      const agentIds = agentIdsForWorkspaces(
+        [...agentSnapshots, ...registryRecords],
+        filter.workspaceIds,
+      );
+      agentSnapshots = agentSnapshots.filter((agent) => agentIds.has(agent.id));
+      registryRecords = registryRecords.filter((record) => agentIds.has(record.id));
+    }
+
     const liveAgents = await Promise.all(
       agentSnapshots.map((agent) => this.buildAgentPayload(agent)),
     );
-
-    // Add persisted agents that have not been lazily initialized yet
-    // (excluding internal agents which are for ephemeral system tasks)
-    const registryRecords = await this.agentStorage.list();
-    const liveIds = new Set(agentSnapshots.map((a) => a.id));
     const registeredProviderIds = new Set(this.providerSnapshotManager.listRegisteredProviderIds());
     const persistedAgents = registryRecords
-      .filter((record) => !liveIds.has(record.id) && !record.internal)
       // Keep raw-record filters ahead of projection; seeded homes can carry thousands of archived agents.
       .filter((record) => includeArchived || !record.archivedAt)
       .filter((record) => labelEntries.every(([key, value]) => record.labels?.[key] === value))

@@ -103,6 +103,18 @@ function createActivityToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+// getTerminals(dir) also returns terminals in subdirectories, so dedupe nested directories by id.
+export async function listAllTerminals(
+  manager: Pick<TerminalManager, "listDirectories" | "getTerminals">,
+): Promise<TerminalSession[]> {
+  const terminalsByDirectory = await Promise.all(
+    manager.listDirectories().map((cwd) => manager.getTerminals(cwd)),
+  );
+  return [
+    ...new Map(terminalsByDirectory.flat().map((terminal) => [terminal.id, terminal])).values(),
+  ];
+}
+
 export function createTerminalManager(
   managerOptions: TerminalManagerOptions = {},
 ): TerminalManager {

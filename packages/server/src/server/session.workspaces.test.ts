@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import { LinearConnectionStatus, type LinearIssue } from "@getpaseo/protocol/messages";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { Session } from "./session.js";
 import { WorkspacePortsService } from "./workspace-ports/service.js";
@@ -165,6 +166,9 @@ interface SessionTestAccess {
   handleMessage(message: unknown, source?: object): Promise<unknown>;
   handleCreatePaseoWorktreeRequest(params: unknown): Promise<unknown>;
   listAgentPayloads(...args: unknown[]): Promise<unknown[]>;
+  buildAgentPayload(agent: { id: string }): Promise<unknown>;
+  buildStoredAgentPayload(record: { id: string }, ...args: unknown[]): unknown;
+  providerSnapshotManager: { listRegisteredProviderIds(): string[] };
   listFetchWorkspacesEntries(params: unknown): Promise<ListFetchResult>;
   listFetchAgentsEntries(params: unknown): Promise<ListFetchResult>;
   resolveAgentIdentifier(identifier: string): Promise<unknown>;
@@ -7162,6 +7166,124 @@ test("same-cwd workspace descriptors compute agent status per workspaceId", asyn
   const attentionDescriptors = await session.buildWorkspaceDescriptorMap({ includeGitData: false });
   expect(attentionDescriptors.get(workspaceA.workspaceId)?.status).toBe("done");
   expect(attentionDescriptors.get(workspaceB.workspaceId)?.status).toBe("attention");
+});
+
+test("a single-workspace update projects only that workspace's agents and matches the full build", async () => {
+  vi.setSystemTime(new Date("2026-05-12T12:00:00.000Z"));
+  const project = createPersistedProjectRecord({
+    projectId: "proj-scoped-projection",
+    rootPath: REPO_CWD,
+    kind: "git",
+    displayName: "repo",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspace = (workspaceId: string) =>
+    createPersistedWorkspaceRecord({
+      workspaceId,
+      projectId: project.projectId,
+      cwd: REPO_CWD,
+      kind: "local_checkout",
+      displayName: workspaceId,
+      createdAt: "2026-03-01T12:00:00.000Z",
+      updatedAt: "2026-03-01T12:00:00.000Z",
+    });
+  const workspaces = [workspace("ws-target"), workspace("ws-other")];
+  const stored = [
+    makeStoredAgent({
+      id: "stored-target",
+      cwd: REPO_CWD,
+      workspaceId: "ws-target",
+      updatedAt: "2026-05-12T09:00:00.000Z",
+    }),
+    // A child of an agent in another workspace is a root in its own workspace
+    // only while that parent exists, so its parent must still be projected.
+    makeStoredAgent({
+      id: "stored-target-child",
+      cwd: REPO_CWD,
+      workspaceId: "ws-target",
+      updatedAt: "2026-05-12T10:00:00.000Z",
+      requiresAttention: true,
+      attentionReason: "finished",
+      labels: { [PARENT_AGENT_ID_LABEL]: "stored-other-parent" },
+    }),
+    makeStoredAgent({
+      id: "stored-other-parent",
+      cwd: REPO_CWD,
+      workspaceId: "ws-other",
+      updatedAt: "2026-05-12T08:00:00.000Z",
+    }),
+    ...Array.from({ length: 5 }, (_, index) =>
+      makeStoredAgent({
+        id: `stored-other-${index}`,
+        cwd: REPO_CWD,
+        workspaceId: "ws-other",
+        updatedAt: "2026-05-12T08:00:00.000Z",
+      }),
+    ),
+  ];
+  const live = [
+    makeManagedAgent({
+      id: "live-target",
+      cwd: REPO_CWD,
+      workspaceId: "ws-target",
+      lifecycle: "idle",
+      updatedAt: "2026-05-12T11:00:00.000Z",
+    }),
+    makeManagedAgent({
+      id: "live-other",
+      cwd: REPO_CWD,
+      workspaceId: "ws-other",
+      lifecycle: "running",
+      updatedAt: "2026-05-12T11:00:00.000Z",
+    }),
+  ];
+
+  const setupSession = () => {
+    const session = createSessionForWorkspaceTests({
+      agentManager: { listAgents: () => live },
+      agentStorage: {
+        list: async () => stored,
+        get: async (agentId: string) => stored.find((record) => record.id === agentId) ?? null,
+      },
+    });
+    session.projectRegistry.list = async () => [project];
+    session.workspaceRegistry.list = async () => workspaces;
+    session.providerSnapshotManager.listRegisteredProviderIds = () => ["codex"];
+    const projectedIds: string[] = [];
+    const buildAgentPayload = session.buildAgentPayload.bind(session);
+    const buildStoredAgentPayload = session.buildStoredAgentPayload.bind(session);
+    session.buildAgentPayload = (agent) => {
+      projectedIds.push(agent.id);
+      return buildAgentPayload(agent);
+    };
+    session.buildStoredAgentPayload = (record, ...args) => {
+      projectedIds.push(record.id);
+      return buildStoredAgentPayload(record, ...args);
+    };
+    return { session, projectedIds };
+  };
+
+  const full = setupSession();
+  const fullDescriptor = (
+    await full.session.buildWorkspaceDescriptorMap({ includeGitData: false })
+  ).get("ws-target");
+
+  const scoped = setupSession();
+  const scopedDescriptors = await scoped.session.buildWorkspaceDescriptorMap({
+    includeGitData: false,
+    workspaceIds: ["ws-target"],
+  });
+
+  expect(fullDescriptor).toEqual(expect.objectContaining({ status: "attention" }));
+  expect(scopedDescriptors.get("ws-target")).toEqual(fullDescriptor);
+  expect(scoped.projectedIds.sort()).toEqual([
+    "live-target",
+    "stored-other-parent",
+    "stored-target",
+    "stored-target-child",
+  ]);
+  vi.useRealTimers();
 });
 
 test("buildWorkspaceDescriptorMap keeps a done workspace recent after its agents are archived", async () => {
