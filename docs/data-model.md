@@ -453,7 +453,7 @@ Paseo uses these paths under the configured OpenAI base URL:
 
 **Path:** `$PASEO_HOME/schedules/{id}.json`
 
-One file per schedule. ID is 8 hex characters.
+One file per schedule. ID is 8 hex characters. The daemon reads the directory once at startup and keeps schedules in memory; it does not see files you edit or add by hand until it restarts, and its next write to an edited schedule overwrites your edit.
 
 | Field       | Type                                  | Description                      |
 | ----------- | ------------------------------------- | -------------------------------- |

@@ -100,10 +100,13 @@ function parseStoredSchedule(
   return StoredScheduleSchema.safeParse(json);
 }
 
+// Loads the schedules directory once and serves reads from memory: the service ticks every
+// second. Every write goes through this store, so the cache stays exact. Files edited or added
+// by hand while the daemon runs are not seen until the next daemon start.
 export class ScheduleStore {
   private readonly scheduleMutations = new Map<string, Promise<unknown>>();
   private readonly identityMutations = new Map<string, Promise<unknown>>();
-  private reportedInvalidFiles = new Set<string>();
+  private schedules: Promise<Map<string, StoredSchedule>> | undefined;
 
   constructor(
     private readonly dir: string,
@@ -114,14 +117,16 @@ export class ScheduleStore {
     return join(this.dir, `${id}.json`);
   }
 
-  private async ensureDir(): Promise<void> {
-    await mkdir(this.dir, { recursive: true });
+  private load(): Promise<Map<string, StoredSchedule>> {
+    this.schedules ??= this.readAll().catch((error) => {
+      this.schedules = undefined;
+      throw error;
+    });
+    return this.schedules;
   }
 
-  // The service lists schedules on every tick, so a file that is not a valid schedule is
-  // reported when it first appears rather than once per second.
-  async list(): Promise<StoredSchedule[]> {
-    await this.ensureDir();
+  private async readAll(): Promise<Map<string, StoredSchedule>> {
+    await mkdir(this.dir, { recursive: true });
     const entries = await readdir(this.dir, { withFileTypes: true });
     const files = await Promise.all(
       entries
@@ -131,33 +136,26 @@ export class ScheduleStore {
           return { filePath, parsed: parseStoredSchedule(await readFile(filePath, "utf-8")) };
         }),
     );
-    const schedules: StoredSchedule[] = [];
-    const invalidFiles = new Set<string>();
+    const schedules = new Map<string, StoredSchedule>();
     for (const { filePath, parsed } of files) {
       if (parsed.success) {
-        schedules.push(parsed.data);
-        continue;
-      }
-      invalidFiles.add(filePath);
-      if (!this.reportedInvalidFiles.has(filePath)) {
+        schedules.set(parsed.data.id, parsed.data);
+      } else {
         this.logger.error({ err: parsed.error, filePath }, "Skipping invalid schedule file");
       }
     }
-    this.reportedInvalidFiles = invalidFiles;
-    return schedules.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    return schedules;
+  }
+
+  async list(): Promise<StoredSchedule[]> {
+    const schedules = await this.load();
+    return [...schedules.values()].sort((left, right) =>
+      left.createdAt.localeCompare(right.createdAt),
+    );
   }
 
   async get(id: string): Promise<StoredSchedule | null> {
-    await this.ensureDir();
-    try {
-      const content = await readFile(this.filePath(id), "utf-8");
-      return StoredScheduleSchema.parse(JSON.parse(content));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return null;
-      }
-      throw error;
-    }
+    return (await this.load()).get(id) ?? null;
   }
 
   async create(schedule: Omit<StoredSchedule, "id">): Promise<StoredSchedule> {
@@ -217,14 +215,16 @@ export class ScheduleStore {
   }
 
   private async write(schedule: StoredSchedule): Promise<void> {
-    await this.ensureDir();
+    const schedules = await this.load();
     await writeJsonFileAtomic(this.filePath(schedule.id), schedule);
+    schedules.set(schedule.id, schedule);
   }
 
   async delete(id: string): Promise<void> {
     await this.serializeScheduleMutation(id, async () => {
-      await this.ensureDir();
+      const schedules = await this.load();
       await rm(this.filePath(id), { force: true });
+      schedules.delete(id);
     });
   }
 

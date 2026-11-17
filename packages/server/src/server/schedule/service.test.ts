@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -414,6 +414,142 @@ describe("ScheduleService", () => {
     const inspected = await service.inspect(created.id);
     expect(inspected.status).toBe("completed");
     expect(inspected.nextRunAt).toBeNull();
+  });
+
+  function createTickTestService(
+    runner: ScheduleServiceOptions["runner"] = async () => ({ agentId: null, output: "ok" }),
+  ): ScheduleService {
+    return createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+      runner,
+    });
+  }
+
+  function createMinutelySchedule(service: ScheduleService, prompt: string) {
+    return service.create({
+      prompt,
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      runOnCreate: false,
+    });
+  }
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "ticks from memory without reading the schedules directory",
+    async () => {
+      const service = createTickTestService();
+      const created = await createMinutelySchedule(service, "Check status");
+      const schedulesDir = join(tempDir, "schedules");
+      const scheduleFile = join(schedulesDir, `${created.id}.json`);
+      // Write-only: atomic writes still land, but any listing or read fails with EACCES.
+      await chmod(scheduleFile, 0o200);
+      await chmod(schedulesDir, 0o300);
+      try {
+        now = new Date("2026-01-01T00:01:00.000Z");
+        await service.tick();
+        await service.tick();
+      } finally {
+        await chmod(schedulesDir, 0o755);
+      }
+
+      const persisted = await new ScheduleStore(schedulesDir, createTestLogger()).get(created.id);
+      expect(persisted?.runs).toHaveLength(1);
+      expect(persisted?.nextRunAt).toBe("2026-01-01T00:02:00.000Z");
+    },
+  );
+
+  test("runs a schedule that came due during sleep once on wake", async () => {
+    const service = createTickTestService();
+    const created = await createMinutelySchedule(service, "Check status");
+
+    now = new Date("2026-01-01T03:00:30.000Z");
+    await Promise.all([service.tick(), service.tick()]);
+    await service.tick();
+
+    const inspected = await service.inspect(created.id);
+    expect(inspected.runs).toHaveLength(1);
+    expect(inspected.nextRunAt).toBe("2026-01-01T03:01:00.000Z");
+  });
+
+  test("does not rerun a schedule that a concurrent tick already ran", async () => {
+    let releaseSlowRun: (() => void) | undefined;
+    const slowRunBlocked = new Promise<void>((resolve) => {
+      releaseSlowRun = resolve;
+    });
+    let slowRunEntered: (() => void) | undefined;
+    const slowRunStarted = new Promise<void>((resolve) => {
+      slowRunEntered = resolve;
+    });
+    const service = createTickTestService(async (schedule) => {
+      if (schedule.prompt === "slow") {
+        slowRunEntered?.();
+        await slowRunBlocked;
+      }
+      return { agentId: null, output: "ok" };
+    });
+    // Ticks visit schedules oldest first, so the first tick blocks on "slow" before "fast".
+    await createMinutelySchedule(service, "slow");
+    now = new Date("2026-01-01T00:00:01.000Z");
+    const fast = await createMinutelySchedule(service, "fast");
+
+    now = new Date("2026-01-01T00:01:01.000Z");
+    const firstTick = service.tick();
+    await slowRunStarted;
+    await service.tick();
+    releaseSlowRun?.();
+    await firstTick;
+
+    expect((await service.inspect(fast.id)).runs).toHaveLength(1);
+  });
+
+  test("pause and delete stop the next tick from running a due schedule", async () => {
+    const runs: string[] = [];
+    const service = createTickTestService(async (schedule) => {
+      runs.push(schedule.prompt);
+      return { agentId: null, output: "ok" };
+    });
+    const paused = await createMinutelySchedule(service, "paused");
+    const deleted = await createMinutelySchedule(service, "deleted");
+    await service.pause(paused.id);
+    await service.delete(deleted.id);
+
+    now = new Date("2026-01-01T00:01:00.000Z");
+    await service.tick();
+    expect(runs).toEqual([]);
+
+    await service.resume(paused.id);
+    now = new Date("2026-01-01T00:02:00.000Z");
+    await service.tick();
+    expect(runs).toEqual(["paused"]);
+  });
+
+  test("completes an expired schedule on tick without running it", async () => {
+    const runs: string[] = [];
+    const service = createTickTestService(async (schedule) => {
+      runs.push(schedule.prompt);
+      return { agentId: null, output: "ok" };
+    });
+    const created = await service.create({
+      prompt: "Expiring",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      runOnCreate: false,
+      expiresAt: "2026-01-01T00:00:30.000Z",
+    });
+
+    now = new Date("2026-01-01T00:01:00.000Z");
+    await service.tick();
+
+    expect(runs).toEqual([]);
+    expect(await service.inspect(created.id)).toMatchObject({
+      status: "completed",
+      nextRunAt: null,
+    });
   });
 
   test("executes new-agent schedules through AgentManager with real fake clients", async () => {
