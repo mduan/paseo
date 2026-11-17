@@ -3574,8 +3574,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   private resolvedPermissionRequests = new Set<string>();
   private pendingAgentMessages = new Map<string, string>();
   private pendingReasoning = new Map<string, string>();
-  // Child-thread text deltas, keyed by child thread id. Flushed before every other dispatched
-  // notification, replays included, so deltas stay ordered against tool calls and status changes.
+  // Keyed by child thread id; flushed before any non-delta dispatch (replays too) to keep order.
   private readonly subAgentTextCoalescer = new AgentStreamCoalescer({
     timers: { setTimeout, clearTimeout },
     onFlush: ({ agentId: childThreadId, item }) => {
@@ -6054,7 +6053,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       toolCallId: state.callId,
       parentSubagentId: state.parentSubagentId,
     };
-    // Every child delta refreshes activity; only a changed descriptor is worth a broadcast.
+    // Skip unchanged descriptors — each upsert rebuilds the workspace descriptor in every session.
     const key = JSON.stringify(event);
     if (state.lastUpsertByThreadId.get(childThreadId) === key) return;
     state.lastUpsertByThreadId.set(childThreadId, key);

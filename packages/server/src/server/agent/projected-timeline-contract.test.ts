@@ -62,7 +62,7 @@ test("projects Codex child history and confines old-client degradation to the ch
     await expect
       .poll(() => ctx.daemon.daemon.agentManager.listProviderSubagents(agent.id).length)
       .toBe(1);
-    // Child deltas are coalesced, so wait for the text rather than one row per delta.
+    // Child deltas are coalesced — row count varies, so wait on the text.
     await expect
       .poll(() =>
         ctx.daemon.daemon.agentManager
