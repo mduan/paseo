@@ -8,6 +8,9 @@ import { projectTimelineRows } from "../timeline-projection.js";
 
 const markdown = new MarkdownIt({ html: false });
 const PAGE_SIZE = 200;
+// Projected items get a new object when their text changes; the stored text guards
+// against an item that was mutated in place.
+const blockCache = new WeakMap<object, { text: string; blocks: string[] }>();
 interface SearchLocation {
   seq: number;
   role: "user" | "assistant";
@@ -46,6 +49,14 @@ function searchableBlocks(text: string): string[] {
       return "";
     })
     .filter(Boolean);
+}
+
+function cachedSearchableBlocks(item: object, text: string): string[] {
+  const cached = blockCache.get(item);
+  if (cached?.text === text) return cached.blocks;
+  const blocks = searchableBlocks(text);
+  blockCache.set(item, { text, blocks });
+  return blocks;
 }
 
 function countMatches(text: string, pattern: RegExp): number {
@@ -88,7 +99,7 @@ export async function searchTimeline({
     const item = entry.item;
     if (item.type !== "user_message" && item.type !== "assistant_message") continue;
     const raw = item.text.replace(/\r/g, "");
-    const blocks = item.type === "assistant_message" ? searchableBlocks(raw) : [raw];
+    const blocks = item.type === "assistant_message" ? cachedSearchableBlocks(item, raw) : [raw];
     const count = blocks.reduce((sum, block) => sum + countMatches(block, pattern), 0);
     if (count) {
       if (locations.length === PAGE_SIZE) {
