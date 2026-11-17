@@ -4285,6 +4285,29 @@ describe("Codex app-server provider", () => {
     },
   );
 
+  test("keeps child streamed reasoning intact across a root turn", () => {
+    const { session, events } = startStreamingChild();
+    const sendChildDelta = (delta: string) =>
+      asInternals(session).handleNotification("item/reasoning/summaryTextDelta", {
+        threadId: COALESCE_CHILD,
+        itemId: "child-reasoning",
+        delta,
+      });
+    const finalText = "Before the root turn ended. After it ended.";
+    sendChildDelta("Before the root turn ended. ");
+    asInternals(session).handleNotification("turn/completed", {
+      threadId: "test-thread",
+      turn: { status: "interrupted" },
+    });
+    sendChildDelta("After it ended.");
+    asInternals(session).handleNotification("item/completed", {
+      threadId: COALESCE_CHILD,
+      item: { type: "reasoning", id: "child-reasoning", summary: [finalText] },
+    });
+
+    expect(joinedText(childTimeline(events), "reasoning")).toBe(finalText);
+  });
+
   test("drops root streamed text when the root turn ends", () => {
     const session = createSession();
     const events: AgentStreamEvent[] = [];
