@@ -136,7 +136,6 @@ type CodexTestSession = AgentSession & {
 
 type TurnTerminalEvent = Extract<
   AgentStreamEvent,
-  AgentTimelineItem,
   { type: "turn_completed" | "turn_failed" | "turn_canceled" }
 >;
 
