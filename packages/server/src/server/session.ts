@@ -1226,9 +1226,9 @@ export class Session {
       logger: this.sessionLogger,
       projectRegistry: this.projectRegistry,
       workspaceRegistry: this.workspaceRegistry,
-      listAgentPayloads: (filter) => this.listAgentPayloads(filter),
+      listAgentPayloads: (scope) => this.listAgentPayloads(scope),
       listProviderSubagentActivity: async () => this.agentManager.listProviderSubagentActivity(),
-      listTerminalActivityContributions: (filter) => this.listTerminalActivityContributions(filter),
+      listTerminalActivityContributions: (scope) => this.listTerminalActivityContributions(scope),
       isProviderVisibleToClient: (provider) => this.isProviderVisibleToClient(provider),
       buildWorkspaceDescriptor: (input) => this.buildWorkspaceDescriptor(input),
     });
@@ -5493,7 +5493,7 @@ export class Session {
   }
 
   private async listTerminalActivityContributions(
-    filter?: WorkspaceScope,
+    scope?: WorkspaceScope,
   ): Promise<Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>> {
     const terminalManager = this.terminalManager;
     if (!terminalManager) {
@@ -5503,7 +5503,7 @@ export class Session {
     const terminalsByDirectory = await Promise.all(
       directories.map((cwd) => terminalManager.getTerminals(cwd)),
     );
-    const workspaceIds = filter?.workspaceIds;
+    const workspaceIds = scope?.workspaceIds;
     const sessions = terminalsByDirectory
       .flat()
       .filter(

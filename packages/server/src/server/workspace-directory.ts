@@ -81,10 +81,10 @@ export interface WorkspaceDirectoryDeps {
   workspaceRegistry: {
     list(): Promise<PersistedWorkspaceRecord[]>;
   };
-  listAgentPayloads(filter?: WorkspaceScope): Promise<AgentSnapshotPayload[]>;
+  listAgentPayloads(scope?: WorkspaceScope): Promise<AgentSnapshotPayload[]>;
   listProviderSubagentActivity(): Promise<ProviderSubagentWorkspaceActivity[]>;
   listTerminalActivityContributions(
-    filter?: WorkspaceScope,
+    scope?: WorkspaceScope,
   ): Promise<Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>>;
   isProviderVisibleToClient(provider: string): boolean;
   buildWorkspaceDescriptor(input: {
