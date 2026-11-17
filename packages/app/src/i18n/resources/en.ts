@@ -1050,7 +1050,7 @@ export const en = {
         previewTooLargeDescription: "Narrow the comparison to preview it here",
         largeDiffTitle: "This diff is very large",
         largeDiffDescription:
-          "Rendering it may be slow. Check the comparison below, a changed base is a common cause.",
+          "Rendering it may be slow. Check the comparison below. A changed base is a common cause.",
         largeDiffFrom: "From",
         largeDiffTo: "To",
         largeDiffFiles: "Files",
