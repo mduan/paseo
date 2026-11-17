@@ -756,6 +756,7 @@ function ChangesComparisonToolbar({
             <View style={styles.changesToolbarBranches}>
               <ChangesBranchLabels model={repository} />
             </View>
+            <View style={styles.changesToolbarDivider} />
             <View style={styles.changesToolbarModeMenu}>{modeMenu}</View>
           </>
         ) : (
@@ -1874,6 +1875,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
+  },
+  changesToolbarDivider: {
+    width: 1,
+    height: 16,
+    marginHorizontal: theme.spacing[1],
+    backgroundColor: theme.colors.border,
   },
   changesToolbarModeMenu: {
     flexShrink: 0,
