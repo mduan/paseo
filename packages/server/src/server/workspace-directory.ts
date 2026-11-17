@@ -721,6 +721,22 @@ function groupAgentsByWorkspaceId(
   return byWorkspaceId;
 }
 
+// Agent fields that can change the workspace descriptor once its bucket history exists; equal keys
+// mean an agent_state event cannot change it. The field-sweep test catches a missing field.
+export function workspaceStatusKey(agent: AgentSnapshotPayload): string {
+  return JSON.stringify([
+    agent.workspaceId,
+    agent.provider,
+    agent.status,
+    agent.pendingPermissions?.length ?? 0,
+    agent.requiresAttention,
+    agent.attentionReason,
+    agent.attentionTimestamp,
+    agent.archivedAt,
+    getParentAgentIdFromLabels(agent.labels),
+  ]);
+}
+
 // Agents owned by `workspaceIds` plus their direct parents — a child with a parent in another
 // workspace is a root only while that parent is active (see resolveWorkspaceRootAgent).
 export function agentIdsForWorkspaces(

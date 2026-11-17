@@ -1,8 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import type { AgentSnapshotPayload, WorkspaceDescriptorPayload } from "./messages.js";
-import { WorkspaceDirectory } from "./workspace-directory.js";
+import { WorkspaceDirectory, workspaceStatusKey } from "./workspace-directory.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { ProviderSubagentWorkspaceActivity } from "./workspace-directory.js";
@@ -693,4 +693,121 @@ test("Git observation targets exclude archived records without hydrating app des
   expect(await directory.listObservationTargets()).toEqual([
     { id: "observed", workspaceDirectory: "/workspace/observed", workspaceKind: "local_checkout" },
   ]);
+});
+
+test("workspaceStatusKey changes whenever an agent field change changes its workspace descriptor", async () => {
+  const project: PersistedProjectRecord = {
+    projectId: "project-1",
+    rootPath: "/workspace/project",
+    kind: "git",
+    displayName: "project",
+    customName: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+  };
+  const workspace: PersistedWorkspaceRecord = {
+    workspaceId: "workspace-1",
+    projectId: project.projectId,
+    cwd: project.rootPath,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+  };
+  const base = createAgent({
+    id: "agent",
+    status: "running",
+    cwd: workspace.cwd,
+    workspaceId: workspace.workspaceId,
+  });
+  // A different value for every field, so a field the descriptor starts reading is caught here.
+  const changed: Required<AgentSnapshotPayload> = {
+    id: "agent-2",
+    provider: "claude",
+    cwd: "/workspace/other",
+    workspaceId: "workspace-2",
+    model: "model-2",
+    features: [{ type: "toggle", id: "fast", label: "Fast", value: true }],
+    thinkingOptionId: "high",
+    effectiveThinkingOptionId: "high",
+    createdAt: "2026-04-01T12:00:00.000Z",
+    updatedAt: "2026-04-01T12:00:00.000Z",
+    lastUserMessageAt: "2026-04-01T12:00:00.000Z",
+    status: "idle",
+    activeTurn: { turnId: "turn-2", startedAt: "2026-04-01T12:00:00.000Z" },
+    turnCount: 2,
+    capabilities: { ...base.capabilities, supportsStreaming: false },
+    currentModeId: "plan",
+    availableModes: [{ id: "plan", label: "Plan" }],
+    pendingPermissions: [{ id: "permission", provider: "codex", name: "tool", kind: "tool" }],
+    persistence: { provider: "codex", sessionId: "session-2" },
+    runtimeInfo: { provider: "codex", sessionId: "session-2" },
+    lastUsage: { contextWindowUsedTokens: 10 },
+    lastError: "error",
+    title: "title",
+    labels: { [PARENT_AGENT_ID_LABEL]: "missing-parent" },
+    requiresAttention: true,
+    attentionReason: "finished",
+    attentionTimestamp: "2026-04-01T12:00:00.000Z",
+    archivedAt: "2026-04-01T12:00:00.000Z",
+    providerUnavailable: true,
+    latestTurnDiffAt: "2026-04-01T12:00:00.000Z",
+    lastAssistantPreview: "preview",
+    suggestedNextActions: ["next"],
+  };
+
+  // Seed bucket history first, as the subscription snapshot does, then read the descriptor.
+  async function descriptorAfter(agent: AgentSnapshotPayload) {
+    let agents = [base];
+    const directory = new WorkspaceDirectory({
+      logger: createTestLogger(),
+      projectRegistry: { list: async () => [project] },
+      workspaceRegistry: { list: async () => [workspace] },
+      listAgentPayloads: async () => agents,
+      listProviderSubagentActivity: async () => [],
+      listTerminalActivityContributions: async () => [],
+      isProviderVisibleToClient: (provider) => provider === "codex",
+      buildWorkspaceDescriptor: async ({ workspace: record }) => ({
+        id: record.workspaceId,
+        projectId: record.projectId,
+        projectDisplayName: "project",
+        projectCustomName: null,
+        projectRootPath: project.rootPath,
+        workspaceDirectory: record.cwd,
+        projectKind: "git",
+        workspaceKind: record.kind,
+        name: record.displayName,
+        archivingAt: null,
+        status: "done",
+        activityAt: null,
+        diffStat: null,
+        gitRuntime: null,
+        githubRuntime: null,
+      }),
+    });
+    await directory.buildDescriptorMap({ includeGitData: false });
+    agents = [agent];
+    const descriptors = await directory.buildDescriptorMap({ includeGitData: false });
+    return descriptors.get(workspace.workspaceId);
+  }
+
+  vi.useFakeTimers({ now: new Date("2026-05-01T12:00:00.000Z") });
+  const baseline = await descriptorAfter(base);
+  const fieldsThatChangeTheDescriptor: string[] = [];
+  for (const field of Object.keys(changed) as Array<keyof AgentSnapshotPayload>) {
+    const agent = { ...base, [field]: changed[field] };
+    if (JSON.stringify(await descriptorAfter(agent)) === JSON.stringify(baseline)) continue;
+    fieldsThatChangeTheDescriptor.push(field);
+    expect({ field, keyChanged: workspaceStatusKey(agent) !== workspaceStatusKey(base) }).toEqual({
+      field,
+      keyChanged: true,
+    });
+  }
+  vi.useRealTimers();
+  // Guards the sweep itself: these fields are known to change the descriptor.
+  expect(fieldsThatChangeTheDescriptor).toEqual(
+    expect.arrayContaining(["workspaceId", "status", "archivedAt", "labels", "provider"]),
+  );
 });

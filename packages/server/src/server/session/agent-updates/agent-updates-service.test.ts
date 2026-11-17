@@ -518,6 +518,42 @@ describe("forwardLiveAgent", () => {
     expect(h.workspaceUpdates).toEqual(["ws-1"]);
   });
 
+  test("skips a workspace update when the agent's workspace status inputs are unchanged", async () => {
+    const h = buildHarness();
+    const agent = { ...h.managed("a"), workspaceId: "ws-1" };
+    const skipUnchanged = { skipUnchangedWorkspaceStatus: true };
+
+    await h.service.forwardLiveAgent(agent, skipUnchanged);
+    // A usage-only change: nothing the workspace status reads.
+    await h.service.forwardLiveAgent(
+      { ...agent, lastUsage: { contextWindowUsedTokens: 10 } } as ManagedAgent,
+      skipUnchanged,
+    );
+    expect(h.workspaceUpdates).toEqual(["ws-1"]);
+
+    await h.service.forwardLiveAgent(
+      { ...agent, lifecycle: "idle" } as ManagedAgent,
+      skipUnchanged,
+    );
+    expect(h.workspaceUpdates).toEqual(["ws-1", "ws-1"]);
+
+    // Callers that do not opt in always update, e.g. a resume after unarchive.
+    await h.service.forwardLiveAgent({ ...agent, lifecycle: "idle" } as ManagedAgent);
+    expect(h.workspaceUpdates).toEqual(["ws-1", "ws-1", "ws-1"]);
+  });
+
+  test("updates the workspace again for an agent re-added after removal", async () => {
+    const h = buildHarness();
+    const agent = { ...h.managed("a"), workspaceId: "ws-1" };
+    const skipUnchanged = { skipUnchangedWorkspaceStatus: true };
+
+    await h.service.forwardLiveAgent(agent, skipUnchanged);
+    await h.service.removeAgent("a");
+    await h.service.forwardLiveAgent(agent, skipUnchanged);
+
+    expect(h.workspaceUpdates).toEqual(["ws-1", "ws-1"]);
+  });
+
   test("drops an upsert whose provider is not visible to the client", async () => {
     const h = buildHarness();
     h.service.beginSubscription({ subscriptionId: "sub", filter: {} });
