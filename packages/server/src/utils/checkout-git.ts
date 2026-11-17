@@ -636,7 +636,7 @@ export async function readDiffContextLines(input: {
   ref?: string;
   startLine: number;
   lineCount: number;
-}): Promise<ReturnType<typeof highlightFileLines>> {
+}): ReturnType<typeof highlightFileLines> {
   const content = input.ref
     ? await readGitFileContentAtRef(input.cwd, input.ref, input.path)
     : await readFile(resolve(input.cwd, input.path), "utf-8");

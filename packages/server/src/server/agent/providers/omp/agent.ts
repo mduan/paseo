@@ -80,7 +80,7 @@ import { materializeProviderImage } from "../provider-image-output.js";
 import { OmpCliRuntime } from "./cli-runtime.js";
 import { listOmpImportableSessions, readOmpImportSessionConfig } from "./session-descriptor.js";
 import type { OmpRuntime, OmpRuntimeSession, OmpStartSessionInput } from "./runtime.js";
-import { OmpMcpBridge, type OmpBridgedToolIdentity } from "./mcp-bridge.js";
+import type { OmpBridgedToolIdentity } from "./mcp-bridge.js";
 import type {
   OmpAgentSessionEvent,
   OmpAgentMessage,
@@ -2210,6 +2210,8 @@ export class OmpAgentClient implements AgentClient {
     if (!catalog && !config.mcpServers) {
       return;
     }
+    // The bridge pulls in the MCP client SDK, so it loads only when a session needs it.
+    const { OmpMcpBridge } = await import("./mcp-bridge.js");
     const bridge = await OmpMcpBridge.connect(config.mcpServers, config.cwd, this.logger, {
       ...process.env,
       ...this.runtimeSettings?.env,

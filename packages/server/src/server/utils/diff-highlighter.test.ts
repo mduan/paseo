@@ -363,7 +363,7 @@ describe("reconstructOldFile", () => {
 });
 
 describe("highlightDiffFromHunks", () => {
-  it("continues highlighting large diffs whose lines stay bounded", () => {
+  it("continues highlighting large diffs whose lines stay bounded", async () => {
     const sourceLines = Array.from(
       { length: 101 },
       (_, index) => `const value${index} = "${"x".repeat(990)}";`,
@@ -378,16 +378,16 @@ describe("highlightDiffFromHunks", () => {
       ].join("\n"),
     );
 
-    const highlighted = highlightDiffFromHunks(file);
+    const highlighted = await highlightDiffFromHunks(file);
     const contentLines = highlighted.hunks[0].lines.slice(1);
 
     expect(contentLines[0].tokens).toContainEqual({ text: "const", style: "keyword" });
     expect(contentLines[100].tokens).toContainEqual({ text: "const", style: "keyword" });
   });
 
-  it("adds syntax highlighting tokens to TypeScript code", () => {
+  it("adds syntax highlighting tokens to TypeScript code", async () => {
     const files = parseDiff(SIMPLE_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
 
     // Check that tokens are added
     const hunk = highlighted.hunks[0];
@@ -408,9 +408,9 @@ describe("highlightDiffFromHunks", () => {
     expect(numberToken!.style).toBe("number");
   });
 
-  it("highlights both added and removed lines correctly", () => {
+  it("highlights both added and removed lines correctly", async () => {
     const files = parseDiff(SIMPLE_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     // Removed line: "const bar = 2;"
@@ -426,7 +426,7 @@ describe("highlightDiffFromHunks", () => {
     expect(addedNumber?.style).toBe("number");
   });
 
-  it("does not modify unsupported file types", () => {
+  it("does not modify unsupported file types", async () => {
     const file: ParsedDiffFile = {
       path: "README.txt",
       isNew: false,
@@ -448,16 +448,16 @@ describe("highlightDiffFromHunks", () => {
       ],
     };
 
-    const highlighted = highlightDiffFromHunks(file);
+    const highlighted = await highlightDiffFromHunks(file);
 
     // Lines should not have tokens
     expect(highlighted.hunks[0].lines[1].tokens).toBeUndefined();
     expect(highlighted.hunks[0].lines[2].tokens).toBeUndefined();
   });
 
-  it("adds syntax highlighting tokens to Rust code", () => {
+  it("adds syntax highlighting tokens to Rust code", async () => {
     const files = parseDiff(RUST_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     const fnLine = hunk.lines[1];
@@ -471,9 +471,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to C code", () => {
+  it("adds syntax highlighting tokens to C code", async () => {
     const files = parseDiff(C_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     const mainLine = hunk.lines[1];
@@ -487,9 +487,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to Java code", () => {
+  it("adds syntax highlighting tokens to Java code", async () => {
     const files = parseDiff(JAVA_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     const classLine = hunk.lines[1];
@@ -503,9 +503,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to Svelte components", () => {
+  it("adds syntax highlighting tokens to Svelte components", async () => {
     const files = parseDiff(SVELTE_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     const scriptLine = hunk.lines[1];
@@ -530,9 +530,9 @@ describe("highlightDiffFromHunks", () => {
     expect(markupLine!.tokens!.some((t) => t.text === "span" && t.style === "tag")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to Astro components", () => {
+  it("adds syntax highlighting tokens to Astro components", async () => {
     const [file] = parseDiff(ASTRO_DIFF);
-    const highlighted = highlightDiffFromHunks(file);
+    const highlighted = await highlightDiffFromHunks(file);
     const addedLine = highlighted.hunks[0].lines.find((line) => line.type === "add");
     const markupLine = highlighted.hunks[0].lines.find((line) => line.content.includes("<main"));
 
@@ -542,9 +542,9 @@ describe("highlightDiffFromHunks", () => {
     expect(markupLine?.tokens).toContainEqual({ text: "class", style: "attribute" });
   });
 
-  it("adds syntax highlighting tokens to Objective-C file extensions", () => {
+  it("adds syntax highlighting tokens to Objective-C file extensions", async () => {
     const files = parseDiff(OBJECTIVE_C_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const hunk = highlighted.hunks[0];
 
     const addedLine = hunk.lines.find(
@@ -554,9 +554,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to Go code", () => {
+  it("adds syntax highlighting tokens to Go code", async () => {
     const files = parseDiff(GO_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const addedLine = highlighted.hunks[0].lines.find(
       (line) => line.type === "add" && line.content.includes("version"),
     );
@@ -565,9 +565,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to PHP code", () => {
+  it("adds syntax highlighting tokens to PHP code", async () => {
     const files = parseDiff(PHP_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const addedLine = highlighted.hunks[0].lines.find(
       (line) => line.type === "add" && line.content.includes("$version"),
     );
@@ -576,9 +576,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.some((t) => t.text === "2" && t.style === "number")).toBe(true);
   });
 
-  it("adds syntax highlighting tokens to YAML code", () => {
+  it("adds syntax highlighting tokens to YAML code", async () => {
     const files = parseDiff(YAML_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const addedLine = highlighted.hunks[0].lines.find(
       (line) => line.type === "add" && line.content.includes("count"),
     );
@@ -587,9 +587,9 @@ describe("highlightDiffFromHunks", () => {
     expect(addedLine!.tokens!.length).toBeGreaterThan(0);
   });
 
-  it("adds syntax highlighting tokens to XML code", () => {
+  it("adds syntax highlighting tokens to XML code", async () => {
     const files = parseDiff(XML_DIFF);
-    const highlighted = highlightDiffFromHunks(files[0]);
+    const highlighted = await highlightDiffFromHunks(files[0]);
     const addedLine = highlighted.hunks[0].lines.find(
       (line) => line.type === "add" && line.content.includes("<count>"),
     );
@@ -716,10 +716,15 @@ index 1111111..2222222 100644
 });
 
 describe("highlightFileLines", () => {
-  it("returns the requested line range with full-file tokens", () => {
+  it("returns the requested line range with full-file tokens", async () => {
     const content = "const a = 1;\nconst b = 2;\nconst c = 3;\n";
     expect(countFileLines(content)).toBe(3);
-    const lines = highlightFileLines({ content, path: "example.ts", startLine: 2, lineCount: 5 });
+    const lines = await highlightFileLines({
+      content,
+      path: "example.ts",
+      startLine: 2,
+      lineCount: 5,
+    });
     expect(lines.map((line) => line.content)).toEqual(["const b = 2;", "const c = 3;"]);
     expect(lines[0]?.tokens?.map((token) => token.text).join("")).toBe("const b = 2;");
   });

@@ -1,7 +1,8 @@
 import type pino from "pino";
-import { OpenAI } from "openai";
+import type { OpenAI } from "openai";
 import { Readable } from "node:stream";
 import type { SpeechStreamResult, TextToSpeechProvider } from "../../speech-provider.js";
+import { createLazyOpenAIClient } from "./client.js";
 
 export type { SpeechStreamResult };
 
@@ -14,7 +15,7 @@ export interface TTSConfig {
 }
 
 export class OpenAITTS implements TextToSpeechProvider {
-  private readonly openaiClient: OpenAI;
+  private readonly getOpenAIClient: () => Promise<OpenAI>;
   private readonly config: TTSConfig;
   private readonly logger: pino.Logger;
 
@@ -26,10 +27,7 @@ export class OpenAITTS implements TextToSpeechProvider {
       ...ttsConfig,
     };
     this.logger = parentLogger.child({ module: "agent", provider: "openai", component: "tts" });
-    this.openaiClient = new OpenAI({
-      apiKey: ttsConfig.apiKey,
-      ...(ttsConfig.baseUrl ? { baseURL: ttsConfig.baseUrl } : {}),
-    });
+    this.getOpenAIClient = createLazyOpenAIClient(ttsConfig);
 
     this.logger.info(
       { voice: this.config.voice, model: this.config.model, format: this.config.responseFormat },
@@ -54,7 +52,8 @@ export class OpenAITTS implements TextToSpeechProvider {
         "Synthesizing speech",
       );
 
-      const response = await this.openaiClient.audio.speech.create({
+      const openaiClient = await this.getOpenAIClient();
+      const response = await openaiClient.audio.speech.create({
         model: this.config.model!,
         voice: this.config.voice!,
         input: text,

@@ -13,6 +13,13 @@ export interface AggregatedAgent extends AgentDirectoryEntry {
   workspacePullRequest?: import("@/git/pr-hint").PrHint | null;
 }
 
+const DISABLED_RESULT = {
+  agents: [] as AggregatedAgent[],
+  isLoading: false,
+  isInitialLoad: false,
+  isRevalidating: false,
+};
+
 export interface AggregatedAgentsResult {
   agents: AggregatedAgent[];
   isLoading: boolean;
@@ -21,40 +28,109 @@ export interface AggregatedAgentsResult {
   refreshAll: () => void;
 }
 
-export function useAggregatedAgents(options?: {
-  includeArchived?: boolean;
-  demand?: boolean;
-}): AggregatedAgentsResult {
-  const daemons = useHosts();
-  const runtime = getHostRuntimeStore();
-  const includeArchived = options?.includeArchived ?? false;
-  const demand = options?.demand ?? true;
-  const serverIds = useMemo(() => daemons.map((daemon) => daemon.serverId), [daemons]);
-  useEffect(() => {
-    if (!demand) return;
-    const releases = serverIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
-    return () => releases.forEach((release) => release());
-  }, [demand, runtime, serverIds]);
-  const runtimeVersion = useSyncExternalStore(
-    (onStoreChange) => runtime.subscribeAll(onStoreChange),
-    () => runtime.getVersion(),
-    () => runtime.getVersion(),
-  );
+export type SessionAgentMaps = Record<string, Map<string, Agent> | undefined>;
 
-  const sessionAgents = useSessionStore(
+const NO_SESSION_AGENTS: SessionAgentMaps = {};
+
+/** Each session's agents map, keyed by server id. Stable while no session's agents map changes. */
+export function useSessionAgentMaps(enabled = true): SessionAgentMaps {
+  return useSessionStore(
     useShallow((state) => {
-      const result: Record<string, Map<string, Agent> | undefined> = {};
+      if (!enabled) return NO_SESSION_AGENTS;
+      const result: SessionAgentMaps = {};
       for (const [serverId, session] of Object.entries(state.sessions)) {
         result[serverId] = session.agents;
       }
       return result;
     }),
   );
+}
+
+/** Holds agent directory demand on every host while `enabled`. */
+export function useAgentDirectoryDemand(enabled: boolean): void {
+  const daemons = useHosts();
+  const runtime = getHostRuntimeStore();
+  const serverIds = useMemo(() => daemons.map((daemon) => daemon.serverId), [daemons]);
+  useEffect(() => {
+    if (!enabled) return;
+    const releases = serverIds.map((serverId) => runtime.acquireDirectoryDemand(serverId));
+    return () => releases.forEach((release) => release());
+  }, [enabled, runtime, serverIds]);
+}
+
+/** Unsorted, freshly built entries for every session agent. */
+export function buildAggregatedAgents({
+  sessionAgents,
+  serverLabelById,
+  includeArchived,
+}: {
+  sessionAgents: SessionAgentMaps;
+  serverLabelById: ReadonlyMap<string, string>;
+  includeArchived: boolean;
+}): AggregatedAgent[] {
+  const allAgents: AggregatedAgent[] = [];
+  for (const [serverId, agents] of Object.entries(sessionAgents)) {
+    if (!agents || agents.size === 0) {
+      continue;
+    }
+    const serverLabel = serverLabelById.get(serverId) ?? serverId;
+    for (const agent of agents.values()) {
+      if (!includeArchived && agent.archivedAt) {
+        continue;
+      }
+      allAgents.push({
+        id: agent.id,
+        serverId,
+        serverLabel,
+        title: agent.title ?? null,
+        status: agent.status,
+        turn: agent.turn,
+        lastActivityAt: agent.lastActivityAt,
+        cwd: agent.cwd,
+        workspaceId: agent.workspaceId,
+        provider: agent.provider,
+        pendingPermissionCount: agent.pendingPermissions.length,
+        requiresAttention: agent.requiresAttention,
+        attentionReason: agent.attentionReason,
+        attentionTimestamp: agent.attentionTimestamp,
+        archivedAt: agent.archivedAt,
+        createdAt: agent.createdAt,
+        labels: agent.labels,
+        projectPlacement: agent.projectPlacement,
+      });
+    }
+  }
+  return allAgents;
+}
+
+const noopSubscribe = () => () => {};
+
+/**
+ * `enabled: false` skips aggregation and runtime subscriptions and returns no agents, so an
+ * always-mounted caller costs nothing until it needs the list.
+ */
+export function useAggregatedAgents(options?: {
+  includeArchived?: boolean;
+  enabled?: boolean;
+}): AggregatedAgentsResult {
+  const daemons = useHosts();
+  const runtime = getHostRuntimeStore();
+  const includeArchived = options?.includeArchived ?? false;
+  const enabled = options?.enabled ?? true;
+  const serverIds = useMemo(() => daemons.map((daemon) => daemon.serverId), [daemons]);
+  useAgentDirectoryDemand(enabled);
+  const runtimeVersion = useSyncExternalStore(
+    enabled ? (onStoreChange) => runtime.subscribeAll(onStoreChange) : noopSubscribe,
+    () => (enabled ? runtime.getVersion() : 0),
+    () => (enabled ? runtime.getVersion() : 0),
+  );
+
+  const sessionAgents = useSessionAgentMaps(enabled);
 
   const refreshAll = useCallback(() => {
-    if (!demand) return;
+    if (!enabled) return;
     for (const serverId of serverIds) void runtime.refreshDirectories(serverId);
-  }, [demand, runtime, serverIds]);
+  }, [enabled, runtime, serverIds]);
 
   // Keyed by "serverId:agentId" — reuse the previous AggregatedAgent object when
   // none of its fields changed, so downstream memo/shallow comparisons can bail early.
@@ -64,51 +140,22 @@ export function useAggregatedAgents(options?: {
   const prevSortedRef = useRef<AggregatedAgent[]>([]);
 
   const result = useMemo(() => {
+    if (!enabled) return DISABLED_RESULT;
     // runtimeVersion is referenced so the memo recomputes when runtime state changes.
     void runtimeVersion;
-    const allAgents: AggregatedAgent[] = [];
     const serverLabelById = new Map(
       daemons.map((daemon) => [daemon.serverId, daemon.label] as const),
     );
-
-    // Derive agent directory from all sessions
-    for (const [serverId, agents] of Object.entries(sessionAgents)) {
-      if (!agents || agents.size === 0) {
-        continue;
-      }
-      const serverLabel = serverLabelById.get(serverId) ?? serverId;
-      for (const agent of agents.values()) {
-        if (!includeArchived && agent.archivedAt) {
-          continue;
-        }
-        const nextAgent: AggregatedAgent = {
-          id: agent.id,
-          serverId,
-          serverLabel,
-          title: agent.title ?? null,
-          status: agent.status,
-          turn: agent.turn,
-          lastActivityAt: agent.lastActivityAt,
-          cwd: agent.cwd,
-          workspaceId: agent.workspaceId,
-          provider: agent.provider,
-          pendingPermissionCount: agent.pendingPermissions.length,
-          requiresAttention: agent.requiresAttention,
-          attentionReason: agent.attentionReason,
-          attentionTimestamp: agent.attentionTimestamp,
-          archivedAt: agent.archivedAt,
-          createdAt: agent.createdAt,
-          labels: agent.labels,
-          projectPlacement: agent.projectPlacement,
-        };
-        const cacheKey = `${serverId}:${agent.id}`;
-        const prev = prevAgentsRef.current.get(cacheKey);
-        // Preserve object identity when fields are unchanged so callers can use
-        // reference equality (useShallow, memo) to skip re-renders.
-        allAgents.push(prev !== undefined && equal(prev, nextAgent) ? prev : nextAgent);
-      }
-    }
-
+    const allAgents = buildAggregatedAgents({
+      sessionAgents,
+      serverLabelById,
+      includeArchived,
+    }).map((nextAgent) => {
+      const prev = prevAgentsRef.current.get(`${nextAgent.serverId}:${nextAgent.id}`);
+      // Preserve object identity when fields are unchanged so callers can use
+      // reference equality (useShallow, memo) to skip re-renders.
+      return prev !== undefined && equal(prev, nextAgent) ? prev : nextAgent;
+    });
     // Sort by: running agents first, then by most recent activity
     allAgents.sort((left, right) => {
       const leftRunning = left.turn.phase === "open";
@@ -159,7 +206,7 @@ export function useAggregatedAgents(options?: {
       isInitialLoad,
       isRevalidating,
     };
-  }, [daemons, includeArchived, runtime, runtimeVersion, sessionAgents]);
+  }, [daemons, enabled, includeArchived, runtime, runtimeVersion, sessionAgents]);
 
   return {
     ...result,

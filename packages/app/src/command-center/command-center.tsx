@@ -131,7 +131,7 @@ function useBuiltInRows(open: boolean): {
   agents: CommandCenterAgentResult[];
 } {
   const { t } = useTranslation();
-  const { agents } = useAggregatedAgents({ demand: open });
+  const { agents } = useAggregatedAgents({ enabled: open });
   const { projects } = useProjects({ enabled: open });
   const showHost = useHosts().length > 1;
 

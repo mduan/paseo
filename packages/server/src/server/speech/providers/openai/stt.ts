@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import type pino from "pino";
-import { OpenAI } from "openai";
+import type { OpenAI } from "openai";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -12,6 +12,7 @@ import type {
   StreamingTranscriptionSession,
   TranscriptionResult,
 } from "../../speech-provider.js";
+import { createLazyOpenAIClient } from "./client.js";
 
 export type { LogprobToken, TranscriptionResult };
 
@@ -47,7 +48,7 @@ function isLogprobTokenArray(value: unknown): value is LogprobToken[] {
 }
 
 export class OpenAISTT implements SpeechToTextProvider {
-  private readonly openaiClient: OpenAI;
+  private readonly getOpenAIClient: () => Promise<OpenAI>;
   private readonly config: STTConfig;
   private readonly logger: pino.Logger;
   public readonly id = "openai" as const;
@@ -55,10 +56,7 @@ export class OpenAISTT implements SpeechToTextProvider {
   constructor(sttConfig: STTConfig, parentLogger: pino.Logger) {
     this.config = sttConfig;
     this.logger = parentLogger.child({ module: "agent", provider: "openai", component: "stt" });
-    this.openaiClient = new OpenAI({
-      apiKey: sttConfig.apiKey,
-      ...(sttConfig.baseUrl ? { baseURL: sttConfig.baseUrl } : {}),
-    });
+    this.getOpenAIClient = createLazyOpenAIClient(sttConfig);
     this.logger.info({ model: sttConfig.model || "whisper-1" }, "STT (OpenAI Whisper) initialized");
   }
 
@@ -203,7 +201,8 @@ export class OpenAISTT implements SpeechToTextProvider {
         modelToUse === "gpt-4o-transcribe" || modelToUse === "gpt-4o-mini-transcribe";
       const includeLogprobs: ["logprobs"] = ["logprobs"];
 
-      const response = await this.openaiClient.audio.transcriptions.create({
+      const openaiClient = await this.getOpenAIClient();
+      const response = await openaiClient.audio.transcriptions.create({
         file: await import("fs").then((fs) => fs.createReadStream(tempFilePath!)),
         language,
         model: modelToUse,
