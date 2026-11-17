@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { i18n } from "@/i18n/i18next";
+import { i18n, loadI18nLocale } from "@/i18n/i18next";
 import {
   resolveUpdateCalloutDescriptor,
   type ResolveUpdateCalloutInput,
@@ -107,6 +107,7 @@ describe("resolveUpdateCalloutDescriptor", () => {
   });
 
   it("uses the active app language for local callout chrome", async () => {
+    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     try {
       const descriptor = resolveUpdateCalloutDescriptor(input());

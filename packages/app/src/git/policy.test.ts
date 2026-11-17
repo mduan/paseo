@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { CheckoutPrStatusSchema } from "@getpaseo/protocol/messages";
-import { i18n } from "@/i18n/i18next";
+import { i18n, loadI18nLocale } from "@/i18n/i18next";
 
 import { buildGitActions, type BuildGitActionsInput } from "./policy";
 import { deriveMergeCapability, type ForgeSpecificStatusFacts } from "./merge-capability";
@@ -743,6 +743,7 @@ describe("git-actions-policy", () => {
   });
 
   it("uses the active language for policy-owned action labels and unavailable messages", async () => {
+    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     const actions = buildGitActions(
       createInput({

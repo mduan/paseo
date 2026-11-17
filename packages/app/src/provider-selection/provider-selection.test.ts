@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentModelDefinition, ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import type { AgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
-import { i18n } from "@/i18n/i18next";
+import { i18n, loadI18nLocale } from "@/i18n/i18next";
 import {
   buildProviderQualifiedDescription,
   buildProviderSelectorProviders,
@@ -392,6 +392,7 @@ describe("combined model selector data", () => {
   });
 
   it("uses the active app language for utility labels", async () => {
+    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     try {
       const providers = buildSelectableProviderSelectorProviders([

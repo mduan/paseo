@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { i18n } from "@/i18n/i18next";
+import { i18n, loadI18nLocale } from "@/i18n/i18next";
 import { buildDraftPanelDescriptor } from "@/panels/draft-panel-descriptor";
 
 function TestIcon() {
@@ -44,6 +44,7 @@ describe("buildDraftPanelDescriptor", () => {
   });
 
   it("uses the active language for draft descriptor chrome", async () => {
+    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     const idleDescriptor = buildDraftPanelDescriptor({
       isCreating: false,
