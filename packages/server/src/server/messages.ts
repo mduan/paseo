@@ -37,3 +37,16 @@ export function serializeAgentStreamEvent(event: AgentStreamEvent): AgentStreamE
 
   return validateStreamEventPayload(event);
 }
+
+const serializedDispatches = new WeakMap<object, AgentStreamEventPayload | null>();
+
+// AgentManager hands one fresh envelope object to every subscriber per dispatch, so keying on it
+// validates each event once daemon-wide. Callers must treat the shared result as read-only.
+export function serializeDispatchedAgentStreamEvent(dispatch: {
+  event: AgentStreamEvent;
+}): AgentStreamEventPayload | null {
+  if (!serializedDispatches.has(dispatch)) {
+    serializedDispatches.set(dispatch, serializeAgentStreamEvent(dispatch.event));
+  }
+  return serializedDispatches.get(dispatch) ?? null;
+}

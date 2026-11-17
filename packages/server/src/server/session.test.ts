@@ -15,7 +15,10 @@ import {
 } from "../services/github-service.js";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import type { WorkspaceDescriptorPayload } from "@getpaseo/protocol/messages";
+import {
+  AgentStreamEventPayloadSchema,
+  type WorkspaceDescriptorPayload,
+} from "@getpaseo/protocol/messages";
 import {
   decodeFileTransferFrame,
   encodeFileTransferFrame,
@@ -5407,6 +5410,85 @@ test("keeps selective delivery scoped per socket when a retained session also ha
       }),
     },
   ]);
+});
+
+describe("agent stream validation", () => {
+  async function createTimelineSubscriber(agentId: string) {
+    const messages: SessionOutboundMessage[] = [];
+    let listener: ((event: AgentManagerEvent) => void) | undefined;
+    const session = createSessionForTest({
+      messages,
+      agentManager: {
+        subscribe: vi.fn((callback: (event: AgentManagerEvent) => void) => {
+          listener = callback;
+          return () => {};
+        }),
+      },
+    });
+    const socket = {};
+    session.updateClientCapabilities({ selective_agent_timeline: true }, socket);
+    await session.handleMessage(
+      {
+        type: "agent.timeline.set_subscription.request",
+        agentIds: [agentId],
+        requestId: "timeline-subscription",
+      },
+      socket,
+    );
+    messages.length = 0;
+    if (!listener) throw new Error("Agent event listener was not installed");
+    return { messages, listener };
+  }
+
+  function createToolCallEvent(agentId: string): AgentManagerEvent {
+    return {
+      type: "agent_stream",
+      agentId,
+      seq: 7,
+      epoch: "epoch-1",
+      timestamp: "2026-11-16T00:00:00.000Z",
+      event: {
+        type: "timeline",
+        provider: "mock",
+        item: {
+          type: "tool_call",
+          callId: "call-1",
+          name: "shell",
+          status: "completed",
+          error: null,
+          detail: { type: "shell", command: "ls", output: "a\nb\n" },
+        },
+      },
+    };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("a session that does not follow the agent does no serialization", async () => {
+    const { messages, listener } = await createTimelineSubscriber("followed-agent");
+    const safeParse = vi.spyOn(AgentStreamEventPayloadSchema, "safeParse");
+
+    listener(createToolCallEvent("other-agent"));
+
+    expect(safeParse).not.toHaveBeenCalled();
+    expect(messages).toEqual([]);
+  });
+
+  test("subscribed sessions get identical frames from one validation per event", async () => {
+    const first = await createTimelineSubscriber("agent-a");
+    const second = await createTimelineSubscriber("agent-a");
+    const safeParse = vi.spyOn(AgentStreamEventPayloadSchema, "safeParse");
+
+    const event = createToolCallEvent("agent-a");
+    first.listener(event);
+    second.listener(event);
+
+    expect(safeParse).toHaveBeenCalledTimes(1);
+    expect(first.messages).toHaveLength(1);
+    expect(JSON.stringify(second.messages)).toBe(JSON.stringify(first.messages));
+  });
 });
 
 test("sends project updates only to capable sockets in a retained session", async () => {
