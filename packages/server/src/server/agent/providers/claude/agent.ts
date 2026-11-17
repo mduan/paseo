@@ -6260,7 +6260,9 @@ function convertClaudeHistoryEntryPreamble(
     return { shortCircuit: [taskNotificationItem] };
   }
 
-  if (entry.isCompactSummary) {
+  // Other entry types can carry a `message` too, such as `api-request-blob` copies of the API
+  // request with injected context. Only user and assistant entries are conversation.
+  if ((entry.type !== "user" && entry.type !== "assistant") || entry.isCompactSummary) {
     return { shortCircuit: [] };
   }
   if (entry.type === "user" && isSyntheticHistoryUserEntry(entry)) {
@@ -6273,10 +6275,7 @@ function convertClaudeHistoryEntryPreamble(
   }
 
   const content = message.content;
-  if (
-    (entry.type === "user" || entry.type === "assistant") &&
-    isClaudeTranscriptNoiseContent(content)
-  ) {
+  if (isClaudeTranscriptNoiseContent(content)) {
     return { shortCircuit: [] };
   }
 
