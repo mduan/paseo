@@ -15,6 +15,7 @@ import type {
   AgentSessionConfig,
   AgentSlashCommand,
   AgentStreamEvent,
+  AgentTimelineItem,
   AgentUsage,
 } from "../agent-sdk-types.js";
 import {
@@ -819,6 +820,76 @@ process.stdin.on("data", (chunk) => {
     await session.close();
     rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+const COALESCE_CHILD = "coalesce-child-thread";
+
+function startStreamingChild(): { session: CodexTestSession; events: AgentStreamEvent[] } {
+  const session = createSession();
+  const events: AgentStreamEvent[] = [];
+  session.subscribe((event) => events.push(event));
+  asInternals(session).handleNotification("item/completed", {
+    threadId: "test-thread",
+    item: {
+      type: "subAgentActivity",
+      id: "spawn-coalesce-child",
+      kind: "started",
+      agentThreadId: COALESCE_CHILD,
+      agentPath: "/root/coalesce",
+    },
+  });
+  events.length = 0;
+  return { session, events };
+}
+
+function streamDeltas(session: CodexTestSession, count: number): string {
+  let text = "";
+  for (let index = 0; index < count; index += 1) {
+    const delta = `r${index} `;
+    text += delta;
+    asInternals(session).handleNotification("item/reasoning/summaryTextDelta", {
+      threadId: COALESCE_CHILD,
+      itemId: "child-reasoning",
+      delta,
+    });
+  }
+  let message = "";
+  for (let index = 0; index < count; index += 1) {
+    const delta = `m${index} `;
+    message += delta;
+    asInternals(session).handleNotification("item/agentMessage/delta", {
+      threadId: COALESCE_CHILD,
+      itemId: "child-message",
+      delta,
+    });
+  }
+  return `${text}|${message}`;
+}
+
+function childTimeline(events: AgentStreamEvent[]): AgentTimelineItem[] {
+  return events.flatMap((event) =>
+    event.type === "provider_subagent" &&
+    event.event.type === "timeline" &&
+    event.event.id === COALESCE_CHILD
+      ? [event.event.item]
+      : [],
+  );
+}
+
+function joinedText(items: AgentTimelineItem[], type: "reasoning" | "assistant_message") {
+  return items.flatMap((item) => (item.type === type ? [item.text] : [])).join("");
+}
+
+function countSubagentTraffic(events: AgentStreamEvent[]) {
+  return {
+    childRows: childTimeline(events).length,
+    upserts: events.filter(
+      (event) => event.type === "provider_subagent" && event.event.type === "upsert",
+    ).length,
+    parentToolCalls: events.filter(
+      (event) => event.type === "timeline" && event.item.type === "tool_call",
+    ).length,
+  };
 }
 
 describe("Codex app-server provider", () => {
@@ -4046,6 +4117,139 @@ describe("Codex app-server provider", () => {
     });
   });
 
+  test("coalesces deltas into few rows and broadcasts with identical final text", () => {
+    const { session, events } = startStreamingChild();
+    const [reasoning, message] = streamDeltas(session, 500).split("|");
+    asInternals(session).handleNotification("turn/completed", {
+      threadId: COALESCE_CHILD,
+      turn: { status: "completed" },
+    });
+
+    const items = childTimeline(events);
+    expect(joinedText(items, "reasoning")).toBe(reasoning);
+    expect(joinedText(items, "assistant_message")).toBe(message);
+    const counts = countSubagentTraffic(events);
+    expect(counts.childRows).toBeLessThanOrEqual(3);
+    expect(counts.upserts).toBeLessThanOrEqual(3);
+    expect(counts.parentToolCalls).toBeLessThanOrEqual(4);
+    expect(events.at(-1)).toMatchObject({
+      type: "timeline",
+      item: {
+        callId: "spawn-coalesce-child",
+        status: "completed",
+        detail: { type: "sub_agent", log: expect.stringContaining("m499") },
+      },
+    });
+  });
+
+  test("sends buffered text before an interrupted child turn settles", () => {
+    const { session, events } = startStreamingChild();
+    const [, message] = streamDeltas(session, 50).split("|");
+    asInternals(session).handleNotification("turn/completed", {
+      threadId: COALESCE_CHILD,
+      turn: { status: "interrupted" },
+    });
+
+    expect(joinedText(childTimeline(events), "assistant_message")).toBe(message);
+    const lastRowIndex = events.findLastIndex(
+      (event) => event.type === "provider_subagent" && event.event.type === "timeline",
+    );
+    const canceledIndex = events.findIndex(
+      (event) =>
+        event.type === "provider_subagent" &&
+        event.event.type === "upsert" &&
+        event.event.status === "canceled",
+    );
+    expect(canceledIndex).toBeGreaterThan(lastRowIndex);
+  });
+
+  test("keeps buffered text ahead of a later child tool call", () => {
+    const { session, events } = startStreamingChild();
+    streamDeltas(session, 5);
+    asInternals(session).handleNotification("item/started", {
+      threadId: COALESCE_CHILD,
+      item: {
+        type: "commandExecution",
+        id: "child-command",
+        status: "inProgress",
+        command: "ls",
+      },
+    });
+
+    expect(childTimeline(events).map((item) => item.type)).toEqual([
+      "reasoning",
+      "reasoning",
+      "assistant_message",
+      "tool_call",
+    ]);
+    expect(joinedText(childTimeline(events), "assistant_message")).toBe("m0 m1 m2 m3 m4 ");
+  });
+
+  test("keeps replayed early text ahead of a replayed tool call", () => {
+    const session = createSession();
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    for (const delta of ["early ", "text ", "here"]) {
+      asInternals(session).handleNotification("item/agentMessage/delta", {
+        threadId: COALESCE_CHILD,
+        itemId: "early-message",
+        delta,
+      });
+    }
+    asInternals(session).handleNotification("item/started", {
+      threadId: COALESCE_CHILD,
+      item: {
+        type: "commandExecution",
+        id: "early-command",
+        status: "inProgress",
+        command: "ls",
+      },
+    });
+    asInternals(session).handleNotification("item/completed", {
+      threadId: "test-thread",
+      item: {
+        type: "subAgentActivity",
+        id: "spawn-coalesce-child",
+        kind: "started",
+        agentThreadId: COALESCE_CHILD,
+        agentPath: "/root/coalesce",
+      },
+    });
+
+    const items = childTimeline(events);
+    expect(items.map((item) => item.type)).toEqual([
+      "assistant_message",
+      "assistant_message",
+      "tool_call",
+    ]);
+    expect(joinedText(items, "assistant_message")).toBe("early text here");
+  });
+
+  test("flushes buffered text after the coalescing window and on close", async () => {
+    vi.useFakeTimers();
+    try {
+      const { session, events } = startStreamingChild();
+      streamDeltas(session, 3);
+      vi.advanceTimersByTime(100);
+      expect(joinedText(childTimeline(events), "assistant_message")).toBe("m0 m1 m2 ");
+
+      asInternals(session).handleNotification("item/agentMessage/delta", {
+        threadId: COALESCE_CHILD,
+        itemId: "child-message",
+        delta: "tail",
+      });
+      asInternals(session).handleNotification("item/agentMessage/delta", {
+        threadId: COALESCE_CHILD,
+        itemId: "child-message",
+        delta: " end",
+      });
+      await session.close();
+      expect(joinedText(childTimeline(events), "assistant_message")).toBe("m0 m1 m2 tail end");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("keeps a nested child under its spawning parent after a root interaction", () => {
     const session = createSession();
     const events: AgentStreamEvent[] = [];
@@ -4097,10 +4301,10 @@ describe("Codex app-server provider", () => {
         ? [event.event]
         : [],
     );
-    expect(grandchildUpserts.map((event) => event.parentSubagentId)).toEqual([
-      "child-thread-root",
-      "child-thread-root",
-    ]);
+    expect(grandchildUpserts.length).toBeGreaterThan(0);
+    expect(grandchildUpserts.every((event) => event.parentSubagentId === "child-thread-root")).toBe(
+      true,
+    );
     expect(events.at(-1)).toMatchObject({
       type: "timeline",
       item: {

@@ -62,18 +62,20 @@ test("projects Codex child history and confines old-client degradation to the ch
     await expect
       .poll(() => ctx.daemon.daemon.agentManager.listProviderSubagents(agent.id).length)
       .toBe(1);
+    // Child deltas are coalesced — row count varies, so wait on the text.
     await expect
-      .poll(
-        () =>
-          ctx.daemon.daemon.agentManager.fetchProviderSubagentTimeline(agent.id, "child-thread")
-            .window.maxSeq,
+      .poll(() =>
+        ctx.daemon.daemon.agentManager
+          .fetchProviderSubagentTimeline(agent.id, "child-thread")
+          .rows.map((row) => (row.item.type === "assistant_message" ? row.item.text : ""))
+          .join(""),
       )
-      .toBe(3);
+      .toBe("ABC");
     const child = await ctx.client.fetchProviderSubagentTimeline(agent.id, "child-thread", {
       limit: 1,
     });
     expect(child.projection).toBe("projected");
-    expect(child.rows).toMatchObject([{ seqStart: 1, seqEnd: 3, item: { text: "ABC" } }]);
+    expect(child.rows).toMatchObject([{ seqStart: 1, item: { text: "ABC" } }]);
     const catchUp = await ctx.client.fetchProviderSubagentTimeline(agent.id, "child-thread", {
       direction: "after",
       cursor: { epoch: child.epoch, seq: 1 },
