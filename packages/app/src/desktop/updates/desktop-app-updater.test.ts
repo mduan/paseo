@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { i18n, loadI18nLocale } from "@/i18n/i18next";
+import { i18n } from "@/i18n/i18next";
 import {
   createDesktopAppUpdater,
   formatStatusText,
@@ -463,7 +463,6 @@ describe("formatStatusText", () => {
   });
 
   it("uses the active app language for local status wrappers", async () => {
-    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     try {
       expect(

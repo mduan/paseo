@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DesktopHostBridge } from "@/desktop/host";
-import { i18n, loadI18nLocale } from "@/i18n/i18next";
+import { i18n } from "@/i18n/i18next";
 import {
   createDesktopPermissions,
   type DesktopPermissionEnvironment,
@@ -183,7 +183,6 @@ describe("desktop-permissions", () => {
   });
 
   it("uses the active app language for local status details", async () => {
-    await loadI18nLocale("zh-CN");
     await i18n.changeLanguage("zh-CN");
     try {
       const permissions = createDesktopPermissions(

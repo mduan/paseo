@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createInstance } from "i18next";
-import { i18n, isI18nLocaleLoaded, loadI18nLocale } from "./i18next";
 import { ar } from "./resources/ar";
 import { en } from "./resources/en";
 import { es } from "./resources/es";
@@ -106,24 +105,6 @@ function findUntranslatedConnectionErrors(): string[] {
 }
 
 describe("translation resources", () => {
-  it.each([
-    { locale: "ar", resource: ar },
-    { locale: "es", resource: es },
-    { locale: "fr", resource: fr },
-    { locale: "ja", resource: ja },
-    { locale: "ko", resource: ko },
-    { locale: "pt-BR", resource: ptBR },
-    { locale: "ru", resource: ru },
-    { locale: "zh-CN", resource: zhCN },
-  ] as const)("loads $locale on demand", async ({ locale, resource }) => {
-    expect(isI18nLocaleLoaded(locale)).toBe(false);
-
-    await loadI18nLocale(locale);
-
-    expect(isI18nLocaleLoaded(locale)).toBe(true);
-    expect(i18n.getResourceBundle(locale, "translation")).toEqual(resource);
-  });
-
   it.each([en, ar, es, fr, ja, ko, ptBR, ru, zhCN])(
     "renders panel headers and metadata lists without untranslated placeholders",
     async (resource) => {
