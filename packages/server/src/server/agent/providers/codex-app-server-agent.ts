@@ -3496,7 +3496,7 @@ interface CodexSubAgentCallState {
   childItemOrder: string[];
   childItems: Map<string, AgentTimelineItem>;
   childThreadIds: Set<string>;
-  lastUpsertByThreadId: Map<string, string>;
+  lastUpsertKeyByThreadId: Map<string, string>;
 }
 
 /** What a child thread's subtitle reports. Codex reports tokens per thread but no cost. */
@@ -5801,7 +5801,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         childItemOrder: [],
         childItems: new Map<string, AgentTimelineItem>(),
         childThreadIds: new Set<string>(),
-        lastUpsertByThreadId: new Map<string, string>(),
+        lastUpsertKeyByThreadId: new Map<string, string>(),
       } satisfies CodexSubAgentCallState);
 
     state.toolCall = {
@@ -6055,8 +6055,8 @@ export class CodexAppServerAgentSession implements AgentSession {
     };
     // Skip unchanged descriptors — each upsert rebuilds the workspace descriptor in every session.
     const key = JSON.stringify(event);
-    if (state.lastUpsertByThreadId.get(childThreadId) === key) return;
-    state.lastUpsertByThreadId.set(childThreadId, key);
+    if (state.lastUpsertKeyByThreadId.get(childThreadId) === key) return;
+    state.lastUpsertKeyByThreadId.set(childThreadId, key);
     this.emitEvent({ type: "provider_subagent", provider: CODEX_PROVIDER, event });
   }
 
