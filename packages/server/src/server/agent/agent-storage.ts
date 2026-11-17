@@ -112,11 +112,17 @@ export function parseStoredAgentRecord(value: unknown): StoredAgentRecord {
   return STORED_AGENT_SCHEMA.parse(value);
 }
 
+interface QueuedSnapshot {
+  agent: ManagedAgent;
+  write?: Promise<void>;
+}
+
 export class AgentStorage {
   private cache: Map<string, StoredAgentRecord> = new Map();
   private pathById: Map<string, string> = new Map();
   private pathsById: Map<string, Set<string>> = new Map();
   private pendingWrites: Map<string, Promise<void>> = new Map();
+  private queuedSnapshots: Map<string, QueuedSnapshot> = new Map();
   private deleting: Set<string> = new Set();
   private daemonAgentIdsByExecution: Map<string, string> = new Map();
   private daemonExecutionKeysByAgentId: Map<string, string> = new Map();
@@ -180,9 +186,11 @@ export class AgentStorage {
   private queueRecordMutation(
     agentId: string,
     mutate: (existing: StoredAgentRecord | null) => StoredAgentRecord,
+    onStart?: () => void,
   ): Promise<void> {
     const prev = this.pendingWrites.get(agentId) ?? Promise.resolve();
     const next = prev.then(async () => {
+      onStart?.();
       if (this.deleting.has(agentId)) {
         return undefined;
       }
@@ -260,27 +268,62 @@ export class AgentStorage {
     options?: { title?: string | null; internal?: boolean },
   ): Promise<void> {
     await this.load();
+    if (options) {
+      await this.queueSnapshotWrite(agent.id, () => agent, options);
+      return;
+    }
+    // Plain snapshots read the live agent when the write starts, so a snapshot that is
+    // still waiting in the queue already covers this one. Only join it while it is the
+    // newest queued mutation, so later deletes and archives keep their order.
+    const queued = this.queuedSnapshots.get(agent.id);
+    if (queued?.write && this.pendingWrites.get(agent.id) === queued.write) {
+      queued.agent = agent;
+      await queued.write;
+      return;
+    }
+    const entry: QueuedSnapshot = { agent };
+    const release = () => {
+      if (this.queuedSnapshots.get(agent.id) === entry) this.queuedSnapshots.delete(agent.id);
+    };
+    this.queuedSnapshots.set(agent.id, entry);
+    entry.write = this.queueSnapshotWrite(agent.id, () => entry.agent, undefined, release);
+    await entry.write.finally(release);
+  }
+
+  private queueSnapshotWrite(
+    agentId: string,
+    getAgent: () => ManagedAgent,
+    options: { title?: string | null; internal?: boolean } | undefined,
+    onStart?: () => void,
+  ): Promise<void> {
     const hasTitleOverride =
       options !== undefined && Object.prototype.hasOwnProperty.call(options, "title");
     const hasInternalOverride =
       options !== undefined && Object.prototype.hasOwnProperty.call(options, "internal");
-    await this.queueRecordMutation(agent.id, (existing) => {
-      const record = toStoredAgentRecord(agent, {
-        title: hasTitleOverride ? (options?.title ?? null) : (existing?.title ?? null),
-        createdAt: existing?.createdAt,
-        internal: hasInternalOverride ? options?.internal : (agent.internal ?? existing?.internal),
-      });
-      // A resumed agent has no preview until its timeline hydrates; keep the stored one.
-      record.lastAssistantPreview ??= existing?.lastAssistantPreview;
+    return this.queueRecordMutation(
+      agentId,
+      (existing) => {
+        const agent = getAgent();
+        const record = toStoredAgentRecord(agent, {
+          title: hasTitleOverride ? (options?.title ?? null) : (existing?.title ?? null),
+          createdAt: existing?.createdAt,
+          internal: hasInternalOverride
+            ? options?.internal
+            : (agent.internal ?? existing?.internal),
+        });
+        // A resumed agent has no preview until its timeline hydrates; keep the stored one.
+        record.lastAssistantPreview ??= existing?.lastAssistantPreview;
 
-      // Preserve soft-delete/archive status across snapshot flushes. The
-      // projection runs inside the per-agent write queue so it cannot commit a
-      // stale pre-archive record after the archive mutation.
-      if (existing && existing.archivedAt !== undefined) {
-        record.archivedAt = existing.archivedAt;
-      }
-      return record;
-    });
+        // Preserve soft-delete/archive status across snapshot flushes. The
+        // projection runs inside the per-agent write queue so it cannot commit a
+        // stale pre-archive record after the archive mutation.
+        if (existing && existing.archivedAt !== undefined) {
+          record.archivedAt = existing.archivedAt;
+        }
+        return record;
+      },
+      onStart,
+    );
   }
 
   async setTitle(agentId: string, title: string): Promise<void> {

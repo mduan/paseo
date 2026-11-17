@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "vitest";
+import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
 import os from "node:os";
 import path from "node:path";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
@@ -393,6 +393,39 @@ describe("AgentStorage", () => {
     const record = await storage.get(agentId);
     expect(record?.title).toBe("Generated title");
     expect(record?.archivedAt).toBe("2025-01-03T00:00:00.000Z");
+  });
+
+  test("coalesces queued snapshot writes and persists the latest state", async () => {
+    const agentId = "agent-coalesced";
+    await storage.applySnapshot(createManagedAgent({ id: agentId }));
+
+    let releasePendingWrite: (() => void) | null = null;
+    const pendingWrite = new Promise<void>((resolve) => {
+      releasePendingWrite = resolve;
+    });
+    const storageInternals = storage as unknown as {
+      pendingWrites: Map<string, Promise<void>>;
+      writeRecord: (record: unknown) => Promise<void>;
+    };
+    storageInternals.pendingWrites.set(agentId, pendingWrite);
+    const writeRecord = vi.spyOn(storageInternals, "writeRecord");
+
+    const snapshots = [1, 2, 3, 4, 5].map((day) =>
+      storage.applySnapshot(
+        createManagedAgent({
+          id: agentId,
+          lifecycle: "running",
+          updatedAt: new Date(`2025-01-0${day}T00:00:00.000Z`),
+        }),
+      ),
+    );
+    releasePendingWrite?.();
+    await Promise.all(snapshots);
+
+    expect(writeRecord).toHaveBeenCalledTimes(1);
+    const reloaded = new AgentStorage(storagePath, logger);
+    const record = await reloaded.get(agentId);
+    expect(record?.updatedAt).toBe("2025-01-05T00:00:00.000Z");
   });
 
   test("list returns all agents including internal ones", async () => {
