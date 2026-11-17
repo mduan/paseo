@@ -134,7 +134,6 @@ export function BaseRefSwitcher({
   );
 }
 
-/** Tooltip body for a truncated branch label: what the branch is, then its full name. */
 export function BranchTooltipText({ title, name }: { title: string; name: string }) {
   return (
     <View>
