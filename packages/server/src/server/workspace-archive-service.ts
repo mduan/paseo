@@ -74,6 +74,8 @@ export interface ArchiveResult {
 export interface ArchiveByScopeRequest {
   scope: ArchiveScope;
   requestId: string;
+  // Runs once records are archived, before teardown and worktree removal, which can take minutes.
+  onRecordsArchived?: () => void;
 }
 
 class WorktreeStillReferencedError extends Error {
@@ -158,6 +160,7 @@ async function archiveByScopeWithPriority(
       targetWorkspaceIds,
       request.requestId,
     );
+    request.onRecordsArchived?.();
 
     if (target.backing?.mainRepoRoot) {
       try {
