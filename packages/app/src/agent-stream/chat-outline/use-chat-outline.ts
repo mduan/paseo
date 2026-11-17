@@ -62,18 +62,19 @@ export function useChatOutline({
   const readingSeqRef = useRef<number | null>(null);
   const nextJumpRequestIdRef = useRef(0);
   const nextIndexRequestIdRef = useRef(0);
-  const loadedItems = useMemo(() => [...tail, ...(head ?? NO_STREAM_ITEMS)], [head, tail]);
   const prompts = enabled ? (index?.prompts ?? NO_PROMPTS) : NO_PROMPTS;
+  const indexable = isWeb && enabled && timelineEpoch !== null;
 
   // The viewed timeline already owns live delivery and reconnect catch-up. Its complete
   // loaded items (including rows outside the mounted window) invalidate the prompt index.
-  const latestPromptSeq = loadedItems.reduce(
-    (latest, item) =>
-      item.kind === "user_message" && item.timelineCursor?.epoch === timelineEpoch
-        ? Math.max(latest, item.timelineCursor.seq)
-        : latest,
-    -1,
+  // The head changes on every streamed chunk, so only it is rescanned; the tail scan is memoized.
+  const tailPromptSeq = useMemo(
+    () => (indexable ? findLatestPromptSeq(tail, timelineEpoch) : -1),
+    [indexable, tail, timelineEpoch],
   );
+  const latestPromptSeq = indexable
+    ? Math.max(tailPromptSeq, findLatestPromptSeq(head ?? NO_STREAM_ITEMS, timelineEpoch))
+    : -1;
 
   useEffect(() => setIndex(null), [agentId, enabled, serverId, timelineEpoch]);
 
@@ -135,7 +136,7 @@ export function useChatOutline({
 
   useEffect(() => {
     if (pendingJump === null) return;
-    const target = loadedItems.find((item) => item.timelineCursor?.seq === pendingJump.seq);
+    const target = findLoadedItemBySeq({ tail, head, seq: pendingJump.seq });
     if (target) {
       if (pendingJump.hasScrolled) return;
       if (visibleMessageIds?.has(target.id) === false) {
@@ -150,13 +151,13 @@ export function useChatOutline({
       return;
     }
     if (pendingJump.fetchSettled) setPendingJump(null);
-  }, [loadedItems, pendingJump, revealLoadedMessage, viewportRef, visibleMessageIds]);
+  }, [head, pendingJump, revealLoadedMessage, tail, viewportRef, visibleMessageIds]);
 
   const jumpToPrompt = useCallback(
     (seq: number) => {
       nextJumpRequestIdRef.current += 1;
       setPendingJump(null);
-      const loaded = loadedItems.find((item) => item.timelineCursor?.seq === seq);
+      const loaded = findLoadedItemBySeq({ tail, head, seq });
       if (loaded) {
         if (revealLoadedMessage?.(loaded.id)) {
           const requestId = nextJumpRequestIdRef.current;
@@ -182,8 +183,31 @@ export function useChatOutline({
           });
         });
     },
-    [agentId, index, loadedItems, onJumpError, revealLoadedMessage, serverId, viewportRef],
+    [agentId, head, index, onJumpError, revealLoadedMessage, serverId, tail, viewportRef],
   );
 
   return { prompts, activePrompt, jumpToPrompt, reportReadingPosition };
+}
+
+function findLatestPromptSeq(items: StreamItem[], timelineEpoch: string | null): number {
+  let latest = -1;
+  for (const item of items) {
+    if (item.kind === "user_message" && item.timelineCursor?.epoch === timelineEpoch) {
+      latest = Math.max(latest, item.timelineCursor.seq);
+    }
+  }
+  return latest;
+}
+
+function findLoadedItemBySeq({
+  tail,
+  head,
+  seq,
+}: {
+  tail: StreamItem[];
+  head: StreamItem[] | undefined;
+  seq: number;
+}): StreamItem | undefined {
+  const matches = (item: StreamItem) => item.timelineCursor?.seq === seq;
+  return tail.find(matches) ?? head?.find(matches);
 }
