@@ -4250,6 +4250,63 @@ describe("Codex app-server provider", () => {
     }
   });
 
+  test.each(["interrupted", "completed"])(
+    "keeps child streamed text intact across an %s root turn",
+    (status) => {
+      const { session, events } = startStreamingChild();
+      const sendChildDelta = (delta: string) =>
+        asInternals(session).handleNotification("item/agentMessage/delta", {
+          threadId: COALESCE_CHILD,
+          itemId: "child-message",
+          delta,
+        });
+      const finalText = "Before the root turn ended. After it ended.";
+      sendChildDelta("Before the root turn ended. ");
+      asInternals(session).handleNotification("turn/completed", {
+        threadId: "test-thread",
+        turn: { status },
+      });
+      sendChildDelta("After it ended.");
+      asInternals(session).handleNotification("item/completed", {
+        threadId: COALESCE_CHILD,
+        item: { type: "agentMessage", id: "child-message", text: finalText },
+      });
+
+      expect(joinedText(childTimeline(events), "assistant_message")).toBe(finalText);
+      const parentToolCall = events.findLast(
+        (event) => event.type === "timeline" && event.item.type === "tool_call",
+      );
+      expect(parentToolCall).toMatchObject({
+        item: {
+          callId: "spawn-coalesce-child",
+          detail: { type: "sub_agent", log: expect.stringContaining(finalText) },
+        },
+      });
+    },
+  );
+
+  test("drops root streamed text when the root turn ends", () => {
+    const session = createSession();
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    asInternals(session).handleNotification("item/agentMessage/delta", {
+      itemId: "root-message",
+      delta: "Hel",
+    });
+    asInternals(session).handleNotification("turn/completed", {
+      threadId: "test-thread",
+      turn: { status: "interrupted" },
+    });
+    asInternals(session).handleNotification("item/completed", {
+      item: { id: "root-message", type: "agentMessage", text: "Hello" },
+    });
+
+    expect(events.at(-1)).toMatchObject({
+      type: "timeline",
+      item: { type: "assistant_message", text: "Hello" },
+    });
+  });
+
   test("keeps a nested child under its spawning parent after a root interaction", () => {
     const session = createSession();
     const events: AgentStreamEvent[] = [];
