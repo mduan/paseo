@@ -52,10 +52,7 @@ export interface DiffComparisonRefs {
   to: DiffRef;
 }
 
-/**
- * Renders `children` unless the diff is very large, which usually means a wrong base or
- * generated output. Then it asks first, and shows the diff once per comparison.
- */
+/** Asks before rendering a very large diff; stays open until `comparisonKey` changes. */
 export function LargeDiffGate({
   files,
   comparisonKey,
