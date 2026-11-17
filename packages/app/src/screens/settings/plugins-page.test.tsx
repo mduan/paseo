@@ -71,6 +71,7 @@ vi.mock("react-native-reanimated", () => ({
     value >= 1 ? output[1] : output[0],
   useAnimatedStyle: (factory: () => unknown) => factory(),
   useDerivedValue: (factory: () => unknown) => ({ value: factory() }),
+  makeMutable: (value: unknown) => ({ value }),
   withTiming: (value: unknown) => value,
 }));
 

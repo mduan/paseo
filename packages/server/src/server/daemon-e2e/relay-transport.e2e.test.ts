@@ -184,7 +184,7 @@ async function waitForCapturedLog(
   let relayProcess: ChildProcess | null = null;
   let relayStdoutLines: string[] = [];
 
-  const startRelay = async (options: { useLocalRelay?: boolean } = {}) => {
+  const startRelay = async () => {
     relayStdoutLines = [];
     relayPort = await getAvailablePort();
     const relayDir = path.resolve(process.cwd(), "../relay");
@@ -198,10 +198,9 @@ async function waitForCapturedLog(
       String(relayPort),
       "--live-reload=false",
       "--show-interactive-dev-session=false",
+      "--var",
+      "PASEO_RELAY_UPSTREAM:",
     ];
-    if (options.useLocalRelay) {
-      relayArgs.push("--var", "PASEO_RELAY_UPSTREAM:");
-    }
     relayProcess = spawn("npx", relayArgs, {
       cwd: relayDir,
       env: { ...process.env },
@@ -386,7 +385,7 @@ async function waitForCapturedLog(
     process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
-    await startRelay({ useLocalRelay: true });
+    await startRelay();
 
     const daemon = await createTestPaseoDaemon({
       listen: "127.0.0.1",
