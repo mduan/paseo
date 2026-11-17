@@ -1877,7 +1877,8 @@ const styles = StyleSheet.create((theme) => ({
   changesToolbarDivider: {
     width: 1,
     height: 16,
-    marginHorizontal: theme.spacing[1],
+    // No right margin: the branch label's own horizontal padding supplies it.
+    marginLeft: theme.spacing[1],
     backgroundColor: theme.colors.border,
   },
   changesToolbarModeMenu: {
