@@ -3485,6 +3485,16 @@ function buildCodexCustomProviderConfig(
   };
 }
 
+/** Streamed text per Codex item id, used to reconcile deltas with the completed item. */
+interface CodexStreamedText {
+  agentMessages: Map<string, string>;
+  reasoning: Map<string, string>;
+}
+
+function createCodexStreamedText(): CodexStreamedText {
+  return { agentMessages: new Map(), reasoning: new Map() };
+}
+
 interface CodexSubAgentCallState {
   callId: string;
   toolCall: ToolCallTimelineItem;
@@ -3572,8 +3582,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   private mcpElicitationPermissionIds = new Map<number, string>();
   private pendingPermissionHandlers = new Map<string, CodexPendingPermissionHandler>();
   private resolvedPermissionRequests = new Set<string>();
-  private pendingAgentMessages = new Map<string, string>();
-  private pendingReasoning = new Map<string, string>();
+  private rootStreamedText = createCodexStreamedText();
+  // Child threads outlive root turns, so a root turn reset must not clear their text.
+  private subAgentStreamedTextByThreadId = new Map<string, CodexStreamedText>();
   // Keyed by child thread id; flushed before any non-delta dispatch (replays too) to keep order.
   private readonly subAgentTextCoalescer = new AgentStreamCoalescer({
     timers: { setTimeout, clearTimeout },
@@ -4095,6 +4106,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     this.subAgentCallsByCallId.clear();
     this.subAgentCallIdByChildThreadId.clear();
     this.subAgentUsageByThreadId.clear();
+    this.subAgentStreamedTextByThreadId.clear();
     this.pendingSubAgentNotificationsByThreadId.clear();
     this.persistedProviderSubagentEvents = [];
     this.loadingPersistedHistory = true;
@@ -5776,6 +5788,16 @@ export class CodexAppServerAgentSession implements AgentSession {
     return this.subAgentCallIdByChildThreadId.get(threadId) ?? null;
   }
 
+  private getStreamedText(threadId: string | null | undefined): CodexStreamedText {
+    if (!threadId || !this.getSubAgentCallIdForThread(threadId)) return this.rootStreamedText;
+    let streamed = this.subAgentStreamedTextByThreadId.get(threadId);
+    if (!streamed) {
+      streamed = createCodexStreamedText();
+      this.subAgentStreamedTextByThreadId.set(threadId, streamed);
+    }
+    return streamed;
+  }
+
   private registerSubAgentToolCall(params: {
     timelineItem: ToolCallTimelineItem;
     rawItem: { [key: string]: unknown };
@@ -6083,8 +6105,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   ): void {
     const itemId = parsed.item.id;
     if (!parsed.threadId) return;
+    const streamed = this.getStreamedText(parsed.threadId);
     if (timelineItem.type === "assistant_message" && itemId) {
-      const streamedText = this.pendingAgentMessages.get(itemId);
+      const streamedText = streamed.agentMessages.get(itemId);
       if (streamedText !== undefined) {
         const suffix = this.buildMissingFinalTextSuffix(timelineItem, streamedText);
         if (suffix) this.emitProviderSubagentTimeline(parsed.threadId, suffix);
@@ -6092,7 +6115,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       }
     }
     if (timelineItem.type === "reasoning" && itemId) {
-      const streamedText = this.pendingReasoning.get(itemId);
+      const streamedText = streamed.reasoning.get(itemId);
       if (streamedText !== undefined) {
         const suffix = this.buildMissingFinalTextSuffix(timelineItem, streamedText);
         if (suffix) this.emitProviderSubagentTimeline(parsed.threadId, suffix);
@@ -6123,16 +6146,19 @@ export class CodexAppServerAgentSession implements AgentSession {
     }
   }
 
-  private handleSubAgentChildItemCompleted(
-    callId: string,
-    itemId: string | undefined,
-    timelineItem: AgentTimelineItem,
-  ): void {
-    this.applyBufferedDeltaTextToTimelineItem(timelineItem, itemId);
+  private handleSubAgentChildItemCompleted(params: {
+    callId: string;
+    childThreadId: string | null;
+    itemId: string | undefined;
+    timelineItem: AgentTimelineItem;
+  }): void {
+    const { callId, childThreadId, itemId, timelineItem } = params;
+    const streamed = this.getStreamedText(childThreadId);
+    this.applyBufferedDeltaTextToTimelineItem(timelineItem, itemId, streamed);
     if (itemId) {
       this.upsertSubAgentChildItem(callId, itemId, timelineItem);
-      this.pendingAgentMessages.delete(itemId);
-      this.pendingReasoning.delete(itemId);
+      streamed.agentMessages.delete(itemId);
+      streamed.reasoning.delete(itemId);
       this.pendingCommandOutputDeltas.delete(itemId);
       this.pendingFileChangeOutputDeltas.delete(itemId);
     }
@@ -6172,9 +6198,10 @@ export class CodexAppServerAgentSession implements AgentSession {
     routedSubAgentCallId: string | null = null,
   ): void {
     if (parsed.kind === "agent_message_delta") {
-      const prev = this.pendingAgentMessages.get(parsed.itemId) ?? "";
+      const { agentMessages } = this.getStreamedText(parsed.threadId);
+      const prev = agentMessages.get(parsed.itemId) ?? "";
       const text = prev + parsed.delta;
-      this.pendingAgentMessages.set(parsed.itemId, text);
+      agentMessages.set(parsed.itemId, text);
       const subAgentCallId = this.getSubAgentCallIdForThread(parsed.threadId);
       if (subAgentCallId) {
         this.upsertSubAgentChildItem(subAgentCallId, parsed.itemId, {
@@ -6208,8 +6235,9 @@ export class CodexAppServerAgentSession implements AgentSession {
       return;
     }
     if (parsed.kind === "reasoning_delta") {
-      const text = (this.pendingReasoning.get(parsed.itemId) ?? "") + parsed.delta;
-      this.pendingReasoning.set(parsed.itemId, text);
+      const { reasoning } = this.getStreamedText(parsed.threadId);
+      const text = (reasoning.get(parsed.itemId) ?? "") + parsed.delta;
+      reasoning.set(parsed.itemId, text);
       const subAgentCallId = this.getSubAgentCallIdForThread(parsed.threadId);
       if (subAgentCallId) {
         this.upsertSubAgentChildItem(subAgentCallId, parsed.itemId, { type: "reasoning", text });
@@ -6298,6 +6326,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       } else if (parsed.status === "interrupted") {
         status = "canceled";
       }
+      if (parsed.threadId) this.subAgentStreamedTextByThreadId.delete(parsed.threadId);
       this.emitSubAgentActivityUpdate(subAgentCallId, status);
       return;
     }
@@ -6339,8 +6368,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     this.emittedProviderSubagentUserMessageKeys.clear();
     this.emittedExecCommandStartedCallIds.clear();
     this.emittedExecCommandCompletedCallIds.clear();
-    this.pendingAgentMessages.clear();
-    this.pendingReasoning.clear();
+    this.rootStreamedText = createCodexStreamedText();
     this.pendingCommandOutputDeltas.clear();
     this.pendingFileChangeOutputDeltas.clear();
     this.pendingAssistantMessageBoundary = false;
@@ -6887,7 +6915,12 @@ export class CodexAppServerAgentSession implements AgentSession {
     const imageItems = mcpToolResultImagesToTimeline(parsed.item);
     if (childSubAgentCallId) {
       this.emitCompletedProviderSubagentItem(parsed, timelineItem);
-      this.handleSubAgentChildItemCompleted(childSubAgentCallId, parsed.item.id, timelineItem);
+      this.handleSubAgentChildItemCompleted({
+        callId: childSubAgentCallId,
+        childThreadId: parsed.threadId,
+        itemId: parsed.item.id,
+        timelineItem,
+      });
       this.emitProviderSubagentTimelineItems(parsed.threadId, imageItems);
       this.replayPendingSubAgentNotifications(registeredChildThreadIds);
       return;
@@ -6911,7 +6944,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       this.replayPendingSubAgentNotifications(registeredChildThreadIds);
       return;
     }
-    this.applyBufferedDeltaTextToTimelineItem(timelineItem, itemId);
+    this.applyBufferedDeltaTextToTimelineItem(timelineItem, itemId, this.rootStreamedText);
     if (timelineItem.type === "tool_call") {
       if (timelineItem.detail.type === "plan") {
         this.rememberPlanResult(timelineItem);
@@ -6947,15 +6980,16 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (!itemId) {
       return false;
     }
-    if (timelineItem.type === "assistant_message" && this.pendingAgentMessages.has(itemId)) {
-      const streamedText = this.pendingAgentMessages.get(itemId) ?? "";
-      this.pendingAgentMessages.delete(itemId);
+    const { agentMessages, reasoning } = this.rootStreamedText;
+    if (timelineItem.type === "assistant_message" && agentMessages.has(itemId)) {
+      const streamedText = agentMessages.get(itemId) ?? "";
+      agentMessages.delete(itemId);
       this.emitMissingFinalTextSuffix(timelineItem, streamedText);
       return true;
     }
-    if (timelineItem.type === "reasoning" && this.pendingReasoning.has(itemId)) {
-      const streamedText = this.pendingReasoning.get(itemId) ?? "";
-      this.pendingReasoning.delete(itemId);
+    if (timelineItem.type === "reasoning" && reasoning.has(itemId)) {
+      const streamedText = reasoning.get(itemId) ?? "";
+      reasoning.delete(itemId);
       this.emitMissingFinalTextSuffix(timelineItem, streamedText);
       return true;
     }
@@ -6989,19 +7023,20 @@ export class CodexAppServerAgentSession implements AgentSession {
   private applyBufferedDeltaTextToTimelineItem(
     timelineItem: AgentTimelineItem,
     itemId: string | null | undefined,
+    streamed: CodexStreamedText,
   ): void {
     if (!itemId) {
       return;
     }
     if (timelineItem.type === "assistant_message") {
-      const buffered = this.pendingAgentMessages.get(itemId);
+      const buffered = streamed.agentMessages.get(itemId);
       if (buffered && buffered.length > 0) {
         if (!timelineItem.text.startsWith(buffered)) timelineItem.text = buffered;
       }
       return;
     }
     if (timelineItem.type === "reasoning") {
-      const buffered = this.pendingReasoning.get(itemId);
+      const buffered = streamed.reasoning.get(itemId);
       if (buffered && !timelineItem.text.startsWith(buffered)) timelineItem.text = buffered;
     }
   }
