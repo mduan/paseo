@@ -39,8 +39,7 @@ interface ActivityBuffers {
   thought: string;
 }
 
-// Same continuation rule as the app: a piece without an id, or with the previous id, continues
-// that message, so it is appended exactly. Trimming pieces would break lines mid-token.
+// App's continuation rule (no id or same id): append exactly — trimming breaks lines mid-token.
 function appendAssistantText(
   buffers: ActivityBuffers,
   item: Extract<AgentTimelineItem, { type: "assistant_message" }>,

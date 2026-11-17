@@ -94,8 +94,7 @@ describe("ClaudeAgentSession persisted history load", () => {
   });
 
   test("skips API request copies that Claude Code records in the transcript", async () => {
-    // Claude Code 2.1.2xx writes each API request body as `api-request-blob` entries. Their
-    // messages hold injected context (deferred-tool notices, MCP instructions, reminders).
+    // `api-request-blob` entries copy API request bodies, including injected context.
     const transcript = [
       { type: "user", uuid: "u1", message: { role: "user", content: "Write util.ts" } },
       {

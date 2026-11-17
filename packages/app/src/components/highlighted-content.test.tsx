@@ -25,8 +25,7 @@ afterEach(() => {
   container.remove();
 });
 
-// A line with no text collapses to zero height in the gutterless view, so it
-// must carry a placeholder character.
+// Gutterless rows have no minHeight — a blank line needs a placeholder to keep its height.
 it("keeps a placeholder in blank lines of the gutterless view", () => {
   const lines = highlightToKeyedLines("const a = 1;\n\nconst b = 2;", "ts");
   if (!lines) throw new Error("expected ts to highlight");

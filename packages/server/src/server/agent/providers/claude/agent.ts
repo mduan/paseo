@@ -6260,8 +6260,7 @@ function convertClaudeHistoryEntryPreamble(
     return { shortCircuit: [taskNotificationItem] };
   }
 
-  // Other entry types can carry a `message` too, such as `api-request-blob` copies of the API
-  // request with injected context. Only user and assistant entries are conversation.
+  // Only user/assistant entries are conversation — e.g. `api-request-blob` holds injected context.
   if ((entry.type !== "user" && entry.type !== "assistant") || entry.isCompactSummary) {
     return { shortCircuit: [] };
   }
