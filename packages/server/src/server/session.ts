@@ -25,6 +25,7 @@ import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-ca
 import { formatPluginSourceReference } from "@getpaseo/protocol/plugin-source-reference";
 import {
   serializeAgentStreamEvent,
+  serializeDispatchedAgentStreamEvent,
   type AgentSnapshotPayload,
   type AgentAttachment,
   type FirstAgentContext,
@@ -1345,6 +1346,23 @@ export class Session {
     return source ? this.supportsForSource(capability, source) : this.supports(capability);
   }
 
+  // Keep in sync with the recipients in forwardAgentStream; this may only over-report.
+  private hasAgentStreamRecipient(agentId: string): boolean {
+    for (const subscription of this.timelineSubscriptions.values()) {
+      if (subscription.agentIds.has(agentId)) return true;
+    }
+    // COMPAT(ownedSubscriptions): added in v0.8.0, remove implicit timeline delivery after 2027-03-09.
+    for (const [source, { capabilities }] of this.clientSources) {
+      if (!this.delivery.isModern(source) && !capabilities.has(CLIENT_CAPS.selectiveAgentTimeline))
+        return true;
+    }
+    return (
+      this.clientSources.size === 0 &&
+      !this.supports(CLIENT_CAPS.selectiveAgentTimeline) &&
+      this.timelineSubscriptions.size === 0
+    );
+  }
+
   private forwardAgentStream(
     event: Extract<AgentManagerEvent, { type: "agent_stream" }>,
     serializedEvent: Extract<SessionOutboundMessage, { type: "agent_stream" }>["payload"]["event"],
@@ -2016,7 +2034,16 @@ export class Session {
             });
         }
 
-        const serializedEvent = serializeAgentStreamEvent(event.event);
+        const streamEventType = event.event.type;
+        if (
+          streamEventType !== "attention_required" &&
+          streamEventType !== "permission_requested" &&
+          streamEventType !== "permission_resolved" &&
+          !this.hasAgentStreamRecipient(event.agentId)
+        ) {
+          return;
+        }
+        const serializedEvent = serializeDispatchedAgentStreamEvent(event);
         if (!serializedEvent) {
           return;
         }

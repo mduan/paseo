@@ -12,7 +12,7 @@ import type { AgentStorage, StoredAgentRecord } from "../agent/agent-storage.js"
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
 import { buildStoredAgentPayload } from "../agent/agent-projections.js";
-import { serializeAgentSnapshot, serializeAgentStreamEvent } from "../messages.js";
+import { serializeAgentSnapshot, serializeDispatchedAgentStreamEvent } from "../messages.js";
 import { daemonExecutionKey, type DaemonAgentOwner } from "../agent/agent-owner.js";
 
 export interface HubExecutionAgentCreateInput {
@@ -308,7 +308,7 @@ export class DaemonExecutions implements HubExecutionAgents {
     if (!this.isOwned(agent)) {
       return null;
     }
-    const serialized = serializeAgentStreamEvent(event.event);
+    const serialized = serializeDispatchedAgentStreamEvent(event);
     if (!serialized) {
       return null;
     }

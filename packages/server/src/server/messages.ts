@@ -37,3 +37,15 @@ export function serializeAgentStreamEvent(event: AgentStreamEvent): AgentStreamE
 
   return validateStreamEventPayload(event);
 }
+
+const serializedDispatches = new WeakMap<object, AgentStreamEventPayload | null>();
+
+// Keyed on AgentManager's per-dispatch envelope: one validation per event. Shared; do not mutate.
+export function serializeDispatchedAgentStreamEvent(dispatch: {
+  event: AgentStreamEvent;
+}): AgentStreamEventPayload | null {
+  if (!serializedDispatches.has(dispatch)) {
+    serializedDispatches.set(dispatch, serializeAgentStreamEvent(dispatch.event));
+  }
+  return serializedDispatches.get(dispatch) ?? null;
+}
