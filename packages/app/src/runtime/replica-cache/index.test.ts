@@ -667,6 +667,76 @@ describe("ReplicaCache", () => {
     expect((await cache.readTimeline(SERVER_ID, "agent-1"))?.items).toEqual([timelineItem("New")]);
   });
 
+  it.each([
+    { itemCount: 50, withOrchestratorCalls: false },
+    { itemCount: 50, withOrchestratorCalls: true },
+    { itemCount: 120, withOrchestratorCalls: false },
+    { itemCount: 120, withOrchestratorCalls: true },
+  ])(
+    "stores the newest 50 storable items of $itemCount (orchestrator calls: $withOrchestratorCalls)",
+    async ({ itemCount, withOrchestratorCalls }) => {
+      const orchestratorIndexes = withOrchestratorCalls
+        ? new Set([itemCount - 2, itemCount - 7, itemCount - 30])
+        : new Set<number>();
+      const items = Array.from({ length: itemCount }, (_, index): StreamItem => {
+        const shared = {
+          id: `item-${index}`,
+          timestamp: new Date(1000 + index),
+          timelineCursor: { epoch: "epoch-1", seq: index + 1 },
+        };
+        return orchestratorIndexes.has(index)
+          ? {
+              ...shared,
+              kind: "tool_call",
+              payload: {
+                source: "orchestrator",
+                data: {
+                  toolCallId: `call-${index}`,
+                  toolName: "tool",
+                  arguments: {},
+                  status: "completed",
+                },
+              },
+            }
+          : { ...shared, kind: "assistant_message", text: `Message ${index}` };
+      });
+      const range = { epoch: "epoch-1", startSeq: 1, endSeq: itemCount };
+
+      async function storedPayload(value: {
+        items: StreamItem[];
+        range: typeof range | null;
+        hasOlder: boolean;
+      }): Promise<string> {
+        const storage = new MemoryStorage();
+        const cache = createCache(storage);
+        cache.commitTimeline(SERVER_ID, "agent-1", { agentId: "agent-1", ...value });
+        await cache.flush();
+        return requireTimelineRow(storage).payload;
+      }
+
+      // The previous algorithm serialized every item, dropped the unstorable orchestrator calls,
+      // kept the last 50, and persisted coverage only for an untruncated, lossless timeline.
+      const storableItems = items.filter(
+        (item) => item.kind !== "tool_call" || item.payload.source === "agent",
+      );
+      const keepsCoverage = itemCount <= 50 && !withOrchestratorCalls;
+      const referenceItems = (
+        JSON.parse(
+          await storedPayload({ items: storableItems.slice(-50), range: null, hasOlder: false }),
+        ) as { items: unknown[] }
+      ).items;
+      const expected = JSON.stringify({
+        agentId: "agent-1",
+        items: referenceItems,
+        range: keepsCoverage ? range : null,
+        hasOlder: keepsCoverage,
+      });
+
+      expect(referenceItems).toHaveLength(Math.min(50, storableItems.length));
+      expect(await storedPayload({ items, range, hasOlder: true })).toBe(expected);
+    },
+  );
+
   it("round-trips plugin timeline items", async () => {
     const storage = new MemoryStorage();
     const writer = createCache(storage);

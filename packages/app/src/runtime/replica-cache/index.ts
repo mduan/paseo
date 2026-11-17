@@ -802,12 +802,25 @@ function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
   const canonicalItems = timeline.items.filter(
     (item) => item.kind !== "user_message" || !isUnreconciledLocalUserMessage(item),
   );
+  if (canonicalItems.length > MAX_TIMELINE_ITEMS) {
+    // Coverage can't be persisted for a truncated timeline, so only the newest storable items
+    // matter. Walk backwards so streaming persists don't serialize the whole loaded history.
+    const items: StoredTimelineItem[] = [];
+    for (
+      let index = canonicalItems.length - 1;
+      index >= 0 && items.length < MAX_TIMELINE_ITEMS;
+      index -= 1
+    ) {
+      const item = serializeTimelineItem(canonicalItems[index]);
+      if (item) items.push(item);
+    }
+    return { agentId: timeline.agentId, items: items.toReversed(), range: null, hasOlder: false };
+  }
   const items = canonicalItems.map(serializeTimelineItem).filter((item) => item !== null);
   const range = timeline.range;
   const canPersistCoverage =
     range !== null &&
     range.retainedRanges === undefined &&
-    canonicalItems.length <= MAX_TIMELINE_ITEMS &&
     items.length === canonicalItems.length &&
     canonicalItems.every(
       (item) =>
@@ -819,7 +832,7 @@ function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
     canonicalItems.some((item) => item.timelineCursor?.seq === range.endSeq);
   return {
     agentId: timeline.agentId,
-    items: items.slice(-MAX_TIMELINE_ITEMS),
+    items,
     range: canPersistCoverage
       ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq }
       : null,
