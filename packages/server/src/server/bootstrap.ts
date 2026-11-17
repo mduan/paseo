@@ -7,7 +7,6 @@ import { open, rm, stat } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { getHostName } from "./host-name.js";
 import path from "node:path";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Logger } from "pino";
 import { z } from "zod";
 import { createBranchChangeRouteHandler } from "./script-route-branch-handler.js";
@@ -136,7 +135,6 @@ import { TurnDiffStore } from "./agent/turn-diffs/store.js";
 import { attachAgentStoragePersistence } from "./persistence-hooks.js";
 import { attachWorkspaceResponseRecorder } from "./workspace-response-recorder.js";
 import { attachSuggestedNextActions, createSuggestionGenerator } from "./suggested-next-actions.js";
-import { createAgentMcpServer } from "./agent/mcp-server.js";
 import {
   createPaseoToolCatalog,
   type PaseoToolHostDependencies,
@@ -1488,6 +1486,11 @@ export async function createPaseoDaemon(
     const agentMcpRoute = "/mcp/agents";
 
     const createAgentMcpSession = async (callerAgentId?: string) => {
+      // The MCP SDK loads on the first agent MCP request instead of at daemon startup.
+      const [{ createAgentMcpServer }, { StreamableHTTPServerTransport }] = await Promise.all([
+        import("./agent/mcp-server.js"),
+        import("@modelcontextprotocol/sdk/server/streamableHttp.js"),
+      ]);
       const agentMcpServer = await createAgentMcpServer(
         createAgentToolHostDependencies({
           callerAgentId,
