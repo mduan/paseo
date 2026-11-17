@@ -552,6 +552,74 @@ describe("ScheduleService", () => {
     });
   });
 
+  test("keeps the newest 200 finished runs and still completes at maxRuns", async () => {
+    const service = createTickTestService();
+    const created = await service.create({
+      prompt: "Check status",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      runOnCreate: false,
+      maxRuns: 202,
+    });
+    const minute = (n: number) => new Date(Date.UTC(2026, 0, 1, 0, n)).toISOString();
+
+    for (let n = 1; n <= 201; n += 1) {
+      now = new Date(minute(n));
+      await service.tick();
+    }
+    const trimmed = await new ScheduleStore(join(tempDir, "schedules"), createTestLogger()).get(
+      created.id,
+    );
+    expect(trimmed).toMatchObject({ status: "active", finishedRunCount: 201 });
+    expect(trimmed?.runs).toHaveLength(200);
+    expect(trimmed?.runs[0]?.scheduledFor).toBe(minute(2));
+    expect(trimmed?.runs.at(-1)?.scheduledFor).toBe(minute(201));
+
+    now = new Date(minute(202));
+    await service.tick();
+    expect(await service.inspect(created.id)).toMatchObject({
+      status: "completed",
+      finishedRunCount: 202,
+    });
+  });
+
+  test("counts finished runs from run history for schedules saved without a run count", async () => {
+    const finishedRun = (id: string) => ({
+      id,
+      scheduledFor: now.toISOString(),
+      startedAt: now.toISOString(),
+      endedAt: now.toISOString(),
+      status: "succeeded" as const,
+      agentId: null,
+      output: "ok",
+      error: null,
+    });
+    const legacy = await new ScheduleStore(join(tempDir, "schedules"), createTestLogger()).create({
+      name: null,
+      prompt: "Saved before run counts",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      status: "active",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      nextRunAt: "2026-01-01T00:01:00.000Z",
+      lastRunAt: null,
+      pausedAt: null,
+      expiresAt: null,
+      maxRuns: 3,
+      runs: [finishedRun("run-1"), finishedRun("run-2")],
+    });
+    const service = createTickTestService();
+
+    now = new Date("2026-01-01T00:01:00.000Z");
+    await service.tick();
+
+    expect(await service.inspect(legacy.id)).toMatchObject({
+      status: "completed",
+      finishedRunCount: 3,
+    });
+  });
+
   test("executes new-agent schedules through AgentManager with real fake clients", async () => {
     const manager = new AgentManager({
       logger: createTestLogger(),
@@ -2141,6 +2209,7 @@ describe("ScheduleService", () => {
       agentId: associatedAgentId,
       error: "Daemon restarted before the scheduled run completed",
     });
+    expect(inspected.finishedRunCount).toBe(1);
     await service2.stop();
   });
 

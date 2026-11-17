@@ -58,6 +58,7 @@ export interface ScheduleRecord {
   pausedAt: string | null;
   expiresAt: string | null;
   maxRuns: number | null;
+  finishedRunCount?: number;
   runs: ScheduleRunRecord[];
 }
 
