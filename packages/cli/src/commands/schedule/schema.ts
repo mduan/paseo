@@ -1,3 +1,4 @@
+import { countFinishedScheduleRuns } from "@getpaseo/protocol/schedule/types";
 import type { OutputSchema } from "../../output/index.js";
 import { formatCadence, formatTarget, type ScheduleRow } from "./shared.js";
 import type { ScheduleRecord, ScheduleRunRecord } from "./types.js";
@@ -65,6 +66,8 @@ export function toScheduleLogRow(run: ScheduleRunRecord): ScheduleLogRow {
 }
 
 export function createScheduleInspectRows(schedule: ScheduleRecord): ScheduleInspectRow[] {
+  const runningRunCount = schedule.runs.filter((run) => run.status === "running").length;
+  const runCount = countFinishedScheduleRuns(schedule) + runningRunCount;
   return [
     { key: "Id", value: schedule.id },
     { key: "Name", value: schedule.name ?? "null" },
@@ -85,6 +88,6 @@ export function createScheduleInspectRows(schedule: ScheduleRecord): ScheduleIns
     { key: "PausedAt", value: schedule.pausedAt ?? "null" },
     { key: "ExpiresAt", value: schedule.expiresAt ?? "null" },
     { key: "MaxRuns", value: schedule.maxRuns == null ? "null" : `${schedule.maxRuns}` },
-    { key: "RunCount", value: `${schedule.runs.length}` },
+    { key: "RunCount", value: `${runCount}` },
   ];
 }

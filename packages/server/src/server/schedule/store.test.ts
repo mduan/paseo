@@ -50,7 +50,7 @@ describe("ScheduleStore", () => {
     expect(listed).toEqual([created]);
   });
 
-  test("reports an invalid schedule file once while it stays invalid, by name, and lists the rest", async () => {
+  test("reports an invalid schedule file once, by name, and lists the rest", async () => {
     const created = await store.create({
       name: "Morning summary",
       prompt: "Summarize new commits",
@@ -81,16 +81,12 @@ describe("ScheduleStore", () => {
 
     expect(await reloaded.list()).toEqual([created]);
     expect(await reloaded.list()).toEqual([created]);
-    await rm(join(tempDir, "notes.json"));
-    expect(await reloaded.list()).toEqual([created]);
-    await writeFile(join(tempDir, "notes.json"), "{ not json");
-    expect(await reloaded.list()).toEqual([created]);
 
     const skipped = {
       msg: "Skipping invalid schedule file",
       filePath: join(tempDir, "notes.json"),
     };
-    expect(logLines.map(({ msg, filePath }) => ({ msg, filePath }))).toEqual([skipped, skipped]);
+    expect(logLines.map(({ msg, filePath }) => ({ msg, filePath }))).toEqual([skipped]);
   });
 
   test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(

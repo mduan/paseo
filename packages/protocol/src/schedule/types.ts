@@ -69,9 +69,20 @@ export const StoredScheduleSchema = z.object({
   pausedAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
   maxRuns: z.number().int().positive().nullable(),
+  // Counts every finished run, including ones trimmed from `runs`. Absent in files saved before
+  // runs were trimmed.
+  finishedRunCount: z.number().int().nonnegative().optional(),
   runs: z.array(ScheduleRunSchema),
 });
 export type StoredSchedule = z.infer<typeof StoredScheduleSchema>;
+
+export function countFinishedScheduleRuns(
+  schedule: Pick<StoredSchedule, "finishedRunCount" | "runs">,
+): number {
+  return (
+    schedule.finishedRunCount ?? schedule.runs.filter((run) => run.status !== "running").length
+  );
+}
 
 export const ScheduleSummarySchema = StoredScheduleSchema.omit({
   runs: true,

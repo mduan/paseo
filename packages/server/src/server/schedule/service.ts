@@ -18,18 +18,20 @@ import type { PersistedWorkspaceRecord } from "../workspace-registry.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
 import { ScheduleStore } from "./store.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
-import type {
-  CreateScheduleInput,
-  ScheduleExecutionResult,
-  ScheduleRun,
-  ScheduleTarget,
-  StoredSchedule,
-  UpdateScheduleInput,
-  UpdateScheduleNewAgentConfig,
+import {
+  countFinishedScheduleRuns,
+  type CreateScheduleInput,
+  type ScheduleExecutionResult,
+  type ScheduleRun,
+  type ScheduleTarget,
+  type StoredSchedule,
+  type UpdateScheduleInput,
+  type UpdateScheduleNewAgentConfig,
 } from "@getpaseo/protocol/schedule/types";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
 
 const SCHEDULE_TICK_INTERVAL_MS = 1000;
+const MAX_KEPT_SCHEDULE_RUNS = 200;
 
 // A run failed because its target no longer exists: the agent was deleted or
 // archived, or a new-agent cwd was removed. These are permanent, so the schedule
@@ -126,10 +128,6 @@ function normalizeMaxRuns(value: number | null | undefined): number | null {
   return value;
 }
 
-function countCompletedRuns(schedule: StoredSchedule): number {
-  return schedule.runs.filter((run) => run.status !== "running").length;
-}
-
 function shouldArchiveScheduleRunWorkspace(input: {
   agentId: string | null;
   archiveOnFinish?: boolean;
@@ -144,7 +142,7 @@ function shouldCompleteSchedule(schedule: StoredSchedule, now: Date): boolean {
   if (schedule.maxRuns == null) {
     return false;
   }
-  return countCompletedRuns(schedule) >= schedule.maxRuns;
+  return countFinishedScheduleRuns(schedule) >= schedule.maxRuns;
 }
 
 function requireSchedule(schedule: StoredSchedule | null, id: string): StoredSchedule {
@@ -335,6 +333,7 @@ export class ScheduleService {
       pausedAt: null,
       expiresAt: input.expiresAt ?? null,
       maxRuns: normalizeMaxRuns(input.maxRuns),
+      finishedRunCount: 0,
       runs: [],
     };
   }
@@ -548,9 +547,10 @@ export class ScheduleService {
 
   async tick(): Promise<void> {
     const now = this.now();
-    const schedules = await this.store.list();
-    for (const schedule of schedules) {
-      if (schedule.status !== "active" || !schedule.nextRunAt) {
+    for (const { id } of await this.store.list()) {
+      // Re-read — an earlier run in this tick can take minutes while other ticks change it.
+      const schedule = await this.store.get(id);
+      if (!schedule || schedule.status !== "active" || !schedule.nextRunAt) {
         continue;
       }
       if (this.runningScheduleIds.has(schedule.id)) {
@@ -623,7 +623,7 @@ export class ScheduleService {
           endedAt: now.toISOString(),
           error: "Daemon restarted before the scheduled run completed",
         };
-        updated = { ...updated, runs };
+        updated = { ...updated, runs, finishedRunCount: countFinishedScheduleRuns(current) + 1 };
         dirty = true;
       }
 
@@ -773,7 +773,9 @@ export class ScheduleService {
       );
       let updated: StoredSchedule = {
         ...schedule,
-        runs: completedRuns,
+        // Only this run can be in flight, and it is finished now, so trimming drops finished runs.
+        runs: completedRuns.slice(-MAX_KEPT_SCHEDULE_RUNS),
+        finishedRunCount: countFinishedScheduleRuns(schedule) + 1,
         lastRunAt: now.toISOString(),
         updatedAt: now.toISOString(),
       };
