@@ -833,8 +833,20 @@ function reconcileOverlappingProjectedAssistant(params: {
   };
 
   if (headMatch) {
+    // A painted prefix of this message can sit in the tail while pre-sync live chunks
+    // built a second copy in the head. The projection supersedes both.
+    const isSupersededPrefix = (item: StreamItem) => {
+      const cursor = item.timelineCursor;
+      return (
+        matches(item) &&
+        cursor?.epoch === params.epoch &&
+        unit.sourceSeqRanges.some(
+          (range) => range.startSeq <= cursor.seq && cursor.seq <= range.endSeq,
+        )
+      );
+    };
     return {
-      tail: params.tail,
+      tail: params.tail.filter((item) => !isSupersededPrefix(item)),
       head: replaceMatch(params.head, headMatch.index),
       reconciled: true,
     };
