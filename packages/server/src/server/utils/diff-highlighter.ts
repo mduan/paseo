@@ -1,6 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { highlightCode, isLanguageSupported, type HighlightToken } from "@getpaseo/highlight";
+import type { HighlightToken } from "@getpaseo/highlight";
+
+type Highlighter = typeof import("@getpaseo/highlight");
+
+let highlighterModule: Promise<Highlighter> | undefined;
+
+// The grammars load on the first highlight request instead of at daemon startup.
+function loadHighlighter(): Promise<Highlighter> {
+  highlighterModule ??= import("@getpaseo/highlight");
+  return highlighterModule;
+}
 
 const MAX_DIFF_HIGHLIGHT_LINE_CHARS = 10_000;
 const MAX_FULL_FILE_HIGHLIGHT_CHARS = 1024 * 1024;
@@ -281,6 +291,7 @@ function buildTokenLookup(
 }
 
 function buildFullFileTokenLookup(
+  highlighter: Highlighter,
   fileContent: string,
   path: string,
 ): Map<number, HighlightToken[]> | null {
@@ -289,7 +300,7 @@ function buildFullFileTokenLookup(
     return null;
 
   const lookup = new Map<number, HighlightToken[]>();
-  const highlighted = highlightCode(fileContent, path);
+  const highlighted = highlighter.highlightCode(fileContent, path);
 
   for (let i = 0; i < highlighted.length; i++) {
     lookup.set(i + 1, highlighted[i]);
@@ -298,7 +309,10 @@ function buildFullFileTokenLookup(
   return lookup;
 }
 
-function buildReconstructedTokenLookups(file: ParsedDiffFile): {
+function buildReconstructedTokenLookups(
+  highlighter: Highlighter,
+  file: ParsedDiffFile,
+): {
   newTokensByLine: Map<number, HighlightToken[]>;
   oldTokensByLine: Map<number, HighlightToken[]>;
 } {
@@ -306,8 +320,8 @@ function buildReconstructedTokenLookups(file: ParsedDiffFile): {
   const oldFileLines = reconstructOldFile(file.hunks);
   const newFileContent = buildFileContent(newFileLines);
   const oldFileContent = buildFileContent(oldFileLines);
-  const newHighlighted = highlightCode(newFileContent, file.path);
-  const oldHighlighted = highlightCode(oldFileContent, file.path);
+  const newHighlighted = highlighter.highlightCode(newFileContent, file.path);
+  const oldHighlighted = highlighter.highlightCode(oldFileContent, file.path);
 
   return {
     newTokensByLine: buildTokenLookup(newFileLines, newHighlighted),
@@ -319,12 +333,13 @@ function buildReconstructedTokenLookups(file: ParsedDiffFile): {
  * Apply syntax highlighting to diff hunks using reconstructed file content.
  * This is the fallback when actual file content is not available.
  */
-export function highlightDiffFromHunks(file: ParsedDiffFile): ParsedDiffFile {
-  if (!isLanguageSupported(file.path) || hasOversizedDiffLine(file)) {
+export async function highlightDiffFromHunks(file: ParsedDiffFile): Promise<ParsedDiffFile> {
+  const highlighter = await loadHighlighter();
+  if (!highlighter.isLanguageSupported(file.path) || hasOversizedDiffLine(file)) {
     return file;
   }
 
-  const reconstructedTokens = buildReconstructedTokenLookups(file);
+  const reconstructedTokens = buildReconstructedTokenLookups(highlighter, file);
   return applyTokensToHunks(
     file,
     reconstructedTokens.newTokensByLine,
@@ -341,21 +356,22 @@ export async function highlightDiffWithFileContent(
   cwd: string,
   options: HighlightDiffWithFileContentOptions = {},
 ): Promise<ParsedDiffFile> {
-  if (!isLanguageSupported(file.path) || hasOversizedDiffLine(file)) {
+  const highlighter = await loadHighlighter();
+  if (!highlighter.isLanguageSupported(file.path) || hasOversizedDiffLine(file)) {
     return file;
   }
 
   let newTokensByLine: Map<number, HighlightToken[]> | null = null;
   const oldTokensByLine =
     typeof options.oldFileContent === "string"
-      ? buildFullFileTokenLookup(options.oldFileContent, file.path)
+      ? buildFullFileTokenLookup(highlighter, options.oldFileContent, file.path)
       : null;
   if (typeof options.newFileContent === "string") {
-    newTokensByLine = buildFullFileTokenLookup(options.newFileContent, file.path);
+    newTokensByLine = buildFullFileTokenLookup(highlighter, options.newFileContent, file.path);
   } else {
     try {
       const fileContent = await readFile(resolve(cwd, file.path), "utf-8");
-      newTokensByLine = buildFullFileTokenLookup(fileContent, file.path);
+      newTokensByLine = buildFullFileTokenLookup(highlighter, fileContent, file.path);
     } catch {
       // Deleted or unavailable files use reconstructed tokens below.
     }
@@ -363,7 +379,7 @@ export async function highlightDiffWithFileContent(
 
   if (newTokensByLine && oldTokensByLine)
     return applyTokensToHunks(file, newTokensByLine, oldTokensByLine);
-  const reconstructedTokens = buildReconstructedTokenLookups(file);
+  const reconstructedTokens = buildReconstructedTokenLookups(highlighter, file);
   return applyTokensToHunks(
     file,
     newTokensByLine ?? reconstructedTokens.newTokensByLine,
@@ -450,17 +466,18 @@ export function countFileLines(content: string): number {
  * Returns highlighted lines [startLine, startLine + lineCount) of a file.
  * Full-file tokens preserve multi-line context within the highlighting budget.
  */
-export function highlightFileLines(input: {
+export async function highlightFileLines(input: {
   content: string;
   path: string;
   startLine: number;
   lineCount: number;
-}): Array<{ content: string; tokens?: HighlightToken[] }> {
+}): Promise<Array<{ content: string; tokens?: HighlightToken[] }>> {
+  const highlighter = await loadHighlighter();
   const start = input.startLine - 1;
   const lines = splitFileLines(input.content).slice(start, start + input.lineCount);
   const tokensByLine =
-    isLanguageSupported(input.path) && lines.length > 0
-      ? buildFullFileTokenLookup(input.content, input.path)
+    highlighter.isLanguageSupported(input.path) && lines.length > 0
+      ? buildFullFileTokenLookup(highlighter, input.content, input.path)
       : null;
   return lines.map((content, index) => {
     const tokens = tokensByLine?.get(input.startLine + index);
