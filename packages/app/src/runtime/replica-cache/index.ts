@@ -803,8 +803,7 @@ function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
     (item) => item.kind !== "user_message" || !isUnreconciledLocalUserMessage(item),
   );
   if (canonicalItems.length > MAX_TIMELINE_ITEMS) {
-    // Coverage can't be persisted for a truncated timeline, so only the newest storable items
-    // matter. Walk backwards so streaming persists don't serialize the whole loaded history.
+    // Truncated timelines store no coverage, so serialize only the newest storable items.
     const items: StoredTimelineItem[] = [];
     for (
       let index = canonicalItems.length - 1;

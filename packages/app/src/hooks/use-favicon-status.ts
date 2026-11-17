@@ -102,7 +102,6 @@ export function useFaviconStatus() {
     return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
-  // Update favicon when the status or color scheme changes
   useEffect(() => {
     if (isNative) return;
 
