@@ -721,9 +721,8 @@ function groupAgentsByWorkspaceId(
   return byWorkspaceId;
 }
 
-// Agents owned by `workspaceIds`, plus each one's direct parent. A child whose parent sits in
-// another workspace is a root only while that parent is active (see resolveWorkspaceRootAgent),
-// so the parent is needed to project these workspaces' descriptors.
+// Agents owned by `workspaceIds` plus their direct parents — a child with a parent in another
+// workspace is a root only while that parent is active (see resolveWorkspaceRootAgent).
 export function agentIdsForWorkspaces(
   agents: Iterable<{ id: string; workspaceId?: string; labels?: Record<string, unknown> }>,
   workspaceIds: ReadonlySet<string>,
