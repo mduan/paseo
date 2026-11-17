@@ -229,6 +229,20 @@ second line'`,
     ]);
   });
 
+  it("joins pieces of one assistant message exactly and separates different messages", () => {
+    // Reasoning between the pieces keeps the projection from merging them.
+    const timeline: AgentTimelineItem[] = [
+      { type: "assistant_message", text: "```ts\n  return Promise.reject(res", messageId: "m1" },
+      { type: "reasoning", text: "Checking" },
+      { type: "assistant_message", text: ".statusText)\n```\n", messageId: "m1" },
+      { type: "assistant_message", text: "Done.", messageId: "m2" },
+    ];
+
+    expect(curateAgentActivity(timeline)).toBe(
+      "```ts\n  return Promise.reject(res.statusText)\n```\nDone.\n[Thought] Checking",
+    );
+  });
+
   it("renders todo/error/compaction entries", () => {
     const timeline: AgentTimelineItem[] = [
       {

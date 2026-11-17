@@ -33,13 +33,33 @@ function appendText(buffer: string, text: string): string {
   return `${buffer}\n${normalized}`;
 }
 
+interface ActivityBuffers {
+  message: string;
+  messageId?: string;
+  thought: string;
+}
+
+// Same continuation rule as the app: a piece without an id, or with the previous id, continues
+// that message, so it is appended exactly. Trimming pieces would break lines mid-token.
+function appendAssistantText(
+  buffers: ActivityBuffers,
+  item: Extract<AgentTimelineItem, { type: "assistant_message" }>,
+): void {
+  const continuesMessage = item.messageId === undefined || item.messageId === buffers.messageId;
+  buffers.message =
+    buffers.message && !continuesMessage
+      ? `${buffers.message.trimEnd()}\n${item.text.trimStart()}`
+      : buffers.message + item.text;
+  buffers.messageId = item.messageId ?? buffers.messageId;
+}
+
 function activityEntry(text: string): ActivityEntry {
   return { text };
 }
 
 function flushBuffers(
   entries: ActivityEntry[],
-  buffers: { message: string; thought: string },
+  buffers: ActivityBuffers,
   options?: ActivityCuratorOptions,
 ) {
   if (buffers.message.trim()) {
@@ -51,6 +71,7 @@ function flushBuffers(
     entries.push(activityEntry(`[Thought] ${text}`));
   }
   buffers.message = "";
+  buffers.messageId = undefined;
   buffers.thought = "";
 }
 
@@ -144,7 +165,7 @@ function curateProjectedActivityEntries(
   const recentItems = maxItems > 0 && items.length > maxItems ? items.slice(-maxItems) : items;
 
   const entries: ActivityEntry[] = [];
-  const buffers = { message: "", thought: "" };
+  const buffers: ActivityBuffers = { message: "", thought: "" };
 
   for (const item of recentItems) {
     if (!shouldIncludeItem(item, options)) {
@@ -157,7 +178,7 @@ function curateProjectedActivityEntries(
         entries.push(activityEntry(`[User] ${item.text.trim()}`));
         break;
       case "assistant_message":
-        buffers.message = appendText(buffers.message, item.text);
+        appendAssistantText(buffers, item);
         break;
       case "reasoning":
         buffers.thought = appendText(buffers.thought, item.text);
