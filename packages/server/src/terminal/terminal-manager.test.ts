@@ -1,6 +1,10 @@
 import { it, expect, afterEach } from "vitest";
 import { isPlatform } from "../test-utils/platform.js";
-import { createTerminalManager, type TerminalManager } from "./terminal-manager.js";
+import {
+  createTerminalManager,
+  listAllTerminals,
+  type TerminalManager,
+} from "./terminal-manager.js";
 import type { TerminalWorkspaceContributionChangedEvent } from "./terminal-manager.js";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -30,10 +34,7 @@ const temporaryDirs: string[] = [];
 
 afterEach(async () => {
   if (manager) {
-    const terminalsByCwd = await Promise.all(
-      manager.listDirectories().map((cwd) => manager.getTerminals(cwd)),
-    );
-    for (const terminal of terminalsByCwd.flat()) {
+    for (const terminal of await listAllTerminals(manager)) {
       await manager.killTerminalAndWait(terminal.id);
     }
     manager.killAll();
@@ -95,6 +96,20 @@ it("creates separate terminals for different cwds", async () => {
   expect(tmpTerminals.length).toBe(1);
   expect(homeTerminals.length).toBe(1);
   expect(tmpTerminals[0].id).not.toBe(homeTerminals[0].id);
+});
+
+it("lists every terminal once when directories are nested", async () => {
+  manager = createTerminalManager();
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "terminal-manager-nested-")));
+  temporaryDirs.push(root);
+  const nested = join(root, "packages", "app");
+  mkdirSync(nested, { recursive: true });
+  const rootTerminal = await manager.createTerminal({ cwd: root, workspaceId: "ws-test" });
+  const nestedTerminal = await manager.createTerminal({ cwd: nested, workspaceId: "ws-test" });
+
+  const ids = (await listAllTerminals(manager)).map((terminal) => terminal.id);
+
+  expect(ids.sort()).toEqual([rootTerminal.id, nestedTerminal.id].sort());
 });
 
 it("lists subdirectory terminals when querying the workspace root", async () => {

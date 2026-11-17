@@ -14,7 +14,7 @@ import { monitorEventLoopDelay } from "node:perf_hooks";
 import type { AgentManager, AgentMetricsSnapshot } from "./agent/agent-manager.js";
 import type { AgentStorage } from "./agent/agent-storage.js";
 import type { DownloadTokenStore } from "./file-download/token-store.js";
-import type { TerminalManager } from "../terminal/terminal-manager.js";
+import { listAllTerminals, type TerminalManager } from "../terminal/terminal-manager.js";
 import type pino from "pino";
 import type { ProjectRegistry, WorkspaceRegistry } from "./workspace-registry.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
@@ -723,15 +723,9 @@ export class VoiceAssistantWebSocketServer {
       listProcessOwners: async () => {
         const owners = new Map<number, string>();
         if (!this.terminalManager) return owners;
-        const directories = this.terminalManager.listDirectories();
-        const groups = await Promise.all(
-          directories.map((directory) => this.terminalManager!.getTerminals(directory)),
-        );
-        for (const terminals of groups) {
-          for (const terminal of terminals) {
-            if (terminal.pid !== undefined && terminal.workspaceId) {
-              owners.set(terminal.pid, terminal.workspaceId);
-            }
+        for (const terminal of await listAllTerminals(this.terminalManager)) {
+          if (terminal.pid !== undefined && terminal.workspaceId) {
+            owners.set(terminal.pid, terminal.workspaceId);
           }
         }
         return owners;

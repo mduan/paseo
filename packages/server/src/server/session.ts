@@ -41,9 +41,10 @@ import {
   type WorkspaceSetupSnapshot,
   type WorkspaceDescriptorPayload,
 } from "./messages.js";
-import type {
-  TerminalManager,
-  TerminalWorkspaceContributionChangedEvent,
+import {
+  listAllTerminals,
+  type TerminalManager,
+  type TerminalWorkspaceContributionChangedEvent,
 } from "../terminal/terminal-manager.js";
 import { TerminalSessionController } from "../terminal/terminal-session-controller.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
@@ -5501,17 +5502,11 @@ export class Session {
     if (!terminalManager) {
       return [];
     }
-    const directories = terminalManager.listDirectories();
-    const terminalsByDirectory = await Promise.all(
-      directories.map((cwd) => terminalManager.getTerminals(cwd)),
-    );
     const workspaceIds = scope?.workspaceIds;
-    const sessions = terminalsByDirectory
-      .flat()
-      .filter(
-        (session) =>
-          !workspaceIds || (!!session.workspaceId && workspaceIds.has(session.workspaceId)),
-      );
+    const sessions = (await listAllTerminals(terminalManager)).filter(
+      (session) =>
+        !workspaceIds || (!!session.workspaceId && workspaceIds.has(session.workspaceId)),
+    );
     return sessions.map((session) => {
       const contribution: { cwd: string; workspaceId?: string; activity: TerminalActivity | null } =
         {

@@ -36,7 +36,11 @@ import {
   type TerminalRestoreOptions,
 } from "./terminal-restore.js";
 import type { TerminalSession } from "./terminal.js";
-import type { TerminalManager, TerminalsChangedEvent } from "./terminal-manager.js";
+import {
+  listAllTerminals,
+  type TerminalManager,
+  type TerminalsChangedEvent,
+} from "./terminal-manager.js";
 import { applyTerminalSize } from "./terminal-size-ownership.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import { terminalSubscriptionKey } from "@getpaseo/protocol/terminal-subscription-key";
@@ -464,14 +468,7 @@ export class TerminalSessionController {
     if (!this.terminalManager) {
       return [];
     }
-    const directories = this.terminalManager.listDirectories();
-    const manager = this.terminalManager;
-    const terminalsByDirectory = await Promise.all(
-      directories.map((cwd) => manager.getTerminals(cwd)),
-    );
-    return [
-      ...new Map(terminalsByDirectory.flat().map((terminal) => [terminal.id, terminal])).values(),
-    ];
+    return listAllTerminals(this.terminalManager);
   }
 
   private async getTerminalsForWorkspaceRoot(
