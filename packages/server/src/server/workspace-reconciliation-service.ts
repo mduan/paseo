@@ -1,4 +1,5 @@
-import { statSync, watch as watchPath } from "node:fs";
+import { watch as watchPath } from "node:fs";
+import { stat } from "node:fs/promises";
 import pLimit from "p-limit";
 import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
 import type pino from "pino";
@@ -17,6 +18,9 @@ import {
 } from "./workspace-registry-model.js";
 import { workspaceIdsForProjects } from "./workspace-directory.js";
 import { deriveProjectKey } from "./project-key.js";
+
+// Stats on an offline mount can hang; cap them so they can't occupy every libuv pool thread.
+const directoryStatLimit = pLimit(2);
 
 const DEFAULT_RESCAN_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_DEBOUNCE_MS = 100;
@@ -199,17 +203,21 @@ export class WorkspaceReconciliationService {
       this.projectRegistry.list(),
       this.workspaceRegistry.list(),
     ]);
+    const activeProjects = projects.filter((project) => !project.archivedAt);
+    const activeWorkspaces = workspaces.filter((workspace) => !workspace.archivedAt);
+    const [workspaceStates, projectStates] = await Promise.all([
+      Promise.all(activeWorkspaces.map((workspace) => this.inspectDirectory(workspace.cwd))),
+      Promise.all(activeProjects.map((project) => this.inspectDirectory(project.rootPath))),
+    ]);
     const workspacesByProject = new Map<string, PersistedWorkspaceRecord[]>();
-    for (const workspace of workspaces) {
-      if (workspace.archivedAt || this.inspectDirectory(workspace.cwd) !== "directory") continue;
+    activeWorkspaces.forEach((workspace, index) => {
+      if (workspaceStates[index] !== "directory") return;
       const siblings = workspacesByProject.get(workspace.projectId) ?? [];
       siblings.push(workspace);
       workspacesByProject.set(workspace.projectId, siblings);
-    }
+    });
     await this.reconcileGitMetadataForProjects(
-      projects.filter(
-        (project) => !project.archivedAt && this.inspectDirectory(project.rootPath) === "directory",
-      ),
+      activeProjects.filter((_project, index) => projectStates[index] === "directory"),
       workspacesByProject,
       changes,
     );
@@ -226,16 +234,21 @@ export class WorkspaceReconciliationService {
 
     const activeProjects = allProjects.filter((p) => !p.archivedAt);
     const activeWorkspaces = allWorkspaces.filter((w) => !w.archivedAt);
-    const workspaceDirectoryStates = activeWorkspaces.map((workspace) => ({
-      workspace,
-      state: this.inspectDirectory(workspace.cwd),
-    }));
+    const workspaceDirectoryStates = await Promise.all(
+      activeWorkspaces.map(async (workspace) => ({
+        workspace,
+        state: await this.inspectDirectory(workspace.cwd),
+      })),
+    );
     // Project roots are read after the workspace directories, so a volume that
     // goes away mid-pass leaves its project unreachable rather than its workspaces
     // alone. The skew can only withhold an archive, never produce one.
+    const projectRootStates = await Promise.all(
+      activeProjects.map((project) => this.inspectDirectory(project.rootPath)),
+    );
     const reachableProjectIds = new Set(
       activeProjects
-        .filter((project) => this.inspectDirectory(project.rootPath) === "directory")
+        .filter((_project, index) => projectRootStates[index] === "directory")
         .map((project) => project.projectId),
     );
 
@@ -541,9 +554,11 @@ export class WorkspaceReconciliationService {
     return this.workspaceGitService.getCheckout(cwd, { priority: "background" });
   }
 
-  private inspectDirectory(targetPath: string): DirectoryState {
+  private async inspectDirectory(targetPath: string): Promise<DirectoryState> {
     try {
-      return statSync(targetPath).isDirectory() ? "directory" : "missing";
+      return (await directoryStatLimit(() => stat(targetPath))).isDirectory()
+        ? "directory"
+        : "missing";
     } catch (error) {
       if (isMissingPathError(error)) return "missing";
       this.logger.warn(
