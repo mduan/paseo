@@ -5119,12 +5119,12 @@ class ClaudeAgentSession implements AgentSession {
         );
         return;
       }
-      const content = fs.readFileSync(historyPath, "utf8");
+      const entries = parseClaudeHistoryRecords(fs.readFileSync(historyPath, "utf8"));
       const replay = this.ingestPersistedSidechains(
-        content,
+        entries,
         readClaudeSidechainHistory(historyPath),
       );
-      this.ingestPersistedHistory(content, replay);
+      this.ingestPersistedHistory(entries, replay);
     } catch (error) {
       this.logger.warn(
         { err: error, sessionId, historyPath },
@@ -5133,14 +5133,13 @@ class ClaudeAgentSession implements AgentSession {
     }
   }
 
-  private ingestPersistedHistory(content: string, replay: ClaudeReplayOwnership): void {
-    if (!content) {
-      return;
-    }
-
+  private ingestPersistedHistory(
+    entries: ClaudeHistoryEntry[],
+    replay: ClaudeReplayOwnership,
+  ): void {
     const timeline: PersistedTimelineEntry[] = [];
-    for (const line of content.split(/\r?\n/)) {
-      this.ingestPersistedHistoryLine(line, timeline, replay);
+    for (const entry of entries) {
+      this.ingestPersistedHistoryEntry(entry, timeline, replay);
     }
 
     if (timeline.length > 0) {
@@ -5150,15 +5149,14 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private ingestPersistedSidechains(
-    parentContent: string,
+    transcriptEntries: ClaudeHistoryEntry[],
     sidechains: ClaudeSidechainHistory,
   ): ClaudeReplayOwnership {
-    const parentEntries = parseClaudeHistoryRecords(parentContent).filter(
-      (entry) => entry.isSidechain !== true,
-    );
-    const sidechainEntries = [parentContent, ...sidechains.contents]
-      .flatMap(parseClaudeHistoryRecords)
-      .filter((entry) => entry.isSidechain === true && typeof entry.agentId === "string");
+    const parentEntries = transcriptEntries.filter((entry) => entry.isSidechain !== true);
+    const sidechainEntries = [
+      ...transcriptEntries,
+      ...sidechains.contents.flatMap(parseClaudeHistoryRecords),
+    ].filter((entry) => entry.isSidechain === true && typeof entry.agentId === "string");
 
     // Replay produces the same observations the live task protocol produces, then folds them
     // with the same function, so identity and status are derived once for both paths.
@@ -5216,28 +5214,11 @@ class ClaudeAgentSession implements AgentSession {
     return replay;
   }
 
-  private ingestPersistedHistoryLine(
-    line: string,
+  private ingestPersistedHistoryEntry(
+    entry: ClaudeHistoryEntry,
     timeline: PersistedTimelineEntry[],
     replay: ClaudeReplayOwnership,
   ): void {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    let entry: Record<string, unknown>;
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      const record = toObjectRecord(parsed);
-      if (!record) {
-        return;
-      }
-      entry = record;
-    } catch {
-      return;
-    }
-
     if (entry.isSidechain) {
       return;
     }
