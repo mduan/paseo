@@ -61,8 +61,7 @@ interface StreamingCodeSplit {
   pendingLine: string;
 }
 
-// The paced reveal grows a streaming block every frame. Highlighting only the
-// finished lines keeps the parse from re-running until a line completes.
+// The paced reveal grows a streaming block every frame; highlighting finished lines re-parses only per new line.
 function splitAtLastLineBreak(code: string): StreamingCodeSplit | undefined {
   const lastLineBreak = code.lastIndexOf("\n");
   if (lastLineBreak < 0) return undefined;
@@ -97,8 +96,7 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
     () => (isStreaming ? splitAtLastLineBreak(code) : undefined),
     [code, isStreaming],
   );
-  // Until the first line break, a streaming block has no finished lines and
-  // renders as plain text.
+  // No finished lines yet (no line break) → the plain-text branch.
   const highlightSource = isStreaming ? streamingSplit?.completeLines : renderedCode;
   const keyedLines = useMemo<KeyedLine[] | null>(
     () =>
@@ -161,8 +159,7 @@ interface TokenSpanProps {
   token: HighlightToken;
 }
 
-// Compare token contents: re-highlighting creates new token objects even when
-// a line's tokens are unchanged.
+// Compare contents — re-highlighting creates new token objects for unchanged tokens.
 const TokenSpan = React.memo(
   function TokenSpan({ token }: TokenSpanProps) {
     return (

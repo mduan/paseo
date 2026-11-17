@@ -45,8 +45,7 @@ class LRUCache<K, V> {
 const tokenizationCache = new LRUCache<string, HighlightToken[][]>(200);
 
 export interface TokenizeOptions {
-  // Pass false for transient input, such as a code block that is still
-  // streaming, so it does not evict finished blocks from the cache.
+  // False for transient input (a streaming code block) so it can't evict finished blocks.
   storeInCache?: boolean;
 }
 

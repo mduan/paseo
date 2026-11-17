@@ -67,8 +67,7 @@ export type WorkspaceSessionAgent = Pick<
 const NO_AGENTS: WorkspaceSessionAgent[] = [];
 const NO_AGENT_IDS: string[] = [];
 
-// Every sidebar workspace selects its agents on each session-store commit, so the grouping is
-// built once per `agents` Map and shared instead of rescanning every agent per workspace.
+// Built once per `agents` Map — every sidebar workspace selects on each session-store commit.
 const unarchivedAgentsByWorkspace = new WeakMap<
   ReadonlyMap<string, WorkspaceSessionAgent>,
   Map<string, WorkspaceSessionAgent[]>
