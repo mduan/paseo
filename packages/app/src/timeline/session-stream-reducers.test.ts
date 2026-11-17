@@ -1945,6 +1945,66 @@ describe("processTimelineResponse", () => {
     ]);
   });
 
+  it("keeps one assistant copy when a painted prefix and a pre-sync live head share a projected message", () => {
+    const messageId = "answer-1";
+    const paintedPrefix: StreamItem = {
+      kind: "assistant_message",
+      id: messageId,
+      messageId,
+      text: "Section 1.",
+      timestamp: new Date(1032),
+      timelineCursor: { epoch: "epoch-1", seq: 32 },
+    };
+    const live = processAgentStreamEvents({
+      events: [makeStreamReducerEvent(makeAssistantTimelineEvent(" Section 3.", messageId), 52)],
+      currentTail: [paintedPrefix],
+      currentHead: [],
+      currentCursor: undefined,
+      hasAuthoritativeBaseline: false,
+    });
+
+    const caughtUp = processTimelineResponse({
+      ...baseTimelineInput,
+      currentTail: live.tail,
+      currentHead: live.head,
+      currentCursor: { epoch: "epoch-1", startSeq: 1, endSeq: 32 },
+      payload: {
+        ...baseTimelineInput.payload,
+        startCursor: { seq: 33 },
+        endCursor: { seq: 52 },
+        entries: [
+          {
+            ...makeTimelineEntry(30, "Section 1. Section 2. Section 3.", "assistant_message", 52),
+            sourceSeqRanges: [{ startSeq: 30, endSeq: 52 }],
+            item: {
+              type: "assistant_message",
+              text: "Section 1. Section 2. Section 3.",
+              messageId,
+            },
+          },
+        ],
+      },
+    });
+    const completed = processAgentStreamEvents({
+      events: [
+        makeStreamReducerEvent(makeAssistantTimelineEvent(" Section 4.", messageId), 53),
+        {
+          event: { type: "turn_completed", provider: "claude" },
+          seq: undefined,
+          epoch: undefined,
+          timestamp: new Date(2000),
+        },
+      ],
+      currentTail: caughtUp.tail,
+      currentHead: caughtUp.head,
+      currentCursor: caughtUp.cursor ?? undefined,
+    });
+
+    expect(getAssistantTexts([...completed.tail, ...completed.head])).toEqual([
+      "Section 1. Section 2. Section 3. Section 4.",
+    ]);
+  });
+
   it("does not replay a reasoning prefix when catch-up completes an earlier tool call", () => {
     const live = processAgentStreamEvents({
       events: [

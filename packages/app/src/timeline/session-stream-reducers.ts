@@ -833,8 +833,19 @@ function reconcileOverlappingProjectedAssistant(params: {
   };
 
   if (headMatch) {
+    // Reload can leave a painted prefix in the tail and a pre-sync copy in the head — replace both.
+    const isSupersededPrefix = (item: StreamItem) => {
+      const cursor = item.timelineCursor;
+      return (
+        matches(item) &&
+        cursor?.epoch === params.epoch &&
+        unit.sourceSeqRanges.some(
+          (range) => range.startSeq <= cursor.seq && cursor.seq <= range.endSeq,
+        )
+      );
+    };
     return {
-      tail: params.tail,
+      tail: params.tail.filter((item) => !isSupersededPrefix(item)),
       head: replaceMatch(params.head, headMatch.index),
       reconciled: true,
     };
