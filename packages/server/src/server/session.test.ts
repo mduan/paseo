@@ -3857,6 +3857,7 @@ describe("session checkout refresh handling", () => {
       force: true,
       includeForge: true,
       reason: "manual-refresh",
+      queueIfBusy: true,
     });
     expect(checkoutDiffManager.scheduleRefreshForCwd).toHaveBeenCalledWith("/tmp/request-worktree");
     expect(messages).toContainEqual({
