@@ -326,6 +326,14 @@ export class TimelineProjection {
     return this.rows.map((row) => ({ ...row }));
   }
 
+  getItems(): AgentTimelineItem[] {
+    return this.rows.map((row) => row.item);
+  }
+
+  findRow(predicate: (row: ProjectedTimelineRow) => boolean): ProjectedTimelineRow | undefined {
+    return this.rows.find(predicate);
+  }
+
   enrichSubmittedUserMessage(
     clientMessageId: string,
     providerMessageId: string,

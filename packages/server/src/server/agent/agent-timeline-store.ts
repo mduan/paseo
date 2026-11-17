@@ -71,9 +71,7 @@ export class InMemoryAgentTimelineStore {
   }
 
   getItems(agentId: string): AgentTimelineItem[] {
-    return this.requireState(agentId)
-      .projection.getRows()
-      .map((row) => row.item);
+    return this.requireState(agentId).projection.getItems();
   }
 
   getRows(agentId: string): ProjectedTimelineRow[] {
@@ -81,13 +79,11 @@ export class InMemoryAgentTimelineStore {
   }
 
   getSubmittedUserMessage(agentId: string, clientMessageId: string): AgentTimelineRow | null {
-    const row = this.requireState(agentId)
-      .projection.getRows()
-      .find(
-        (candidate) =>
-          candidate.item.type === "user_message" &&
-          candidate.item.clientMessageId === clientMessageId,
-      );
+    const row = this.requireState(agentId).projection.findRow(
+      (candidate) =>
+        candidate.item.type === "user_message" &&
+        candidate.item.clientMessageId === clientMessageId,
+    );
     return row ? cloneRow(row) : null;
   }
 
