@@ -56,7 +56,7 @@ import { buildAbsoluteExplorerPath } from "@/utils/explorer-paths";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { GitActionsSplitButton } from "@/git/actions-split-button";
 import type { GitActions } from "@/git/policy";
-import { BaseRefSwitcher } from "@/components/base-ref-switcher";
+import { BaseRefSwitcher, BranchTooltipText } from "@/components/base-ref-switcher";
 import { useGitActions } from "@/git/use-actions";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import { buildForgeSignInCommand, getForgePresentation, type Forge } from "@/git/forge";
@@ -603,6 +603,7 @@ function ChangesHeader({ compact, repository, comparison, sidebarSurface }: Chan
       <ChangesComparisonToolbar
         compact={compact}
         model={comparison}
+        repository={repository}
         sidebarSurface={sidebarSurface}
       />
     );
@@ -669,7 +670,6 @@ function ChangesRepositoryToolbar({
   model: ChangesRepositoryToolbarModel;
   sidebarSurface: boolean;
 }) {
-  const { t } = useTranslation();
   return (
     <ChangesToolbarRow
       compact={compact}
@@ -678,23 +678,7 @@ function ChangesRepositoryToolbar({
       trailing={model.gitActions ? "framed" : "glyph"}
     >
       <ChangesToolbarLeading>
-        <View style={toolbarLabelTriggerFrameStyle()}>
-          <Text
-            testID="changes-current-branch"
-            style={toolbarLabelTriggerTextStyle(false)}
-            numberOfLines={1}
-          >
-            {model.branchName ?? t("branchSwitcher.detachedHead")}
-          </Text>
-        </View>
-        {model.baseRefLabel ? (
-          <BaseRefSwitcher
-            baseRefLabel={model.baseRefLabel}
-            serverId={model.serverId}
-            workspaceId={model.workspaceId ?? model.cwd}
-            cwd={model.cwd}
-          />
-        ) : null}
+        <ChangesBranchLabels model={model} />
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
         {model.gitActions ? <GitActionsSplitButton gitActions={model.gitActions} menuOnly /> : null}
@@ -703,15 +687,61 @@ function ChangesRepositoryToolbar({
   );
 }
 
+function ChangesBranchLabels({ model }: { model: ChangesRepositoryToolbarModel }) {
+  const { t } = useTranslation();
+  const branchName = model.branchName ?? t("branchSwitcher.detachedHead");
+  return (
+    <>
+      <Tooltip delayDuration={300} enabledOnDesktop enabledOnMobile={false}>
+        <TooltipTrigger asChild>
+          <View style={toolbarLabelTriggerFrameStyle()}>
+            <Text
+              testID="changes-current-branch"
+              style={toolbarLabelTriggerTextStyle(false)}
+              numberOfLines={1}
+            >
+              {branchName}
+            </Text>
+          </View>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <BranchTooltipText title={t("branchSwitcher.title")} name={branchName} />
+        </TooltipContent>
+      </Tooltip>
+      {model.baseRefLabel ? (
+        <BaseRefSwitcher
+          baseRefLabel={model.baseRefLabel}
+          serverId={model.serverId}
+          workspaceId={model.workspaceId ?? model.cwd}
+          cwd={model.cwd}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function ChangesComparisonToolbar({
   compact,
   model,
+  repository,
   sidebarSurface,
 }: {
   compact: boolean;
   model: ChangesComparisonToolbarModel;
+  /** Set when this row stands alone (the Diff tab), so it carries the branch labels. */
+  repository?: ChangesRepositoryToolbarModel;
   sidebarSurface: boolean;
 }) {
+  const modeMenu = (
+    <DiffModeMenu
+      diffMode={model.diffMode}
+      onSelectUncommitted={model.onSelectUncommitted}
+      onSelectBase={model.onSelectBase}
+      onSelectAll={model.onSelectAll}
+      turnModes={model.turnModes}
+      commitRanges={model.commitRanges}
+    />
+  );
   return (
     <ChangesToolbarRow
       compact={compact}
@@ -720,14 +750,17 @@ function ChangesComparisonToolbar({
       trailing="glyph"
     >
       <ChangesToolbarLeading>
-        <DiffModeMenu
-          diffMode={model.diffMode}
-          onSelectUncommitted={model.onSelectUncommitted}
-          onSelectBase={model.onSelectBase}
-          onSelectAll={model.onSelectAll}
-          turnModes={model.turnModes}
-          commitRanges={model.commitRanges}
-        />
+        {repository ? (
+          // Branch names truncate first so the mode menu keeps its label.
+          <>
+            <View style={styles.changesToolbarBranches}>
+              <ChangesBranchLabels model={repository} />
+            </View>
+            <View style={styles.changesToolbarModeMenu}>{modeMenu}</View>
+          </>
+        ) : (
+          modeMenu
+        )}
         {model.selectedDiffStat ? (
           <DiffStat
             additions={model.selectedDiffStat.additions}
@@ -1834,6 +1867,16 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
+  },
+  changesToolbarBranches: {
+    flexShrink: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
+  changesToolbarModeMenu: {
+    flexShrink: 0,
   },
   changesToolbarControls: {
     flexDirection: "row",

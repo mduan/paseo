@@ -1726,11 +1726,11 @@ export const es: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "HEAD separado",
+    title: "Rama actual",
     searchPlaceholder: "Filtrar ramas...",
     empty: "No se encontraron sucursales.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "Cambiar rama base",
     currentBase: "Rama base: {{baseRef}}. Pulsa para cambiar la rama base.",
     placeholder: "Cambiar rama base...",
     title: "Rama base",

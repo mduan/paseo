@@ -110,7 +110,7 @@ export function BaseRefSwitcher({
             />
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <Text style={styles.tooltipText}>{t("baseRefSwitcher.triggerTooltip")}</Text>
+            <BranchTooltipText title={t("baseRefSwitcher.title")} name={displayedBaseRefLabel} />
           </TooltipContent>
         </Tooltip>
         <Combobox
@@ -134,6 +134,16 @@ export function BaseRefSwitcher({
   );
 }
 
+/** Tooltip body for a truncated branch label: what the branch is, then its full name. */
+export function BranchTooltipText({ title, name }: { title: string; name: string }) {
+  return (
+    <View>
+      <Text style={styles.tooltipTitle}>{title}</Text>
+      <Text style={styles.tooltipText}>{name}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
@@ -146,6 +156,10 @@ const styles = StyleSheet.create((theme) => ({
   anchor: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  tooltipTitle: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   tooltipText: {
     color: theme.colors.popoverForeground,

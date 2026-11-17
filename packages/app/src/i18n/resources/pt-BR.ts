@@ -1711,11 +1711,11 @@ export const ptBR: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "HEAD desanexado",
+    title: "Branch atual",
     searchPlaceholder: "Filtrar branches...",
     empty: "Nenhuma branch encontrada.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "Alterar branch base",
     currentBase: "Branch base: {{baseRef}}. Pressione para alterar a branch base.",
     placeholder: "Alterar branch base...",
     title: "Branch base",

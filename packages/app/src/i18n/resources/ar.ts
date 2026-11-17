@@ -1679,11 +1679,11 @@ export const ar: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "HEAD منفصل",
+    title: "الفرع الحالي",
     searchPlaceholder: "تصفية الفروع...",
     empty: "لم يتم العثور على فروع.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "تغيير الفرع الأساسي",
     currentBase: "الفرع الأساسي: {{baseRef}}. اضغط لتغيير الفرع الأساسي.",
     placeholder: "تغيير الفرع الأساسي...",
     title: "الفرع الأساسي",

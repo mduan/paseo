@@ -1708,11 +1708,11 @@ export const ru: TranslationResources = {
   },
   branchSwitcher: {
     detachedHead: "Отсоединённый HEAD",
+    title: "Текущая ветка",
     searchPlaceholder: "Фильтровать ветки...",
     empty: "Ветки не найдены.",
   },
   baseRefSwitcher: {
-    triggerTooltip: "Изменить базовую ветку",
     currentBase: "Базовая ветка: {{baseRef}}. Нажмите, чтобы изменить базовую ветку.",
     placeholder: "Изменить базовую ветку...",
     title: "Базовая ветка",
