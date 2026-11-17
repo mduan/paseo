@@ -27,13 +27,15 @@ describe("OpenAITTS", () => {
     speechCreateMock.mockReset();
   });
 
-  test("passes configured baseUrl to the OpenAI client", () => {
+  test("passes configured baseUrl to the OpenAI client", async () => {
+    speechCreateMock.mockResolvedValue({ body: null });
     const provider = new OpenAITTS(
       { apiKey: "sk-test", baseUrl: "https://speech.example.com/v1" },
       pino({ level: "silent" }),
     );
 
     expect(provider.getConfig().baseUrl).toBe("https://speech.example.com/v1");
+    await provider.synthesizeSpeech("hello");
     expect(openAiConstructorOptionsMock).toHaveBeenCalledWith({
       apiKey: "sk-test",
       baseURL: "https://speech.example.com/v1",
