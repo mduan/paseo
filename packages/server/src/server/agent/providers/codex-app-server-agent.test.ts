@@ -842,28 +842,19 @@ function startStreamingChild(): { session: CodexTestSession; events: AgentStream
   return { session, events };
 }
 
-function streamDeltas(session: CodexTestSession, count: number): string {
-  let text = "";
-  for (let index = 0; index < count; index += 1) {
-    const delta = `r${index} `;
-    text += delta;
-    asInternals(session).handleNotification("item/reasoning/summaryTextDelta", {
-      threadId: COALESCE_CHILD,
-      itemId: "child-reasoning",
-      delta,
-    });
+function streamDeltas(session: CodexTestSession, count: number) {
+  const streamed = { reasoning: "", message: "" };
+  for (const [kind, method, itemId, prefix] of [
+    ["reasoning", "item/reasoning/summaryTextDelta", "child-reasoning", "r"],
+    ["message", "item/agentMessage/delta", "child-message", "m"],
+  ] as const) {
+    for (let index = 0; index < count; index += 1) {
+      const delta = `${prefix}${index} `;
+      streamed[kind] += delta;
+      asInternals(session).handleNotification(method, { threadId: COALESCE_CHILD, itemId, delta });
+    }
   }
-  let message = "";
-  for (let index = 0; index < count; index += 1) {
-    const delta = `m${index} `;
-    message += delta;
-    asInternals(session).handleNotification("item/agentMessage/delta", {
-      threadId: COALESCE_CHILD,
-      itemId: "child-message",
-      delta,
-    });
-  }
-  return `${text}|${message}`;
+  return streamed;
 }
 
 function childTimeline(events: AgentStreamEvent[]): AgentTimelineItem[] {
@@ -878,18 +869,6 @@ function childTimeline(events: AgentStreamEvent[]): AgentTimelineItem[] {
 
 function joinedText(items: AgentTimelineItem[], type: "reasoning" | "assistant_message") {
   return items.flatMap((item) => (item.type === type ? [item.text] : [])).join("");
-}
-
-function countSubagentTraffic(events: AgentStreamEvent[]) {
-  return {
-    childRows: childTimeline(events).length,
-    upserts: events.filter(
-      (event) => event.type === "provider_subagent" && event.event.type === "upsert",
-    ).length,
-    parentToolCalls: events.filter(
-      (event) => event.type === "timeline" && event.item.type === "tool_call",
-    ).length,
-  };
 }
 
 describe("Codex app-server provider", () => {
@@ -4119,7 +4098,7 @@ describe("Codex app-server provider", () => {
 
   test("coalesces deltas into few rows and broadcasts with identical final text", () => {
     const { session, events } = startStreamingChild();
-    const [reasoning, message] = streamDeltas(session, 500).split("|");
+    const { reasoning, message } = streamDeltas(session, 500);
     asInternals(session).handleNotification("turn/completed", {
       threadId: COALESCE_CHILD,
       turn: { status: "completed" },
@@ -4128,10 +4107,14 @@ describe("Codex app-server provider", () => {
     const items = childTimeline(events);
     expect(joinedText(items, "reasoning")).toBe(reasoning);
     expect(joinedText(items, "assistant_message")).toBe(message);
-    const counts = countSubagentTraffic(events);
-    expect(counts.childRows).toBeLessThanOrEqual(3);
-    expect(counts.upserts).toBeLessThanOrEqual(3);
-    expect(counts.parentToolCalls).toBeLessThanOrEqual(4);
+    expect(items.length).toBeLessThanOrEqual(3);
+    expect(
+      events.filter((event) => event.type === "provider_subagent" && event.event.type === "upsert")
+        .length,
+    ).toBeLessThanOrEqual(3);
+    expect(
+      events.filter((event) => event.type === "timeline" && event.item.type === "tool_call").length,
+    ).toBeLessThanOrEqual(4);
     expect(events.at(-1)).toMatchObject({
       type: "timeline",
       item: {
@@ -4144,7 +4127,7 @@ describe("Codex app-server provider", () => {
 
   test("sends buffered text before an interrupted child turn settles", () => {
     const { session, events } = startStreamingChild();
-    const [, message] = streamDeltas(session, 50).split("|");
+    const { message } = streamDeltas(session, 50);
     asInternals(session).handleNotification("turn/completed", {
       threadId: COALESCE_CHILD,
       turn: { status: "interrupted" },
