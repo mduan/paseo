@@ -68,6 +68,11 @@ export type ProviderSubagentWorkspaceActivity = Pick<
   "parentAgentId" | "status" | "updatedAt"
 >;
 
+// Limits a read to what the descriptors of these workspaces need. Absent means all workspaces.
+export interface WorkspaceScope {
+  workspaceIds?: ReadonlySet<string>;
+}
+
 export interface WorkspaceDirectoryDeps {
   logger: pino.Logger;
   projectRegistry: {
@@ -76,11 +81,11 @@ export interface WorkspaceDirectoryDeps {
   workspaceRegistry: {
     list(): Promise<PersistedWorkspaceRecord[]>;
   };
-  listAgentPayloads(): Promise<AgentSnapshotPayload[]>;
+  listAgentPayloads(filter?: WorkspaceScope): Promise<AgentSnapshotPayload[]>;
   listProviderSubagentActivity(): Promise<ProviderSubagentWorkspaceActivity[]>;
-  listTerminalActivityContributions(): Promise<
-    Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
-  >;
+  listTerminalActivityContributions(
+    filter?: WorkspaceScope,
+  ): Promise<Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>>;
   isProviderVisibleToClient(provider: string): boolean;
   buildWorkspaceDescriptor(input: {
     workspace: PersistedWorkspaceRecord;
@@ -216,19 +221,25 @@ export class WorkspaceDirectory {
     includeGitData: boolean;
     workspaceIds?: Iterable<string>;
   }): Promise<Map<string, WorkspaceDescriptorPayload>> {
+    const workspaceIds = options.workspaceIds ? new Set(options.workspaceIds) : undefined;
+    const scope = { workspaceIds };
     const [
       agents,
       providerSubagentActivity,
-      persistedWorkspaces,
+      allWorkspaces,
       persistedProjects,
       terminalContributions,
     ] = await Promise.all([
-      this.deps.listAgentPayloads(),
+      this.deps.listAgentPayloads(scope),
       this.deps.listProviderSubagentActivity(),
       this.deps.workspaceRegistry.list(),
       this.deps.projectRegistry.list(),
-      this.deps.listTerminalActivityContributions(),
+      this.deps.listTerminalActivityContributions(scope),
     ]);
+    // ponytail: registries are in-memory caches, so list() then filter; use get() if that changes.
+    const persistedWorkspaces = workspaceIds
+      ? allWorkspaces.filter((workspace) => workspaceIds.has(workspace.workspaceId))
+      : allWorkspaces;
 
     const activeProjects = new Map(
       persistedProjects
@@ -237,16 +248,12 @@ export class WorkspaceDirectory {
     );
     const activeRecords = activeWorkspaceRecords(persistedWorkspaces, persistedProjects);
     const descriptorsByWorkspaceId = new Map<string, WorkspaceDescriptorPayload>();
-    const workspaceIds = options.workspaceIds ? new Set(options.workspaceIds) : null;
     const activeWorkspaceIds = new Set(activeRecords.map((workspace) => workspace.workspaceId));
-    const includedWorkspaces = activeRecords.filter(
-      (workspace) => !workspaceIds || workspaceIds.has(workspace.workspaceId),
-    );
     const activeRecordsByWorkspaceId = new Map(
       activeRecords.map((workspace) => [workspace.workspaceId, workspace] as const),
     );
     const workspaceDescriptors = await Promise.all(
-      includedWorkspaces.map((workspace) =>
+      activeRecords.map((workspace) =>
         this.deps.buildWorkspaceDescriptor({
           workspace,
           projectRecord: activeProjects.get(workspace.projectId) ?? null,
@@ -254,8 +261,8 @@ export class WorkspaceDirectory {
         }),
       ),
     );
-    for (let i = 0; i < includedWorkspaces.length; i += 1) {
-      const workspaceId = includedWorkspaces[i].workspaceId;
+    for (let i = 0; i < activeRecords.length; i += 1) {
+      const workspaceId = activeRecords[i].workspaceId;
       descriptorsByWorkspaceId.set(workspaceId, {
         ...workspaceDescriptors[i],
         archivingAt: this.archivingByWorkspaceId.get(workspaceId) ?? null,
@@ -712,6 +719,23 @@ function groupAgentsByWorkspaceId(
     byWorkspaceId.set(workspaceId, entries);
   }
   return byWorkspaceId;
+}
+
+// Agents owned by `workspaceIds`, plus each one's direct parent. A child whose parent sits in
+// another workspace is a root only while that parent is active (see resolveWorkspaceRootAgent),
+// so the parent is needed to project these workspaces' descriptors.
+export function agentIdsForWorkspaces(
+  agents: Iterable<{ id: string; workspaceId?: string; labels?: Record<string, unknown> }>,
+  workspaceIds: ReadonlySet<string>,
+): Set<string> {
+  const agentIds = new Set<string>();
+  for (const agent of agents) {
+    if (!agent.workspaceId || !workspaceIds.has(agent.workspaceId)) continue;
+    agentIds.add(agent.id);
+    const parentAgentId = getParentAgentIdFromLabels(agent.labels);
+    if (parentAgentId) agentIds.add(parentAgentId);
+  }
+  return agentIds;
 }
 
 export function resolveWorkspaceRootAgent(

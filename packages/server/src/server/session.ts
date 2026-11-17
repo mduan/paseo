@@ -250,10 +250,12 @@ import {
   type LinearIntegrationService,
 } from "../services/linear-integration.js";
 import {
+  agentIdsForWorkspaces,
   resolveWorkspaceRootAgent,
   summarizeFetchWorkspacesEntries,
   workspaceIdsOnCheckout,
   WorkspaceDirectory,
+  type WorkspaceScope,
   type WorkspaceUpdatesFilter,
 } from "./workspace-directory.js";
 import { shouldEmitPendingBootstrapUpdate } from "./workspace-bootstrap-dedupe.js";
@@ -1224,9 +1226,9 @@ export class Session {
       logger: this.sessionLogger,
       projectRegistry: this.projectRegistry,
       workspaceRegistry: this.workspaceRegistry,
-      listAgentPayloads: () => this.listAgentPayloads(),
+      listAgentPayloads: (filter) => this.listAgentPayloads(filter),
       listProviderSubagentActivity: async () => this.agentManager.listProviderSubagentActivity(),
-      listTerminalActivityContributions: () => this.listTerminalActivityContributions(),
+      listTerminalActivityContributions: (filter) => this.listTerminalActivityContributions(filter),
       isProviderVisibleToClient: (provider) => this.isProviderVisibleToClient(provider),
       buildWorkspaceDescriptor: (input) => this.buildWorkspaceDescriptor(input),
     });
@@ -5490,9 +5492,9 @@ export class Session {
     );
   }
 
-  private async listTerminalActivityContributions(): Promise<
-    Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
-  > {
+  private async listTerminalActivityContributions(
+    filter?: WorkspaceScope,
+  ): Promise<Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>> {
     const terminalManager = this.terminalManager;
     if (!terminalManager) {
       return [];
@@ -5501,7 +5503,14 @@ export class Session {
     const terminalsByDirectory = await Promise.all(
       directories.map((cwd) => terminalManager.getTerminals(cwd)),
     );
-    return terminalsByDirectory.flat().map((session) => {
+    const workspaceIds = filter?.workspaceIds;
+    const sessions = terminalsByDirectory
+      .flat()
+      .filter(
+        (session) =>
+          !workspaceIds || (!!session.workspaceId && workspaceIds.has(session.workspaceId)),
+      );
+    return sessions.map((session) => {
       const contribution: { cwd: string; workspaceId?: string; activity: TerminalActivity | null } =
         {
           cwd: session.cwd,
@@ -5521,23 +5530,32 @@ export class Session {
     labels?: Record<string, string>;
     includeArchived?: boolean;
     includeUnavailablePersisted?: boolean;
+    workspaceIds?: ReadonlySet<string>;
   }): Promise<AgentSnapshotPayload[]> {
     const includeArchived = filter?.includeArchived === true;
     const labelEntries = filter?.labels ? Object.entries(filter.labels) : [];
 
-    // Get live agents with session modes
-    const agentSnapshots = this.agentManager.listAgents();
+    let agentSnapshots = this.agentManager.listAgents();
+    const liveIds = new Set(agentSnapshots.map((a) => a.id));
+    // Persisted agents that have not been lazily initialized yet
+    // (excluding internal agents which are for ephemeral system tasks)
+    let registryRecords = (await this.agentStorage.list()).filter(
+      (record) => !liveIds.has(record.id) && !record.internal,
+    );
+    if (filter?.workspaceIds) {
+      const agentIds = agentIdsForWorkspaces(
+        [...agentSnapshots, ...registryRecords],
+        filter.workspaceIds,
+      );
+      agentSnapshots = agentSnapshots.filter((agent) => agentIds.has(agent.id));
+      registryRecords = registryRecords.filter((record) => agentIds.has(record.id));
+    }
+
     const liveAgents = await Promise.all(
       agentSnapshots.map((agent) => this.buildAgentPayload(agent)),
     );
-
-    // Add persisted agents that have not been lazily initialized yet
-    // (excluding internal agents which are for ephemeral system tasks)
-    const registryRecords = await this.agentStorage.list();
-    const liveIds = new Set(agentSnapshots.map((a) => a.id));
     const registeredProviderIds = new Set(this.providerSnapshotManager.listRegisteredProviderIds());
     const persistedAgents = registryRecords
-      .filter((record) => !liveIds.has(record.id) && !record.internal)
       // Keep raw-record filters ahead of projection; seeded homes can carry thousands of archived agents.
       .filter((record) => includeArchived || !record.archivedAt)
       .filter((record) => labelEntries.every(([key, value]) => record.labels?.[key] === value))
