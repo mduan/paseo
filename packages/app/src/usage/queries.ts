@@ -1,8 +1,9 @@
 import { supportsUsageReports } from "@getpaseo/client/internal/daemon-client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { skipToken, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useShallow } from "zustand/shallow";
 import { useFetchQuery } from "@/data/query";
+import { useAppVisible } from "@/hooks/use-app-visible";
 import { useAppSettings } from "@/hooks/use-settings";
 import {
   getHostRuntimeStore,
@@ -116,18 +117,24 @@ export function useUsageHostReports(serverId: string | null): UsageReportEntry[]
 /**
  * Force-refreshes the host's reports on the user's auto-refresh interval, so the sidebar summary
  * moves without opening the Usage screen. Mount it once; every mount runs its own timer.
+ * The timer pauses while the app is hidden; returning after a missed tick refreshes at once.
  */
 export function useUsageAutoRefresh(serverId: string | null): void {
   const queryClient = useQueryClient();
   const { settings } = useAppSettings();
   const intervalMs = usageAutoRefreshMs(settings.usageAutoRefresh);
+  const visible = useAppVisible();
+  const lastRefreshAtRef = useRef(Date.now());
   useEffect(() => {
-    if (!serverId || !intervalMs) return;
-    const timer = setInterval(() => {
+    if (!serverId || !intervalMs || !visible) return;
+    const refresh = () => {
+      lastRefreshAtRef.current = Date.now();
       void refreshReports(queryClient, serverId).catch(() => undefined);
-    }, intervalMs);
+    };
+    if (Date.now() - lastRefreshAtRef.current >= intervalMs) refresh();
+    const timer = setInterval(refresh, intervalMs);
     return () => clearInterval(timer);
-  }, [queryClient, serverId, intervalMs]);
+  }, [queryClient, serverId, intervalMs, visible]);
 }
 
 /** Every host with whether it is connected and reports usage, in host order. */

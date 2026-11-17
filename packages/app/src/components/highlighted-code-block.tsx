@@ -11,6 +11,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { highlightToKeyedLines, type KeyedLine } from "@/utils/highlight-cache";
+import type { MarkdownPhase } from "@/components/markdown/fence/types";
 import {
   markdownCopyCodeBlockDataSet,
   markdownCopyDataSet,
@@ -22,6 +23,7 @@ interface HighlightedCodeBlockProps {
   language: string | null | undefined;
   inheritedStyles: TextStyle;
   textStyle: TextStyle;
+  phase?: MarkdownPhase;
 }
 
 // Fence info strings ("```ts", "```typescript", "```ts {1,3}") map to the
@@ -54,11 +56,27 @@ function stripTerminalFenceNewline(code: string): string {
   return code.endsWith("\n") ? code.slice(0, -1) : code;
 }
 
+interface StreamingCodeSplit {
+  completeLines: string;
+  pendingLine: string;
+}
+
+// The paced reveal grows a streaming block every frame; highlighting finished lines re-parses only per new line.
+function splitAtLastLineBreak(code: string): StreamingCodeSplit | undefined {
+  const lastLineBreak = code.lastIndexOf("\n");
+  if (lastLineBreak < 0) return undefined;
+  return {
+    completeLines: code.slice(0, lastLineBreak),
+    pendingLine: code.slice(lastLineBreak + 1),
+  };
+}
+
 export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   code,
   language,
   inheritedStyles,
   textStyle,
+  phase = "complete",
 }: HighlightedCodeBlockProps) {
   // Box styles (bg / padding / border / radius / margin) go on the wrapper View
   // so the absolute copy button positions relative to the visible code area,
@@ -73,10 +91,23 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
     [language],
   );
 
-  const keyedLines = useMemo<KeyedLine[] | null>(
-    () => highlightToKeyedLines(renderedCode, fenceLanguageToExtension(language)),
-    [renderedCode, language],
+  const isStreaming = phase === "streaming";
+  const streamingSplit = useMemo(
+    () => (isStreaming ? splitAtLastLineBreak(code) : undefined),
+    [code, isStreaming],
   );
+  // No finished lines yet (no line break) → the plain-text branch.
+  const highlightSource = isStreaming ? streamingSplit?.completeLines : renderedCode;
+  const keyedLines = useMemo<KeyedLine[] | null>(
+    () =>
+      highlightSource === undefined
+        ? null
+        : highlightToKeyedLines(highlightSource, fenceLanguageToExtension(language), {
+            storeInCache: !isStreaming,
+          }),
+    [highlightSource, language, isStreaming],
+  );
+  const pendingLine = streamingSplit?.pendingLine;
 
   const isCompact = useIsCompactFormFactor();
   const [isHovered, setIsHovered] = useState(false);
@@ -98,6 +129,7 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
       {keyedLines ? (
         <MarkdownTextSpan style={innerTextStyle} copyTag="code">
           {renderCodeSegments(keyedLines)}
+          {pendingLine ? <CodeTextSpan key="pending-line" text={`\n${pendingLine}`} /> : null}
         </MarkdownTextSpan>
       ) : (
         <MarkdownTextSpan style={innerTextStyle} copyTag="code">
@@ -127,13 +159,17 @@ interface TokenSpanProps {
   token: HighlightToken;
 }
 
-const TokenSpan = React.memo(function TokenSpan({ token }: TokenSpanProps) {
-  return (
-    <MarkdownTextSpan style={token.style ? syntaxTokenStyleFor(token.style) : undefined}>
-      {token.text}
-    </MarkdownTextSpan>
-  );
-});
+// Compare contents — re-highlighting creates new token objects for unchanged tokens.
+const TokenSpan = React.memo(
+  function TokenSpan({ token }: TokenSpanProps) {
+    return (
+      <MarkdownTextSpan style={token.style ? syntaxTokenStyleFor(token.style) : undefined}>
+        {token.text}
+      </MarkdownTextSpan>
+    );
+  },
+  (prev, next) => prev.token.text === next.token.text && prev.token.style === next.token.style,
+);
 
 interface CodeTextSpanProps {
   text: string;

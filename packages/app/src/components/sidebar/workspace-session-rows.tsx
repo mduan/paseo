@@ -80,13 +80,12 @@ import {
   selectExplorerSidebarPaneId,
   useWorkspaceLayoutStore,
 } from "@/stores/workspace-layout-store";
-import { isWorkspaceRootAgent } from "@/subagents/policies";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getAgentActivityAt } from "@/utils/workspace-agent-activity";
-import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { buildWorkspaceTabPersistenceKey, type WorkspaceTab } from "@/workspace-tabs/model";
 import {
   orderWorkspaceSessions,
+  selectWorkspaceSessionAgentIds,
   type WorkspaceSessionRow,
 } from "@/components/sidebar/workspace-session-order";
 
@@ -147,28 +146,19 @@ export function useWorkspaceSessionRows(workspace: SidebarWorkspaceEntry): Works
     (state) => state.hiddenAgentIdsByWorkspace[layoutKey],
   );
 
+  // Collapsed workspaces show no rows, and nothing else reads their agents.
   const agentIds = useSessionStore(
     useShallow((state) => {
-      if (!kinds.agents) return EMPTY_IDS;
+      if (!kinds.agents || !expanded) return EMPTY_IDS;
       const session = state.sessions[serverId];
-      const normalizedWorkspaceId = normalizeWorkspaceOpaqueId(workspaceId);
-      if (!session?.agents || !normalizedWorkspaceId) return EMPTY_IDS;
-      const agents = Array.from(session.agents.values()).filter((agent) => {
-        if (agent.archivedAt) return false;
-        if (normalizeWorkspaceOpaqueId(agent.workspaceId) !== normalizedWorkspaceId) return false;
-        // `/clear` and friends hide the agent they replace; it stays unarchived but has no tab.
-        if (hiddenAgentIds?.has(agent.id)) return false;
-        const parent = agent.parentAgentId
-          ? (session.agents.get(agent.parentAgentId) ??
-            session.agentDetails?.get(agent.parentAgentId))
-          : undefined;
-        const hasOpenTab = tabs.some(
-          (tab) => tab.target.kind === "agent" && tab.target.agentId === agent.id,
-        );
-        return isWorkspaceRootAgent(agent, parent) || hasOpenTab;
+      if (!session?.agents) return EMPTY_IDS;
+      return selectWorkspaceSessionAgentIds({
+        agents: session.agents,
+        agentDetails: session.agentDetails,
+        workspaceId,
+        hiddenAgentIds,
+        tabs,
       });
-      agents.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      return agents.map((agent) => agent.id);
     }),
   );
 

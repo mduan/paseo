@@ -1804,6 +1804,7 @@ interface StreamStatePatch {
   head?: StreamItem[];
   acknowledgedClientMessageIds?: readonly string[];
   taskSnapshot?: TodoEntry[];
+  updateCursor?: (current: TimelineCursor | undefined) => TimelineCursor;
 }
 
 export function deriveAgentStreamTurnLiveness(
@@ -1830,10 +1831,6 @@ export function deriveAgentStreamTurnLiveness(
 export interface CreateSessionAgentStreamReducerQueueInput {
   serverId: string;
   setAgentStreamState: (serverId: string, agentId: string, state: StreamStatePatch) => void;
-  setAgentTimelineCursor: (
-    serverId: string,
-    state: (prev: Map<string, TimelineCursor>) => Map<string, TimelineCursor>,
-  ) => void;
   recoverTimelineGap: (agentId: string, cursor: { epoch: string; endSeq: number }) => void;
   onCommitted?: (agentId: string) => void;
 }
@@ -1886,11 +1883,42 @@ function cancelAgentStreamReducerFlush(id: number) {
   clearScheduledReducerFlush(handle);
 }
 
+function createCursorUpdater(
+  nextCursor: TimelineCursor | null,
+  events: readonly AgentStreamReducerEvent[],
+): StreamStatePatch["updateCursor"] {
+  if (!nextCursor) {
+    return undefined;
+  }
+  const lastEvent = events.at(-1);
+  return (current) => {
+    if (
+      current &&
+      lastEvent &&
+      typeof lastEvent.seq === "number" &&
+      typeof lastEvent.epoch === "string" &&
+      current.epoch === lastEvent.epoch &&
+      lastEvent.seq >= current.startSeq &&
+      lastEvent.seq <= current.endSeq
+    ) {
+      return current;
+    }
+    if (
+      current &&
+      current.epoch === nextCursor.epoch &&
+      current.startSeq === nextCursor.startSeq &&
+      current.endSeq === nextCursor.endSeq
+    ) {
+      return current;
+    }
+    return nextCursor;
+  };
+}
+
 export function createSessionAgentStreamReducerQueue(
   input: CreateSessionAgentStreamReducerQueueInput,
 ): AgentStreamReducerQueue {
-  const { serverId, setAgentStreamState, setAgentTimelineCursor, recoverTimelineGap, onCommitted } =
-    input;
+  const { serverId, setAgentStreamState, recoverTimelineGap, onCommitted } = input;
 
   return createAgentStreamReducerQueue({
     getSnapshot: (agentId) => {
@@ -1905,11 +1933,15 @@ export function createSessionAgentStreamReducerQueue(
       };
     },
     commit: (agentId, result, events) => {
+      const updateCursor = result.cursorChanged
+        ? createCursorUpdater(result.cursor, events)
+        : undefined;
       if (
         result.changedTail ||
         result.changedHead ||
         result.acknowledgedClientMessageIds.length > 0 ||
-        result.taskSnapshot !== undefined
+        result.taskSnapshot !== undefined ||
+        updateCursor
       ) {
         setAgentStreamState(serverId, agentId, {
           ...(result.changedTail ? { tail: result.tail } : {}),
@@ -1918,35 +1950,7 @@ export function createSessionAgentStreamReducerQueue(
             ? { acknowledgedClientMessageIds: result.acknowledgedClientMessageIds }
             : {}),
           ...(result.taskSnapshot !== undefined ? { taskSnapshot: result.taskSnapshot } : {}),
-        });
-      }
-      if (result.cursorChanged && result.cursor) {
-        const nextCursor = result.cursor;
-        const lastEvent = events.at(-1);
-        setAgentTimelineCursor(serverId, (prev) => {
-          const current = prev.get(agentId);
-          if (
-            current &&
-            lastEvent &&
-            typeof lastEvent.seq === "number" &&
-            typeof lastEvent.epoch === "string" &&
-            current.epoch === lastEvent.epoch &&
-            lastEvent.seq >= current.startSeq &&
-            lastEvent.seq <= current.endSeq
-          ) {
-            return prev;
-          }
-          if (
-            current &&
-            current.epoch === nextCursor.epoch &&
-            current.startSeq === nextCursor.startSeq &&
-            current.endSeq === nextCursor.endSeq
-          ) {
-            return prev;
-          }
-          const next = new Map(prev);
-          next.set(agentId, nextCursor);
-          return next;
+          ...(updateCursor ? { updateCursor } : {}),
         });
       }
       onCommitted?.(agentId);

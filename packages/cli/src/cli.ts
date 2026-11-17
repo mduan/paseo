@@ -1,5 +1,5 @@
 import { pairCommand } from "./commands/daemon/pair.js";
-import { Command, Option } from "commander";
+import { type Command, Option } from "commander";
 import { createAgentCommand } from "./commands/agent/index.js";
 import { createDaemonCommand } from "./commands/daemon/index.js";
 import { createPermitCommand } from "./commands/permit/index.js";
@@ -38,25 +38,13 @@ import {
   addJsonAndDaemonHostOptions,
   withGlobalOptions,
 } from "./utils/command-options.js";
-import { resolveCliVersion } from "./version.js";
-
-const VERSION = resolveCliVersion();
+import { createCliProgram } from "./cli-program.js";
 
 export function createCli(): Command {
-  const program = new Command();
+  return createCliProgram(registerCommands);
+}
 
-  program
-    .name("paseo")
-    .description("Paseo CLI - control your AI coding agents from the command line")
-    .version(VERSION, "-v, --version", "output the version number")
-    // Global output options
-    .option("-o, --format <format>", "output format: table, json, yaml", "table")
-    .option("--json", "output in JSON format (alias for --format json)")
-    .option("-q, --quiet", "minimal output (IDs only)")
-    .option("--no-headers", "omit table headers")
-    .option("--no-color", "disable colored output");
-  addDaemonHostOption(program);
-
+function registerCommands(program: Command): void {
   // Primary agent commands (top-level)
   addJsonAndDaemonHostOptions(addLsOptions(program.command("ls"))).action(withOutput(runLsCommand));
 
@@ -159,38 +147,4 @@ export function createCli(): Command {
   // COMPAT(worktreeCli): legacy command alias added before workspace was the product unit.
   // Added in v0.2.0; remove after 2027-01-17.
   program.addCommand(createWorktreeCommand(), { hidden: true });
-
-  // Stop root parsing at the command so `plugin update --version` belongs to update.
-  // Keep global options available after a command, as they were before positional parsing.
-  program.enablePositionalOptions();
-  for (const command of program.commands) {
-    for (const option of program.options) {
-      if (option.long === "--version") continue;
-      if (!command.options.some((local) => local.long === option.long)) command.addOption(option);
-      if (option.long === "--home" || option.long === "--host") continue;
-      command.on(`option:${option.name()}`, () => {
-        const key = option.attributeName();
-        program.setOptionValueWithSource(key, command.opts()[key], "cli");
-      });
-    }
-    if (command.name() !== "plugin")
-      command.version(VERSION, "-v, --version", "output the version number");
-  }
-
-  const enforceSelectorDuplicates = (command: Command) => {
-    for (const option of command.options) {
-      if (option.long !== "--home" && option.long !== "--host") continue;
-      option.argParser((value: string, previous: string | undefined) => {
-        if (previous !== undefined && previous !== value)
-          throw {
-            code: "TARGET_AMBIGUOUS",
-            message: `Conflicting duplicate ${option.long} selectors.`,
-          };
-        return value;
-      });
-    }
-    command.commands.forEach(enforceSelectorDuplicates);
-  };
-  enforceSelectorDuplicates(program);
-  return program;
 }

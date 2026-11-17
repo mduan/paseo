@@ -29,15 +29,13 @@ export interface FoldedTail {
  */
 export function foldCompletedTurns(input: {
   tail: StreamItem[];
-  head: StreamItem[];
+  headContinuesTail: boolean;
   isTurnActive: boolean;
   activeTurnId: string | null;
   expandedTurnKeys: ReadonlySet<string>;
 }): FoldedTail {
-  const { tail, head, isTurnActive, activeTurnId, expandedTurnKeys } = input;
-  const lastTurnIsLive =
-    (isTurnActive && activeTurnId === null) ||
-    (head.length > 0 && continuesTurn(tail[tail.length - 1] ?? null, head[0]!));
+  const { tail, headContinuesTail, isTurnActive, activeTurnId, expandedTurnKeys } = input;
+  const lastTurnIsLive = (isTurnActive && activeTurnId === null) || headContinuesTail;
 
   const items: StreamItem[] = [];
   const expandedWorkItemIds = new Set<string>();
@@ -152,8 +150,17 @@ export function useFoldedTail(input: {
     pendingAnchorRef.current = undefined;
     anchor.restore(anchor.top - top);
   }, []);
+  // Key on this boolean, not `head` (new every frame), so downstream tail caches keep hitting.
+  const headContinuesTail =
+    head.length > 0 && continuesTurn(tail[tail.length - 1] ?? null, head[0]!);
   return useMemo(() => {
-    const folded = foldCompletedTurns({ tail, head, isTurnActive, activeTurnId, expandedTurnKeys });
+    const folded = foldCompletedTurns({
+      tail,
+      headContinuesTail,
+      isTurnActive,
+      activeTurnId,
+      expandedTurnKeys,
+    });
     return {
       tail: folded.items,
       expandedTurnKeys,
@@ -165,7 +172,16 @@ export function useFoldedTail(input: {
         onToggleLayout,
       },
     };
-  }, [tail, head, isTurnActive, activeTurnId, expandedTurnKeys, onToggle, onToggleLayout, expand]);
+  }, [
+    tail,
+    headContinuesTail,
+    isTurnActive,
+    activeTurnId,
+    expandedTurnKeys,
+    onToggle,
+    onToggleLayout,
+    expand,
+  ]);
 }
 
 export interface WorkToggleContextValue {

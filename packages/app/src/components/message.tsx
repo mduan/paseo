@@ -141,6 +141,10 @@ interface UserMessageProps {
 
 const MessageOuterSpacingContext = createContext(false);
 
+// Shared across messages — parsers hold only config, and each construction recompiles linkify-it's regexes.
+const assistantMarkdownParser = createAssistantMarkdownParser();
+const streamingAssistantMarkdownParser = createAssistantMarkdownParser({ streaming: true });
+
 export function MessageOuterSpacingProvider({
   disableOuterSpacing,
   children,
@@ -1598,11 +1602,6 @@ export const AssistantMessage = memo(function AssistantMessage({
   phase,
 }: AssistantMessageProps) {
   const { t } = useTranslation();
-  const markdownParser = useMemo(createAssistantMarkdownParser, []);
-  const streamingMarkdownParser = useMemo(
-    () => createAssistantMarkdownParser({ streaming: true }),
-    [],
-  );
   const renderedMessage = useMemo(
     () =>
       renderFullContent ? { text: message, capped: false } : capAssistantMessageForRender(message),
@@ -1895,7 +1894,7 @@ export const AssistantMessage = memo(function AssistantMessage({
           );
         }
 
-        const inlineCodeLinkUrl = getInlineCodeAutoLinkUrl(markdownParser, content);
+        const inlineCodeLinkUrl = getInlineCodeAutoLinkUrl(assistantMarkdownParser, content);
         if (inlineCodeLinkUrl) {
           const source = getInlineCodeAutoLinkSource({
             href: inlineCodeLinkUrl,
@@ -2050,7 +2049,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         );
       },
     };
-  }, [client, fileLinkActions, markdownParser, occurrenceKey, phase, serverId, workspaceRoot]);
+  }, [client, fileLinkActions, occurrenceKey, phase, serverId, workspaceRoot]);
 
   const blocks = useMemo(() => splitMarkdownBlocks(revealedMessage), [revealedMessage]);
   const keyedBlocks = useMemo(
@@ -2083,8 +2082,8 @@ export const AssistantMessage = memo(function AssistantMessage({
             rules={markdownRules}
             parser={
               phase === "streaming" && index === keyedBlocks.length - 1
-                ? streamingMarkdownParser
-                : markdownParser
+                ? streamingAssistantMarkdownParser
+                : assistantMarkdownParser
             }
             onLinkPress={handleMarkdownLinkPress}
           />

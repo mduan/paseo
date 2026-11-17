@@ -44,10 +44,19 @@ class LRUCache<K, V> {
 
 const tokenizationCache = new LRUCache<string, HighlightToken[][]>(200);
 
+export interface TokenizeOptions {
+  // False for transient input (a streaming code block) so it can't evict finished blocks.
+  storeInCache?: boolean;
+}
+
 // Tokenize `code` to per-line tokens, cached. Returns null when the language is
 // unsupported, the input is over the size cap, or parsing throws — callers then
 // render plain text.
-export function tokenizeToLines(code: string, ext: string | null): HighlightToken[][] | null {
+export function tokenizeToLines(
+  code: string,
+  ext: string | null,
+  { storeInCache = true }: TokenizeOptions = {},
+): HighlightToken[][] | null {
   if (!ext) return null;
   if (code.length > MAX_HIGHLIGHT_CHARS) return null;
   const cacheKey = `${ext}:${code}`;
@@ -59,7 +68,7 @@ export function tokenizeToLines(code: string, ext: string | null): HighlightToke
   } catch {
     return null;
   }
-  tokenizationCache.set(cacheKey, lines);
+  if (storeInCache) tokenizationCache.set(cacheKey, lines);
   return lines;
 }
 
@@ -73,8 +82,12 @@ function toKeyedLine(tokens: HighlightToken[], lineIndex: number): KeyedLine {
   };
 }
 
-export function highlightToKeyedLines(code: string, ext: string | null): KeyedLine[] | null {
-  const lines = tokenizeToLines(code, ext);
+export function highlightToKeyedLines(
+  code: string,
+  ext: string | null,
+  options?: TokenizeOptions,
+): KeyedLine[] | null {
+  const lines = tokenizeToLines(code, ext, options);
   return lines ? lines.map(toKeyedLine) : null;
 }
 

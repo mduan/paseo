@@ -1,3 +1,6 @@
+import type { Agent } from "@/stores/session-store";
+import { isWorkspaceRootAgent } from "@/subagents/policies";
+import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import type { WorkspaceTab, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 export type WorkspaceSessionTarget = Extract<
@@ -54,4 +57,69 @@ export function orderWorkspaceSessions(input: {
   for (const agentId of agentIds) push({ kind: "agent", agentId }, null);
   for (const terminalId of terminalIds) push({ kind: "terminal", terminalId }, null);
   return rows;
+}
+
+export type WorkspaceSessionAgent = Pick<
+  Agent,
+  "id" | "archivedAt" | "workspaceId" | "parentAgentId" | "createdAt"
+>;
+
+const NO_AGENTS: WorkspaceSessionAgent[] = [];
+const NO_AGENT_IDS: string[] = [];
+
+// Built once per `agents` Map — every sidebar workspace selects on each session-store commit.
+const unarchivedAgentsByWorkspace = new WeakMap<
+  ReadonlyMap<string, WorkspaceSessionAgent>,
+  Map<string, WorkspaceSessionAgent[]>
+>();
+
+function getUnarchivedAgentsByWorkspace(
+  agents: ReadonlyMap<string, WorkspaceSessionAgent>,
+): Map<string, WorkspaceSessionAgent[]> {
+  let index = unarchivedAgentsByWorkspace.get(agents);
+  if (index) return index;
+  index = new Map();
+  for (const agent of agents.values()) {
+    if (agent.archivedAt) continue;
+    const workspaceId = normalizeWorkspaceOpaqueId(agent.workspaceId);
+    if (!workspaceId) continue;
+    const workspaceAgents = index.get(workspaceId);
+    if (workspaceAgents) workspaceAgents.push(agent);
+    else index.set(workspaceId, [agent]);
+  }
+  for (const workspaceAgents of index.values()) {
+    workspaceAgents.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+  unarchivedAgentsByWorkspace.set(agents, index);
+  return index;
+}
+
+/**
+ * The workspace's sidebar agents, oldest first: unarchived, not hidden, and either a workspace
+ * root or open in a tab.
+ */
+export function selectWorkspaceSessionAgentIds(input: {
+  agents: ReadonlyMap<string, WorkspaceSessionAgent>;
+  agentDetails: ReadonlyMap<string, WorkspaceSessionAgent> | undefined;
+  workspaceId: string;
+  hiddenAgentIds: ReadonlySet<string> | undefined;
+  tabs: readonly WorkspaceTab[];
+}): string[] {
+  const { agents, agentDetails, hiddenAgentIds, tabs } = input;
+  const workspaceId = normalizeWorkspaceOpaqueId(input.workspaceId);
+  if (!workspaceId) return NO_AGENT_IDS;
+  const workspaceAgents = getUnarchivedAgentsByWorkspace(agents).get(workspaceId) ?? NO_AGENTS;
+  const ids: string[] = [];
+  for (const agent of workspaceAgents) {
+    // `/clear` and friends hide the agent they replace; it stays unarchived but has no tab.
+    if (hiddenAgentIds?.has(agent.id)) continue;
+    const parent = agent.parentAgentId
+      ? (agents.get(agent.parentAgentId) ?? agentDetails?.get(agent.parentAgentId))
+      : undefined;
+    const hasOpenTab = tabs.some(
+      (tab) => tab.target.kind === "agent" && tab.target.agentId === agent.id,
+    );
+    if (isWorkspaceRootAgent(agent, parent) || hasOpenTab) ids.push(agent.id);
+  }
+  return ids;
 }

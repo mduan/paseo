@@ -51,6 +51,27 @@ describe("buildAgentStreamRenderModel", () => {
     expect(model.segments.historyVirtualized).toHaveLength(0);
   });
 
+  it("keeps the windowed history identity when only the head changes", () => {
+    const tail = [
+      userMessage("u1", 1),
+      assistantMessage("a1", 2),
+      userMessage("u2", 3),
+      assistantMessage("a2", 4),
+    ];
+    const build = (head: StreamItem[]) =>
+      buildAgentStreamRenderModel({
+        isTurnActive: true,
+        activeTurnStartedAt: null,
+        tail,
+        head,
+        platform: "web",
+        isMobileBreakpoint: false,
+        historyStart: 2,
+      });
+
+    expect(build([assistantMessage("live", 5)]).history).toBe(build([]).history);
+  });
+
   it("derives timing only for the rendered history window", () => {
     const tail = [
       userMessage("hidden-u", 1),

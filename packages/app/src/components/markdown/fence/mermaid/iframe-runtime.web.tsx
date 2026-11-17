@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiagramColorScheme, MermaidRenderRequest } from "./render-model";
-import { mermaidRuntimeHtml } from "./runtime/html.gen";
 import { parseMermaidRuntimeMessage, type MermaidRuntimeRenderMessage } from "./runtime/messages";
 import { MermaidRuntimeRequestDriver } from "./runtime/request-driver";
 
@@ -18,6 +17,24 @@ interface MermaidIframeRuntimeProps {
   onRenderFailed: (revision: number) => void;
 }
 
+// ~3.6 MB runtime document — loaded as a separate chunk on first use, not with the entry bundle.
+let runtimeHtml: string | undefined;
+let runtimeHtmlPromise: Promise<string> | undefined;
+
+function loadRuntimeHtml(): Promise<string> {
+  runtimeHtmlPromise ??= import("./runtime/html.gen").then(
+    (module) => {
+      runtimeHtml = module.mermaidRuntimeHtml;
+      return runtimeHtml;
+    },
+    (error: unknown) => {
+      runtimeHtmlPromise = undefined;
+      throw error;
+    },
+  );
+  return runtimeHtmlPromise;
+}
+
 /** Sandboxed Mermaid renderer. Sizing and gestures belong to the surrounding viewport. */
 export function MermaidIframeRuntime({
   request,
@@ -27,6 +44,28 @@ export function MermaidIframeRuntime({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const driverRef = useRef<MermaidRuntimeRequestDriver | null>(null);
   driverRef.current ??= new MermaidRuntimeRequestDriver();
+  const [html, setHtml] = useState(runtimeHtml);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    if (html) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const loaded = await loadRuntimeHtml();
+        if (!cancelled) setHtml(loaded);
+      } catch {
+        if (!cancelled) setLoadFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [html]);
+
+  useEffect(() => {
+    if (loadFailed && request) onRenderFailed(request.revision);
+  }, [loadFailed, onRenderFailed, request]);
 
   const sendRequest = useCallback((current: MermaidRenderRequest | null) => {
     const target = iframeRef.current?.contentWindow;
@@ -66,6 +105,9 @@ export function MermaidIframeRuntime({
     return () => window.removeEventListener("message", receiveMessage);
   }, [onRenderFailed, onRendered, sendRequest]);
 
+  // Requests queue in the driver until the loaded iframe reports `bridgeReady`.
+  if (!html) return null;
+
   // `inert` (not just tabIndex) because the Modal focus trap focuses descendants
   // programmatically; a focused iframe swallows every keystroke, including Escape.
   return (
@@ -75,7 +117,7 @@ export function MermaidIframeRuntime({
       aria-hidden
       inert
       sandbox="allow-scripts"
-      srcDoc={mermaidRuntimeHtml}
+      srcDoc={html}
       tabIndex={-1}
       style={iframeStyle}
     />

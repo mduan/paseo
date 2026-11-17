@@ -3,6 +3,7 @@ import { FlatList, Text, View, type ListRenderItem } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { highlightCode, type HighlightToken } from "@getpaseo/highlight";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
+import type { KeyedToken } from "@/utils/highlight-cache";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";
 import type { FileReviewConfig } from "../editor/review-layer.web";
@@ -22,7 +23,15 @@ interface FileSourceViewProps {
 
 interface SourceLine {
   number: number;
-  tokens: HighlightToken[];
+  tokens: KeyedToken[];
+}
+
+// A line can repeat a token's style and text, so only its position keys it.
+function toSourceLine(tokens: HighlightToken[], index: number): SourceLine {
+  return {
+    number: index + 1,
+    tokens: tokens.map((token, tokenIndex) => ({ key: String(tokenIndex), token })),
+  };
 }
 
 export function FileSourceView({
@@ -63,14 +72,8 @@ function VirtualizedSource({
 }) {
   const listRef = useRef<FlatList<SourceLine>>(null);
   const lines = useMemo(() => {
-    if (presentation === "highlighted")
-      return highlightCode(content, filename).map((tokens, index) => ({
-        number: index + 1,
-        tokens,
-      }));
-    return content
-      .split("\n")
-      .map((text, index) => ({ number: index + 1, tokens: [{ text, style: null }] }));
+    if (presentation === "highlighted") return highlightCode(content, filename).map(toSourceLine);
+    return content.split("\n").map((text, index) => toSourceLine([{ text, style: null }], index));
   }, [content, filename, presentation]);
   useEffect(() => {
     if (!location.lineStart) return;
@@ -98,8 +101,8 @@ function SourceLineView({ line }: { line: SourceLine }) {
     <View style={styles.line}>
       <Text style={styles.gutter}>{line.number}</Text>
       <Text selectable style={styles.text}>
-        {line.tokens.map((token) => (
-          <Text key={`${token.style}:${token.text}`} style={syntaxTokenStyleFor(token.style)}>
+        {line.tokens.map(({ key, token }) => (
+          <Text key={key} style={syntaxTokenStyleFor(token.style)}>
             {token.text}
           </Text>
         ))}

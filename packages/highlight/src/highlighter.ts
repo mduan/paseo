@@ -39,23 +39,17 @@ export function highlightCode(code: string, filename: string): HighlightToken[][
       continue;
     }
 
-    let currentToken: HighlightToken = { text: "", style: styleMap[pos] };
-
-    for (let i = 0; i < line.length; i++) {
-      const charStyle = styleMap[pos + i];
-      if (charStyle === currentToken.style) {
-        currentToken.text += line[i];
-      } else {
-        if (currentToken.text) {
-          result[lineIndex].push(currentToken);
-        }
-        currentToken = { text: line[i], style: charStyle };
+    let tokenStart = 0;
+    for (let i = 1; i < line.length; i++) {
+      if (styleMap[pos + i] !== styleMap[pos + tokenStart]) {
+        result[lineIndex].push({
+          text: line.slice(tokenStart, i),
+          style: styleMap[pos + tokenStart],
+        });
+        tokenStart = i;
       }
     }
-
-    if (currentToken.text) {
-      result[lineIndex].push(currentToken);
-    }
+    result[lineIndex].push({ text: line.slice(tokenStart), style: styleMap[pos + tokenStart] });
 
     pos += line.length + 1; // +1 for newline
   }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { orderWorkspaceSessions } from "@/components/sidebar/workspace-session-order";
+import {
+  orderWorkspaceSessions,
+  selectWorkspaceSessionAgentIds,
+  type WorkspaceSessionAgent,
+} from "@/components/sidebar/workspace-session-order";
 import type { WorkspaceTab, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 function tab(tabId: string, target: WorkspaceTabTarget): WorkspaceTab {
@@ -42,5 +46,51 @@ describe("orderWorkspaceSessions", () => {
       kinds: { agents: true, terminals: false, browsers: false },
     });
     expect(rows.map((row) => row.key)).toEqual(["agent:a1"]);
+  });
+});
+
+function agent(id: string, fields: Partial<WorkspaceSessionAgent> = {}): WorkspaceSessionAgent {
+  return { id, workspaceId: "ws-1", parentAgentId: null, createdAt: new Date(0), ...fields };
+}
+
+function agentMap(...agents: WorkspaceSessionAgent[]): Map<string, WorkspaceSessionAgent> {
+  return new Map(agents.map((entry) => [entry.id, entry]));
+}
+
+describe("selectWorkspaceSessionAgentIds", () => {
+  const base = { agentDetails: undefined, hiddenAgentIds: undefined, tabs: [] };
+
+  it("lists the workspace's visible root agents oldest first", () => {
+    const agents = agentMap(
+      agent("newer", { createdAt: new Date(2) }),
+      agent("older", { createdAt: new Date(1) }),
+      agent("archived", { archivedAt: new Date(3) }),
+      agent("hidden"),
+      agent("elsewhere", { workspaceId: "ws-2" }),
+      agent("child", { parentAgentId: "older" }),
+      agent("opened-child", { parentAgentId: "older", createdAt: new Date(3) }),
+    );
+    const ids = selectWorkspaceSessionAgentIds({
+      ...base,
+      agents,
+      workspaceId: "ws-1",
+      hiddenAgentIds: new Set(["hidden"]),
+      tabs: [tab("t1", { kind: "agent", agentId: "opened-child" })],
+    });
+    expect(ids).toEqual(["older", "newer", "opened-child"]);
+    expect(selectWorkspaceSessionAgentIds({ ...base, agents, workspaceId: "ws-2" })).toEqual([
+      "elsewhere",
+    ]);
+  });
+
+  it("reflects agent changes once the agents map is replaced", () => {
+    const first = agentMap(agent("a1"));
+    expect(selectWorkspaceSessionAgentIds({ ...base, agents: first, workspaceId: "ws-1" })).toEqual(
+      ["a1"],
+    );
+    const next = agentMap(agent("a1", { archivedAt: new Date(1) }), agent("a2"));
+    expect(selectWorkspaceSessionAgentIds({ ...base, agents: next, workspaceId: "ws-1" })).toEqual([
+      "a2",
+    ]);
   });
 });

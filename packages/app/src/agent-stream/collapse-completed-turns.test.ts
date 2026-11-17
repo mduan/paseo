@@ -50,7 +50,7 @@ const turn2 = [user("p2", "t2"), thought("w3", "t2"), assistant("a2", "t2")];
 function fold(input: { isTurnActive?: boolean; activeTurnId?: string; expanded?: string[] }) {
   const folded = foldCompletedTurns({
     tail: [...turn1, ...turn2],
-    head: [],
+    headContinuesTail: false,
     isTurnActive: input.isTurnActive ?? false,
     activeTurnId: input.activeTurnId ?? null,
     expandedTurnKeys: new Set(input.expanded),
@@ -89,7 +89,7 @@ describe("foldCompletedTurns", () => {
         { ...thought("w", "t"), timestamp: at(5) },
         { ...assistant("a", "t"), timestamp: at(12) },
       ],
-      head: [],
+      headContinuesTail: false,
       isTurnActive: false,
       activeTurnId: null,
       expandedTurnKeys: new Set(),
@@ -108,7 +108,7 @@ describe("foldCompletedTurns", () => {
         { ...thought("w", "t2"), timestamp: at(30) },
         { ...assistant("a2", "t2"), timestamp: at(33) },
       ],
-      head: [],
+      headContinuesTail: false,
       isTurnActive: false,
       activeTurnId: null,
       expandedTurnKeys: new Set(),
@@ -120,7 +120,7 @@ describe("foldCompletedTurns", () => {
   it("gives a turn without work a duration-only row", () => {
     const folded = foldCompletedTurns({
       tail: [user("p", "t"), assistant("a", "t")],
-      head: [],
+      headContinuesTail: false,
       isTurnActive: false,
       activeTurnId: null,
       expandedTurnKeys: new Set(),
@@ -148,7 +148,7 @@ describe("foldCompletedTurns", () => {
     const foldRuleTurn = (expanded: string[]) =>
       foldCompletedTurns({
         tail,
-        head: [],
+        headContinuesTail: false,
         isTurnActive: false,
         activeTurnId: null,
         expandedTurnKeys: new Set(expanded),
@@ -167,7 +167,7 @@ describe("foldCompletedTurns", () => {
     };
     const folded = foldCompletedTurns({
       tail: [marker, user("p", "t"), thought("w", "t"), assistant("a", "t")],
-      head: [],
+      headContinuesTail: false,
       isTurnActive: false,
       activeTurnId: null,
       expandedTurnKeys: new Set(),

@@ -50,6 +50,14 @@ describe("tokenizeToLines", () => {
     const second = tokenizeToLines("const cached = true;", "ts");
     expect(first).toBe(second);
   });
+
+  it("does not cache results when storeInCache is false", () => {
+    const code = "const transient = true;";
+    const first = tokenizeToLines(code, "ts", { storeInCache: false });
+    const second = tokenizeToLines(code, "ts", { storeInCache: false });
+    expect(first).toEqual(second);
+    expect(first).not.toBe(second);
+  });
 });
 
 describe("highlightToKeyedLines", () => {

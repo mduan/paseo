@@ -5450,7 +5450,7 @@ export class AgentManager {
         this.pluginLifecycle,
         describeHookAgent({ ...agent, title: agent.config.title }),
         event,
-        this.timelineStore.getItems(agentId),
+        () => this.timelineStore.getItems(agentId),
       );
     }
   }

@@ -157,3 +157,13 @@ it("sees the final assistant message beyond the search page", async () => {
     { seq: 203, role: "assistant", count: 1, folded: false },
   ]);
 });
+
+it("searches the current text of an assistant item that changed in place", async () => {
+  const item = { type: "assistant_message" as const, text: "before" };
+  const source = rows([item]);
+  expect((await searchTimeline({ rows: source, query: "after" })).locations).toEqual([]);
+  item.text = "after";
+  expect((await searchTimeline({ rows: source, query: "after" })).locations).toEqual([
+    { seq: 1, role: "assistant", count: 1, folded: false },
+  ]);
+});
