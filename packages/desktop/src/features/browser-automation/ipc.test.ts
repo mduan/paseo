@@ -14,6 +14,7 @@ class FakeImage implements TabImage {
 }
 
 class FakeDebugger {
+  public constructor(private readonly isDestroyed: () => boolean) {}
   public attachedProtocolVersions: string[] = [];
   public commands: Array<{ command: string; params: Record<string, unknown> }> = [];
   public blockCommands = false;
@@ -38,6 +39,9 @@ class FakeDebugger {
   }
 
   public async sendCommand(command: string, params?: Record<string, unknown>): Promise<unknown> {
+    if (this.isDestroyed()) {
+      throw new Error("Object has been destroyed");
+    }
     this.commands.push({ command, params: params ?? {} });
     this.beforeCommand?.(command);
     const commandError = this.failedCommandErrors.get(command);
@@ -107,15 +111,7 @@ type ConsoleMessageListener = (
 ) => void;
 
 class FakeWebContents {
-  public backgroundThrottling = true;
-  public getBackgroundThrottling(): boolean {
-    return this.backgroundThrottling;
-  }
-  public setBackgroundThrottling(allowed: boolean): void {
-    if (this.destroyed) throw new Error("Object has been destroyed");
-    this.backgroundThrottling = allowed;
-  }
-  public readonly debugger = new FakeDebugger();
+  public readonly debugger = new FakeDebugger(() => this.destroyed);
   public readonly inputEvents: IsolatedKeyboardInputEvent[] = [];
   public readonly loadedUrls: string[] = [];
   public frameListener: ((image: TabImage) => void) | null = null;
@@ -760,27 +756,74 @@ function deferred<T>() {
 }
 
 describe("pixel capture frame production", () => {
-  test.each([true, false])(
-    "restores the prior throttling policy (%s) after capture or failure",
-    async (previous) => {
-      const contents = new FakeWebContents(8001);
-      contents.backgroundThrottling = previous;
-      const tab = adaptWebContents(contents);
-      expect(
-        await tab.withFrameProduction(async () => {
-          expect(contents.backgroundThrottling).toBe(false);
-          return "pixels";
-        }),
-      ).toBe("pixels");
-      expect(contents.backgroundThrottling).toBe(previous);
-      await expect(
-        tab.withFrameProduction(async () => {
-          throw new Error("capture failed");
-        }),
-      ).rejects.toThrow("capture failed");
-      expect(contents.backgroundThrottling).toBe(previous);
-    },
-  );
+  test("a timed-out full-page command does not block another tab's screenshot", async () => {
+    vi.useFakeTimers();
+    try {
+      const blocked = new FakeWebContents(8003);
+      blocked.debugger.blockedCommandNames.add("Page.captureScreenshot");
+      const next = new FakeWebContents(8004);
+      const tabs = new Map([
+        ["blocked", adaptWebContents(blocked)],
+        ["next", adaptWebContents(next)],
+      ]);
+      const registry: BrowserRegistry = {
+        listRegisteredBrowserIds: () => [...tabs.keys()],
+        listRegisteredBrowserIdsForWorkspace: () => [...tabs.keys()],
+        getTabContents: (id) => tabs.get(id) ?? null,
+        getBrowserWorkspaceId: () => null,
+        getWorkspaceActiveBrowserId: () => null,
+      };
+      const capture = ({ browserId, fullPage }: { browserId: string; fullPage: boolean }) =>
+        executeAutomationCommand(
+          {
+            type: "browser.automation.execute.request",
+            requestId: browserId,
+            command: { command: "screenshot", args: { browserId, fullPage } },
+          },
+          registry,
+        );
+      const timedOut = capture({ browserId: "blocked", fullPage: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(blocked.debugger.commands).toContainEqual({
+        command: "Page.captureScreenshot",
+        params: expect.any(Object),
+      });
+      const following = capture({ browserId: "next", fullPage: false });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(next.frameListener).not.toBeNull();
+      next.frameListener?.(new FakeImage());
+      await expect(following).resolves.toMatchObject({ ok: true });
+
+      blocked.debugger.finishNextCommand();
+      await expect(timedOut).resolves.toMatchObject({
+        ok: false,
+        error: { code: "screenshot_no_frame" },
+      });
+      expect(blocked.debugger.commands).toContainEqual({
+        command: "Emulation.setFocusEmulationEnabled",
+        params: { enabled: false },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("releases temporary frame production after capture or failure", async () => {
+    const contents = new FakeWebContents(8001);
+    const tab = adaptWebContents(contents);
+    expect(await tab.withFrameProduction(async () => "pixels")).toBe("pixels");
+    await expect(
+      tab.withFrameProduction(async () => {
+        throw new Error("capture failed");
+      }),
+    ).rejects.toThrow("capture failed");
+    expect(contents.debugger.commands).toEqual([
+      { command: "Emulation.setFocusEmulationEnabled", params: { enabled: true } },
+      { command: "Emulation.setFocusEmulationEnabled", params: { enabled: false } },
+      { command: "Emulation.setFocusEmulationEnabled", params: { enabled: true } },
+      { command: "Emulation.setFocusEmulationEnabled", params: { enabled: false } },
+    ]);
+  });
 
   test("does not touch a guest destroyed during capture", async () => {
     const contents = new FakeWebContents(8002);

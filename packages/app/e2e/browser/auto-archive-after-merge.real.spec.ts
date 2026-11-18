@@ -9,6 +9,7 @@ import {
 import {
   cloneGithubRepoDefaultBranchOnly,
   createTempGithubRepo,
+  mergeGithubPullRequest,
 } from "../support/helpers/github-fixtures";
 import {
   archiveWorkspaceFromDaemon,
@@ -61,17 +62,20 @@ async function createMergedPullRequestScenario(): Promise<MergedPullRequestScena
   try {
     const repo = await createTempGithubRepo({
       category: "auto-archive-latch",
-      prs: [{ title: "Auto-archive latch", state: "merged" }],
+      prs: [{ title: "Auto-archive latch", state: "open" }],
     });
     cleanups.push(() => repo.cleanup());
     const checkout = await cloneGithubRepoDefaultBranchOnly(repo);
     cleanups.push(() => checkout.cleanup());
     const workspaceClient = await connectNewWorkspaceDaemonClient();
     cleanups.push(() => workspaceClient.close());
+    const workspaces = workspaceClient.observeWorkspaces();
+    cleanups.push(() => workspaces.release());
+    await workspaces.ready;
     const agentClient = await connectSeedClient();
     cleanups.push(() => agentClient.close());
     const previousConfig = await workspaceClient.getDaemonConfig();
-    await workspaceClient.patchDaemonConfig({ autoArchiveAfterMerge: false });
+    await workspaceClient.patchDaemonConfig({ autoArchiveAfterMerge: true });
     cleanups.push(() =>
       workspaceClient.patchDaemonConfig({
         autoArchiveAfterMerge: previousConfig.config.autoArchiveAfterMerge,
@@ -118,11 +122,12 @@ async function createMergedPullRequestScenario(): Promise<MergedPullRequestScena
       agentTitle,
       workspaceId: workspace.id,
       autoArchive: async () => {
-        await workspaceClient.patchDaemonConfig({ autoArchiveAfterMerge: true });
         await workspaceClient.checkoutRefresh(workspace.workspaceDirectory);
         await expect
-          .poll(() => agentClient.fetchAgent({ agentId: agent.id }), { timeout: 30_000 })
-          .toMatchObject({ agent: { archivedAt: expect.any(String) } });
+          .poll(() => workspaceClient.checkoutPrStatus(workspace.workspaceDirectory))
+          .toMatchObject({ status: { state: "open", isMerged: false } });
+        mergeGithubPullRequest(pullRequest.url);
+        await workspaceClient.checkoutRefresh(workspace.workspaceDirectory);
         await expect
           .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 30_000 })
           .toBe(false);

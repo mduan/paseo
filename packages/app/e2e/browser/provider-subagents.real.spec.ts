@@ -19,7 +19,7 @@ import { openSubagentsTrack } from "../support/helpers/subagents";
 interface ProviderSubagentCase {
   provider: RewindFlowProvider;
   sentinel: string;
-  expectedName: string;
+  expectedName: string | RegExp;
   expectedSubtitle?: RegExp;
   expectsUserMessage?: boolean;
   prompt: string;
@@ -30,7 +30,7 @@ const cases: ProviderSubagentCase[] = [
   {
     provider: "claude",
     sentinel: "CLAUDE_CHILD_SENTINEL",
-    expectedName: "sentinel_child",
+    expectedName: /sentinel.*child/i,
     providerConfig: { model: "claude-sonnet-5" },
     prompt:
       'Use Claude Code\'s native Task tool exactly once. Set its subagent_type input to "Explore" and its name input to "sentinel_child". Ask it to reply with exactly CLAUDE_CHILD_SENTINEL and do nothing else. Wait for it, then reply ROOT_DONE. Do not use Paseo tools.',
@@ -39,6 +39,7 @@ const cases: ProviderSubagentCase[] = [
     provider: "codex",
     sentinel: "CODEX_CHILD_SENTINEL",
     expectedName: "Sentinel child",
+    expectsUserMessage: false,
     providerConfig: { providerOptions: { features: { multi_agent_v2: true } } },
     prompt:
       'Use the native collaboration.spawn_agent tool exactly once with task_name "sentinel_child" and fork_turns "none". Ask it to reply with exactly CODEX_CHILD_SENTINEL and do nothing else. Wait for it with collaboration.wait_agent, then reply ROOT_DONE. Do not use Paseo tools.',

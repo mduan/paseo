@@ -73,6 +73,10 @@ function gh(args: string[], opts?: { cwd?: string }): string {
   }).trim();
 }
 
+export function mergeGithubPullRequest(url: string): void {
+  gh(["pr", "merge", url, "--merge"]);
+}
+
 function git(args: string[], cwd: string): string {
   return execFileSync("git", args, {
     cwd,
@@ -133,7 +137,7 @@ async function seedPr(args: {
   }
 
   if (spec.state === "merged") {
-    gh(["pr", "merge", String(prNumber), "--merge"], { cwd: basePath });
+    mergeGithubPullRequest(prUrl);
   } else if (spec.state === "closed") {
     gh(["pr", "close", String(prNumber)], { cwd: basePath });
   }

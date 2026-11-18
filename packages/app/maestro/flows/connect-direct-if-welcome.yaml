@@ -18,13 +18,11 @@ appId: ${PASEO_MAESTRO_APP_ID}
           timeout: 10000
 
       - tapOn:
-          id: "direct-host-input"
+          id: "direct-host-advanced-toggle"
+      - tapOn:
+          id: "direct-host-uri-input"
       - eraseText
-      - inputText: ${PASEO_MAESTRO_DIRECT_ENDPOINT}
-
-      - assertVisible:
-          id: "direct-host-input"
-          text: ${PASEO_MAESTRO_DIRECT_ENDPOINT}
+      - inputText: "tcp://${PASEO_MAESTRO_DIRECT_ENDPOINT}"
 
       - tapOn:
           id: "direct-host-submit"

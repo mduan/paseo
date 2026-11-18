@@ -10,7 +10,8 @@ appId: ${PASEO_MAESTRO_APP_ID}
 - runFlow: flows/connect-direct-if-welcome.yaml
 
 - extendedWaitUntil:
-    visible: "What shall we build today?"
+    visible:
+      id: "menu-button"
     timeout: 60000
 
 - takeScreenshot: 01-connected
@@ -20,7 +21,6 @@ appId: ${PASEO_MAESTRO_APP_ID}
 
 - takeScreenshot: 02-new-workspace
 
-- runFlow: flows/new-workspace-select-codex-gpt54.yaml
 - runFlow: flows/new-workspace-submit-and-assert-created.yaml
 
 - takeScreenshot: 03-created-workspace

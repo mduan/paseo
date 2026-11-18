@@ -36,6 +36,7 @@ describe("daemon E2E - permission flow: Claude", () => {
         title: "Claude Permission Test",
         modeId: "default",
       });
+      await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
       collector.clear();
       await ctx.client.sendMessage(
@@ -54,16 +55,16 @@ describe("daemon E2E - permission flow: Claude", () => {
       expect(finalState.status).toBe("idle");
       expect(existsSync(filePath)).toBe(false);
 
-      const hasPermissionResolved = collector.messages.some((m) => {
-        if (m.type !== "agent_stream") return false;
-        if (m.payload.agentId !== agent.id) return false;
-        return (
-          m.payload.event.type === "permission_resolved" &&
-          m.payload.event.requestId === permission.id &&
-          m.payload.event.resolution.behavior === "allow"
-        );
-      });
-      expect(hasPermissionResolved).toBe(true);
+      const hasPermissionResolved = () =>
+        collector.messages.some((m) => {
+          return (
+            m.type === "agent_permission_resolved" &&
+            m.payload.agentId === agent.id &&
+            m.payload.requestId === permission.id &&
+            m.payload.resolution.behavior === "allow"
+          );
+        });
+      await expect.poll(hasPermissionResolved).toBe(true);
 
       await ctx.client.deleteAgent(agent.id);
     } finally {
@@ -83,6 +84,7 @@ describe("daemon E2E - permission flow: Claude", () => {
         title: "Claude Permission Deny Test",
         modeId: "default",
       });
+      await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
       collector.clear();
       await ctx.client.sendMessage(
@@ -104,16 +106,16 @@ describe("daemon E2E - permission flow: Claude", () => {
       expect(finalState.status).toBe("idle");
       expect(existsSync(filePath)).toBe(true);
 
-      const hasPermissionResolved = collector.messages.some((m) => {
-        if (m.type !== "agent_stream") return false;
-        if (m.payload.agentId !== agent.id) return false;
-        return (
-          m.payload.event.type === "permission_resolved" &&
-          m.payload.event.requestId === permission.id &&
-          m.payload.event.resolution.behavior === "deny"
-        );
-      });
-      expect(hasPermissionResolved).toBe(true);
+      const hasPermissionResolved = () =>
+        collector.messages.some((m) => {
+          return (
+            m.type === "agent_permission_resolved" &&
+            m.payload.agentId === agent.id &&
+            m.payload.requestId === permission.id &&
+            m.payload.resolution.behavior === "deny"
+          );
+        });
+      await expect.poll(hasPermissionResolved).toBe(true);
 
       await ctx.client.deleteAgent(agent.id);
     } finally {

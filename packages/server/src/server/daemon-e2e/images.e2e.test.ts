@@ -37,6 +37,7 @@ describe("sendImages", () => {
       cwd,
       title: "Image Test Agent",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     expect(agent.id).toBeTruthy();
     expect(agent.provider).toBe("claude");
@@ -100,6 +101,7 @@ describe("sendImages", () => {
       cwd,
       title: "Multi-Image Test Agent",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     expect(agent.id).toBeTruthy();
 

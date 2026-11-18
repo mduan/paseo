@@ -204,18 +204,8 @@ For a short recording that starts after launch/connection/sidebar setup:
 bash packages/app/maestro/record-workspace-create-android-focus.sh
 ```
 
-The flow details are documented in `packages/app/maestro/README.md`. The important rule is that a valid new-workspace assertion must prove the redirect completed: select a real model, tap `Create`, wait for `workspace-header-title`, wait for `message-input-root`, assert `New workspace` is gone, and assert the Android redbox strings are absent. Waiting for the composer alone is too weak because it can still be the `/new` route after a validation error.
-
-New workspace scenarios should compose the reusable subflows in `packages/app/maestro/flows/`:
-
-- `android-dev-client.yaml`
-- `connect-direct-if-welcome.yaml`
-- `open-prepared-project-sidebar.yaml`
-- `new-workspace-open-from-sidebar.yaml`
-- `new-workspace-select-codex-gpt54.yaml`
-- `new-workspace-submit-and-assert-created.yaml`
-
-The workspace-create shell scripts render those subflows into a temp directory before running Maestro, which keeps nested `runFlow` paths and `${PASEO_MAESTRO_*}` placeholders working together.
+The [Maestro guide](../packages/app/maestro/README.md#new-workspace-android-flow) defines the flow requirements and reusable subflows.
+The shell scripts render those subflows into a temporary directory before Maestro runs.
 
 ### Inputs that Maestro types into
 

@@ -44,7 +44,7 @@ PASEO_CAPTURE_HARNESS_GROUP=browser-profile npm run capture-harness --workspace=
 ```
 
 The browser profile group runs two Electron processes in sequence. It verifies that each
-renderer-side `did-attach` identity maps to the correct main-process guest, that two live
+renderer-side `dom-ready` identity maps to the correct main-process guest, that two live
 tabs share cookies and local storage through one persistent session, and that the data is
 still present after the first Electron process exits and the second starts.
 
@@ -102,8 +102,9 @@ layering inside `overlay-root`. Activating a presented browser also focuses its 
 `WebContents` in main so macOS assigns keyboard first-responder ownership to the page.
 
 There is no renderer prep/restore handshake or lifetime background-throttling override.
-Screenshot capture temporarily enables frame production inside the shared serialized queue,
-restores the previous throttling policy on success or failure, and retains a 5-second capture budget.
+Screenshot capture uses the shared serialized queue and retains a five-second capture budget.
+Capture preserves the existing policy for background throttling. A throttling toggle can leave hidden
+guests active after capture.
 The browser tool takes one viewport frame through Electron's frame subscription and releases the
 subscription on completion or cancellation. A resized resident guest can produce fresh pixels
 while `capturePage()` leaves its surface-copy request pending; waiting for animation frames or

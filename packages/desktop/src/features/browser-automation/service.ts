@@ -142,7 +142,7 @@ async function withPixelCaptureTimeout<T>(
   }
 }
 
-async function runSerializedPixelCapture<T>(capture: () => Promise<T>): Promise<T> {
+async function runSerializedPixelCapture<T>(capture: (deadline: number) => Promise<T>): Promise<T> {
   const previous = pixelCaptureQueue;
   let releaseCurrent = () => {};
   const current = new Promise<void>((resolve) => {
@@ -153,7 +153,8 @@ async function runSerializedPixelCapture<T>(capture: () => Promise<T>): Promise<
 
   await previous.catch(() => {});
   try {
-    return await capture();
+    const deadline = Date.now() + PIXEL_CAPTURE_TIMEOUT_MS;
+    return await withPixelCaptureTimeout(capture(deadline), deadline - Date.now());
   } finally {
     releaseCurrent();
     if (pixelCaptureQueue === tail) {
@@ -208,9 +209,8 @@ async function runPaintedPixelCapture<T>(
   contents: TabContents,
   capture: () => Promise<T>,
 ): Promise<T> {
-  return runSerializedPixelCapture(() =>
+  return runSerializedPixelCapture((deadline) =>
     contents.withFrameProduction(async () => {
-      const deadline = Date.now() + PIXEL_CAPTURE_TIMEOUT_MS;
       await waitForPaint(contents, deadline);
       return capturePixelFrameWithRetry(contents, capture, deadline);
     }),
@@ -218,9 +218,8 @@ async function runPaintedPixelCapture<T>(
 }
 
 async function capturePaintedViewport(contents: TabContents): Promise<TabImage> {
-  return runSerializedPixelCapture(() =>
+  return runSerializedPixelCapture((deadline) =>
     contents.withFrameProduction(async () => {
-      const deadline = Date.now() + PIXEL_CAPTURE_TIMEOUT_MS;
       const controller = new AbortController();
       try {
         await waitForPaint(contents, deadline);

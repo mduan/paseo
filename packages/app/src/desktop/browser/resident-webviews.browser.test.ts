@@ -215,9 +215,7 @@ describe("resident browser webviews", () => {
     expect(webview?.isConnected).toBe(true);
     expect(webview?.getAttribute("data-paseo-browser-id")).toBe("browser-agent");
     expect(webview?.getAttribute("partition")).toBe("persist:paseo-browser");
-    expect((webview as HTMLUnknownElement & { src?: string })?.src).toContain(
-      "https://example.com",
-    );
+    expect((webview as HTMLUnknownElement & { src?: string })?.src).toContain("about:blank");
     expectPermanentHostParking(residentHost());
     expectResidentWebviewParking(webview as HTMLElement);
   });
@@ -236,11 +234,15 @@ describe("resident browser webviews", () => {
     if (!firstWebview || !secondWebview) {
       throw new Error("Expected resident webviews");
     }
+    firstWebview.dispatchEvent(new Event("did-attach"));
+    secondWebview.dispatchEvent(new Event("did-attach"));
+    expect(attachedBrowsers).toEqual([]);
+
     Object.assign(firstWebview, { getWebContentsId: () => 101 });
     Object.assign(secondWebview, { getWebContentsId: () => 202 });
 
-    firstWebview.dispatchEvent(new Event("did-attach"));
-    secondWebview.dispatchEvent(new Event("did-attach"));
+    firstWebview.dispatchEvent(new Event("dom-ready"));
+    secondWebview.dispatchEvent(new Event("dom-ready"));
 
     expect(firstWebview.getAttribute("partition")).toBe("persist:paseo-browser");
     expect(secondWebview.getAttribute("partition")).toBe("persist:paseo-browser");
@@ -248,6 +250,17 @@ describe("resident browser webviews", () => {
       { browserId: "browser-first", workspaceId: "workspace-a", webContentsId: 101 },
       { browserId: "browser-second", workspaceId: "workspace-b", webContentsId: 202 },
     ]);
+    expect((firstWebview as HTMLElement & { src: string }).src).toBe("https://example.com/first");
+    expect((secondWebview as HTMLElement & { src: string }).src).toBe("https://example.com/second");
+
+    Object.assign(firstWebview, { getWebContentsId: () => 303, src: "https://example.com/next" });
+    firstWebview.dispatchEvent(new Event("dom-ready"));
+    expect(attachedBrowsers.at(-1)).toEqual({
+      browserId: "browser-first",
+      workspaceId: "workspace-a",
+      webContentsId: 303,
+    });
+    expect((firstWebview as HTMLElement & { src: string }).src).toBe("https://example.com/next");
   });
 
   it("normalizes an existing resident host back to permanent parking", () => {

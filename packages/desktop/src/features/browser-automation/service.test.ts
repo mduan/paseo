@@ -1617,6 +1617,40 @@ describe("executeAutomationCommand", () => {
     }
   });
 
+  test.each([
+    { setupDelayMs: 6_000, cleanupDelayMs: 0 },
+    { setupDelayMs: 0, cleanupDelayMs: 6_000 },
+  ])(
+    "focus setup ($setupDelayMs ms) and cleanup ($cleanupDelayMs ms) share the capture budget",
+    async ({ setupDelayMs, cleanupDelayMs }) => {
+      vi.useFakeTimers();
+      try {
+        const browser = new BrowserAutomationHarness();
+        browser.tab.withFrameProduction = async (capture) => {
+          await new Promise((resolve) => setTimeout(resolve, setupDelayMs));
+          const result = await capture();
+          await new Promise((resolve) => setTimeout(resolve, cleanupDelayMs));
+          return result;
+        };
+        let result: unknown;
+        const screenshot = browser
+          .execute({ command: "screenshot", args: { browserId: BROWSER_A } })
+          .then((value) => {
+            result = value;
+            return value;
+          });
+        await vi.advanceTimersByTimeAsync(4_999);
+        expect(result).toBeUndefined();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(result).toMatchObject({ ok: false, error: { code: "screenshot_no_frame" } });
+        await screenshot;
+      } finally {
+        await vi.runAllTimersAsync();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test("screenshot surfaces ordinary viewport capture errors", async () => {
     const browser = new BrowserAutomationHarness();
     browser.tab.captureThrows = true;

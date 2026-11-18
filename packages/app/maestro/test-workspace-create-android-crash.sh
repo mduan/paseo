@@ -5,8 +5,8 @@
 # opens a prepared git project, creates a workspace through the UI, and captures
 # adb logcat around the redirect window.
 #
-# This harness is deliberately stronger than "composer is visible": it selects
-# a model, taps Create, asserts the workspace header, asserts the New Workspace
+# This harness is deliberately stronger than "composer is visible": it taps
+# Create, asserts the workspace header and launcher, asserts the New Workspace
 # route is gone, and fails if logcat contains the Android Fabric view-parent
 # crash signature.
 #
@@ -14,6 +14,7 @@
 #   bash packages/app/maestro/test-workspace-create-android-crash.sh
 #
 # Optional environment:
+#   PASEO_MAESTRO_DEV_URL=<Expo development-client link for an isolated Metro port>
 #   PASEO_MAESTRO_APP_ID=sh.paseo.debug
 #   PASEO_MAESTRO_DIRECT_ENDPOINT=127.0.0.1:6767
 #   PASEO_MAESTRO_DAEMON_WS_URL=ws://127.0.0.1:6767/ws
@@ -160,7 +161,7 @@ LOGCAT_PID="$!"
 
 echo "Running Maestro flow..."
 set +e
-(cd "$OUT_DIR" && maestro test "$FLOW") 2>&1 | tee "$OUT_DIR/maestro.log"
+(cd "$OUT_DIR" && maestro test -e "PASEO_MAESTRO_DEV_URL=${PASEO_MAESTRO_DEV_URL:-}" "$FLOW") 2>&1 | tee "$OUT_DIR/maestro.log"
 MAESTRO_STATUS=${PIPESTATUS[0]}
 set -e
 

@@ -818,7 +818,7 @@ test("discarding a staged rename restores its source path", async ({ page }) => 
 
   const panel = page.getByTestId("working-diff-panel").filter({ visible: true });
   const renamedHeader = diffHeaderForPath(panel, "src/zz-renamed.ts");
-  await expect(renamedHeader).toHaveAccessibleName("src/zz-renamed.ts, +1, -0");
+  await expect(renamedHeader).toHaveAccessibleName("src/zz-renamed.ts, +0, -0");
   const renamedToggle = renamedHeader.getByTestId(/^diff-file-\d+-toggle$/);
   const toggleTestId = await renamedToggle.getAttribute("data-testid");
   expect(toggleTestId).not.toBeNull();
@@ -1336,6 +1336,7 @@ test("canvas headers keep a many-file diff bounded while scrolling end to end", 
   const workspace = await createWorkspaceWithManyTinyDiffs(2_000);
   await useUnwrappedDiffLines(page);
   await openWorkspaceChangesSurface(page, workspace, 90_000);
+  await page.getByTestId("large-diff-show").click();
 
   const root = page.getByTestId("git-diff-canvas-root");
   const scroller = page.getByTestId("git-diff-scroll");

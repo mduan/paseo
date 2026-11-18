@@ -50,13 +50,18 @@ import {
   isRealpathInsideRoot,
   looksLikeDefiniteWindowsPath,
 } from "../utils/path.js";
-import type { GitProcessPriority } from "../utils/git-process-scheduler.js";
+import {
+  promoteGitProcessPriority,
+  type GitProcessPriority,
+} from "../utils/git-process-scheduler.js";
 import {
   createRunGitCommand,
+  getGitCommandPriority,
   runGitCommand,
   runWithGitCommandPriority,
   type RunGitCommand,
 } from "../utils/run-git-command.js";
+import { GitTaskQueue } from "../utils/git-task-queue.js";
 import { branchNameFromRef } from "../utils/worktree-metadata.js";
 import { listPaseoWorktrees, type PaseoWorktreeInfo } from "../utils/worktree.js";
 import { READ_ONLY_GIT_ENV } from "./checkout-git-utils.js";
@@ -342,16 +347,8 @@ enum WorkspaceGitRefreshOrigin {
   Observation = "observation",
 }
 
-// A caller waiting on a merged refresh keeps it out of the background lane.
-function mergeRefreshOrigins(
-  pending: WorkspaceGitRefreshOrigin,
-  request: WorkspaceGitRefreshOrigin,
-): WorkspaceGitRefreshOrigin {
-  return pending === WorkspaceGitRefreshOrigin.Demand ? pending : request;
-}
-
 interface WorkspaceGitRefreshRequest {
-  origin: WorkspaceGitRefreshOrigin;
+  priority: GitProcessPriority;
   force: boolean;
   refreshStructure: boolean;
   refreshWorktree: boolean;
@@ -615,10 +612,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   private readonly fileObserver: FileObserver;
   private readonly deps: WorkspaceGitServiceDependencies;
   private readonly forgeResolver: ForgeResolver;
-  private readonly workspaceRefreshLimit = pLimit({
-    concurrency: WORKSPACE_GIT_REFRESH_CONCURRENCY,
-    rejectOnClear: true,
-  });
+  private readonly workspaceRefreshLimit = new GitTaskQueue(WORKSPACE_GIT_REFRESH_CONCURRENCY);
   private readonly workspaceObservationSetupLimit = pLimit({
     concurrency: WORKSPACE_GIT_OBSERVATION_SETUP_CONCURRENCY,
     rejectOnClear: true,
@@ -773,6 +767,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     this.assertNotDisposed();
     cwd = resolve(cwd);
     const request = this.normalizeRefreshRequest(options, "getSnapshot", true);
+    if (request.force && (request.refreshStructure || request.refreshWorktree)) {
+      this.invalidateCheckoutDiffCache(cwd, "uncommitted");
+      this.invalidateCheckoutDiffCache(cwd, "base");
+    }
     const target = this.ensureWorkspaceTarget(cwd);
     if (!request.force && target.latestSnapshot) {
       return target.latestSnapshot;
@@ -988,7 +986,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     cwd = resolve(cwd);
     const target = this.ensureWorkspaceTarget(cwd);
     await this.refreshWorkspaceTarget(target, {
-      origin: WorkspaceGitRefreshOrigin.Demand,
+      priority: getGitCommandPriority(),
       force: false,
       refreshStructure: true,
       refreshWorktree: true,
@@ -1258,7 +1256,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         return;
       }
       void this.refreshWorkspaceTarget(target, {
-        origin: WorkspaceGitRefreshOrigin.Demand,
+        priority: getGitCommandPriority(),
         force: false,
         refreshStructure: true,
         refreshWorktree: true,
@@ -1651,7 +1649,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
             return false;
           }
           const changed = await this.refreshDegradedPollTarget(workspaceTarget, {
-            origin: WorkspaceGitRefreshOrigin.Observation,
+            priority: "background",
             force: false,
             refreshStructure: target.repoRoot === null,
             refreshWorktree: true,
@@ -2716,7 +2714,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
             workingTreeTargets.add(workingTreeTarget);
           }
           return await this.refreshDegradedPollTarget(workspaceTarget, {
-            origin: WorkspaceGitRefreshOrigin.Observation,
+            priority: "background",
             force: false,
             refreshStructure: true,
             refreshWorktree: true,
@@ -3086,7 +3084,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         target.refreshState.queued = this.mergeRefreshRequests(target.refreshState.queued, request);
       }
       // The caller now waits on this refresh — promote its remaining Git work.
-      active.origin = mergeRefreshOrigins(active.origin, request.origin);
+      active.priority = promoteGitProcessPriority({
+        current: active.priority,
+        requested: request.priority,
+      });
       return target.refreshState.promise;
     }
 
@@ -3121,7 +3122,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
 
     const force = options?.force === true;
     return {
-      origin: WorkspaceGitRefreshOrigin.Demand,
+      priority: getGitCommandPriority(),
       force,
       refreshStructure: options?.refreshGit !== false,
       refreshWorktree: options?.refreshGit !== false,
@@ -3150,7 +3151,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   ): WorkspaceGitRefreshRequest {
     const scope = options.scope;
     return {
-      origin: options.origin,
+      priority:
+        options.origin === WorkspaceGitRefreshOrigin.Observation
+          ? "background"
+          : getGitCommandPriority(),
       force: options.force === true,
       refreshStructure: scope !== "worktree" && scope !== "refs",
       refreshWorktree: scope !== "structure" && scope !== "refs",
@@ -3182,7 +3186,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       request.movedRemoteRefs,
     );
     return {
-      origin: mergeRefreshOrigins(pending.origin, request.origin),
+      priority: promoteGitProcessPriority({
+        current: pending.priority,
+        requested: request.priority,
+      }),
       force,
       refreshStructure: pending.refreshStructure || request.refreshStructure,
       refreshWorktree: pending.refreshWorktree || request.refreshWorktree,
@@ -3224,12 +3231,15 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       }
       try {
         const runRefreshGitCommand = this.createRefreshGitCommand(request);
-        const admittedSnapshot = await this.workspaceRefreshLimit(() => {
-          if (target.closed || this.workspaceTargets.get(target.cwd) !== target) {
-            return null;
-          }
-          return this.refreshSnapshot(target, request, runRefreshGitCommand);
-        });
+        const admittedSnapshot = await this.workspaceRefreshLimit.run(
+          () => {
+            if (target.closed || this.workspaceTargets.get(target.cwd) !== target) {
+              return null;
+            }
+            return this.refreshSnapshot(target, request, runRefreshGitCommand);
+          },
+          { priority: () => request.priority },
+        );
         if (!admittedSnapshot) {
           break;
         }
@@ -3264,16 +3274,11 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     return snapshot;
   }
 
-  // Origin is read per command so a joining demand caller promotes the rest of the refresh.
-  // Demand uses the ambient lane so a "high" user action is not demoted.
+  // A joining demand can promote commands after this refresh's async context was created.
   private createRefreshGitCommand(request: WorkspaceGitRefreshRequest): RunGitCommand {
-    const provenance = `workspace-refresh:${request.reason}`;
-    const runDemand = createRunGitCommand(provenance);
-    const runObservation = createRunGitCommand(provenance, { priority: "background" });
+    const runRefresh = createRunGitCommand(`workspace-refresh:${request.reason}`);
     return (args, options) =>
-      request.origin === WorkspaceGitRefreshOrigin.Observation
-        ? runObservation(args, options)
-        : runDemand(args, options);
+      runWithGitCommandPriority(request.priority, () => runRefresh(args, options));
   }
 
   private async refreshSnapshot(

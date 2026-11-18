@@ -98,6 +98,7 @@ async function createAgentInBranchOffWorktree(options?: {
   autoArchive?: boolean;
   branchName?: string;
   repoDir?: string;
+  initialPrompt?: string;
 }): Promise<{ repoDir: string; agentId: string; worktreePath: string }> {
   const repoDir = options?.repoDir ?? createGitRepo();
   const branchName = options?.branchName ?? `agent-lifecycle-${Date.now()}`;
@@ -112,7 +113,7 @@ async function createAgentInBranchOffWorktree(options?: {
       base: "main",
     },
     ...(options?.autoArchive !== undefined ? { autoArchive: options.autoArchive } : {}),
-    initialPrompt: "Say done.",
+    initialPrompt: options?.initialPrompt ?? "Say done.",
   });
   return { repoDir, agentId: created.id, worktreePath: created.cwd };
 }
@@ -350,7 +351,7 @@ test("archiving a created worktree removes the directory on last reference", asy
 });
 
 test("auto-archiving a created worktree keeps the directory when a sibling workspace references it", async () => {
-  const created = await createAgentInBranchOffWorktree({ autoArchive: true });
+  const created = await createAgentInBranchOffWorktree({ autoArchive: true, initialPrompt: "" });
 
   // Create a sibling workspace that shares the same backing directory.
   const sibling = await ctx.client.createWorkspace({
@@ -361,6 +362,7 @@ test("auto-archiving a created worktree keeps the directory when a sibling works
     throw new Error(sibling.error ?? "Failed to create sibling workspace");
   }
 
+  await ctx.client.sendMessage(created.agentId, "Say done.");
   await ctx.client.waitForFinish(created.agentId, 10000);
 
   await expectAgentAbsentFromActiveList(created.agentId);

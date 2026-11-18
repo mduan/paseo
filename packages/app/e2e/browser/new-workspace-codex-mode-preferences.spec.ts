@@ -2,7 +2,7 @@ import { expect, type Page } from "../support/fixtures";
 import { test } from "../support/creation-fixtures";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
-import type { FormPreferences } from "@/create-agent-preferences/preferences";
+import { resolveSavedModeId, type FormPreferences } from "@/create-agent-preferences/preferences";
 import { gotoAppShell } from "../support/helpers/app";
 import { captureWorkspaceAgentRequest } from "../support/helpers/creation";
 import { openAgentRoute } from "../support/helpers/mock-agent";
@@ -15,6 +15,7 @@ import { expectNoTruncation } from "../support/helpers/no-truncation";
 import { escapeRegex } from "../support/helpers/regex";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { getServerId } from "../support/helpers/server-id";
 
 const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
 
@@ -67,14 +68,12 @@ async function seedCodexDefaultPermissionPreferences(page: Page, cwd: string): P
 }
 
 async function readCodexModePreference(page: Page): Promise<unknown> {
-  return page.evaluate((preferencesKey) => {
+  const preferences = await page.evaluate((preferencesKey) => {
     const raw = localStorage.getItem(preferencesKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as {
-      providerPreferences?: Record<string, { mode?: unknown }>;
-    };
-    return parsed.providerPreferences?.codex?.mode ?? null;
+    return JSON.parse(raw) as FormPreferences;
   }, CREATE_AGENT_PREFERENCES_KEY);
+  return resolveSavedModeId(preferences?.providerPreferences?.codex, getServerId()) ?? null;
 }
 
 async function selectMode(page: Page, label: string): Promise<void> {
@@ -112,7 +111,7 @@ async function expectThinkingOptionsFit(page: Page): Promise<void> {
 test.describe("New workspace Codex mode preferences", () => {
   test.describe.configure({ timeout: 240_000 });
 
-  test("keeps Full Access as the global Codex mode after the workspace draft auto-submit handoff", async ({
+  test("keeps Full Access as the host's Codex mode after the workspace draft auto-submit handoff", async ({
     page,
     startup,
   }) => {
@@ -137,12 +136,12 @@ test.describe("New workspace Codex mode preferences", () => {
         page.getByRole("button", { name: "Select agent mode (Full access)" }),
       ).toBeVisible();
 
-      await submitNewWorkspacePrompt(page, "Keep Codex full access selected globally.");
+      await submitNewWorkspacePrompt(page, "Keep Codex full access selected on this host.");
       const createAgentRequest = await createAgentRecorder.waitForRequest();
 
       await expect(page).toHaveURL(/\/workspace\//);
       await expect(
-        page.getByText("Keep Codex full access selected globally.", { exact: true }).first(),
+        page.getByText("Keep Codex full access selected on this host.", { exact: true }).first(),
       ).toBeVisible();
       expect(createAgentRequest.config).toMatchObject({
         provider: "codex",

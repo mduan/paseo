@@ -36,6 +36,7 @@ export interface ReplicaCacheRecord {
 }
 
 interface ReplicaCacheWriteObserverState {
+  transactions: number;
   lastValues: Record<string, string>;
   redundantWrites: number;
   serializedChars: number;
@@ -44,6 +45,7 @@ interface ReplicaCacheWriteObserverState {
 }
 
 interface ReplicaCacheWriteObserverReport {
+  transactions: number;
   redundantWrites: number;
   serializedChars: number;
   storageDurationMs: number;
@@ -207,6 +209,7 @@ export async function observeReplicaCacheStorageWrites(page: Page): Promise<void
   await page.addInitScript(
     ({ databaseName, storeName }) => {
       window.__replicaCacheWriteObserver = {
+        transactions: 0,
         lastValues: {},
         redundantWrites: 0,
         serializedChars: 0,
@@ -214,6 +217,7 @@ export async function observeReplicaCacheStorageWrites(page: Page): Promise<void
         writes: 0,
       };
       const originalPut = IDBObjectStore.prototype.put;
+      const observedTransactions = new WeakSet<IDBTransaction>();
       IDBObjectStore.prototype.put = function measuredPut(value: unknown, key?: IDBValidKey) {
         const request =
           key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
@@ -236,6 +240,14 @@ export async function observeReplicaCacheStorageWrites(page: Page): Promise<void
           typeof payload !== "string"
         ) {
           return request;
+        }
+        const transaction = this.transaction;
+        if (!observedTransactions.has(transaction)) {
+          observedTransactions.add(transaction);
+          transaction.addEventListener("complete", () => {
+            const state = window.__replicaCacheWriteObserver;
+            if (state) state.transactions += 1;
+          });
         }
         const rowKey = `${serverId}:${kind}:${id}`;
         const startedAt = performance.now();
@@ -265,6 +277,7 @@ export async function resetReplicaCacheStorageWriteObserver(page: Page): Promise
   );
   await page.evaluate((values) => {
     window.__replicaCacheWriteObserver = {
+      transactions: 0,
       lastValues: values,
       redundantWrites: 0,
       serializedChars: 0,
@@ -281,6 +294,7 @@ export async function readReplicaCacheStorageWriteObserver(
     const state = window.__replicaCacheWriteObserver;
     if (!state) throw new Error("Replica cache write observer is not installed");
     return {
+      transactions: state.transactions,
       redundantWrites: state.redundantWrites,
       serializedChars: state.serializedChars,
       storageDurationMs: state.storageDurationMs,

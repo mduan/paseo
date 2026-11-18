@@ -388,13 +388,14 @@ test("runs paseo.json setup asynchronously and reports status via timeline tool_
         worktreeSlug: "async-setup-test",
       },
     }),
-    timeoutMs: 2500,
+    timeoutMs: 10000,
     label: "createAgent should not block on setup",
   });
 
   expect(agent.cwd).toContain(path.join(".paseo", "worktrees"));
   expect(existsSync(path.join(agent.cwd, "setup-done.txt"))).toBe(false);
 
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
   writeFileSync(path.join(agent.cwd, "allow-setup"), "ok\n");
 
   const completed = await waitForTimelineToolCall(
@@ -476,7 +477,7 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
           worktreeSlug: "async-setup-terminals-test",
         },
       }),
-      timeoutMs: 2500,
+      timeoutMs: 10000,
       label: "createAgent should not block on setup",
     });
 
@@ -485,6 +486,7 @@ test("bootstraps configured worktree terminals after setup succeeds", async () =
     expect(existsSync(path.join(agent.cwd, "dev-terminal.txt"))).toBe(false);
     expect(existsSync(path.join(agent.cwd, "lint-terminal.txt"))).toBe(false);
 
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
     writeFileSync(path.join(agent.cwd, "allow-setup"), "ok\n");
 
     await waitForTimelineToolCall(
@@ -578,7 +580,7 @@ test("reports failures via timeline tool_call without deleting the created workt
   execSync("git branch -M main", { cwd: repoRoot, stdio: "pipe" });
 
   const setupCommand =
-    'echo "started" > "$PASEO_WORKTREE_PATH/setup-start.txt"; sleep 0.1; echo "boom" 1>&2; exit 7';
+    'while [ ! -f "$PASEO_WORKTREE_PATH/allow-start" ]; do sleep 0.05; done; echo "started" > "$PASEO_WORKTREE_PATH/setup-start.txt"; echo "setup running"; while [ ! -f "$PASEO_WORKTREE_PATH/allow-failure" ]; do sleep 0.05; done; echo "boom" 1>&2; exit 7';
   writeFileSync(
     path.join(repoRoot, "paseo.json"),
     JSON.stringify({
@@ -614,19 +616,22 @@ test("reports failures via timeline tool_call without deleting the created workt
         worktreeSlug: "async-setup-failure-test",
       },
     }),
-    timeoutMs: 2500,
+    timeoutMs: 10000,
     label: "createAgent should not block on failing setup",
   });
 
   expect(agent.cwd).toContain(path.join(".paseo", "worktrees"));
   expect(existsSync(agent.cwd)).toBe(true);
 
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
+  writeFileSync(path.join(agent.cwd, "allow-start"), "ok\n");
   const started = await waitForTimelineToolCall(
     collector.messages,
     agent.id,
     (item) => item.name === "paseo_worktree_setup" && item.status === "running",
     10000,
   );
+  writeFileSync(path.join(agent.cwd, "allow-failure"), "ok\n");
 
   const failed = await waitForTimelineToolCall(
     collector.messages,
@@ -695,7 +700,7 @@ test("creates agent in ~/.paseo/worktrees/{hash} when worktree is requested", as
   rmSync(cwd, { recursive: true, force: true });
 }, 60000);
 
-test("archiving a worktree shuts down its terminals but leaves the worktree on disk", async () => {
+test("archiving the last worktree workspace shuts down its terminals and runs teardown", async () => {
   const repoRoot = tmpCwd();
 
   const { execSync } = await import("child_process");
@@ -750,7 +755,7 @@ test("archiving a worktree shuts down its terminals but leaves the worktree on d
         worktreeSlug: "archive-cleanup-test",
       },
     }),
-    timeoutMs: 2500,
+    timeoutMs: 10000,
     label: "createAgent should not block on setup",
   });
 
@@ -777,11 +782,8 @@ test("archiving a worktree shuts down its terminals but leaves the worktree on d
   expect(archive.success).toBe(true);
   expect(archive.removedAgents).toContain(agent.id);
 
-  // Archiving tears down the workspace's terminals but never deletes the
-  // worktree from disk and never runs teardown commands — on-disk removal is a
-  // separate, explicit step.
-  expect(existsSync(agent.cwd)).toBe(true);
-  expect(existsSync(teardownMarkerPath)).toBe(false);
+  await expect.poll(() => existsSync(agent.cwd), { timeout: 10000 }).toBe(false);
+  expect(readFileSync(teardownMarkerPath, "utf8").trim()).toBe(agent.cwd);
 
   const afterArchiveDirectories = ctx.daemon.daemon.terminalManager.listDirectories();
   expect(afterArchiveDirectories).not.toContain(agent.cwd);

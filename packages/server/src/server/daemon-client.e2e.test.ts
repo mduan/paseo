@@ -1,5 +1,5 @@
-import { test, expect, beforeAll, afterAll } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { test, expect, beforeAll, afterAll, vi } from "vitest";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir, homedir } from "node:os";
 import path from "node:path";
@@ -161,11 +161,11 @@ test("DaemonClient uploads file bytes to daemon temp storage", async () => {
       requestId: "req-upload-e2e",
       file: {
         type: "uploaded_file",
-        id: "upload_req-upload-e2e",
+        id: expect.stringMatching(/^upload_[0-9a-f-]+$/),
         fileName: "notes.txt",
         mimeType: "text/plain",
         size: 11,
-        path: path.join(daemon.paseoHome, "uploads", "upload_req-upload-e2e", "notes.txt"),
+        path: path.join(daemon.paseoHome, "uploads", result.file!.id, "notes.txt"),
       },
       error: null,
     });
@@ -1090,8 +1090,10 @@ test("update_agent persists unloaded title and labels across auto-unarchive", as
 }, 180000);
 
 test("returns home-scoped directory suggestions", async () => {
-  const insideHomeDir = mkdtempSync(path.join(homedir(), "paseo-dir-suggestion-"));
-  const rootBrowseDir = mkdtempSync(path.join(homedir(), "000-paseo-root-browse-"));
+  const fixtureHome = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-suggestion-home-")));
+  const insideHomeDir = mkdtempSync(path.join(fixtureHome, "paseo-dir-suggestion-"));
+  const rootBrowseDir = mkdtempSync(path.join(fixtureHome, "000-paseo-root-browse-"));
+  vi.stubEnv("HOME", fixtureHome);
   const outsideHomeDir = mkdtempSync(path.join(tmpdir(), "paseo-dir-suggestion-outside-"));
 
   try {
@@ -1122,8 +1124,8 @@ test("returns home-scoped directory suggestions", async () => {
     expect(outsideResult.error).toBeNull();
     expect(outsideResult.directories).not.toContain(outsideHomeDir);
   } finally {
-    rmSync(insideHomeDir, { recursive: true, force: true });
-    rmSync(rootBrowseDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+    rmSync(fixtureHome, { recursive: true, force: true });
     rmSync(outsideHomeDir, { recursive: true, force: true });
   }
 }, 30000);
@@ -1342,25 +1344,10 @@ test("creates agent and exercises lifecycle", async () => {
   });
 
   const createRequestId = `create-${Date.now()}`;
-  const createdStatusPromise = waitForSignal(15000, (resolve) => {
-    const unsubscribe = ctx.client.on("status", (message) => {
-      if (message.type !== "status") {
-        return;
-      }
-      const payload = message.payload as {
-        status?: string;
-        agentId?: string;
-        requestId?: string;
-      };
-      if (payload.status !== "agent_created") {
-        return;
-      }
-      if (payload.requestId !== createRequestId) {
-        return;
-      }
-      resolve(message);
+  const createdResponsePromise = waitForSignal(15000, (resolve) => {
+    return ctx.client.on("agent.create.response", (message) => {
+      if (message.payload.requestId === createRequestId) resolve(message);
     });
-    return unsubscribe;
   });
 
   const agent = await ctx.client.createAgent({
@@ -1377,28 +1364,14 @@ test("creates agent and exercises lifecycle", async () => {
 
   const agentUpdate = await agentUpdatePromise;
   expect(agentUpdate.payload.agent.id).toBe(agent.id);
-  const createdStatus = await createdStatusPromise;
-  expect((createdStatus.payload as { agentId?: string }).agentId).toBe(agent.id);
+  const createdResponse = await createdResponsePromise;
+  expect(createdResponse.payload.agent?.id).toBe(agent.id);
 
   const failRequestId = `fail-${Date.now()}`;
-  const failedStatusPromise = waitForSignal(15000, (resolve) => {
-    const unsubscribe = ctx.client.on("status", (message) => {
-      if (message.type !== "status") {
-        return;
-      }
-      const payload = message.payload as {
-        status?: string;
-        requestId?: string;
-      };
-      if (payload.status !== "agent_create_failed") {
-        return;
-      }
-      if (payload.requestId !== failRequestId) {
-        return;
-      }
-      resolve(message);
+  const failedResponsePromise = waitForSignal(15000, (resolve) => {
+    return ctx.client.on("agent.create.response", (message) => {
+      if (message.payload.requestId === failRequestId) resolve(message);
     });
-    return unsubscribe;
   });
 
   await expect(
@@ -1409,7 +1382,7 @@ test("creates agent and exercises lifecycle", async () => {
       requestId: failRequestId,
     }),
   ).rejects.toThrow("Working directory does not exist");
-  await failedStatusPromise;
+  await failedResponsePromise;
 
   let sawRefresh = false;
   const unsubscribe = ctx.client.subscribe((event) => {
@@ -1596,6 +1569,8 @@ test("handles permission flow", async () => {
     cwd,
     title: "Permission Test",
   });
+
+  await ctx.client.observeEvents(["agent_permission_request", "agent_permission_resolved"]).ready;
 
   const permissionRequestPromise = waitForSignal(60000, (resolve) => {
     const unsubscribe = ctx.client.on("agent_permission_request", (message) => {

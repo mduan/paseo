@@ -1194,24 +1194,36 @@ test("fast output to a slow websocket client falls back to a snapshot", async ()
     ._socket;
   expect(rawSocket).toBeDefined();
 
-  rawSocket!.pause();
-  ctx.client.sendTerminalInput(terminalId, {
-    type: "input",
-    data: `node -e 'process.stdout.write("A".repeat(${8 * 1024 * 1024}))'\r`,
-  });
-
-  await new Promise((resolve) => setTimeout(resolve, 750));
-  const catchUpFramePromise = waitForRawBinaryFrame(
-    ws,
-    (frame) => frame.opcode === TerminalStreamOpcode.Snapshot,
-    15000,
-  );
-  rawSocket!.resume();
-  const catchUpFrame = await catchUpFramePromise;
-  expect(catchUpFrame.opcode).toBe(TerminalStreamOpcode.Snapshot);
-
-  await closeWebSocket(ws);
-  rmSync(cwd, { recursive: true, force: true });
+  try {
+    rawSocket!.pause();
+    ctx.client.sendTerminalInput(terminalId, {
+      type: "input",
+      // Overwrite one row so the burst exercises transport backpressure without
+      // producing a full-history snapshot larger than the socket memory limit.
+      data: `node -e 'process.stdout.write(("A".repeat(60) + "\\r").repeat(512 * 1024) + "\\n" + ["SLOW", "OUTPUT", "DONE"].join("_") + "\\n")'\r`,
+    });
+    await expect
+      .poll(
+        async () => {
+          const capture = await ctx.client.captureTerminal(terminalId);
+          return capture.lines.join("\n").includes("SLOW_OUTPUT_DONE");
+        },
+        { timeout: 15000 },
+      )
+      .toBe(true);
+    const catchUpFramePromise = waitForRawBinaryFrame(
+      ws,
+      (frame) => frame.opcode === TerminalStreamOpcode.Snapshot,
+      15000,
+    );
+    rawSocket!.resume();
+    const catchUpFrame = await catchUpFramePromise;
+    expect(catchUpFrame.opcode).toBe(TerminalStreamOpcode.Snapshot);
+  } finally {
+    rawSocket!.resume();
+    await closeWebSocket(ws);
+    rmSync(cwd, { recursive: true, force: true });
+  }
 }, 40000);
 
 test("multiple clients on the same terminal each receive output independently", async () => {
@@ -1561,8 +1573,7 @@ test("terminal exit prevents resubscribe and sends no frames after exit", async 
     const exitMessage = await exitMessagePromise;
     expect(exitMessage.message.type).toBe("terminal_stream_exit");
 
-    const subscribeResult = await ctx.client.subscribeTerminal(terminalId);
-    expect(subscribeResult.error).toBe("Terminal not found");
+    await expect(ctx.client.subscribeTerminal(terminalId)).rejects.toThrow("Terminal not found");
     await waitForNoRawBinaryFrame(ws, 750);
   } finally {
     await closeWebSocket(ws);
@@ -1802,14 +1813,18 @@ describe("list terminals across directories", () => {
     expect(list).not.toHaveProperty("cwd");
     expect(list.terminals).toEqual(
       expect.arrayContaining([
-        {
+        expect.objectContaining({
           id: firstCreated.terminal!.id,
           name: "first-terminal",
-        },
-        {
+          cwd: cwd1,
+          workspaceId: firstCreated.terminal!.workspaceId,
+        }),
+        expect.objectContaining({
           id: secondCreated.terminal!.id,
           name: "second-terminal",
-        },
+          cwd: cwd2,
+          workspaceId: secondCreated.terminal!.workspaceId,
+        }),
       ]),
     );
   });
@@ -1828,10 +1843,12 @@ describe("list terminals across directories", () => {
     const list = await ctx.client.listTerminals(cwd1);
 
     expect(list.cwd).toBe(cwd1);
-    expect(list.terminals).toEqual([
+    expect(list.terminals).toMatchObject([
       {
         id: firstCreated.terminal!.id,
         name: "cwd-one-terminal",
+        cwd: cwd1,
+        workspaceId: firstCreated.terminal!.workspaceId,
       },
     ]);
   });

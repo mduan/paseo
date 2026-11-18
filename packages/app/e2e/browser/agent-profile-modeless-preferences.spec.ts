@@ -17,6 +17,7 @@ import {
 } from "../support/helpers/new-workspace";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
+import { getServerId } from "../support/helpers/server-id";
 
 const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
 const MODELESS_PROVIDER = "modeless-profile-e2e";
@@ -46,13 +47,13 @@ async function seedPoisonedModelessPreference(page: Page): Promise<void> {
 
 async function readProviderModePreference(page: Page, provider: string): Promise<unknown> {
   return page.evaluate(
-    ({ preferencesKey, providerId }) => {
+    ({ preferencesKey, providerId, serverId }) => {
       const raw = localStorage.getItem(preferencesKey);
       if (!raw) return null;
       const preferences = JSON.parse(raw) as FormPreferences;
-      return preferences.providerPreferences?.[providerId]?.mode ?? null;
+      return preferences.providerPreferences?.[providerId]?.modeByHost?.[serverId] ?? null;
     },
-    { preferencesKey: CREATE_AGENT_PREFERENCES_KEY, providerId: provider },
+    { preferencesKey: CREATE_AGENT_PREFERENCES_KEY, providerId: provider, serverId: getServerId() },
   );
 }
 

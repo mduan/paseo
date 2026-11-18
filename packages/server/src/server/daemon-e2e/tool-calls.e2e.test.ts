@@ -138,6 +138,7 @@ describe("tool call structure", () => {
       title: "Claude Read Test",
       modeId: "bypassPermissions",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 
@@ -180,6 +181,7 @@ describe("tool call structure", () => {
       title: "Claude Bash Test",
       modeId: "bypassPermissions",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 
@@ -224,6 +226,7 @@ describe("tool call structure", () => {
       title: "Claude Edit Test",
       modeId: "bypassPermissions",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 
@@ -270,6 +273,7 @@ describe("tool call structure", () => {
       title: "Codex Shell Test",
       modeId: "full-access",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 
@@ -313,6 +317,7 @@ describe("tool call structure", () => {
       title: "Codex Read Test",
       modeId: "full-access",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 
@@ -355,6 +360,7 @@ describe("tool call structure", () => {
       title: "Codex Edit Test",
       modeId: "full-access",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     collector.clear();
 

@@ -2505,7 +2505,7 @@ async function createBrowserProfileHarnessWindow(partition, sourceUrl) {
   await waitForInactiveReveal(handle, "browser profile window");
   const [guests, identities] = await withTimeout(
     Promise.all([guestsPromise, renderer(win, "window.captureHarness.profileIdentities()")]),
-    "browser profile did-attach",
+    "browser profile DOM-ready",
     BROWSER_PROFILE_TIMEOUT_MS,
   );
   return { handle, guests, identities };
@@ -2609,7 +2609,7 @@ async function runBrowserProfileGroup() {
     assertBrowserProfileFixture(firstState, profileValue, "browser profile first tab");
     assertBrowserProfileFixture(secondState, profileValue, "browser profile second tab");
 
-    pass("browser profile renderer did-attach identities match their main-process guests");
+    pass("browser profile renderer DOM-ready identities match their main-process guests");
     pass("browser profile tabs share cookies, localStorage, and one persistent session");
     if (BROWSER_PROFILE_PHASE === "read") {
       pass("browser profile cookies and localStorage survived an Electron process restart");

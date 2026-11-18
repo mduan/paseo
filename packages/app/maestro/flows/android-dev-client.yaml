@@ -5,18 +5,31 @@ appId: ${PASEO_MAESTRO_APP_ID}
 # Handle Expo dev launcher/dev menu screens when testing Android development
 # builds. Release builds no-op through these optional/conditional steps.
 
-- tapOn:
-    text: ".*(localhost|127\\.0\\.0\\.1|10\\.0\\.2\\.2|192\\.168\\.).*"
-    optional: true
+- runFlow:
+    when:
+      true: ${typeof PASEO_MAESTRO_DEV_URL !== "undefined" && PASEO_MAESTRO_DEV_URL != ""}
+    commands:
+      - extendedWaitUntil:
+          visible: "DEVELOPMENT SERVERS"
+          timeout: 30000
+      - openLink: ${PASEO_MAESTRO_DEV_URL}
 
 - runFlow:
     when:
-      visible: "DEVELOPMENT SERVERS"
+      true: ${typeof PASEO_MAESTRO_DEV_URL === "undefined" || PASEO_MAESTRO_DEV_URL == ""}
     commands:
-      # Expo dev launcher text matching is flaky on Android here; tap the first
-      # development server row by coordinate as the fallback.
       - tapOn:
-          point: "50%,8%"
+          text: ".*(localhost|127\\.0\\.0\\.1|10\\.0\\.2\\.2|192\\.168\\.).*"
+          optional: true
+
+      - runFlow:
+          when:
+            visible: "DEVELOPMENT SERVERS"
+          commands:
+            # Expo dev launcher text matching is flaky on Android here; tap the first
+            # development server row by coordinate as the fallback.
+            - tapOn:
+                point: "50%,8%"
 
 - waitForAnimationToEnd
 
@@ -36,6 +49,9 @@ appId: ${PASEO_MAESTRO_APP_ID}
     when:
       visible: "Performance monitor"
     commands:
-      # Close the Expo dev menu if it opens as a bottom sheet.
-      - tapOn:
-          point: "89%,9%"
+      - tapOn: "Close"
+
+- extendedWaitUntil:
+    visible:
+      id: "menu-button|welcome-screen"
+    timeout: 90000

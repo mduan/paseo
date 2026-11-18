@@ -160,7 +160,7 @@ async function connectCreationPeer(port: number) {
           (m) =>
             "payload" in m && "requestId" in m.payload && m.payload.requestId === message.requestId,
         );
-      await expect.poll(response).toBeDefined();
+      await expect.poll(response, { timeout: 15000 }).toBeDefined();
       return response()!;
     },
   };

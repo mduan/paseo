@@ -19,6 +19,15 @@ export interface ScheduledGitProcess<T> {
 // Drain order. "background" is daemon fan-out: reconciliation, watcher refreshes, fetches.
 export type GitProcessPriority = "high" | "normal" | "background";
 
+export function promoteGitProcessPriority(input: {
+  current: GitProcessPriority;
+  requested: GitProcessPriority;
+}): GitProcessPriority {
+  if (input.current === "high" || input.requested === "high") return "high";
+  if (input.current === "normal" || input.requested === "normal") return "normal";
+  return "background";
+}
+
 function parsePositiveInteger(value: string | undefined): number | undefined {
   if (value === undefined) {
     return undefined;

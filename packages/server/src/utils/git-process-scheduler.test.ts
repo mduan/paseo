@@ -1,7 +1,9 @@
 import { setImmediate as scheduleImmediate } from "node:timers";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { GitProcessScheduler, resolveGitProcessPolicy } from "./git-process-scheduler.js";
+import { GitTaskQueue } from "./git-task-queue.js";
 
 function createConcurrencyTask(
   index: number,
@@ -211,6 +213,22 @@ describe("GitProcessScheduler", () => {
     expect(startedAt).toHaveLength(4);
     expect(startedAt[2]! - startedAt[0]!).toBeGreaterThanOrEqual(1_000);
   });
+});
+
+test("queued Git tasks keep their submitter's async context", async () => {
+  const context = new AsyncLocalStorage<string>();
+  const queue = new GitTaskQueue(1);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const active = context.run("active", () => queue.run(() => gate, { priority: () => "normal" }));
+  const queued = context.run("queued", () =>
+    queue.run(async () => context.getStore(), { priority: () => "normal" }),
+  );
+  release();
+  await active;
+  expect(await queued).toBe("queued");
 });
 
 describe("resolveGitProcessPolicy", () => {
