@@ -550,6 +550,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[2],
+    paddingLeft: theme.spacing[3],
   },
   toolbarActions: {
     flexDirection: "row",
