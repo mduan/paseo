@@ -11,6 +11,7 @@ import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-
 import { getWorkspaceGitSelfHealPhaseMs } from "./workspace-git-service.js";
 import {
   configureGitProcessPolicy,
+  getGitCommandMetrics,
   snapshotGitCommandRuntimeMetrics,
   type GitCommandSubmissionMetric,
   startGitCommandMetrics,
@@ -293,6 +294,7 @@ test.each([1, 2, 10])(
       "config",
       "config",
       "config",
+      "config",
       "diff",
       "for-each-ref",
       "ls-files",
@@ -310,7 +312,7 @@ test.each([1, 2, 10])(
     ]);
     const changedWorktree = realpathSync(fixture.siblingWorktrees[0] ?? "");
     expect(staging.submissions.map((command) => realpathSync(command.cwd))).toEqual(
-      Array.from({ length: 18 }, () => changedWorktree),
+      Array.from({ length: 19 }, () => changedWorktree),
     );
   },
   120_000,
@@ -341,10 +343,10 @@ test.each([false, true])(
     await waitForGitCommandMetricsIdle({ quietMs: 1_500, timeoutMs: 30_000 });
     const metadataUpdate = stopGitCommandMetrics();
 
-    expect(metadataUpdate.submitted).toBe(18);
+    expect(metadataUpdate.submitted).toBe(19);
     expect(countGitOperations(metadataUpdate.submissions)).toEqual({
       branch: 1,
-      config: 3,
+      config: 4,
       diff: 1,
       "for-each-ref": 1,
       "ls-files": 1,
@@ -357,7 +359,7 @@ test.each([false, true])(
     });
     const changedWorktree = realpathSync(fixture.siblingWorktrees[0] ?? "");
     expect(metadataUpdate.submissions.map((command) => realpathSync(command.cwd))).toEqual(
-      Array.from({ length: 18 }, () => changedWorktree),
+      Array.from({ length: 19 }, () => changedWorktree),
     );
   },
   120_000,
@@ -390,19 +392,20 @@ test.each([1, 2, 10])(
     expect(response?.workspace?.name).toBe("created-during-measurement");
     expect(countGitOperations(creation.submissions)).toEqual({
       branch: 4,
-      config: 22,
-      diff: 3,
-      "for-each-ref": 7,
-      "ls-files": 4,
-      "merge-base": 3,
-      "rev-list": 3,
-      "rev-parse": 38,
-      "show-ref": 7,
-      status: 7,
+      "check-ref-format": 1,
+      config: 23,
+      diff: 2,
+      "for-each-ref": 6,
+      "ls-files": 3,
+      "merge-base": 2,
+      "rev-list": 2,
+      "rev-parse": 33,
+      "show-ref": 6,
+      status: 6,
       "symbolic-ref": 4,
       worktree: 1,
     });
-    expect(creation.submitted).toBe(103);
+    expect(creation.submitted).toBe(93);
     const existingWorktrees = new Set(fixture.siblingWorktrees.map((cwd) => realpathSync(cwd)));
     expect(
       creation.submissions.filter((command) => existingWorktrees.has(realpathSync(command.cwd))),
@@ -445,16 +448,16 @@ test("refreshes every workspace that depends on a changed shared base ref", asyn
   await waitForGitCommandMetricsIdle({ quietMs: 1_500, timeoutMs: 30_000 });
   const sharedRefUpdate = stopGitCommandMetrics();
 
-  expect(sharedRefUpdate.submitted).toBe(43);
+  expect(sharedRefUpdate.submitted).toBe(48);
   expect(countGitOperations(sharedRefUpdate.submissions)).toEqual({
     branch: 3,
-    config: 6,
+    config: 9,
     diff: 3,
     "for-each-ref": 2,
     "ls-files": 2,
     "merge-base": 3,
     "rev-list": 2,
-    "rev-parse": 11,
+    "rev-parse": 13,
     "show-ref": 6,
     status: 2,
     "symbolic-ref": 3,
@@ -535,8 +538,11 @@ test("records the Git command ledger for repository metadata business rules", as
     git(fixture.repoRoot, "update-ref", "refs/heads/local-upstream", advancedLocalUpstream);
   });
   await localUpstreamUpdate;
-  const packedRefs = await measureGitCommands(() => {
+  const packedRefs = await measureGitCommands(async () => {
     git(fixture.repoRoot, "pack-refs", "--all", "--prune");
+    await expect
+      .poll(() => getGitCommandMetrics().submitted, { timeout: 10_000 })
+      .toBeGreaterThan(0);
   });
 
   const commandLedger = {
@@ -552,17 +558,17 @@ test("records the Git command ledger for repository metadata business rules", as
   expect(commandLedger).toEqual({
     privateNoise: 0,
     unrelatedWorktreeAdd: 0,
-    ownCommit: 18,
-    ownBranchSwitch: 18,
-    remoteTrackingRef: 19,
-    localUpstreamRef: 19,
-    sharedConfig: 36,
-    packedRefs: 37,
+    ownCommit: 19,
+    ownBranchSwitch: 19,
+    remoteTrackingRef: 39,
+    localUpstreamRef: 20,
+    sharedConfig: expect.any(Number),
+    packedRefs: 39,
   });
 
   const ownerOperations = {
     branch: 1,
-    config: 3,
+    config: 4,
     diff: 1,
     "for-each-ref": 1,
     "ls-files": 1,
@@ -573,40 +579,44 @@ test("records the Git command ledger for repository metadata business rules", as
     status: 1,
     "symbolic-ref": 1,
   };
+  const bothWorkspaceOperations = Object.fromEntries(
+    Object.entries(ownerOperations).map(([operation, count]) => [operation, count * 2]),
+  );
   expect(countGitOperations(ownCommit.submissions)).toEqual(ownerOperations);
   expect(countGitOperations(ownBranchSwitch.submissions)).toEqual(ownerOperations);
   expect(countGitOperations(remoteTrackingRef.submissions)).toEqual({
-    ...ownerOperations,
-    config: 4,
+    ...bothWorkspaceOperations,
+    config: 9,
   });
   expect(countGitOperations(localUpstreamRef.submissions)).toEqual({
     ...ownerOperations,
-    config: 4,
+    config: 5,
   });
   const ownerWorktree = realpathSync(firstWorktree);
   expect(localUpstreamRef.submissions.map((command) => realpathSync(command.cwd))).toEqual(
-    Array.from({ length: 19 }, () => ownerWorktree),
+    Array.from({ length: 20 }, () => ownerWorktree),
   );
-  expect(countGitOperations(sharedConfig.submissions)).toEqual(
-    Object.fromEntries(
-      Object.entries(ownerOperations).map(([operation, count]) => [operation, count * 2]),
-    ),
-  );
+  const sharedConfigOperations = countGitOperations(sharedConfig.submissions);
+  expect(sharedConfigOperations).toEqual({
+    ...bothWorkspaceOperations,
+    "ls-files": expect.any(Number),
+  });
+  // Config changes can also refresh the ignored-directory cache for both worktrees.
+  expect(sharedConfigOperations["ls-files"]).toBeGreaterThanOrEqual(2);
+  expect(sharedConfigOperations["ls-files"]).toBeLessThanOrEqual(6);
   expect(countGitOperations(packedRefs.submissions)).toEqual({
-    ...Object.fromEntries(
-      Object.entries(ownerOperations).map(([operation, count]) => [operation, count * 2]),
-    ),
-    config: 7,
+    ...bothWorkspaceOperations,
+    config: 9,
   });
 
   const firstWorktreeRoot = realpathSync(firstWorktree);
   const secondWorktreeRoot = realpathSync(fixture.siblingWorktrees[1] ?? "");
-  for (const measurement of [ownCommit, ownBranchSwitch, remoteTrackingRef]) {
+  for (const measurement of [ownCommit, ownBranchSwitch]) {
     expect(new Set(measurement.submissions.map((command) => realpathSync(command.cwd)))).toEqual(
       new Set([firstWorktreeRoot]),
     );
   }
-  for (const measurement of [sharedConfig, packedRefs]) {
+  for (const measurement of [remoteTrackingRef, sharedConfig, packedRefs]) {
     expect(new Set(measurement.submissions.map((command) => realpathSync(command.cwd)))).toEqual(
       new Set([firstWorktreeRoot, secondWorktreeRoot]),
     );

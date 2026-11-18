@@ -32,6 +32,10 @@ export function runWithGitCommandPriority<T>(priority: GitProcessPriority, opera
   return gitCommandPriority.run(priority, operation);
 }
 
+export function getGitCommandPriority(): GitProcessPriority {
+  return gitCommandPriority.getStore() ?? "normal";
+}
+
 function createGitCommandRuntimeMetricsWindow(policy: GitProcessPolicy) {
   return new GitCommandRuntimeMetricsWindow({
     concurrencyLimit: policy.maxProcessConcurrency,
@@ -299,7 +303,7 @@ function executeGitCommand<Output>(
   decode: (output: Buffer) => Output,
   provenance?: string,
 ): Promise<GitCommandResult<Output>> {
-  const priority = gitCommandPriority.getStore() ?? "normal";
+  const priority = getGitCommandPriority();
   const metricsState = submitGitCommandMetric({ args, cwd: options.cwd, priority });
   const commandTrace = submitGitCommandTrace(args, options.cwd, {
     active: gitProcessScheduler.activeCount,

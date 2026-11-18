@@ -2089,6 +2089,28 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     service.dispose();
   });
 
+  test.each(["uncommitted", "base"] as const)(
+    "a forced Git refresh invalidates cached %s diffs after mutation",
+    async (mode) => {
+      const getCheckoutDiff = vi
+        .fn()
+        .mockResolvedValueOnce({ diff: "before commit" })
+        .mockResolvedValueOnce({ diff: "after commit" });
+      const service = createService({ getCheckoutDiff, now: () => new Date(0) });
+      try {
+        await expect(service.getCheckoutDiff(REPO_CWD, { mode })).resolves.toEqual({
+          diff: "before commit",
+        });
+        await service.getSnapshot(REPO_CWD, { force: true, reason: "commit-changes" });
+        await expect(service.getCheckoutDiff(REPO_CWD, { mode })).resolves.toEqual({
+          diff: "after commit",
+        });
+      } finally {
+        await service.dispose();
+      }
+    },
+  );
+
   test("getCheckoutDiff serves cached value within the internal min-gap for non-forced reads", async () => {
     let nowMs = 0;
     const getCheckoutDiff = vi

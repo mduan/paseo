@@ -4,6 +4,7 @@ import path, { join } from "node:path";
 import type pino from "pino";
 import type { ForgeService } from "../services/forge-service.js";
 import type {
+  CheckoutContext,
   CheckoutSnapshotFacts,
   CheckoutStatusGit,
   PullRequestStatusResult,
@@ -15,6 +16,13 @@ import {
   WorkspaceGitServiceImpl,
   type WorkspaceGitRuntimeSnapshot,
 } from "./workspace-git-service.js";
+
+import {
+  getGitCommandMetrics,
+  runWithGitCommandPriority,
+  startGitCommandMetrics,
+  stopGitCommandMetrics,
+} from "../utils/run-git-command.js";
 
 const REPO_CWD = path.resolve("/tmp/repo");
 
@@ -531,6 +539,90 @@ describe("WorkspaceGitServiceImpl", () => {
 
     service.dispose();
   });
+
+  test.each([
+    { initial: "background", demand: "normal", expected: "normal" },
+    { initial: "background", demand: "high", expected: "high" },
+    { initial: "high", demand: "normal", expected: "high" },
+  ] as const)(
+    "$demand demand preserves the highest priority when joining a $initial refresh",
+    async ({ initial, demand: demandPriority, expected }) => {
+      vi.useRealTimers();
+      const facts = createDeferred<CheckoutSnapshotFacts>();
+      const getCheckoutSnapshotFacts = vi.fn(() => facts.promise);
+      const service = createService({
+        getCheckoutSnapshotFacts,
+        getCheckoutStatus: vi.fn(async (cwd: string, context: CheckoutContext) => {
+          await context.runGitCommand!(["--version"], { cwd: os.tmpdir() });
+          return createCheckoutStatus(cwd);
+        }),
+      });
+      startGitCommandMetrics();
+      try {
+        const initialRefresh = runWithGitCommandPriority(initial, () =>
+          service.getSnapshot(REPO_CWD, { includeForge: false }),
+        );
+        await vi.waitFor(() => expect(getCheckoutSnapshotFacts).toHaveBeenCalledTimes(1));
+        const demandRefresh = runWithGitCommandPriority(demandPriority, () =>
+          service.getSnapshot(REPO_CWD, { includeForge: false }),
+        );
+        facts.resolve(createCheckoutSnapshotFacts(REPO_CWD));
+        await Promise.all([initialRefresh, demandRefresh]);
+        expect(getGitCommandMetrics().submissions.map((command) => command.priority)).toEqual([
+          expected,
+        ]);
+      } finally {
+        await service.dispose();
+        stopGitCommandMetrics();
+      }
+    },
+  );
+
+  test.each([false, true])(
+    "foreground refresh bypasses queued hydration (joins existing target: %s)",
+    async (joinsExistingTarget) => {
+      const activeCwds = Array.from({ length: WORKSPACE_GIT_REFRESH_CONCURRENCY }, (_, index) =>
+        path.resolve(`/tmp/active-refresh-${index}`),
+      );
+      const olderCwd = path.resolve("/tmp/older-refresh");
+      const foregroundCwd = path.resolve("/tmp/foreground-refresh");
+      const gates = new Map(
+        [...activeCwds, olderCwd, foregroundCwd].map((cwd) => [
+          cwd,
+          createDeferred<CheckoutStatusGit>(),
+        ]),
+      );
+      const started: string[] = [];
+      const service = createService({
+        getCheckoutStatus: vi.fn((cwd: string) => {
+          started.push(cwd);
+          return gates.get(cwd)!.promise;
+        }),
+      });
+      const background = (cwd: string) =>
+        runWithGitCommandPriority("background", () =>
+          service.getSnapshot(cwd, { includeForge: false }),
+        );
+      const reads = activeCwds.map(background);
+      try {
+        await vi.waitFor(() => expect(started).toEqual(activeCwds));
+        reads.push(background(olderCwd));
+        if (joinsExistingTarget) reads.push(background(foregroundCwd));
+        reads.push(
+          runWithGitCommandPriority("high", () =>
+            service.getSnapshot(foregroundCwd, { includeForge: false }),
+          ),
+        );
+        gates.get(activeCwds[0])!.resolve(createCheckoutStatus(activeCwds[0]));
+        await vi.waitFor(() => expect(started.at(-1)).toBe(foregroundCwd));
+        expect(started).not.toContain(olderCwd);
+      } finally {
+        for (const [cwd, gate] of gates) gate.resolve(createCheckoutStatus(cwd));
+        await Promise.all(reads);
+        await service.dispose();
+      }
+    },
+  );
 
   test("bounds refresh generations and re-enqueues hot workspace successors fairly", async () => {
     const hotCwds = Array.from({ length: WORKSPACE_GIT_REFRESH_CONCURRENCY }, (_, index) =>
