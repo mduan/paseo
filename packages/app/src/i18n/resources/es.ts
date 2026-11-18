@@ -2160,6 +2160,10 @@ export const es: TranslationResources = {
     showMoreFiles_other: "Mostrar {{count}} archivos más",
     showFewerFiles: "Mostrar menos archivos",
   },
+  diffStat: {
+    files_one: "{{count}} archivo",
+    files_other: "{{count}} archivos",
+  },
   toolCallDetails: {
     error: "Error",
     empty: "No hay detalles adicionales disponibles",

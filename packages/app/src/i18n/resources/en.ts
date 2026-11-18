@@ -2135,6 +2135,10 @@ export const en = {
     showMoreFiles_other: "Show {{count}} more files",
     showFewerFiles: "Show fewer files",
   },
+  diffStat: {
+    files_one: "{{count}} file",
+    files_other: "{{count}} files",
+  },
   toolCallDetails: {
     error: "Error",
     empty: "No additional details available",

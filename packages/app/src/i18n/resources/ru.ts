@@ -2144,6 +2144,10 @@ export const ru: TranslationResources = {
     showMoreFiles_other: "Показать ещё {{count}} файлов",
     showFewerFiles: "Показать меньше файлов",
   },
+  diffStat: {
+    files_one: "{{count}} файл",
+    files_other: "{{count}} файлов",
+  },
   toolCallDetails: {
     error: "Ошибка",
     empty: "Дополнительные сведения отсутствуют",

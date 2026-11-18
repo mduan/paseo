@@ -2120,6 +2120,10 @@ export const ko: TranslationResources = {
     showMoreFiles_other: "파일 {{count}}개 더 보기",
     showFewerFiles: "파일 적게 보기",
   },
+  diffStat: {
+    files_one: "파일 {{count}}개",
+    files_other: "파일 {{count}}개",
+  },
   toolCallDetails: {
     error: "오류",
     empty: "추가 세부 정보가 없습니다",

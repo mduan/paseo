@@ -2145,6 +2145,10 @@ export const ptBR: TranslationResources = {
     showMoreFiles_other: "Mostrar mais {{count}} arquivos",
     showFewerFiles: "Mostrar menos arquivos",
   },
+  diffStat: {
+    files_one: "{{count}} arquivo",
+    files_other: "{{count}} arquivos",
+  },
   toolCallDetails: {
     error: "Erro",
     empty: "Nenhum detalhe adicional disponível",
