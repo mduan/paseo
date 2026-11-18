@@ -207,6 +207,46 @@ export async function remountAndRecoverAssistantImageFromHistory(
   await userPagesUntilAssistantImageRenders(page, image);
 }
 
+export async function expectCachedAssistantImageSurvivesVirtualization(
+  page: Page,
+  image: AssistantImageFixture,
+): Promise<void> {
+  const rendered = page.getByRole("img", { name: image.alt });
+  const result = await rendered.evaluate(async (element) => {
+    const row = element.closest<HTMLElement>("[data-history-row-id]");
+    const scroll = element.closest<HTMLElement>('[data-testid="agent-chat-scroll"]');
+    if (!row || !scroll) throw new Error("Expected a timeline image row");
+    const rowId = row.dataset.historyRowId;
+    const scrollTop = scroll.scrollTop;
+    let missingPreview = false;
+    const findRow = () =>
+      Array.from(scroll.querySelectorAll<HTMLElement>("[data-history-row-id]")).find(
+        (candidate) => candidate.dataset.historyRowId === rowId,
+      );
+    const observer = new MutationObserver(() => {
+      const current = findRow();
+      if (current && !current.querySelector('[role="img"]')) missingPreview = true;
+    });
+    const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    observer.observe(scroll, { childList: true, subtree: true });
+    try {
+      scroll.scrollTo({ top: scroll.scrollHeight });
+      for (let frame = 0; frame < 120 && findRow(); frame++) await nextFrame();
+      const unmounted = !findRow();
+      scroll.scrollTo({ top: scrollTop });
+      for (let frame = 0; frame < 120; frame++) {
+        await nextFrame();
+        if (findRow()?.querySelector('[role="img"]')) break;
+      }
+      return { unmounted, missingPreview };
+    } finally {
+      observer.disconnect();
+    }
+  });
+  expect(result).toEqual({ unmounted: true, missingPreview: false });
+  await expectAssistantImageRendered(page, image);
+}
+
 export async function sendFollowUpAndExpectVisibleResponse(
   page: Page,
   input: { prompt: string; response: string },

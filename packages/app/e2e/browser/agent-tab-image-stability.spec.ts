@@ -7,6 +7,7 @@ import {
   emitSettledAssistantImage,
   expectAssistantImageNotMounted,
   expectAssistantImageRendered,
+  expectCachedAssistantImageSurvivesVirtualization,
   openAssistantImageTimeline,
   openExistingImageAgentTabs,
   remountAndRecoverAssistantImageFromHistory,
@@ -226,6 +227,12 @@ test("a real assistant PNG remains reachable through pagination and remount", as
   page,
 }) => {
   test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    Object.assign(globalThis, {
+      __PASEO_E2E_WEB_PARTIAL_VIRTUALIZATION_THRESHOLD: 1,
+      __PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS: 1,
+    });
+  });
   const image = await createSmallAssistantPng(workspace, {
     alt: "Paginated real file image",
     fileName: "paginated-assistant-preview.png",
@@ -237,6 +244,7 @@ test("a real assistant PNG remains reachable through pagination and remount", as
   await openAssistantImageTimeline(page, imageAgent);
   await expectAssistantImageNotMounted(page, image);
   await userPagesUntilAssistantImageRenders(page, image);
+  await expectCachedAssistantImageSurvivesVirtualization(page, image);
   await remountAndRecoverAssistantImageFromHistory(page, image);
 });
 

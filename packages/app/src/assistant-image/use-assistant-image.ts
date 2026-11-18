@@ -323,6 +323,11 @@ function usePreviewUrl(attachment: AttachmentMetadata | null | undefined): Previ
   if (!previewKey) {
     return { status: "waiting" };
   }
+  // Virtualized remounts must not measure a placeholder before effects restore the cached URL.
+  const cached = previewUrlCache.peek(previewKey);
+  if (cached) {
+    return { status: "loaded", uri: cached.uri };
+  }
   return entry.key === previewKey ? entry.state : { status: "waiting" };
 }
 
