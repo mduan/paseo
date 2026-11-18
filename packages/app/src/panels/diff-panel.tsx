@@ -18,6 +18,8 @@ import { useInlineReviewController } from "@/review";
 import { buildDiffReviewContext } from "@/review/context";
 import type { ReviewLineRange } from "@/review/range";
 import { DiffDocument } from "@/git/diff-document";
+import { DiffStat } from "@/components/diff-stat";
+import { sumDiffStat } from "@/git/file-header-presentation";
 import { LargeDiffGate } from "@/git/diff-too-large-state";
 import { shouldCollapseDiffFile } from "@/utils/diff-layout";
 import {
@@ -180,6 +182,19 @@ function ChangesPanel() {
 }
 
 const EMPTY_FILES: ParsedDiffFile[] = [];
+
+function FilesDiffStat({ files, testID }: { files: ParsedDiffFile[]; testID?: string }) {
+  const stat = useMemo(() => sumDiffStat(files), [files]);
+  if (files.length === 0) return null;
+  return (
+    <DiffStat
+      additions={stat.additions}
+      deletions={stat.deletions}
+      fileCount={files.length}
+      testID={testID}
+    />
+  );
+}
 
 function CommitDiffPanel() {
   const { t } = useTranslation();
@@ -429,6 +444,7 @@ function TurnDiffPanel() {
           { paddingRight: paneContentToolbarTrailingPadding(panelPreferences.isCompact, "glyph") },
         ]}
       >
+        <FilesDiffStat files={files} testID="turn-diff-stat" />
         <View style={styles.toolbarActions}>
           <ChangesDiffToolbar options={diffOptions} compact={panelPreferences.isCompact} />
           {canOpenInMainPanel ? (

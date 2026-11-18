@@ -134,14 +134,20 @@ function resolveComparisonRefs(input: {
   return { from: { name: input.baseRefLabel ?? undefined }, to };
 }
 
+interface SelectedDiffStat {
+  additions: number;
+  deletions: number;
+  fileCount: number;
+}
+
 function computeSelectedDiffStat(
   files: ParsedDiffFile[],
   isLoading: boolean,
-): { additions: number; deletions: number } | null {
+): SelectedDiffStat | null {
   if (isLoading) {
     return null;
   }
-  return sumDiffStat(files);
+  return { ...sumDiffStat(files), fileCount: files.length };
 }
 
 function useDiscardChangesAction({
@@ -536,7 +542,7 @@ interface ChangesComparisonToolbarModel {
   turnModes: TurnDiffModes | null;
   commitRanges: CommitRangeModes | null;
   mode: ChangesToolbarMode;
-  selectedDiffStat: { additions: number; deletions: number } | null;
+  selectedDiffStat: SelectedDiffStat | null;
   onSelectBase: () => void;
   onSelectAll?: () => void;
   onSelectUncommitted: () => void;
@@ -562,7 +568,7 @@ interface BuildChangesHeaderModelInput {
   onSelectBase: () => void;
   onSelectAll?: () => void;
   onSelectUncommitted: () => void;
-  selectedDiffStat: { additions: number; deletions: number } | null;
+  selectedDiffStat: SelectedDiffStat | null;
   serverId: string;
   workspaceId?: string | null;
 }
@@ -756,6 +762,7 @@ function ChangesComparisonToolbar({
           <DiffStat
             additions={model.selectedDiffStat.additions}
             deletions={model.selectedDiffStat.deletions}
+            fileCount={model.selectedDiffStat.fileCount}
             testID="changes-selected-diff-stat"
           />
         ) : null}

@@ -2131,6 +2131,10 @@ export const ja: TranslationResources = {
     showMoreFiles_other: "さらに {{count}} 個のファイルを表示",
     showFewerFiles: "表示するファイルを減らす",
   },
+  diffStat: {
+    files_one: "{{count}} 個のファイル",
+    files_other: "{{count}} 個のファイル",
+  },
   toolCallDetails: {
     error: "エラー",
     empty: "追加の詳細はありません",

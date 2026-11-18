@@ -2088,6 +2088,10 @@ export const zhCN: TranslationResources = {
     showMoreFiles_other: "再显示 {{count}} 个文件",
     showFewerFiles: "显示更少文件",
   },
+  diffStat: {
+    files_one: "{{count}} 个文件",
+    files_other: "{{count}} 个文件",
+  },
   toolCallDetails: {
     error: "错误",
     empty: "没有可用的更多详情",
