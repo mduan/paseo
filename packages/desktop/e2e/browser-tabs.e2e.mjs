@@ -196,7 +196,9 @@ async function waitForDesktopStatus(page) {
 }
 
 async function startTargetPage() {
-  const server = createServer((_request, response) => {
+  const delayedResponses = new Set();
+  let delayResponse = true;
+  const respond = (response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(`<!doctype html>
       <html>
@@ -214,6 +216,13 @@ async function startTargetPage() {
           <input id="typing-target" />
         </body>
       </html>`);
+  };
+  const server = createServer((request, response) => {
+    if (delayResponse && request.url === "/delayed-new-tab") {
+      delayedResponses.add(response);
+      return;
+    }
+    respond(response);
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -221,11 +230,22 @@ async function startTargetPage() {
   });
   const address = server.address();
   assert(address && typeof address !== "string", "Target page did not bind a TCP port");
-  return { server, url: `http://127.0.0.1:${address.port}/` };
+  return {
+    server,
+    url: `http://127.0.0.1:${address.port}/`,
+    releaseDelayedResponses() {
+      delayResponse = false;
+      for (const response of delayedResponses) respond(response);
+      delayedResponses.clear();
+    },
+  };
 }
 
 async function closeServer(server) {
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => {
+    server.close(resolve);
+    server.closeAllConnections();
+  });
 }
 
 function mcpPayload(result, command) {
@@ -559,6 +579,7 @@ async function runRegression({
   client,
   serverId,
   targetUrl,
+  releaseDelayedResponses,
   callerAgentId,
   artifactDir,
   inspectorPort,
@@ -582,7 +603,14 @@ async function runRegression({
     document.body.appendChild(overlayRoot);
   });
 
-  const created = await callBrowserTool(client, "browser_new_tab", { url: targetUrl });
+  let created;
+  try {
+    created = await callBrowserTool(client, "browser_new_tab", {
+      url: `${targetUrl}delayed-new-tab`,
+    });
+  } finally {
+    releaseDelayedResponses();
+  }
   const browserId = created.browserId;
   assert(typeof browserId === "string", "browser_new_tab returned no browserId");
 
@@ -1177,6 +1205,7 @@ async function main() {
       client,
       serverId: status.serverId,
       targetUrl: target.url,
+      releaseDelayedResponses: target.releaseDelayedResponses,
       inspectorPort,
       callerAgentId,
       artifactDir,

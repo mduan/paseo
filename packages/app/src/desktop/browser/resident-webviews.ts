@@ -309,9 +309,20 @@ export function prepareBrowserWebview(
   webview.setAttribute("spellcheck", "false");
   webview.setAttribute("autosize", "on");
   if (input.initialUrl) {
-    (webview as BrowserWebviewElement).src = input.initialUrl;
+    (webview as BrowserWebviewElement).src = "about:blank";
   }
   registerBrowserWhenAttached(webview as BrowserWebviewElement, input, browser);
+  const initialUrl = input.initialUrl;
+  if (initialUrl && initialUrl !== "about:blank") {
+    // Bootstrap locally so guest identity is available before a slow destination loads.
+    webview.addEventListener(
+      "dom-ready",
+      () => {
+        (webview as BrowserWebviewElement).src = initialUrl;
+      },
+      { once: true },
+    );
+  }
 }
 
 export function ensureResidentBrowserWebview(input: {
