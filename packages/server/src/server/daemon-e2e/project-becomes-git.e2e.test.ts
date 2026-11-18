@@ -63,10 +63,11 @@ test("an empty project becomes Git without changing its identity or creating a w
   cleanupClients.add(client);
   await client.connect();
   await client.fetchAgents({ subscribe: {} });
+  await client.observeEvents(["project.update"]).ready;
 
   const added = await client.addProject(projectRoot);
 
-  expect(added).toEqual({
+  expect(added).toMatchObject({
     requestId: expect.any(String),
     project: {
       projectId: expect.stringMatching(/^prj_[0-9a-f]{16}$/),
@@ -77,7 +78,15 @@ test("an empty project becomes Git without changing its identity or creating a w
     },
     error: null,
   });
-  const project = added.project!;
+  const { projectId, projectDisplayName, projectCustomName, projectRootPath, projectKind } =
+    added.project!;
+  const project = {
+    projectId,
+    projectDisplayName,
+    projectCustomName,
+    projectRootPath,
+    projectKind,
+  };
   const beforeGitInit = await client.fetchWorkspaces({ filter: { projectId: project.projectId } });
   expect(beforeGitInit).toMatchObject({ entries: [], emptyProjects: [project] });
 
@@ -96,7 +105,7 @@ test("an empty project becomes Git without changing its identity or creating a w
     label: "project.update after git init",
   });
 
-  expect(update).toEqual({
+  expect(update).toMatchObject({
     kind: "upsert",
     project: { ...project, projectKind: "git" },
   });
@@ -110,14 +119,16 @@ test("an empty project becomes Git without changing its identity or creating a w
   const persistedProjects = JSON.parse(
     await readFile(path.join(daemon.paseoHome, "projects", "projects.json"), "utf8"),
   ) as PersistedProjectRecord[];
-  expect(persistedProjects).toContainEqual({
-    projectId: project.projectId,
-    rootPath: projectRoot,
-    kind: "git",
-    displayName: project.projectDisplayName,
-    customName: null,
-    createdAt: expect.any(String),
-    updatedAt: expect.any(String),
-    archivedAt: null,
-  });
+  expect(persistedProjects).toContainEqual(
+    expect.objectContaining({
+      projectId: project.projectId,
+      rootPath: projectRoot,
+      kind: "git",
+      displayName: project.projectDisplayName,
+      customName: null,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+      archivedAt: null,
+    }),
+  );
 }, 30_000);

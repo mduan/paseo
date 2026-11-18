@@ -63,6 +63,11 @@ clear_input() {
   adb shell input keyevent 67
 }
 
+fill_input() {
+  clear_input
+  ad fill 'editable=true' "$1" --settle
+}
+
 clear_focused_input_with_adb() {
   adb shell input keycombination 113 29
   adb shell input keyevent 67
@@ -90,7 +95,7 @@ wait_for_ime() {
           return
         fi
       fi
-    elif ! printf '%s' "${window_state}" | rg -q "type=ime .*visible=true"; then
+    elif ! rg -q "type=ime .*visible=true" <<<"${window_state}"; then
       # The window stops reporting visible when the hide animation starts. Android
       # drops a show request made while it is still running, so let it finish
       # before the next tap.
@@ -104,11 +109,22 @@ wait_for_ime() {
 }
 
 ime_is_visible() {
-  adb shell dumpsys window | rg -q "type=ime .*visible=true"
+  local window_state
+  window_state="$(adb shell dumpsys window)"
+  rg -q "type=ime .*visible=true" <<<"${window_state}"
+}
+
+use_helper_ime() {
+  if ime_is_visible; then
+    adb shell input keyevent BACK
+    wait_for_ime false
+  fi
+  adb shell ime set "${HELPER_IME}" >/dev/null
+  wait_for_ime false
 }
 
 open_gboard() {
-  local x="$1" y="$2" height
+  local x y height
   adb shell ime set "${GBOARD_IME}" >/dev/null
   sleep 1
   if ime_is_visible; then
@@ -122,9 +138,6 @@ open_gboard() {
   read -r x y height < <(node "${ASSERT}" rect "${ARTIFACTS_DIR}/keyboard-target.json" editable right)
   adb shell input tap "${x}" "${y}"
   wait_for_ime true
-  snapshot_json "${ARTIFACTS_DIR}/keyboard-target-open.json" --raw
-  read -r x y height < <(node "${ASSERT}" rect "${ARTIFACTS_DIR}/keyboard-target-open.json" editable right)
-  adb shell input tap "${x}" "${y}"
 }
 
 
@@ -224,7 +237,7 @@ read -r _ header_y _ < <(
 adb shell input keyevent HOME
 adb shell am start -n "${APP_ID}/.MainActivity" >/dev/null
 sleep 1
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 clear_focused_input_with_adb
 keyboard_shift="$(read_keyboard_shift)"
 adb shell input keyevent 76
@@ -236,7 +249,7 @@ model_open_y="$((model_y - keyboard_shift))"
 adb shell input tap "${model_x}" "${model_open_y}"
 sleep 1
 capture_screen "${ARTIFACTS_DIR}/model-selector-open.png"
-adb shell ime set "${HELPER_IME}" >/dev/null
+use_helper_ime
 ad wait 'id="compact-provider-list"' 10000
 ad press 'label="Close"' --settle
 adb shell input tap "${input_x}" "${input_y}"
@@ -246,11 +259,11 @@ ad wait 'editable=true' 10000
 adb shell input keyevent HOME
 adb shell am start -n "${APP_ID}/.MainActivity" >/dev/null
 sleep 1
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 clear_focused_input_with_adb
 adb shell input keyevent 76
 sleep 1
-adb shell ime set "${HELPER_IME}" >/dev/null
+use_helper_ime
 ad wait 'id="composer-autocomplete-popover"' 10000
 ad wait 'text="/exit"' 10000
 snapshot_json "${ARTIFACTS_DIR}/command-popover.json"
@@ -263,7 +276,7 @@ ad wait 'label="Message, @files, /commands"' 10000
 
 ad fill 'label="Message, @files, /commands"' "${MESSAGE}" --settle
 snapshot_json "${ARTIFACTS_DIR}/multiline-first.json"
-ad fill 'editable=true focused=true' "${MESSAGE}" --settle
+fill_input "${MESSAGE}"
 snapshot_json "${ARTIFACTS_DIR}/multiline-second.json"
 node "${ASSERT}" same-input-height \
   "${ARTIFACTS_DIR}/multiline-first.json" \
@@ -272,7 +285,7 @@ node "${ASSERT}" same-input-height \
 adb shell input keyevent HOME
 adb shell am start -n "${APP_ID}/.MainActivity" >/dev/null
 sleep 1
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 
 keyboard_shift="$(read_keyboard_shift)"
 capture_screen "${ARTIFACTS_DIR}/keyboard-open.png"
@@ -282,9 +295,9 @@ node "${ASSERT}" same-header \
   "${ARTIFACTS_DIR}/keyboard-open.png" \
   "$((header_y + 48))"
 
-adb shell ime set "${HELPER_IME}" >/dev/null
-ad fill 'editable=true focused=true' "${LONG_MESSAGE}" --settle
-open_gboard "${input_x}" "${input_y}"
+use_helper_ime
+fill_input "${LONG_MESSAGE}"
+open_gboard
 capture_ui_xml "${ARTIFACTS_DIR}/long-draft-keyboard-open.xml"
 capture_screen "${ARTIFACTS_DIR}/long-draft-keyboard-open.png"
 node "${ASSERT}" xml-above-y \
@@ -304,12 +317,12 @@ node "${ASSERT}" xml-composer-contained \
 # draft, jump to the end, hold delete again. The first hold-delete must start mid-draft: from
 # the end, the pre-fix input also returns to baseline. Backspace sits on Gboard's third key
 # row on the paseo-api35 layout.
-adb shell ime set "${HELPER_IME}" >/dev/null
-ad fill 'editable=true' "${BLANK_LINE_DRAFT}" --settle
-open_gboard "${input_x}" "${input_y}"
+use_helper_ime
+fill_input "${BLANK_LINE_DRAFT}"
+open_gboard
 adb shell input keyevent BACK
 wait_for_ime false
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 adb shell input keycombination 113 122
 adb shell input keyevent 20 20 20 20 20 20 20 20
 screen_width="$(adb shell wm size | sed -n 's/.*: \([0-9]*\)x.*/\1/p' | tail -1)"
@@ -318,16 +331,16 @@ backspace_y="$(($(read_ime_top) + 507))"
 adb shell input swipe "${backspace_x}" "${backspace_y}" "${backspace_x}" "${backspace_y}" 8000
 adb shell input keycombination 113 123
 adb shell input swipe "${backspace_x}" "${backspace_y}" "${backspace_x}" "${backspace_y}" 12000
-adb shell ime set "${HELPER_IME}" >/dev/null
+use_helper_ime
 ad wait 'label="Message, @files, /commands"' 10000
 snapshot_json "${ARTIFACTS_DIR}/after-hold-delete.json"
 node "${ASSERT}" same-input-height \
   "${ARTIFACTS_DIR}/baseline.json" \
   "${ARTIFACTS_DIR}/after-hold-delete.json"
 
-adb shell ime set "${HELPER_IME}" >/dev/null
-ad fill 'editable=true' "${MESSAGE}" --settle
-open_gboard "${input_x}" "${input_y}"
+use_helper_ime
+fill_input "${MESSAGE}"
+open_gboard
 keyboard_shift="$(read_keyboard_shift)"
 
 read -r changes_x changes_y _ < <(
@@ -336,23 +349,23 @@ read -r changes_x changes_y _ < <(
 adb shell input tap "${changes_x}" "$((changes_y - keyboard_shift))"
 ad wait 'id="changes-header"' 10000
 capture_screen "${ARTIFACTS_DIR}/changes-control-open.png"
-ad press 'label="Close Explorer sidebar"' --settle
+ad press 'id="explorer-close"' --settle
 ad wait "text=\"${AGENT_TITLE}\"" 10000
 ad wait 'editable=true' 10000
 
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 keyboard_shift="$(read_keyboard_shift)"
 adb shell input tap "${attach_x}" "$((attach_y - keyboard_shift))"
 sleep 1
-adb shell ime set "${HELPER_IME}" >/dev/null
+use_helper_ime
 ad wait 'id="message-input-attachment-menu-content"' 10000
 ad press 540 600 --settle
 
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 keyboard_shift="$(read_keyboard_shift)"
 adb shell input tap 983 "$((attach_y - keyboard_shift))"
 wait_for_ime false
-adb shell ime set "${HELPER_IME}" >/dev/null
+use_helper_ime
 ad wait text "keyboard invariant line one" 10000
 snapshot_json "${ARTIFACTS_DIR}/after-submit.json"
 node "${ASSERT}" has-exact-text "${ARTIFACTS_DIR}/after-submit.json" "${MESSAGE}"
@@ -360,13 +373,13 @@ node "${ASSERT}" same-input-height \
   "${ARTIFACTS_DIR}/baseline.json" \
   "${ARTIFACTS_DIR}/after-submit.json"
 
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 adb shell input keyevent BACK
 wait_for_ime false
 sleep 0.5
 capture_screen "${ARTIFACTS_DIR}/hidden-focused-baseline.png"
 
-open_gboard "${input_x}" "${input_y}"
+open_gboard
 node "${STALL_HERMES}" "${METRO_PORT}" 3000 "${APP_ID}" &
 stall_pid="$!"
 sleep 0.25
@@ -390,13 +403,10 @@ node "${ASSERT}" same-region \
 ad press 'id="menu-button"' --settle
 ad press 'id="sidebar-global-new-workspace"' --settle
 ad wait 'id="workspace-create-submit"' 10000
-adb shell ime set "${HELPER_IME}" >/dev/null
-ad fill 'editable=true' "x" --settle
+use_helper_ime
+fill_input "x"
 snapshot_json "${ARTIFACTS_DIR}/new-workspace-short-draft.json"
-read -r new_input_x new_input_y _ < <(
-  node "${ASSERT}" rect "${ARTIFACTS_DIR}/new-workspace-short-draft.json" "editable"
-)
-open_gboard "${new_input_x}" "${new_input_y}"
+open_gboard
 capture_ui_xml "${ARTIFACTS_DIR}/new-workspace-short-draft-keyboard-open.xml"
 # Typing more lines moves the setup fields up with the composer instead of
 # hiding their bottom rows behind it.
@@ -410,16 +420,10 @@ node "${ASSERT}" xml-fields-follow-growth \
   "${ARTIFACTS_DIR}/new-workspace-short-draft-keyboard-open.xml" \
   "${ARTIFACTS_DIR}/new-workspace-grown-draft-keyboard-open.xml"
 
-adb shell ime set "${HELPER_IME}" >/dev/null
-ad fill 'editable=true' "${LONG_MESSAGE}" --settle
+use_helper_ime
+fill_input "${LONG_MESSAGE}"
 snapshot_json "${ARTIFACTS_DIR}/new-workspace-long-draft.json"
-read -r new_input_x new_input_y new_input_height < <(
-  node "${ASSERT}" rect "${ARTIFACTS_DIR}/new-workspace-long-draft.json" "editable"
-)
-# The editor shrinks when the keyboard opens. Its bottom stays anchored, while
-# its old center can move into the setup fields after the height constraint.
-new_input_y="$((new_input_y + new_input_height / 2 - 8))"
-open_gboard "${new_input_x}" "${new_input_y}"
+open_gboard
 capture_ui_xml "${ARTIFACTS_DIR}/new-workspace-long-draft-keyboard-open.xml"
 capture_screen "${ARTIFACTS_DIR}/new-workspace-long-draft-keyboard-open.png"
 node "${ASSERT}" xml-composer-contained \
@@ -439,29 +443,11 @@ node "${ASSERT}" same-input-height \
 node "${ASSERT}" xml-fields-above-composer \
   "${ARTIFACTS_DIR}/new-workspace-long-draft-keyboard-closed.xml"
 
-# All hosts run the same scenario; only navigation differs.
-# For the shared scenario, tap the editor's blank right edge once. Tapping
-# text again after opening invokes Android's spelling menu for long drafts.
-open_editor_keyboard() {
-  local x="$1" y="$2"
-  local current_ime
-  current_ime="$(adb shell settings get secure default_input_method)"
-  if [[ "${current_ime}" != "${GBOARD_IME}" ]]; then
-    adb shell ime set "${GBOARD_IME}" >/dev/null
-    sleep 1
-  fi
-  if ! ime_is_visible; then adb shell input tap "${x}" "${y}"; fi
-  wait_for_ime true
-}
-
 prepare_composer() {
-  adb shell ime set "${HELPER_IME}" >/dev/null
-  wait_for_ime false
+  use_helper_ime
   clear_input
   wait_for_ime false
-  snapshot_json "${ARTIFACTS_DIR}/overlay-input.json"
-  read -r overlay_x overlay_y overlay_h < <(node "${ASSERT}" rect "${ARTIFACTS_DIR}/overlay-input.json" editable right)
-  if [[ "$1" == open ]]; then open_editor_keyboard "${overlay_x}" "${overlay_y}"; fi
+  if [[ "$1" == open ]]; then open_gboard; fi
 }
 press_composer_control() {
   local x y h
@@ -470,13 +456,30 @@ press_composer_control() {
   adb shell input tap "${x}" "${y}"
 }
 
+open_model_picker() {
+  press_composer_control combined-model-selector
+  ad wait stable 300 5000
+  if ad is visible 'id="agent-controls-model"' >/dev/null 2>&1; then
+    ad press 'id="agent-controls-model"' --settle
+  fi
+}
+
+close_model_picker() {
+  if ad is visible 'id="agent-controls-model-browser-sheet"' >/dev/null 2>&1; then
+    adb shell input keyevent 4
+    ad wait stable 300 5000
+  fi
+  if ad is visible 'id="agent-controls-model"' >/dev/null 2>&1; then
+    ad press 'label="Close"' --settle
+  fi
+}
+
 run_host_overlays() {
   local host="$1"
   for mode in closed open; do
     for query in / @README; do
-      prepare_composer closed
+      prepare_composer "${mode}"
       adb shell input text "${query}"
-      if [[ "${mode}" == open ]]; then open_editor_keyboard "${overlay_x}" "${overlay_y}"; fi
       ad wait 'id="composer-autocomplete-popover"' 10000
       local kind=commands
       if [[ "${query}" == @* ]]; then kind=files; fi
@@ -485,10 +488,10 @@ run_host_overlays() {
       echo "PASS host=${host}: ${kind} popover keyboard=${mode}"
     done
     prepare_composer "${mode}"
-    press_composer_control combined-model-selector
+    open_model_picker
     ad wait 'id="compact-provider-list"' 10000
     capture_screen "${ARTIFACTS_DIR}/${host}-model-${mode}.png"
-    ad press 'label="Close"' --settle
+    close_model_picker
     echo "PASS host=${host}: model selector keyboard=${mode}"
     prepare_composer "${mode}"
     press_composer_control message-input-attach-button
@@ -509,7 +512,7 @@ run_host_scroll() {
   prepare_composer closed
   if [[ "${host}" == new-workspace ]]; then
     ad press 'id="workspace-create-isolation-trigger"' --settle
-    ad press 'text="Local"' --settle
+    ad press 'id="workspace-create-isolation-local"' --settle
   fi
   # Submit through each real host; draft/workspace creation then mounts its chat.
   # A selectable mock model keeps this test independent of provider credentials.
@@ -518,9 +521,8 @@ run_host_scroll() {
   ad fill 'id="model-search-all-input"' 'Ten second stream'
   ad wait 'id="model-row-mock-ten-second-stream"' 10000
   ad press 'id="model-row-mock-ten-second-stream"' --settle
-  ad press 'label="Close"' --settle
-  adb shell ime set "${HELPER_IME}" >/dev/null
-  wait_for_ime false
+  close_model_picker
+  use_helper_ime
   local scroll_message
   scroll_message="$(node -e 'process.stdout.write(Array.from({length: 50}, (_, i) => `Native scroll fixture ${i}: distinct history row after submitting from a dock host.`).join("\n"))')"
   ad fill 'editable=true' "${scroll_message}"
@@ -556,15 +558,12 @@ run_host_scenario() {
   local host="$1"
   local prefix="${ARTIFACTS_DIR}/${host}"
   echo "BEGIN host=${host}"
-  adb shell ime set "${HELPER_IME}" >/dev/null
-  wait_for_ime false
+  use_helper_ime
   clear_input
   ad keyboard dismiss || true
   snapshot_json "${prefix}-empty.json"
   capture_screen "${prefix}-empty.png"
-  local x y height
-  read -r x y height < <(node "${ASSERT}" rect "${prefix}-empty.json" editable right)
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   capture_ui_xml "${prefix}-empty-open.xml"
   capture_screen "${prefix}-empty-open.png"
   node "${ASSERT}" same-input-height "${prefix}-empty.json" "${prefix}-empty-open.xml"
@@ -575,7 +574,7 @@ run_host_scenario() {
   wait_for_ime false
   capture_ui_xml "${prefix}-content-dismissed.xml"
   node "${ASSERT}" same-input-height "${prefix}-empty-open.xml" "${prefix}-content-dismissed.xml"
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   adb shell input text short
   capture_ui_xml "${prefix}-short.xml"
   adb shell input keyevent 66 66 66
@@ -584,12 +583,10 @@ run_host_scenario() {
   capture_screen "${prefix}-grown.png"
   node "${ASSERT}" xml-content-follow-growth "${prefix}-short.xml" "${prefix}-grown.xml"
 
-  adb shell ime set "${HELPER_IME}" >/dev/null
-  wait_for_ime false
-  ad fill 'editable=true' "${LONG_MESSAGE}" --settle
+  use_helper_ime
+  fill_input "${LONG_MESSAGE}"
   snapshot_json "${prefix}-long.json"
-  read -r x y height < <(node "${ASSERT}" rect "${prefix}-long.json" editable right)
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   capture_ui_xml "${prefix}-long-open.xml"
   capture_screen "${prefix}-long-open.png"
   node "${ASSERT}" xml-composer-contained "${prefix}-long-open.xml" "$(read_ime_top)" "${display_density}"
@@ -600,8 +597,7 @@ run_host_scenario() {
   capture_ui_xml "${prefix}-header-dismissed.xml"
   node "${ASSERT}" same-input-height "${prefix}-long-open.xml" "${prefix}-header-dismissed.xml"
   snapshot_json "${prefix}-header-dismissed.json"
-  read -r x y height < <(node "${ASSERT}" rect "${prefix}-header-dismissed.json" editable right)
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   adb shell input keyevent BACK
   wait_for_ime false
   capture_ui_xml "${prefix}-long-closed.xml"
@@ -611,19 +607,17 @@ run_host_scenario() {
   navigation_top="$(adb shell dumpsys window | sed -n 's/.*type=navigationBars frame=\[0,\([0-9][0-9]*\)\].*/\1/p' | head -1)"
   node "${ASSERT}" xml-composer-contained "${prefix}-long-closed.xml" "${navigation_top}" "${display_density}"
   snapshot_json "${prefix}-long-closed.json"
-  read -r x y height < <(node "${ASSERT}" rect "${prefix}-long-closed.json" editable right)
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   capture_ui_xml "${prefix}-long-reopened.xml"
   capture_screen "${prefix}-long-reopened.png"
   node "${ASSERT}" same-input-height "${prefix}-long-open.xml" "${prefix}-long-reopened.xml"
 
-  adb shell ime set "${HELPER_IME}" >/dev/null
-  wait_for_ime false
-  ad fill 'editable=true' "${BLANK_LINE_DRAFT}" --settle
-  open_editor_keyboard "${x}" "${y}"
+  use_helper_ime
+  fill_input "${BLANK_LINE_DRAFT}"
+  open_gboard
   adb shell input keyevent BACK
   wait_for_ime false
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   adb shell input keycombination 113 122
   adb shell input keyevent 20 20 20 20 20 20 20 20
   local delete_y="$(($(read_ime_top) + 507))"
@@ -636,10 +630,9 @@ run_host_scenario() {
   adb shell input keyevent BACK
   wait_for_ime false
   snapshot_json "${prefix}-cleared-closed.json"
-  read -r x y height < <(node "${ASSERT}" rect "${prefix}-cleared-closed.json" editable right)
   capture_screen "${prefix}-stall-baseline.png"
   capture_screen "${prefix}-cleared-closed.png"
-  open_editor_keyboard "${x}" "${y}"
+  open_gboard
   node "${STALL_HERMES}" "${METRO_PORT}" 3000 "${APP_ID}" &
   local stall_pid="$!"
   sleep 0.25

@@ -43,7 +43,7 @@ function fullAccessConfig(provider: RewindFlowProvider): ProviderLaunchConfig {
     case "codex":
       return {
         provider,
-        model: "gpt-5.4-mini",
+        model: "gpt-5.6-sol",
         thinkingOptionId: "low",
         modeId: "full-access",
       };

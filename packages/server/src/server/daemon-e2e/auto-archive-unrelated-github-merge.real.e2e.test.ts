@@ -177,6 +177,8 @@ githubTest(
 
     expect((await context.client.checkoutRefresh(merged.worktreePath)).success).toBe(true);
     await waitForWorkspaceToArchive(context, mergedWorkspace.workspace.id);
+    // This externally created worktree survives archive and still holds the branch.
+    run(merged.worktreePath, "git", ["checkout", "--detach"]);
 
     expect((await context.client.checkoutRefresh(unrelated.worktreePath)).success).toBe(true);
     const unrelatedStatus = await context.client.checkoutPrStatus(unrelated.worktreePath);

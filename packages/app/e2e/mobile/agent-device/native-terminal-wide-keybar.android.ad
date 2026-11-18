@@ -12,7 +12,9 @@ is visible "id=\"terminal-key-esc\""
 is visible "id=\"terminal-key-ctrl\""
 is visible "id=\"terminal-key-enter\""
 is visible "id=\"terminal-paste\""
-press "id=\"terminal-keyboard-toggle\""
+keyboard dismiss
+wait "label=\"Show keyboard\"" 10000
+press "label=\"Show keyboard\""
 type "printf '__AD_%s__\\n' NATIVE_WIDE_KEY_OK" --delay-ms 0
 press "id=\"terminal-key-enter\""
 wait "text" "__AD_NATIVE_WIDE_KEY_OK__" 10000

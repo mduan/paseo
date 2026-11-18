@@ -6,7 +6,7 @@ const featureValuesSchema = z.record(z.string(), z.union([z.boolean(), z.string(
 export interface ProviderPreferences {
   model?: string;
   mode?: string;
-  modeByHost?: Record<string, string>;
+  modeByHost?: Record<string, string | null>;
   thinkingByModel?: Record<string, string>;
   featureValues?: Record<string, unknown>;
 }
@@ -25,7 +25,7 @@ export interface FormPreferences {
 const providerPreferencesSchema: z.ZodType<ProviderPreferences> = z.strictObject({
   model: z.string().optional(),
   mode: z.string().optional(),
-  modeByHost: z.record(z.string(), z.string()).optional(),
+  modeByHost: z.record(z.string(), z.string().nullable()).optional(),
   thinkingByModel: z.record(z.string(), z.string()).optional(),
   featureValues: featureValuesSchema.optional(),
 });
@@ -120,7 +120,7 @@ export function resolveSavedModeId(
 ): string | undefined {
   const normalizedServerId = serverId?.trim();
   if (normalizedServerId && providerPrefs?.modeByHost?.[normalizedServerId] !== undefined) {
-    return providerPrefs.modeByHost[normalizedServerId];
+    return providerPrefs.modeByHost[normalizedServerId] ?? undefined;
   }
   return providerPrefs?.mode;
 }
@@ -140,17 +140,7 @@ function applyProviderPreferenceUpdates(
   }
   if (updates.mode !== undefined) {
     if (normalizedServerId) {
-      const nextModeByHost = { ...existing.modeByHost };
-      if (updates.mode === null) {
-        delete nextModeByHost[normalizedServerId];
-      } else {
-        nextModeByHost[normalizedServerId] = updates.mode;
-      }
-      if (Object.keys(nextModeByHost).length > 0) {
-        next.modeByHost = nextModeByHost;
-      } else {
-        delete next.modeByHost;
-      }
+      next.modeByHost = { ...existing.modeByHost, [normalizedServerId]: updates.mode };
     } else if (updates.mode === null) {
       delete next.mode;
     } else {

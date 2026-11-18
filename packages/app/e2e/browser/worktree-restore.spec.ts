@@ -30,6 +30,7 @@ import {
 } from "../support/helpers/new-workspace";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
+import { openChangesPanel as openWorkingDiffPanel } from "../support/helpers/workspace-tabs";
 import { createTempGitRepo } from "../support/helpers/workspace";
 import {
   waitForSidebarHydration,
@@ -535,11 +536,17 @@ async function restoreCommittedWorkspace(page: Page, route: string): Promise<voi
 }
 
 async function expectRestoredCommitDiff(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Commits/i }).click();
-  await page.getByText("Preserve restored diff", { exact: true }).click();
+  const tree = page.getByTestId("changes-tree-panel").filter({ visible: true });
+  await tree.getByTestId("changes-diff-status-trigger").click();
+  await page
+    .locator('[data-testid^="commit-range-row-"]')
+    .filter({ hasText: "Preserve restored diff" })
+    .click();
+  await page.getByTestId("commit-range-save").click();
+  await openWorkingDiffPanel(page);
   // Diff file headers have no semantic role; their accessible names identify the file and counts.
   await expect(
-    page.getByTestId("commit-diff-panel").filter({ visible: true }).getByTestId("diff-file-0"),
+    page.getByTestId("working-diff-panel").filter({ visible: true }).getByTestId("diff-file-0"),
   ).toHaveAccessibleName("restored-change.txt, +1, -0");
   await page.screenshot({ path: test.info().outputPath("restored-commit.png") });
 }

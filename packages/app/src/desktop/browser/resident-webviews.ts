@@ -60,7 +60,7 @@ function registerBrowserWhenAttached(
 ): void {
   // Reparenting a webview can replace its guest WebContents without replacing
   // this DOM element, so every attachment needs a fresh main-process registration.
-  webview.addEventListener("did-attach", () => {
+  webview.addEventListener("dom-ready", () => {
     const webContentsId = webview.getWebContentsId();
     void browser
       .registerAttachedBrowser({

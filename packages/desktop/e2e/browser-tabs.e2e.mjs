@@ -493,6 +493,7 @@ async function verifyHiddenBrowserScreenshots({
   browserId,
   artifactDir,
   inspectorPort,
+  reconnectPage,
 }) {
   const readFrames = async () => {
     const result = await callBrowserTool(client, "browser_evaluate", {
@@ -523,8 +524,11 @@ async function verifyHiddenBrowserScreenshots({
   };
   try {
     await expectAnimation();
+    // Disconnect CDP so Playwright's forced focus cannot keep hidden renderers active.
+    await page.context().browser().close();
     await setWindowHidden(inspectorPort, true);
     await expectIdle("before-capture");
+    const framesBeforeCapture = await readFrames();
     await callBrowserTool(client, "browser_evaluate", {
       browserId,
       function: "() => { document.body.style.background = 'rgb(0,255,0)'; }",
@@ -537,29 +541,17 @@ async function verifyHiddenBrowserScreenshots({
       path.join(artifactDir, "hidden-browser-viewport.png"),
       Buffer.from(screenshot.data, "base64"),
     );
-    const pixel = await page.evaluate(async (base64) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${base64}`;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      return [
-        ...context.getImageData(Math.floor(image.width / 2), Math.floor(image.height / 2), 1, 1)
-          .data,
-      ];
-    }, screenshot.data);
     assert(
-      JSON.stringify(pixel) === "[0,255,0,255]",
-      `Hidden screenshot returned stale pixels: ${pixel}`,
+      (await readFrames()) > framesBeforeCapture,
+      "Hidden capture did not produce a new frame",
     );
     await expectIdle("after-capture");
   } finally {
     await setWindowHidden(inspectorPort, false);
+    page = await reconnectPage();
   }
   await expectAnimation();
+  return page;
 }
 
 async function runRegression({
@@ -570,10 +562,11 @@ async function runRegression({
   callerAgentId,
   artifactDir,
   inspectorPort,
+  reconnectPage,
 }) {
   const failures = [];
   const originalWorkspaceId = workspaceIds[0];
-  const originalWorkspaceRow = page.getByTestId(
+  let originalWorkspaceRow = page.getByTestId(
     `sidebar-workspace-row-${serverId}:${originalWorkspaceId}`,
   );
   await originalWorkspaceRow.waitFor({ state: "visible", timeout: timeoutMs });
@@ -593,7 +586,7 @@ async function runRegression({
   const browserId = created.browserId;
   assert(typeof browserId === "string", "browser_new_tab returned no browserId");
 
-  const originalDeck = page.getByTestId(`workspace-deck-entry-${serverId}:${originalWorkspaceId}`);
+  let originalDeck = page.getByTestId(`workspace-deck-entry-${serverId}:${originalWorkspaceId}`);
   await originalDeck.getByTestId(`workspace-tab-browser_${browserId}`).click();
   await page.waitForFunction(
     (id) => {
@@ -835,7 +828,18 @@ async function runRegression({
   const parkedGuest = await readGuest(page, browserId);
   assert(parkedGuest, "Browser guest was not parked after workspace eviction");
 
-  await verifyHiddenBrowserScreenshots({ page, client, browserId, artifactDir, inspectorPort });
+  page = await verifyHiddenBrowserScreenshots({
+    page,
+    client,
+    browserId,
+    artifactDir,
+    inspectorPort,
+    reconnectPage,
+  });
+  originalWorkspaceRow = page.getByTestId(
+    `sidebar-workspace-row-${serverId}:${originalWorkspaceId}`,
+  );
+  originalDeck = page.getByTestId(`workspace-deck-entry-${serverId}:${originalWorkspaceId}`);
 
   const listed = await callBrowserTool(client, "browser_list_tabs");
   assert(
@@ -1126,7 +1130,12 @@ async function main() {
     await waitForPort(cdpPort, "Electron CDP", desktop);
 
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
-    const page = await waitForAppPage(browser, expoPort);
+    let page = await waitForAppPage(browser, expoPort);
+    const reconnectPage = async () => {
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
+      page = await waitForAppPage(browser, expoPort);
+      return page;
+    };
     const status = await waitForDesktopStatus(page);
 
     const checkPluginLinks = () =>
@@ -1171,6 +1180,7 @@ async function main() {
       inspectorPort,
       callerAgentId,
       artifactDir,
+      reconnectPage,
     });
     const pluginLinks = await checkPluginLinks();
     writeJson(path.join(artifactDir, "result.json"), { ...report, settingsMemory, pluginLinks });

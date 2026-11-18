@@ -339,4 +339,23 @@ describe("create agent preferences", () => {
       "full-access",
     );
   });
+
+  it("clears a host's mode without restoring its legacy fallback or changing other hosts", () => {
+    const updated = mergeProviderPreferences({
+      preferences: {
+        provider: "pi",
+        providerPreferences: {
+          pi: { mode: "full-access", modeByHost: { "host-c": "auto" } },
+        },
+      },
+      provider: "pi",
+      serverId: "host-a",
+      updates: { mode: null },
+    });
+
+    const stored = parseFormPreferences(updated);
+    expect(resolveSavedModeId(stored.providerPreferences?.pi, "host-a")).toBeUndefined();
+    expect(resolveSavedModeId(stored.providerPreferences?.pi, "host-b")).toBe("full-access");
+    expect(resolveSavedModeId(stored.providerPreferences?.pi, "host-c")).toBe("auto");
+  });
 });

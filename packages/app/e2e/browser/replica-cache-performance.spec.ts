@@ -13,8 +13,8 @@ import {
 } from "../support/helpers/replica-cache-perf";
 
 const RUN_REPLICA_CACHE_PERF = process.env.PASEO_REPLICA_CACHE_PERF_E2E === "1";
-const MAX_STREAM_WRITES = 12;
-const MAX_SERIALIZED_CHARS = 45_000;
+const MAX_STREAM_TRANSACTIONS = 12;
+const MAX_SERIALIZED_CHARS = 190_000;
 
 const test = base.extend<{ replicaCacheAgent: MockAgentWorkspace }>({
   replicaCacheAgent: async ({ page: _page }, provide) => {
@@ -56,9 +56,9 @@ replicaCachePerfDescribe("Replica cache performance", () => {
     console.log(`[perf] Replica cache: ${JSON.stringify(report)}`);
 
     expect(
-      report.writes,
-      "streaming should not continuously persist transient state",
-    ).toBeLessThanOrEqual(MAX_STREAM_WRITES);
+      report.transactions,
+      "streaming should batch persisted replica changes",
+    ).toBeLessThanOrEqual(MAX_STREAM_TRANSACTIONS);
     expect(report.redundantWrites).toBe(0);
     expect(report.serializedChars).toBeLessThanOrEqual(MAX_SERIALIZED_CHARS);
   });

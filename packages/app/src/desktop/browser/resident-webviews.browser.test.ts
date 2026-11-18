@@ -236,11 +236,15 @@ describe("resident browser webviews", () => {
     if (!firstWebview || !secondWebview) {
       throw new Error("Expected resident webviews");
     }
+    firstWebview.dispatchEvent(new Event("did-attach"));
+    secondWebview.dispatchEvent(new Event("did-attach"));
+    expect(attachedBrowsers).toEqual([]);
+
     Object.assign(firstWebview, { getWebContentsId: () => 101 });
     Object.assign(secondWebview, { getWebContentsId: () => 202 });
 
-    firstWebview.dispatchEvent(new Event("did-attach"));
-    secondWebview.dispatchEvent(new Event("did-attach"));
+    firstWebview.dispatchEvent(new Event("dom-ready"));
+    secondWebview.dispatchEvent(new Event("dom-ready"));
 
     expect(firstWebview.getAttribute("partition")).toBe("persist:paseo-browser");
     expect(secondWebview.getAttribute("partition")).toBe("persist:paseo-browser");

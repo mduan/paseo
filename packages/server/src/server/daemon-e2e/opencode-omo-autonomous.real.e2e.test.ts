@@ -26,6 +26,8 @@ test("OpenCode remains idle while an OMO child works and completes the autonomou
       model: runtime.model,
       modeId,
     });
+    await runtime.client.subscribeAgentTimeline(agent.id, () => {}).ready;
+    await runtime.client.observeEvents(["agent.provider_subagents.update"]).ready;
 
     await runtime.client.sendMessage(
       agent.id,

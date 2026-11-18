@@ -108,8 +108,6 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   beginFrameSubscription(onlyDirty: boolean, callback: (image: TabImage) => void): void;
   endFrameSubscription(): void;
   invalidate(): void;
-  getBackgroundThrottling(): boolean;
-  setBackgroundThrottling(allowed: boolean): void;
   sendInputEvent(event: IsolatedKeyboardInputEvent): void;
 }
 
@@ -118,6 +116,13 @@ export function adaptWebContents(contents: BrowserAutomationWebContents): TabCon
   observeConsoleMessages(contents, contentsId);
   const cdpQueue = getCdpQueue(contentsId);
   const dialogMonitor = getDialogMonitor(contents, contentsId, cdpQueue);
+  const sendDebugCommand = (command: string, params?: Record<string, unknown>) =>
+    cdpQueue.run(async () => {
+      if (!contents.debugger.isAttached()) {
+        contents.debugger.attach("1.3");
+      }
+      return contents.debugger.sendCommand(command, params ?? {});
+    });
   return {
     id: contentsId,
     getURL: () => contents.getURL(),
@@ -134,24 +139,20 @@ export function adaptWebContents(contents: BrowserAutomationWebContents): TabCon
     captureFrame: (signal) => captureViewportFrame(contents, signal),
     invalidate: () => contents.invalidate(),
     withFrameProduction: async (capture) => {
-      const previous = contents.getBackgroundThrottling();
-      contents.setBackgroundThrottling(false);
+      // Toggling background throttling can leave hidden guests animating after capture.
+      await sendDebugCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
       try {
         return await capture();
       } finally {
-        if (!contents.isDestroyed()) contents.setBackgroundThrottling(previous);
+        if (!contents.isDestroyed()) {
+          await sendDebugCommand("Emulation.setFocusEmulationEnabled", { enabled: false });
+        }
       }
     },
     sendInputEvent: (event) => contents.sendInputEvent(event),
     getConsoleMessages: () => consoleMessagesByContentsId.get(contentsId) ?? [],
     captureDialogs: (task) => dialogMonitor.capture(task),
-    sendDebugCommand: (command: string, params?: Record<string, unknown>) =>
-      cdpQueue.run(async () => {
-        if (!contents.debugger.isAttached()) {
-          contents.debugger.attach("1.3");
-        }
-        return contents.debugger.sendCommand(command, params ?? {});
-      }),
+    sendDebugCommand,
   };
 }
 

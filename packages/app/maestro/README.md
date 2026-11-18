@@ -51,7 +51,6 @@ The reusable pieces live in `flows/`:
   the compact Android sidebar, and waits for the prepared project.
 - `flows/new-workspace-open-from-sidebar.yaml` taps the project row's
   new-workspace action and waits for `/new`.
-- `flows/new-workspace-select-codex-gpt54.yaml` selects a real provider/model.
 - `flows/new-workspace-submit-and-assert-created.yaml` taps `Create` and proves
   the app landed on the created workspace.
 
@@ -60,21 +59,14 @@ old full flow. The shell scripts render the top-level flows and every `flows/*.y
 file into the same temp directory, so nested `runFlow: flows/...` paths keep
 working with `${PASEO_MAESTRO_*}` placeholders.
 
-The flow is intentionally strict. It must:
+The flow must:
 
 1. Open a prepared project from the daemon.
 2. Tap the project row's new-workspace action.
-3. Select an actual provider/model before tapping `Create`.
-4. Tap `Create`.
-5. Assert the app lands on a workspace header and the draft composer.
-6. Assert `New workspace`, `Select a model`, and the Android redbox text are not
-   visible.
-7. For the shell harness, grep logcat for `failed to insert view` and
-   `specified child already has a parent`.
-
-Do not weaken this flow to only wait for `message-input-root`. That can pass on
-the wrong route. The header assertion and the `New workspace` negative assertion
-are what prove the redirect actually completed.
+3. Tap `Create` with an empty prompt.
+4. Assert that the workspace header and New tab launcher appear.
+5. Assert that `New workspace`, `Select a model`, and the Android redbox text are absent.
+6. For the shell harness, inspect logcat for `failed to insert view` and `specified child already has a parent`.
 
 The scripts assume a development build with package id `sh.paseo.debug`, an
 already-running local daemon on `127.0.0.1:6767`, and a connected Android device

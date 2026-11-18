@@ -2,9 +2,6 @@
 # using ${PASEO_MAESTRO_APP_ID}. Maestro does not substitute environment vars.
 appId: ${PASEO_MAESTRO_APP_ID}
 ---
-# Start on the New Workspace screen after model selection. Taps Create and
-# proves the redirect completed into a workspace draft-agent tab.
-
 - tapOn: "Create"
 
 - extendedWaitUntil:
@@ -14,7 +11,7 @@ appId: ${PASEO_MAESTRO_APP_ID}
 
 - extendedWaitUntil:
     visible:
-      id: "message-input-root"
+      id: "workspace-new-tab-panel"
     timeout: 30000
 
 - assertNotVisible: "New workspace"

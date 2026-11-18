@@ -1859,6 +1859,14 @@ function WorkspaceScreenContent({
   const hasHydratedAgents = useSessionStore(
     (state) => state.sessions[normalizedServerId]?.hasHydratedAgents ?? false,
   );
+  const hasHydratedDirectory = useSessionStore((state) => {
+    const session = state.sessions[normalizedServerId];
+    return session?.hasHydratedWorkspaces && session.hasHydratedAgents;
+  });
+  useEffect(() => {
+    if (!isRouteFocused || hasHydratedDirectory) return;
+    return getHostRuntimeStore().acquireDirectoryDemand(normalizedServerId);
+  }, [hasHydratedDirectory, isRouteFocused, normalizedServerId]);
   const workspaceRouteState = useResolvedWorkspaceRouteState({
     serverId: normalizedServerId,
     workspace: workspaceDescriptor,

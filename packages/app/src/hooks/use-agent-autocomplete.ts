@@ -597,7 +597,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   });
   const errorMessage = resolveAutocompleteErrorMessage({
     mode,
-    isCommandError: isError,
+    isCommandError: isError && options.length === 0,
     commandError: error,
     fileSuggestionsError: fileSuggestionsQuery.error,
     t,

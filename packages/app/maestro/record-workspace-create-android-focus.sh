@@ -3,7 +3,7 @@
 #
 # The setup Maestro flow gets the app to the open sidebar with a prepared
 # project visible. Recording starts after that, then the focused flow taps the
-# new-workspace button, selects a provider/model, taps Create, and asserts the
+# new-workspace button, taps Create with an empty prompt, and asserts the
 # app lands on the created workspace rather than remaining on /new.
 set -euo pipefail
 

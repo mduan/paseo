@@ -43,6 +43,7 @@ describe("OpenCode reasoning events (e2e)", () => {
       model: "opencode/gpt-5-nano",
       title: "reasoning-test",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     expect(agent.id).toBeTruthy();
 

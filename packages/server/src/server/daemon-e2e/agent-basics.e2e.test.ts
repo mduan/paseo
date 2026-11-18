@@ -29,6 +29,7 @@ describe("daemon E2E", () => {
       cwd: "/tmp",
       title: "Test Agent",
     });
+    await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
     expect(agent.id).toBeTruthy();
     expect(agent.provider).toBe("codex");

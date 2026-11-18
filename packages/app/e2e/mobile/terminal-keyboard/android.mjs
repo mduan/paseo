@@ -58,8 +58,11 @@ function imeEvents() {
     .filter((line) => line.includes(`${appId}:`));
 }
 function tap(rect, shift) {
-  ad(
-    "press",
+  // The automation driver's press restores the IME and contaminates this measurement.
+  adb(
+    "shell",
+    "input",
+    "tap",
     String(Math.round(rect.x + rect.width / 2)),
     String(Math.round(rect.y + rect.height / 2 - shift)),
   );

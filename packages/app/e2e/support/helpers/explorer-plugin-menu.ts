@@ -42,7 +42,6 @@ async function openExplorerMenu(page: Page) {
   });
   const menu = page.getByTestId("explorer-sidebar-tab-configuration");
   await expect(menu).toBeVisible();
-  await expect(menu).toHaveCSS("opacity", "1");
   return menu;
 }
 

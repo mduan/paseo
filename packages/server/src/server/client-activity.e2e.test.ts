@@ -57,6 +57,7 @@ describe("client activity tracking", () => {
       messageQueueLimit: null,
     });
     await client.connect();
+    await client.observeEvents(["agent_attention_required"], { notifications: true }).ready;
     return client;
   }
 

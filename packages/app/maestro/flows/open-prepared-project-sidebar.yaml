@@ -6,7 +6,8 @@ appId: ${PASEO_MAESTRO_APP_ID}
 # the prepared project visible.
 
 - extendedWaitUntil:
-    visible: "What shall we build today?"
+    visible:
+      id: "menu-button"
     timeout: 60000
 
 - tapOn:

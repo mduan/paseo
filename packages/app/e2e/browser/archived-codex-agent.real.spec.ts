@@ -34,7 +34,7 @@ async function historyContainsAgent(client: SeedDaemonClient, agentId: string): 
 test.describe("archived Codex agent recovery", () => {
   test.setTimeout(600_000);
 
-  test("cold-opens without provider history, then unarchives and restores the conversation", async ({
+  test("cold-opens retained history, then unarchives and continues the conversation", async ({
     page,
   }) => {
     const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-archived-codex-")));
@@ -70,7 +70,12 @@ test.describe("archived Codex agent recovery", () => {
           projection: "projected",
           limit: 100,
         }),
-      ).rejects.toThrow(/archiv/i);
+      ).resolves.toMatchObject({
+        agent: { archivedAt: expect.any(String) },
+        entries: expect.arrayContaining([
+          expect.objectContaining({ item: expect.objectContaining({ text: INITIAL_REPLY }) }),
+        ]),
+      });
       await expect
         .poll(async () => (handle ? historyContainsAgent(handle.client, handle.agentId) : false), {
           timeout: 30_000,
@@ -90,7 +95,10 @@ test.describe("archived Codex agent recovery", () => {
       });
       await expect(page.getByTestId("agent-load-error")).toHaveCount(0);
       await expect(page.getByTestId("agent-timeline-sync-error")).toHaveCount(0);
-      await expect(page.getByTestId("user-message")).toHaveCount(0);
+      await assertChatTranscript(handle, [
+        { role: "user", text: INITIAL_PROMPT },
+        { role: "assistant", text: INITIAL_REPLY },
+      ]);
 
       await page.getByRole("button", { name: "Unarchive" }).click();
       await expect(page.getByRole("button", { name: "Unarchive" })).toHaveCount(0, {

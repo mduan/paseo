@@ -38,6 +38,7 @@ test("waitForFinish immediately after sendMessage", async () => {
     title: "Immediate Wait Test",
     modeId: "bypassPermissions",
   });
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
   // This was the original bug: waitForFinish returned old idle states
   collector.clear();
@@ -60,6 +61,7 @@ test("rapid fire messages then single wait", async () => {
     title: "Rapid Fire Test",
     modeId: "bypassPermissions",
   });
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
   // Send 3 messages without waiting - tests that waitForFinish
   // finds the idle AFTER the last running state
@@ -96,6 +98,7 @@ test("two agents: waitForFinish filters by agent", async () => {
     title: "Agent 1",
     modeId: "bypassPermissions",
   });
+  await ctx.client.subscribeAgentTimeline(agent1.id, () => {}).ready;
 
   const agent2 = await ctx.client.createAgent({
     provider: "claude",
@@ -104,6 +107,7 @@ test("two agents: waitForFinish filters by agent", async () => {
     title: "Agent 2",
     modeId: "bypassPermissions",
   });
+  await ctx.client.subscribeAgentTimeline(agent2.id, () => {}).ready;
 
   // Start both agents
   collector.clear();
@@ -138,6 +142,7 @@ test("waitForFinish resolves first idle edge even if a new run starts immediatel
     title: "Idle Edge Coherence",
     modeId: "bypassPermissions",
   });
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
   let sawRunning = false;
   let spawnedSecondRun = false;
@@ -190,6 +195,7 @@ test("waitForFinish stays blocked when sendMessage transactionally replaces a ru
     cwd,
     title: "Transactional Replacement Wait",
   });
+  await ctx.client.subscribeAgentTimeline(agent.id, () => {}).ready;
 
   try {
     await secondary.connect();

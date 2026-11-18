@@ -6,6 +6,7 @@ import {
 } from "./replica-cache-storage";
 
 export interface ReplicaCachePerfReport {
+  transactions: number;
   elapsedMs: number;
   redundantWrites: number;
   serializedChars: number;

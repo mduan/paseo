@@ -36,6 +36,8 @@ wait "id=\"direct-password-input\"" 20000
 screenshot "${OUT}/15-add-host-password.png"
 fill "id=\"direct-password-input\"" "${PASSWORD}"
 wait stable
+keyboard dismiss
+scroll down --until "id=\"direct-host-submit\""
 press "id=\"direct-host-submit\""
 wait stable
 open "${APP_ID}" "paseo://settings"

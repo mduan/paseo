@@ -347,7 +347,9 @@ test.skipIf(process.platform === "win32")(
         retryError: null,
       });
       expect((await activeWorkspaceIds()).has(workspace.id)).toBe(false);
-      expect(existsSync(workspace.workspaceDirectory)).toBe(false);
+      await expect
+        .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 10000 })
+        .toBe(false);
     } finally {
       writeFileSync(stopSetupPath, "stop\n");
     }
@@ -403,7 +405,9 @@ test.skipIf(process.platform === "win32")(
       const retry = await ctx.client.archiveWorkspace(workspace.id);
 
       expect(retry.error).toBeNull();
-      expect(existsSync(workspace.workspaceDirectory)).toBe(false);
+      await expect
+        .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 10000 })
+        .toBe(false);
     } finally {
       writeFileSync(stopWriterPath, "stop\n");
       await writerExit;
